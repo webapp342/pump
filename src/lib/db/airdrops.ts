@@ -88,7 +88,7 @@ export type AirdropProgress = {
   onchainQualified: boolean;
 };
 
-export async function listAirdrops(limit = 50): Promise<AirdropListItem[]> {
+export async function listAirdrops(): Promise<AirdropListItem[]> {
   const pool = getLaunchpadPool();
   const result = await pool.query<{
     id: string;
@@ -121,11 +121,11 @@ export async function listAirdrops(limit = 50): Promise<AirdropListItem[]> {
       LEFT JOIN tokens rt ON rt.address = a.reward_token
       LEFT JOIN bonding_states lb ON lb.token_address = a.linked_token
       LEFT JOIN bonding_states rb ON rb.token_address = a.reward_token
-      WHERE a.status IN ('ACTIVE', 'FINALIZED')
-      ORDER BY a.qualify_end DESC
-      LIMIT $1
+      ORDER BY
+        CASE a.status WHEN 'CLOSED' THEN 1 ELSE 0 END,
+        a.qualify_end DESC
     `,
-    [limit]
+    []
   );
 
   return result.rows.map((row) => ({

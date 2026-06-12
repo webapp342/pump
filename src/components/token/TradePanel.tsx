@@ -7,6 +7,7 @@ import { useConnectModal } from "@rainbow-me/rainbowkit";
 import {
   useAccount,
   useBalance,
+  usePublicClient,
   useReadContract,
   useWaitForTransactionReceipt,
   useWriteContract,
@@ -17,13 +18,14 @@ import {
   bondingCurveManagerAbi,
   bondingCurveStateFromTuple,
   minOutWithSlippage,
+  quoteBuyFromCurveState,
   resolveBnbInForTokenOut,
   SLIPPAGE_BPS,
 } from "@/lib/bonding-curve";
 import { formatTradeError } from "@/lib/trade-errors";
 import { bnbToUsd, formatUsdReadable } from "@/lib/format-usd";
 import { useBnbUsdPrice } from "@/hooks/useBnbUsdPrice";
-import { useTradeGasEstimate } from "@/hooks/useTradeGasEstimate";
+import { BUY_GAS_FALLBACK, useTradeGasEstimate } from "@/hooks/useTradeGasEstimate";
 import type { TradePrefillConfig } from "@/lib/token-trade-prefill";
 
 type Side = "buy" | "sell";
@@ -83,6 +85,20 @@ function formatGasCostLabel(gasCostWei: bigint, bnbUsd: number | null): string {
   return usdLabel ? `≈ ${bnbStr} BNB (${usdLabel})` : `≈ ${bnbStr} BNB`;
 }
 
+const GAS_RESERVE_BUFFER_BPS = 12_000n;
+const TOKEN_MAX_SAFETY_BPS = 9_995n;
+const FALLBACK_GAS_RESERVE_WEI = parseEther("0.0005");
+
+function formatAmountFromWei(wei: bigint): string {
+  const raw = formatEther(wei);
+  if (!raw.includes(".")) return raw;
+  return raw.replace(/0+$/, "").replace(/\.$/, "");
+}
+
+function formatTokenInputAmount(wei: bigint): string {
+  return formatAmountFromWei(wei);
+}
+
 function formatBnbReadable(bnb: number): string {
   if (!Number.isFinite(bnb) || bnb <= 0) return "0";
   if (bnb >= 1) return bnb.toFixed(4);
@@ -129,6 +145,7 @@ export function TradePanel({
   onTradeConfirmed,
 }: TradePanelProps) {
   const { address, isConnected, chain } = useAccount();
+  const publicClient = usePublicClient({ chainId: pumpChain.id });
   const { openConnectModal } = useConnectModal();
   const { bnbUsd } = useBnbUsdPrice();
   const [side, setSide] = useState<Side>("buy");
@@ -502,6 +519,63 @@ export function TradePanel({
     setError(null);
   }
 
+  async function resolveBuyGasReserveWei(): Promise<bigint> {
+    if (gasCostWei != null && gasCostWei > 0n) {
+      return (gasCostWei * GAS_RESERVE_BUFFER_BPS) / 10_000n;
+    }
+    if (!publicClient) return FALLBACK_GAS_RESERVE_WEI;
+    try {
+      const gasPrice = await publicClient.getGasPrice();
+      return (BUY_GAS_FALLBACK * gasPrice * GAS_RESERVE_BUFFER_BPS) / 10_000n;
+    } catch {
+      return FALLBACK_GAS_RESERVE_WEI;
+    }
+  }
+
+  async function onUseMaxBuy() {
+    if (!isConnected) {
+      openConnectModal?.();
+      return;
+    }
+    if (wrongChain || paused || bnbBalance === undefined || bnbBalance.value === 0n) return;
+
+    const gasReserve = await resolveBuyGasReserveWei();
+    const maxSpend =
+      bnbBalance.value > gasReserve ? bnbBalance.value - gasReserve : 0n;
+    if (maxSpend === 0n) {
+      setError("Not enough BNB left after gas.");
+      return;
+    }
+
+    if (buyInputMode === "token") {
+      if (!curveState || protocolFeeBps === undefined) {
+        setError("Curve quote unavailable — try again.");
+        return;
+      }
+      const curve = bondingCurveStateFromTuple(curveState);
+      const { tokenOut } = quoteBuyFromCurveState(curve, protocolFeeBps, maxSpend);
+      if (tokenOut === 0n) {
+        setError("Could not quote max buy for this token.");
+        return;
+      }
+      let safeTokens = (tokenOut * TOKEN_MAX_SAFETY_BPS) / 10_000n;
+      const required = resolveBnbInForTokenOut(curve, protocolFeeBps, safeTokens);
+      if (required != null && required > maxSpend && safeTokens > 0n) {
+        safeTokens = (safeTokens * TOKEN_MAX_SAFETY_BPS) / 10_000n;
+      }
+      if (safeTokens === 0n) {
+        setError("Amount too small after gas reserve.");
+        return;
+      }
+      setAmount(formatTokenInputAmount(safeTokens));
+      setError(null);
+      return;
+    }
+
+    setAmount(formatAmountFromWei(maxSpend));
+    setError(null);
+  }
+
   function toggleBuyInputMode() {
     if (side !== "buy") return;
     setBuyInputMode((mode) => {
@@ -652,7 +726,17 @@ export function TradePanel({
       ? "bg-pump-danger text-white"
       : "bg-pump-accent text-pump-accent-foreground";
 
-  const isBuyTokenMode = side === "buy" && buyInputMode === "token";
+  const canUseMaxBuy =
+    side === "buy" &&
+    !paused &&
+    (!isConnected || (!wrongChain && bnbBalance !== undefined && bnbBalance.value > 0n));
+
+  const maxRevealClass =
+    "overflow-hidden whitespace-nowrap transition-[opacity,transform,max-width,padding,margin] duration-200 ease-out " +
+    "max-w-0 scale-95 px-0 opacity-0 ml-0 pointer-events-none " +
+    "max-md:group-focus-within/trade:max-w-[3.75rem] max-md:group-focus-within/trade:scale-100 max-md:group-focus-within/trade:px-2.5 max-md:group-focus-within/trade:opacity-100 max-md:group-focus-within/trade:ml-1.5 max-md:group-focus-within/trade:pointer-events-auto " +
+    "md:group-focus-within/trade:max-w-[3.75rem] md:group-focus-within/trade:scale-100 md:group-focus-within/trade:px-2.5 md:group-focus-within/trade:opacity-100 md:group-focus-within/trade:ml-1.5 md:group-focus-within/trade:pointer-events-auto " +
+    "md:group-hover/trade:max-w-[3.75rem] md:group-hover/trade:scale-100 md:group-hover/trade:px-2.5 md:group-hover/trade:opacity-100 md:group-hover/trade:ml-1.5 md:group-hover/trade:pointer-events-auto";
 
   return (
     <section
@@ -695,12 +779,12 @@ export function TradePanel({
         {paused ? (
           <p className="notice-warning mx-4 mt-2 text-caption">Trading is paused on this curve.</p>
         ) : null}
-        <div className="px-4 pt-4 pb-0">
+        <div className="group/trade px-4 pt-4 pb-0">
           <div className="flex justify-center">
-            <div className="inline-flex items-center">
+            <div className="inline-flex max-w-full items-baseline flex-nowrap gap-2">
               <div
                 className={
-                  side === "buy" && buyInputMode === "usd" ? "relative pl-3.5 md:pl-4" : ""
+                  side === "buy" && buyInputMode === "usd" ? "relative shrink-0 pl-3.5 md:pl-4" : "shrink-0"
                 }
               >
                 {side === "buy" && buyInputMode === "usd" ? (
@@ -733,7 +817,7 @@ export function TradePanel({
                 type="button"
                 onClick={toggleBuyInputMode}
                 disabled={side === "sell"}
-                className="ml-2 flex shrink-0 items-center gap-0.5 text-caption leading-none text-pump-muted transition hover:text-pump-text disabled:opacity-40"
+                className="inline-flex shrink-0 items-center gap-0.5 whitespace-nowrap text-caption leading-none text-pump-muted transition hover:text-pump-text disabled:opacity-40"
                 aria-label="Toggle input currency"
               >
                 {currencyLabel}
@@ -747,37 +831,52 @@ export function TradePanel({
               {conversionParts.join(" · ")}
             </p>
           ) : null}
+
+          {side === "buy" ? (
+            <div className="mt-3 flex justify-center pb-3">
+              <div className="inline-flex max-w-full items-center justify-center">
+                {buyInputMode !== "token" ? (
+                  <div className="inline-flex items-center gap-2 md:gap-3">
+                    {buyInputMode === "usd"
+                      ? QUICK_USD_AMOUNTS.map((usd) => (
+                          <button
+                            key={usd}
+                            type="button"
+                            onClick={() => setQuickUsd(usd)}
+                            disabled={!bnbUsd}
+                            className="chip-button-quick shrink-0 disabled:opacity-40"
+                          >
+                            ${usd}
+                          </button>
+                        ))
+                      : QUICK_BNB_AMOUNTS.map((bnb) => (
+                          <button
+                            key={bnb}
+                            type="button"
+                            onClick={() => setQuickBnb(bnb)}
+                            className="chip-button-quick shrink-0 whitespace-nowrap"
+                          >
+                            {bnb}&nbsp;BNB
+                          </button>
+                        ))}
+                  </div>
+                ) : null}
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => void onUseMaxBuy()}
+                  disabled={!canUseMaxBuy}
+                  className={`chip-button-quick shrink-0 text-caption disabled:opacity-40 ${maxRevealClass}`}
+                >
+                  Max
+                </button>
+              </div>
+            </div>
+          ) : null}
         </div>
 
-        {side === "buy" && buyInputMode !== "token" ? (
-          <div className="mt-5 flex items-center justify-center gap-10 px-4 pb-3">
-            {buyInputMode === "usd"
-              ? QUICK_USD_AMOUNTS.map((usd) => (
-                  <button
-                    key={usd}
-                    type="button"
-                    onClick={() => setQuickUsd(usd)}
-                    disabled={!bnbUsd}
-                    className="chip-button-quick disabled:opacity-40"
-                  >
-                    ${usd}
-                  </button>
-                ))
-              : QUICK_BNB_AMOUNTS.map((bnb) => (
-                  <button
-                    key={bnb}
-                    type="button"
-                    onClick={() => setQuickBnb(bnb)}
-                    className="chip-button-quick"
-                  >
-                    {bnb} BNB
-                  </button>
-                ))}
-          </div>
-        ) : null}
-
         {side === "sell" ? (
-          <div className="mt-5 flex items-center justify-center gap-10 px-4 pb-3">
+          <div className="mt-3 flex items-center justify-center gap-10 px-4 pb-3">
             {QUICK_SELL_PERCENTAGES.map((pct) => (
               <button
                 key={pct}
@@ -792,12 +891,8 @@ export function TradePanel({
           </div>
         ) : null}
 
-        {isBuyTokenMode && !hasTradeAmount ? (
-          <div className="mt-8 pb-4" aria-hidden />
-        ) : null}
-
         {hasTradeAmount ? (
-          <div className={`px-4 pb-4 ${isBuyTokenMode ? "mt-6" : ""}`}>
+          <div className="px-4 pb-4 pt-1">
             <button
               type="button"
               onClick={() => setReceiveExpanded((v) => !v)}

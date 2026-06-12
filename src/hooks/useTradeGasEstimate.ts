@@ -5,7 +5,7 @@ import { erc20Abi, maxUint256 } from "@/lib/abis/erc20";
 import { bondingCurveManagerAbi, minOutWithSlippage } from "@/lib/bonding-curve";
 
 const ESTIMATE_DEBOUNCE_MS = 120;
-const BUY_GAS_FALLBACK = 130_000n;
+export const BUY_GAS_FALLBACK = 130_000n;
 const SELL_GAS_FALLBACK = 150_000n;
 const APPROVE_GAS_FALLBACK = 55_000n;
 
