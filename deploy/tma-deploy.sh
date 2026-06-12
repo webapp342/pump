@@ -11,14 +11,10 @@ log() {
 
 cd "$APP_DIR"
 
-log "Resetting generated files before pull"
-git checkout -- next-env.d.ts 2>/dev/null || true
-
-log "Pulling latest main"
-git pull --ff-only origin main
-
-log "Removing stale nested copy if present"
-rm -rf tma
+log "Syncing repo to origin/main (discards local changes to tracked files)"
+git fetch origin main
+git reset --hard origin/main
+git clean -fd
 
 log "Installing dependencies"
 npm ci
