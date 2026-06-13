@@ -90,19 +90,18 @@ type VerifiedPositionView = {
 function buildVerifiedPositionView(
   position: PortfolioPosition,
   lot: DerivedLot | undefined,
-  onChainBalances: Record<string, string>,
-  onChainVerified: boolean
+  onChainBalances: Record<string, string>
 ): VerifiedPositionView | null {
   const totalBought = Number(position.totalBoughtBnb);
   const totalSold = Number(position.totalSoldBnb);
   const indexedBalance = lot?.netTokens ?? Number(position.tokenBalance);
   const fullCostBasis = lot?.remainingCostBnb ?? Math.max(0, totalBought - totalSold);
   const onChainStr = onChainBalances[position.tokenAddress.toLowerCase()];
-  const onChainBalance =
-    onChainStr != null && onChainVerified ? Number(onChainStr) : undefined;
+  if (onChainStr == null) return null;
+
   const { displayBalance, hidden } = resolveVerifiedTokenBalance(
     indexedBalance,
-    onChainBalance
+    Number(onChainStr)
   );
 
   if (hidden) return null;
@@ -312,6 +311,96 @@ function computeOpenLotForAddress(trades: TradeRow[], walletAddress: string): De
   return { netTokens, remainingCostBnb };
 }
 
+async function fetchPortfolioData(walletAddress: string): Promise<PortfolioData | null> {
+  const response = await fetch(`/api/portfolio?address=${walletAddress}`, { cache: "no-store" });
+  const body = (await response.json()) as { data?: PortfolioData; error?: string };
+  if (!response.ok) throw new Error(body.error ?? "Failed to load portfolio");
+  return body.data ?? null;
+}
+
+async function fetchOnChainBalancesForTokens(
+  walletAddress: string,
+  tokenAddresses: string[]
+): Promise<Record<string, string> | null> {
+  if (tokenAddresses.length === 0) return {};
+
+  const response = await fetch(
+    `/api/portfolio/onchain-balances?address=${walletAddress}&tokens=${tokenAddresses.join(",")}`,
+    { cache: "no-store" }
+  );
+  if (!response.ok) return null;
+
+  const body = (await response.json()) as { data?: Record<string, string> };
+  return body.data ?? {};
+}
+
+async function fetchExtraWalletHoldings(
+  walletAddress: string,
+  excludeTokenAddresses: string[]
+): Promise<WalletLaunchpadHolding[]> {
+  const excludeQuery =
+    excludeTokenAddresses.length > 0 ? `&exclude=${excludeTokenAddresses.join(",")}` : "";
+  const response = await fetch(
+    `/api/portfolio/wallet-holdings?address=${walletAddress}${excludeQuery}`,
+    { cache: "no-store" }
+  );
+  if (!response.ok) return [];
+
+  const body = (await response.json()) as { data?: WalletLaunchpadHolding[] };
+  return body.data ?? [];
+}
+
+async function fetchDerivedLotsForWallet(
+  walletAddress: string,
+  positions: PortfolioPosition[]
+): Promise<Record<string, DerivedLot>> {
+  const entries = await Promise.all(
+    positions.map(async (position) => {
+      try {
+        const response = await fetch(`/api/tokens/${position.tokenAddress}/chart-trades`, {
+          cache: "no-store",
+        });
+        const body = (await response.json()) as { data?: TradeRow[] };
+        if (!response.ok) return [position.tokenAddress, null] as const;
+        const lot = computeOpenLotForAddress(body.data ?? [], walletAddress);
+        return [position.tokenAddress, lot] as const;
+      } catch {
+        return [position.tokenAddress, null] as const;
+      }
+    })
+  );
+
+  const next: Record<string, DerivedLot> = {};
+  for (const [tokenAddress, lot] of entries) {
+    if (lot && lot.netTokens > 0) next[tokenAddress] = lot;
+  }
+  return next;
+}
+
+type VerifiedHoldingsSnapshot = {
+  onChainBalances: Record<string, string>;
+  walletHoldings: WalletLaunchpadHolding[];
+  derivedLots: Record<string, DerivedLot>;
+};
+
+async function fetchVerifiedHoldingsSnapshot(
+  walletAddress: string,
+  portfolio: PortfolioData
+): Promise<VerifiedHoldingsSnapshot | null> {
+  const tokenAddresses = portfolio.positions.map((position) => position.tokenAddress);
+
+  const [onChainBalances, walletHoldings] = await Promise.all([
+    fetchOnChainBalancesForTokens(walletAddress, tokenAddresses),
+    fetchExtraWalletHoldings(walletAddress, tokenAddresses),
+  ]);
+
+  if (onChainBalances === null) return null;
+
+  const derivedLots = await fetchDerivedLotsForWallet(walletAddress, portfolio.positions);
+
+  return { onChainBalances, walletHoldings, derivedLots };
+}
+
 export function PortfolioPanel() {
   const { address, isConnected } = useAccount();
   const { openConnectModal } = useConnectModal();
@@ -327,9 +416,11 @@ export function PortfolioPanel() {
   const [derivedLots, setDerivedLots] = useState<Record<string, DerivedLot>>({});
   const [walletHoldings, setWalletHoldings] = useState<WalletLaunchpadHolding[]>([]);
   const [onChainBalances, setOnChainBalances] = useState<Record<string, string>>({});
-  const [onChainVerified, setOnChainVerified] = useState(false);
+  const [holdingsReady, setHoldingsReady] = useState(false);
   const burstUntilRef = useRef(0);
   const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const loadGenerationRef = useRef(0);
+  const holdingsReadyRef = useRef(false);
 
   const { data: pendingWei, refetch: refetchPending } = useReadContract({
     address: contracts.bondingCurveManager,
@@ -340,159 +431,93 @@ export function PortfolioPanel() {
     query: { enabled: Boolean(address && isConnected) },
   });
 
-  const loadOnChainBalances = useCallback(
-    async (walletAddress: string, tokenAddresses: string[]) => {
-      if (tokenAddresses.length === 0) {
-        setOnChainBalances({});
-        setOnChainVerified(true);
-        return;
-      }
-
-      setOnChainVerified(false);
-      try {
-        const response = await fetch(
-          `/api/portfolio/onchain-balances?address=${walletAddress}&tokens=${tokenAddresses.join(",")}`,
-          { cache: "no-store" }
-        );
-        const body = (await response.json()) as { data?: Record<string, string> };
-        if (!response.ok) {
-          setOnChainBalances({});
-          return;
-        }
-        setOnChainBalances(body.data ?? {});
-        setOnChainVerified(true);
-      } catch {
-        setOnChainBalances({});
-      }
-    },
-    []
-  );
-
-  const loadWalletHoldings = useCallback(
-    async (walletAddress: string, excludeTokenAddresses: string[]) => {
-      try {
-        const excludeQuery =
-          excludeTokenAddresses.length > 0
-            ? `&exclude=${excludeTokenAddresses.join(",")}`
-            : "";
-        const response = await fetch(
-          `/api/portfolio/wallet-holdings?address=${walletAddress}${excludeQuery}`,
-          { cache: "no-store" }
-        );
-        const body = (await response.json()) as {
-          data?: WalletLaunchpadHolding[];
-        };
-
-        if (!response.ok) {
-          setWalletHoldings([]);
-          return;
-        }
-
-        setWalletHoldings(body.data ?? []);
-      } catch {
-        setWalletHoldings([]);
-      }
-    },
-    []
-  );
-
   const loadPortfolio = useCallback(async (walletAddress: string) => {
+    const generation = ++loadGenerationRef.current;
+    const isInitial = !holdingsReadyRef.current;
+
+    if (isInitial) {
+      setLoading(true);
+    }
     setError(null);
 
     try {
-      const response = await fetch(`/api/portfolio?address=${walletAddress}`);
-      const body = (await response.json()) as { data?: PortfolioData; error?: string };
+      const portfolio = await fetchPortfolioData(walletAddress);
+      if (generation !== loadGenerationRef.current) return;
 
-      if (!response.ok) {
-        throw new Error(body.error ?? "Failed to load portfolio");
+      if (!portfolio) {
+        setData(null);
+        setOnChainBalances({});
+        setWalletHoldings([]);
+        setDerivedLots({});
+        holdingsReadyRef.current = true;
+        setHoldingsReady(true);
+        return;
       }
 
-      const portfolio = body.data ?? null;
+      const snapshot = await fetchVerifiedHoldingsSnapshot(walletAddress, portfolio);
+      if (generation !== loadGenerationRef.current) return;
+
+      if (snapshot === null) {
+        if (isInitial) {
+          setData(portfolio);
+          setOnChainBalances({});
+          setWalletHoldings([]);
+          setDerivedLots({});
+          holdingsReadyRef.current = true;
+          setHoldingsReady(true);
+        }
+        return;
+      }
+
       setData(portfolio);
-      if (portfolio) {
-        void loadOnChainBalances(
-          walletAddress,
-          portfolio.positions.map((position) => position.tokenAddress)
-        );
-        void loadWalletHoldings(
-          walletAddress,
-          portfolio.positions.map((position) => position.tokenAddress)
-        );
-      } else {
+      setOnChainBalances(snapshot.onChainBalances);
+      setWalletHoldings(snapshot.walletHoldings);
+      setDerivedLots(snapshot.derivedLots);
+      holdingsReadyRef.current = true;
+      setHoldingsReady(true);
+    } catch (err) {
+      if (generation !== loadGenerationRef.current) return;
+
+      if (isInitial) {
+        setData(null);
         setWalletHoldings([]);
         setOnChainBalances({});
-        setOnChainVerified(true);
+        setDerivedLots({});
+        holdingsReadyRef.current = false;
+        setHoldingsReady(false);
+        setError(err instanceof Error ? err.message : "Failed to load portfolio");
       }
-    } catch (err) {
-      setData(null);
-      setWalletHoldings([]);
-      setError(err instanceof Error ? err.message : "Failed to load portfolio");
     } finally {
-      setLoading(false);
+      if (generation === loadGenerationRef.current) {
+        setLoading(false);
+      }
     }
-  }, [loadOnChainBalances, loadWalletHoldings]);
+  }, []);
 
   useEffect(() => {
     if (!isConnected || !address) {
+      loadGenerationRef.current += 1;
+      holdingsReadyRef.current = false;
       setData(null);
       setWalletHoldings([]);
       setOnChainBalances({});
-      setOnChainVerified(false);
+      setDerivedLots({});
+      setHoldingsReady(false);
       setError(null);
       setLoading(false);
       return;
     }
 
+    loadGenerationRef.current += 1;
+    holdingsReadyRef.current = false;
     setData(null);
     setWalletHoldings([]);
     setOnChainBalances({});
-    setOnChainVerified(false);
+    setDerivedLots({});
+    setHoldingsReady(false);
     setLoading(true);
     void loadPortfolio(address);
   }, [address, isConnected, loadPortfolio]);
-
-  useEffect(() => {
-    const positions = data?.positions ?? [];
-    if (!address || positions.length === 0) {
-      setDerivedLots({});
-      return;
-    }
-
-    const wallet = address;
-    let cancelled = false;
-
-    async function loadDerivedLots() {
-      const entries = await Promise.all(
-        positions.map(async (position) => {
-          try {
-            const response = await fetch(`/api/tokens/${position.tokenAddress}/chart-trades`, {
-              cache: "no-store",
-            });
-            const body = (await response.json()) as { data?: TradeRow[] };
-            if (!response.ok) return [position.tokenAddress, null] as const;
-            const lot = computeOpenLotForAddress(body.data ?? [], wallet);
-            return [position.tokenAddress, lot] as const;
-          } catch {
-            return [position.tokenAddress, null] as const;
-          }
-        })
-      );
-
-      if (cancelled) return;
-      const next: Record<string, DerivedLot> = {};
-      for (const [tokenAddress, lot] of entries) {
-        if (lot && lot.netTokens > 0) next[tokenAddress] = lot;
-      }
-      setDerivedLots(next);
-    }
-
-    void loadDerivedLots();
-    const timer = setInterval(() => void loadDerivedLots(), 20_000);
-    return () => {
-      cancelled = true;
-      clearInterval(timer);
-    };
-  }, [address, data?.positions]);
 
   const schedulePoll = useCallback(() => {
     if (!address) return;
@@ -540,7 +565,7 @@ export function PortfolioPanel() {
     );
   }
 
-  if (loading && !data) {
+  if (loading || !holdingsReady) {
     return <PortfolioPanelSkeleton />;
   }
 
@@ -550,8 +575,7 @@ export function PortfolioPanel() {
         buildVerifiedPositionView(
           position,
           derivedLots[position.tokenAddress],
-          onChainBalances,
-          onChainVerified
+          onChainBalances
         )
       )
       .filter((view): view is VerifiedPositionView => view != null) ?? [];

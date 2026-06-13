@@ -154,11 +154,14 @@ export function TradeTape({
   const creatorKey = creatorAddress.toLowerCase();
   const [tab, setTab] = useState<ActivityTab>("trades");
   const [holderRows, setHolderRows] = useState<HolderRow[]>([]);
+  const [holdersReady, setHoldersReady] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
+    setHoldersReady(false);
+    setHolderRows([]);
 
-    async function loadHolders() {
+    async function loadHolders(isInitial: boolean) {
       try {
         const response = await fetch(`/api/tokens/${tokenAddress}/holders`, {
           cache: "no-store",
@@ -166,18 +169,23 @@ export function TradeTape({
         const body = (await response.json()) as { data?: TokenHolderSnapshot[] };
         if (!response.ok || cancelled) return;
         setHolderRows(mapApiHoldersToRows(body.data ?? []));
+        setHoldersReady(true);
       } catch {
-        if (!cancelled) setHolderRows([]);
+        if (cancelled) return;
+        if (isInitial) {
+          setHolderRows([]);
+          setHoldersReady(true);
+        }
       }
     }
 
-    void loadHolders();
+    void loadHolders(true);
     if (wsConnected) {
       return () => {
         cancelled = true;
       };
     }
-    const timer = window.setInterval(() => void loadHolders(), 15_000);
+    const timer = window.setInterval(() => void loadHolders(false), 15_000);
     return () => {
       cancelled = true;
       window.clearInterval(timer);
@@ -207,7 +215,9 @@ export function TradeTape({
         </div>
 
       {tab === "holders" ? (
-          holderRows.length === 0 ? (
+          !holdersReady ? (
+            <p className="px-4 py-6 text-body-sm text-pump-muted">Verifying holders on-chain…</p>
+          ) : holderRows.length === 0 ? (
             <p className="px-4 py-6 text-body-sm text-pump-muted">No holders yet.</p>
           ) : (
             <div className="overflow-x-auto">
