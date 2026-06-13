@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict r16V34uDDIjlRqEypzXm97XZ5dnvpE4SStU9Wt4OpWMXPiQxvIPo6NMQwgpD1Qw
+\restrict dFJphjeCOEsuOFQMpGEjbq2tX9izE3OIrMqL7zRgu6hwe7oAGFcR6MUXqMSpk4X
 
 -- Dumped from database version 16.14 (Ubuntu 16.14-0ubuntu0.24.04.1)
 -- Dumped by pg_dump version 16.14 (Ubuntu 16.14-0ubuntu0.24.04.1)
@@ -576,8 +576,12 @@ CREATE TABLE public.launchpad_tasks (
     is_active boolean DEFAULT true NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    target_url text,
+    task_source text DEFAULT 'system'::text NOT NULL,
+    CONSTRAINT launchpad_tasks_admin_link_url_check CHECK (((task_source <> 'admin_link'::text) OR ((target_url IS NOT NULL) AND (btrim(target_url) <> ''::text)))),
     CONSTRAINT launchpad_tasks_reward_points_check CHECK ((reward_points >= 0)),
-    CONSTRAINT launchpad_tasks_task_kind_check CHECK ((task_kind = ANY (ARRAY['DAILY'::text, 'ONE_TIME'::text, 'MILESTONE'::text])))
+    CONSTRAINT launchpad_tasks_task_kind_check CHECK ((task_kind = ANY (ARRAY['DAILY'::text, 'ONE_TIME'::text, 'MILESTONE'::text, 'ADMIN_LINK'::text]))),
+    CONSTRAINT launchpad_tasks_task_source_check CHECK ((task_source = ANY (ARRAY['system'::text, 'admin_link'::text])))
 );
 
 
@@ -1692,5 +1696,5 @@ ALTER TABLE ONLY public.user_positions
 -- PostgreSQL database dump complete
 --
 
-\unrestrict r16V34uDDIjlRqEypzXm97XZ5dnvpE4SStU9Wt4OpWMXPiQxvIPo6NMQwgpD1Qw
+\unrestrict dFJphjeCOEsuOFQMpGEjbq2tX9izE3OIrMqL7zRgu6hwe7oAGFcR6MUXqMSpk4X
 

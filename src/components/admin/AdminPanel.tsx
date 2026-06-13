@@ -62,6 +62,17 @@ type SweepRow = {
   sweepRecipient: string | null;
 };
 
+type AdminLinkTask = {
+  taskKey: string;
+  title: string;
+  description: string | null;
+  rewardPoints: number;
+  targetUrl: string;
+  isActive: boolean;
+  createdAt: string;
+  completionCount: number;
+};
+
 function formatBnb(value: string): string {
   const n = Number(value);
   if (!Number.isFinite(n)) return value;
@@ -202,6 +213,14 @@ export function AdminPanel() {
   const [withdrawTokenAddress, setWithdrawTokenAddress] = useState("");
   const [withdrawTokenAmount, setWithdrawTokenAmount] = useState("");
   const [withdrawMode, setWithdrawMode] = useState<TreasuryWithdrawMode>("bnb");
+  const [promoTasks, setPromoTasks] = useState<AdminLinkTask[]>([]);
+  const [promoLoading, setPromoLoading] = useState(true);
+  const [promoSaving, setPromoSaving] = useState(false);
+  const [promoTitle, setPromoTitle] = useState("");
+  const [promoDescription, setPromoDescription] = useState("");
+  const [promoPoints, setPromoPoints] = useState("");
+  const [promoUrl, setPromoUrl] = useState("");
+  const [deactivatingKey, setDeactivatingKey] = useState<string | null>(null);
 
   const isAdmin = isAdminWallet(address);
   const treasuryContract = protocol?.treasury.address as `0x${string}` | undefined;
@@ -240,6 +259,21 @@ export function AdminPanel() {
   } = useWriteContract();
   const { isSuccess: adminTxDone } = useWaitForTransactionReceipt({ hash: adminTxHash });
 
+  const loadPromoTasks = useCallback(async () => {
+    if (!address) return;
+    setPromoLoading(true);
+    try {
+      const res = await fetch(`/api/admin/tasks?address=${address}`, { cache: "no-store" });
+      const json = (await res.json()) as { data?: { tasks: AdminLinkTask[] }; error?: string };
+      if (!res.ok) throw new Error(json.error ?? "Failed to load promo tasks");
+      setPromoTasks(json.data?.tasks ?? []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load promo tasks");
+    } finally {
+      setPromoLoading(false);
+    }
+  }, [address]);
+
   const load = useCallback(async () => {
     setError(null);
     setLoading(true);
@@ -262,7 +296,8 @@ export function AdminPanel() {
 
   useEffect(() => {
     void load();
-  }, [load]);
+    void loadPromoTasks();
+  }, [load, loadPromoTasks]);
 
   useEffect(() => {
     if (!adminTxDone) return;
@@ -374,6 +409,57 @@ export function AdminPanel() {
     setWithdrawTokenAmount(formatEther(treasuryTokenBalance));
   }
 
+  async function onCreatePromoTask() {
+    if (!address) return;
+    setPromoSaving(true);
+    setError(null);
+    try {
+      const rewardPoints = Number.parseInt(promoPoints.trim(), 10);
+      const res = await fetch(`/api/admin/tasks?address=${address}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: promoTitle,
+          description: promoDescription || null,
+          rewardPoints,
+          targetUrl: promoUrl,
+        }),
+      });
+      const json = (await res.json()) as { error?: string };
+      if (!res.ok) throw new Error(json.error ?? "Failed to create task");
+
+      setPromoTitle("");
+      setPromoDescription("");
+      setPromoPoints("");
+      setPromoUrl("");
+      await loadPromoTasks();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to create task");
+    } finally {
+      setPromoSaving(false);
+    }
+  }
+
+  async function onDeactivatePromoTask(taskKey: string) {
+    if (!address) return;
+    setDeactivatingKey(taskKey);
+    setError(null);
+    try {
+      const res = await fetch(`/api/admin/tasks?address=${address}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ taskKey, isActive: false }),
+      });
+      const json = (await res.json()) as { error?: string };
+      if (!res.ok) throw new Error(json.error ?? "Failed to deactivate task");
+      await loadPromoTasks();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to deactivate task");
+    } finally {
+      setDeactivatingKey(null);
+    }
+  }
+
   const readySweeps = airdrops.filter((r) => r.canSweep);
   const treasuryBnb = treasuryLiveBalance
     ? formatEther(treasuryLiveBalance.value)
@@ -448,6 +534,126 @@ export function AdminPanel() {
             <p className="text-caption text-pump-muted">On-chain airdrops tracked</p>
           </StatCell>
         </dl>
+      </section>
+
+      <section className="panel-surface overflow-hidden">
+        <div className="flex flex-wrap items-start justify-between gap-3 border-b border-pump-border/15 px-4 py-3.5 md:px-5">
+          <div>
+            <p className="section-label">Promo link tasks</p>
+            <p className="mt-0.5 field-hint">
+              Create click-to-complete missions for users — opens your link, then awards points
+            </p>
+          </div>
+          <button
+            type="button"
+            className="chip-button"
+            onClick={() => void loadPromoTasks()}
+            disabled={promoLoading}
+          >
+            {promoLoading ? "Refreshing…" : "Refresh"}
+          </button>
+        </div>
+
+        <div className="border-b border-pump-border/10 p-4 md:p-5">
+          <p className="section-label">New task</p>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            <input
+              type="text"
+              placeholder="Title"
+              value={promoTitle}
+              onChange={(e) => setPromoTitle(e.target.value)}
+              className="field-input h-10 bg-pump-bg/80 sm:col-span-2"
+            />
+            <input
+              type="text"
+              placeholder="Description (optional)"
+              value={promoDescription}
+              onChange={(e) => setPromoDescription(e.target.value)}
+              className="field-input h-10 bg-pump-bg/80 sm:col-span-2"
+            />
+            <input
+              type="number"
+              min={0}
+              step={1}
+              placeholder="Points"
+              value={promoPoints}
+              onChange={(e) => setPromoPoints(e.target.value)}
+              className="field-input h-10 bg-pump-bg/80"
+            />
+            <input
+              type="url"
+              placeholder="https://…"
+              value={promoUrl}
+              onChange={(e) => setPromoUrl(e.target.value)}
+              className="field-input h-10 bg-pump-bg/80"
+            />
+          </div>
+          <button
+            type="button"
+            className="primary-button mt-3"
+            disabled={promoSaving || !promoTitle.trim() || !promoUrl.trim() || !promoPoints.trim()}
+            onClick={() => void onCreatePromoTask()}
+          >
+            {promoSaving ? "Creating…" : "Create promo task"}
+          </button>
+        </div>
+
+        {promoLoading ? (
+          <p className="p-4 text-body-sm text-pump-muted md:p-5">Loading promo tasks…</p>
+        ) : promoTasks.length === 0 ? (
+          <p className="p-4 text-body-sm text-pump-muted md:p-5">No promo tasks yet.</p>
+        ) : (
+          <div className="divide-y divide-pump-border/10">
+            {promoTasks.map((task) => (
+              <article
+                key={task.taskKey}
+                className="flex flex-wrap items-start justify-between gap-3 px-4 py-3 md:px-5"
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-body-sm font-medium text-pump-text">{task.title}</p>
+                    <span
+                      className={
+                        task.isActive
+                          ? "status-badge border-pump-accent/30 bg-pump-accent/10 text-pump-accent"
+                          : "status-badge border-pump-border/25 bg-pump-surface/40 text-pump-muted"
+                      }
+                    >
+                      {task.isActive ? "Active" : "Inactive"}
+                    </span>
+                  </div>
+                  {task.description ? (
+                    <p className="mt-0.5 text-caption text-pump-muted">{task.description}</p>
+                  ) : null}
+                  <p className="mt-1 truncate text-caption text-pump-muted">
+                    <a
+                      href={task.targetUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-pump-accent hover:underline"
+                    >
+                      {task.targetUrl}
+                    </a>
+                  </p>
+                  <p className="mt-1 text-caption text-pump-muted">
+                    +{task.rewardPoints} pts · {task.completionCount} completion
+                    {task.completionCount === 1 ? "" : "s"}
+                  </p>
+                </div>
+                {task.isActive ? (
+                  <button
+                    type="button"
+                    className="chip-button shrink-0"
+                    disabled={deactivatingKey === task.taskKey}
+                    onClick={() => void onDeactivatePromoTask(task.taskKey)}
+                  >
+                    {deactivatingKey === task.taskKey ? "…" : "Deactivate"}
+                  </button>
+                ) : null}
+              </article>
+            ))}
+          </div>
+        )}
       </section>
 
       <section className="panel-surface p-4 md:p-5">

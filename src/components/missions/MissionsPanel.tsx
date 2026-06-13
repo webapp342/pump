@@ -20,7 +20,9 @@ type Mission = {
   title: string;
   description: string | null;
   rewardPoints: number;
-  taskKind: "DAILY" | "ONE_TIME" | "MILESTONE";
+  taskKind: "DAILY" | "ONE_TIME" | "MILESTONE" | "ADMIN_LINK";
+  taskSource?: "system" | "admin_link";
+  targetUrl?: string | null;
   completed: boolean;
   completedAt: string | null;
   pointsAwarded: number;
@@ -44,7 +46,12 @@ const missionKindLabel: Record<Mission["taskKind"], string> = {
   DAILY: "Daily",
   ONE_TIME: "Once",
   MILESTONE: "Milestone",
+  ADMIN_LINK: "Promo",
 };
+
+function isAdminLinkMission(mission: Mission): boolean {
+  return mission.taskKind === "ADMIN_LINK" || mission.taskSource === "admin_link";
+}
 
 function missionStatusClass(done: boolean, syncing: boolean): string {
   if (done) return "text-pump-success";
@@ -61,9 +68,13 @@ function missionStatusLabel(done: boolean, syncing: boolean): string {
 function MissionRow({
   mission,
   syncing,
+  onAdminLinkClick,
+  completing,
 }: {
   mission: Mission;
   syncing: boolean;
+  onAdminLinkClick?: (mission: Mission) => void;
+  completing?: boolean;
 }) {
   const progressPct =
     mission.progress && mission.progress.target > 0
@@ -72,9 +83,11 @@ function MissionRow({
 
   const done = mission.completed;
   const showSyncing = syncing && !done;
+  const isLinkTask = isAdminLinkMission(mission) && Boolean(mission.targetUrl);
+  const clickable = isLinkTask && !done && !completing;
 
-  return (
-    <article className="px-3 py-2.5 md:px-4 md:py-3">
+  const content = (
+    <>
       <div className="flex items-start gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
@@ -85,6 +98,11 @@ function MissionRow({
           </div>
           {mission.description ? (
             <p className="mt-0.5 line-clamp-2 text-caption text-pump-muted">{mission.description}</p>
+          ) : null}
+          {isLinkTask && !done ? (
+            <p className="mt-1 text-[11px] text-pump-accent">
+              {completing ? "Completing…" : "Tap to open link and earn points"}
+            </p>
           ) : null}
           {mission.progress && !done ? (
             <div className="mt-2 space-y-1">
@@ -112,10 +130,29 @@ function MissionRow({
           <span
             className={`text-[11px] font-semibold uppercase tracking-wide ${missionStatusClass(done, showSyncing)}`}
           >
-            {missionStatusLabel(done, showSyncing)}
+            {completing ? "Opening…" : missionStatusLabel(done, showSyncing)}
           </span>
         </div>
       </div>
+    </>
+  );
+
+  if (clickable) {
+    return (
+      <button
+        type="button"
+        className="block w-full px-3 py-2.5 text-left transition-colors hover:bg-pump-surface/25 md:px-4 md:py-3"
+        onClick={() => onAdminLinkClick?.(mission)}
+        disabled={completing}
+      >
+        {content}
+      </button>
+    );
+  }
+
+  return (
+    <article className="px-3 py-2.5 md:px-4 md:py-3">
+      {content}
     </article>
   );
 }
@@ -128,6 +165,7 @@ export function MissionsPanel() {
   const [loading, setLoading] = useState(false);
   const [activeFilter, setActiveFilter] = useState<MissionFilter>("open");
   const [pendingKeys, setPendingKeys] = useState<string[]>(() => listPendingMissionKeys());
+  const [completingKey, setCompletingKey] = useState<string | null>(null);
 
   const loadMissions = useCallback(async (walletAddress: string) => {
     setError(null);
@@ -205,6 +243,40 @@ export function MissionsPanel() {
       if (timer) clearTimeout(timer);
     };
   }, [address, isConnected, loadMissions]);
+
+  const onAdminLinkClick = useCallback(
+    async (mission: Mission) => {
+      if (!address || mission.completed || !mission.targetUrl) return;
+
+      setCompletingKey(mission.taskKey);
+      setError(null);
+
+      window.open(mission.targetUrl, "_blank", "noopener,noreferrer");
+
+      try {
+        const response = await fetch("/api/missions/complete-link", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ address, taskKey: mission.taskKey }),
+        });
+        const body = (await response.json()) as {
+          data?: { status: string; pointsAwarded: number; totalPoints: number };
+          error?: string;
+        };
+
+        if (!response.ok) {
+          throw new Error(body.error ?? "Failed to complete task");
+        }
+
+        await loadMissions(address);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to complete task");
+      } finally {
+        setCompletingKey(null);
+      }
+    },
+    [address, loadMissions]
+  );
 
   const completedCount = data?.missions.filter((m) => m.completed).length ?? 0;
   const openCount = data?.missions.filter((m) => !m.completed).length ?? 0;
@@ -341,6 +413,8 @@ export function MissionsPanel() {
                     key={mission.taskKey}
                     mission={mission}
                     syncing={pendingKeys.includes(mission.taskKey)}
+                    onAdminLinkClick={(m) => void onAdminLinkClick(m)}
+                    completing={completingKey === mission.taskKey}
                   />
                 ))}
               </div>

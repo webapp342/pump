@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { Pool } from "pg";
 
 let pool: Pool | null = null;
@@ -19,7 +20,8 @@ export function getIncentivePool(): Pool {
   return pool;
 }
 
-export type MissionKind = "DAILY" | "ONE_TIME" | "MILESTONE";
+export type MissionKind = "DAILY" | "ONE_TIME" | "MILESTONE" | "ADMIN_LINK";
+export type TaskSource = "system" | "admin_link";
 
 export type MissionItem = {
   taskKey: string;
@@ -27,9 +29,22 @@ export type MissionItem = {
   description: string | null;
   rewardPoints: number;
   taskKind: MissionKind;
+  taskSource: TaskSource;
+  targetUrl: string | null;
   completed: boolean;
   completedAt: string | null;
   pointsAwarded: number;
+};
+
+export type AdminLinkTask = {
+  taskKey: string;
+  title: string;
+  description: string | null;
+  rewardPoints: number;
+  targetUrl: string;
+  isActive: boolean;
+  createdAt: string;
+  completionCount: number;
 };
 
 export type MissionsSnapshot = {
@@ -60,6 +75,8 @@ export async function getMissionsForAddress(address: string): Promise<MissionsSn
       description: string | null;
       reward_points: number;
       task_kind: MissionKind;
+      task_source: TaskSource;
+      target_url: string | null;
       completed_at: Date | null;
       points_awarded: number | null;
     }>(
@@ -70,6 +87,8 @@ export async function getMissionsForAddress(address: string): Promise<MissionsSn
           t.description,
           t.reward_points,
           t.task_kind,
+          t.task_source,
+          t.target_url,
           CASE
             WHEN t.task_kind = 'DAILY' THEN dc.completed_at
             ELSE oc.completed_at
@@ -91,9 +110,11 @@ export async function getMissionsForAddress(address: string): Promise<MissionsSn
         ORDER BY
           CASE t.task_kind
             WHEN 'DAILY' THEN 0
-            WHEN 'ONE_TIME' THEN 1
-            WHEN 'MILESTONE' THEN 2
+            WHEN 'ADMIN_LINK' THEN 1
+            WHEN 'ONE_TIME' THEN 2
+            WHEN 'MILESTONE' THEN 3
           END,
+          t.created_at DESC,
           t.reward_points DESC
       `,
       [address, todayUtc]
@@ -110,6 +131,8 @@ export async function getMissionsForAddress(address: string): Promise<MissionsSn
     description: row.description,
     rewardPoints: row.reward_points,
     taskKind: row.task_kind,
+    taskSource: row.task_source,
+    targetUrl: row.target_url,
     completed: row.completed_at !== null,
     completedAt: row.completed_at?.toISOString() ?? null,
     pointsAwarded: row.points_awarded ?? 0,
@@ -315,4 +338,186 @@ export async function ensureVolumeMonsterAward(address: string): Promise<boolean
   } finally {
     client.release();
   }
+}
+
+export function isValidAdminLinkTargetUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url.trim());
+    return parsed.protocol === "http:" || parsed.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+function buildAdminLinkTaskKey(): string {
+  return `ADMIN_LINK_${randomUUID().replace(/-/g, "")}`;
+}
+
+export async function listAdminLinkTasks(): Promise<AdminLinkTask[]> {
+  const db = getIncentivePool();
+  const result = await db.query<{
+    task_key: string;
+    title: string;
+    description: string | null;
+    reward_points: number;
+    target_url: string;
+    is_active: boolean;
+    created_at: Date;
+    completion_count: string;
+  }>(
+    `
+      SELECT
+        t.task_key,
+        t.title,
+        t.description,
+        t.reward_points,
+        t.target_url,
+        t.is_active,
+        t.created_at,
+        COUNT(c.id)::text AS completion_count
+      FROM launchpad_tasks t
+      LEFT JOIN launchpad_user_task_completions c ON c.task_key = t.task_key
+      WHERE t.task_source = 'admin_link'
+      GROUP BY t.task_key
+      ORDER BY t.created_at DESC
+    `
+  );
+
+  return result.rows.map((row) => ({
+    taskKey: row.task_key,
+    title: row.title,
+    description: row.description,
+    rewardPoints: row.reward_points,
+    targetUrl: row.target_url,
+    isActive: row.is_active,
+    createdAt: row.created_at.toISOString(),
+    completionCount: Number(row.completion_count) || 0,
+  }));
+}
+
+export type CreateAdminLinkTaskInput = {
+  title: string;
+  description?: string | null;
+  rewardPoints: number;
+  targetUrl: string;
+};
+
+export async function createAdminLinkTask(input: CreateAdminLinkTaskInput): Promise<AdminLinkTask> {
+  const title = input.title.trim();
+  const targetUrl = input.targetUrl.trim();
+  const description = input.description?.trim() ? input.description.trim() : null;
+
+  if (!title) throw new Error("Title is required");
+  if (!Number.isInteger(input.rewardPoints) || input.rewardPoints < 0) {
+    throw new Error("Reward points must be a non-negative integer");
+  }
+  if (!isValidAdminLinkTargetUrl(targetUrl)) {
+    throw new Error("Target URL must be a valid http or https link");
+  }
+
+  const db = getIncentivePool();
+  const taskKey = buildAdminLinkTaskKey();
+
+  const result = await db.query<{
+    task_key: string;
+    title: string;
+    description: string | null;
+    reward_points: number;
+    target_url: string;
+    is_active: boolean;
+    created_at: Date;
+  }>(
+    `
+      INSERT INTO launchpad_tasks (
+        task_key, title, description, reward_points, task_kind, task_source, target_url, is_active
+      )
+      VALUES ($1, $2, $3, $4, 'ADMIN_LINK', 'admin_link', $5, true)
+      RETURNING task_key, title, description, reward_points, target_url, is_active, created_at
+    `,
+    [taskKey, title, description, input.rewardPoints, targetUrl]
+  );
+
+  const row = result.rows[0];
+  if (!row) throw new Error("Failed to create task");
+
+  return {
+    taskKey: row.task_key,
+    title: row.title,
+    description: row.description,
+    rewardPoints: row.reward_points,
+    targetUrl: row.target_url,
+    isActive: row.is_active,
+    createdAt: row.created_at.toISOString(),
+    completionCount: 0,
+  };
+}
+
+export async function setAdminLinkTaskActive(taskKey: string, isActive: boolean): Promise<boolean> {
+  const db = getIncentivePool();
+  const result = await db.query(
+    `
+      UPDATE launchpad_tasks
+      SET is_active = $2, updated_at = now()
+      WHERE task_key = $1 AND task_source = 'admin_link'
+    `,
+    [taskKey, isActive]
+  );
+  return (result.rowCount ?? 0) > 0;
+}
+
+export type CompleteAdminLinkTaskResult = {
+  status: "SYNCED" | "SKIPPED" | "NOT_FOUND";
+  pointsAwarded: number;
+};
+
+export async function completeAdminLinkTask(
+  address: string,
+  taskKey: string
+): Promise<CompleteAdminLinkTaskResult> {
+  const db = getIncentivePool();
+  const normalized = address.toLowerCase();
+
+  const taskResult = await db.query<{ is_active: boolean; target_url: string }>(
+    `
+      SELECT is_active, target_url
+      FROM launchpad_tasks
+      WHERE task_key = $1
+        AND task_source = 'admin_link'
+        AND task_kind = 'ADMIN_LINK'
+      LIMIT 1
+    `,
+    [taskKey]
+  );
+
+  if ((taskResult.rowCount ?? 0) === 0) {
+    return { status: "NOT_FOUND", pointsAwarded: 0 };
+  }
+
+  if (!taskResult.rows[0]?.is_active) {
+    return { status: "SKIPPED", pointsAwarded: 0 };
+  }
+
+  const awardResult = await db.query<{ status: string; points_awarded: number }>(
+    `
+      SELECT status, points_awarded
+      FROM launchpad_award_points($1, $2, $3, $4, $5, $6::jsonb)
+    `,
+    [
+      normalized,
+      taskKey,
+      `${taskKey}:${normalized}`,
+      null,
+      null,
+      JSON.stringify({
+        source: "admin_link_click",
+        target_url: taskResult.rows[0]?.target_url ?? null,
+      }),
+    ]
+  );
+
+  const row = awardResult.rows[0];
+  const pointsAwarded = row?.points_awarded ?? 0;
+  const status = row?.status === "SYNCED" ? "SYNCED" : "SKIPPED";
+
+  return { status, pointsAwarded };
 }
