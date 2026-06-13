@@ -203,7 +203,7 @@ function ConnectedWalletButton({ address }: { address: string }) {
   useEffect(() => {
     if (!open) return;
 
-    function onPointerDown(event: MouseEvent) {
+    function onPointerDown(event: globalThis.MouseEvent) {
       if (!containerRef.current?.contains(event.target as Node)) {
         setOpen(false);
       }
