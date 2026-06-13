@@ -347,7 +347,7 @@ export function TradePanel({
   }, [writeError]);
 
   const paused =
-    chainCurveSnapshot?.paused ?? localCurveState?.[9] ?? status === "PAUSED";
+    chainCurveSnapshot?.paused ?? localCurveState?.[7] ?? status === "PAUSED";
 
   const estimatedOut =
     side === "sell"

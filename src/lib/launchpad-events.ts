@@ -92,8 +92,6 @@ export type CurveTuple = readonly [
   bigint,
   bigint,
   boolean,
-  boolean,
-  boolean,
 ];
 
 export function tokenFromCurve(token: TokenDetail, curve: CurveTuple): TokenDetail {
@@ -101,6 +99,6 @@ export function tokenFromCurve(token: TokenDetail, curve: CurveTuple): TokenDeta
     ...token,
     reserveBnb: formatEther(curve[2]),
     targetBnb: formatEther(curve[4]),
-    status: curve[9] ? "PAUSED" : "BONDING",
+    status: curve[7] ? "PAUSED" : "BONDING",
   };
 }

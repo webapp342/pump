@@ -330,19 +330,19 @@ export function bondingCurveFromSnapshot(snapshot: BondingCurveSnapshot): Bondin
 }
 
 export function bondingCurveSnapshotFromTuple(
-  tuple: readonly [unknown, unknown, bigint, bigint, bigint, bigint, bigint, boolean, boolean, boolean]
+  tuple: readonly [unknown, unknown, bigint, bigint, bigint, bigint, bigint, boolean]
 ): BondingCurveSnapshot {
   return {
     reserveZug: tuple[2].toString(),
     soldTokens: tuple[3].toString(),
     virtualZugReserve: tuple[5].toString(),
     virtualTokenReserve: tuple[6].toString(),
-    paused: tuple[9],
+    paused: tuple[7],
   };
 }
 
 export function bondingCurveStateFromTuple(
-  tuple: readonly [unknown, unknown, bigint, bigint, bigint, bigint, bigint, boolean, boolean, boolean]
+  tuple: readonly [unknown, unknown, bigint, bigint, bigint, bigint, bigint, boolean]
 ): BondingCurveState {
   return {
     reserveZug: tuple[2],
