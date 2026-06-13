@@ -141,6 +141,27 @@ contract BondingCurveManager {
         emit ReferrerSet(msg.sender, referrer);
     }
 
+    /// @notice Bind referrer and buy in one tx (no separate setReferrer signature).
+    function buyWithReferrer(
+        address token,
+        uint256 minTokenOut,
+        address referrer
+    ) external payable nonReentrant returns (uint256 tokenOut) {
+        _bindReferrerIfEligible(msg.sender, referrer);
+        tokenOut = _buy(token, msg.sender, minTokenOut);
+    }
+
+    /// @notice Bind referrer and sell in one tx when first trade is a sell.
+    function sellWithReferrer(
+        address token,
+        uint256 tokenIn,
+        uint256 minZugOut,
+        address referrer
+    ) external nonReentrant returns (uint256 zugOut) {
+        _bindReferrerIfEligible(msg.sender, referrer);
+        zugOut = _sell(token, msg.sender, tokenIn, minZugOut);
+    }
+
     function registerToken(
         address token,
         address creator,
@@ -234,6 +255,24 @@ contract BondingCurveManager {
     }
 
     function sell(address token, uint256 tokenIn, uint256 minZugOut) external nonReentrant returns (uint256 zugOut) {
+        zugOut = _sell(token, msg.sender, tokenIn, minZugOut);
+    }
+
+    function _bindReferrerIfEligible(address trader, address referrer) internal {
+        if (referrer == address(0) || referrer == trader) return;
+        if (hasTraded[trader]) return;
+        if (traderReferrer[trader] != address(0)) return;
+
+        traderReferrer[trader] = referrer;
+        emit ReferrerSet(trader, referrer);
+    }
+
+    function _sell(
+        address token,
+        address trader,
+        uint256 tokenIn,
+        uint256 minZugOut
+    ) internal returns (uint256 zugOut) {
         CurveState storage c = curves[token];
         if (c.token == address(0)) revert UnknownToken();
         if (c.paused) revert Paused();
@@ -243,16 +282,16 @@ contract BondingCurveManager {
         if (zugOut < minZugOut) revert Slippage();
         if (zugOut == 0) revert InsufficientOutput();
 
-        if (!IERC20Minimal(token).transferFrom(msg.sender, address(this), tokenIn)) revert TransferFailed();
+        if (!IERC20Minimal(token).transferFrom(trader, address(this), tokenIn)) revert TransferFailed();
 
         c.reserveZug -= (zugOut + feeZug);
         c.soldTokens -= tokenIn;
 
-        _sendNative(payable(msg.sender), zugOut);
-        hasTraded[msg.sender] = true;
-        _distributeFee(token, c.creator, msg.sender, feeZug);
+        _sendNative(payable(trader), zugOut);
+        hasTraded[trader] = true;
+        _distributeFee(token, c.creator, trader, feeZug);
 
-        emit Trade(token, msg.sender, false, zugOut + feeZug, tokenIn, feeZug, c.reserveZug, c.soldTokens);
+        emit Trade(token, trader, false, zugOut + feeZug, tokenIn, feeZug, c.reserveZug, c.soldTokens);
     }
 
     function pauseToken(address token, bool paused) external onlyOwner {

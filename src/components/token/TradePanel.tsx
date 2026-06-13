@@ -27,6 +27,11 @@ import {
   type BondingCurveSnapshot,
 } from "@/lib/bonding-curve";
 import { formatTradeError } from "@/lib/trade-errors";
+import {
+  clearStoredReferrer,
+  readStoredReferrer,
+  resolveTradeReferrer,
+} from "@/lib/referral-storage";
 import { bnbToUsd, formatUsdReadable } from "@/lib/format-usd";
 import { useBnbUsdPrice } from "@/hooks/useBnbUsdPrice";
 import {
@@ -177,6 +182,7 @@ export function TradePanel({
   const [receiveExpanded, setReceiveExpanded] = useState(true);
   const [pendingAction, setPendingAction] = useState<"buy" | "sell" | "approve" | null>(null);
   const pendingSellRef = useRef<{ amountWei: bigint; minBnbOut: bigint } | null>(null);
+  const pendingTradeReferrerRef = useRef<`0x${string}` | null>(null);
   /** Set when buy amount comes from slider/max — keeps token mode aligned with BNB/USD spend. */
   const [linkedBuySpendWei, setLinkedBuySpendWei] = useState<bigint | null>(null);
   /** Set when sell amount comes from slider/max — keeps USD/BNB modes aligned with token balance. */
@@ -304,6 +310,24 @@ export function TradePanel({
     abi: erc20Abi,
     functionName: "allowance",
     args: address ? [address, contracts.bondingCurveManager] : undefined,
+    chainId: pumpChain.id,
+    query: { enabled: Boolean(address) },
+  });
+
+  const { data: boundReferrer } = useReadContract({
+    address: contracts.bondingCurveManager,
+    abi: bondingCurveManagerAbi,
+    functionName: "traderReferrer",
+    args: address ? [address] : undefined,
+    chainId: pumpChain.id,
+    query: { enabled: Boolean(address) },
+  });
+
+  const { data: hasTraded } = useReadContract({
+    address: contracts.bondingCurveManager,
+    abi: bondingCurveManagerAbi,
+    functionName: "hasTraded",
+    args: address ? [address] : undefined,
     chainId: pumpChain.id,
     query: { enabled: Boolean(address) },
   });
@@ -680,6 +704,7 @@ export function TradePanel({
       setError("Transaction reverted on-chain. Check wallet balance, token status, and amount.");
       setPendingAction(null);
       pendingSellRef.current = null;
+      pendingTradeReferrerRef.current = null;
       reset();
       return;
     }
@@ -689,12 +714,16 @@ export function TradePanel({
       refetchAllowance();
 
       if (pendingSell) {
+        const tradeReferrer = resolvePendingTradeReferrer();
+        pendingTradeReferrerRef.current = tradeReferrer;
         setPendingAction("sell");
         writeContract({
           address: contracts.bondingCurveManager,
           abi: bondingCurveManagerAbi,
-          functionName: "sell",
-          args: [tokenAddress, pendingSell.amountWei, pendingSell.minBnbOut],
+          functionName: tradeReferrer ? "sellWithReferrer" : "sell",
+          args: tradeReferrer
+            ? [tokenAddress, pendingSell.amountWei, pendingSell.minBnbOut, tradeReferrer]
+            : [tokenAddress, pendingSell.amountWei, pendingSell.minBnbOut],
           chainId: pumpChain.id,
         });
         return;
@@ -710,6 +739,10 @@ export function TradePanel({
     setError(null);
     setLinkedBuySpendWei(null);
     setLinkedSellTokenWei(null);
+    if (pendingTradeReferrerRef.current) {
+      clearStoredReferrer();
+      pendingTradeReferrerRef.current = null;
+    }
     const confirmedSide = pendingAction;
     setPendingAction(null);
     pendingSellRef.current = null;
@@ -874,6 +907,15 @@ export function TradePanel({
     });
   }
 
+  function resolvePendingTradeReferrer(): `0x${string}` | null {
+    return resolveTradeReferrer({
+      storedReferrer: readStoredReferrer(),
+      boundReferrer,
+      hasTraded,
+      traderAddress: address,
+    });
+  }
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
@@ -931,12 +973,16 @@ export function TradePanel({
           return;
         }
 
+        const tradeReferrer = resolvePendingTradeReferrer();
+        pendingTradeReferrerRef.current = tradeReferrer;
         setPendingAction("buy");
         writeContract({
           address: contracts.bondingCurveManager,
           abi: bondingCurveManagerAbi,
-          functionName: "buy",
-          args: [tokenAddress, minOutWithSlippage(tokenOut)],
+          functionName: tradeReferrer ? "buyWithReferrer" : "buy",
+          args: tradeReferrer
+            ? [tokenAddress, minOutWithSlippage(tokenOut), tradeReferrer]
+            : [tokenAddress, minOutWithSlippage(tokenOut)],
           value: submitValue,
           chainId: pumpChain.id,
         });
@@ -973,12 +1019,16 @@ export function TradePanel({
       }
 
       pendingSellRef.current = null;
+      const tradeReferrer = resolvePendingTradeReferrer();
+      pendingTradeReferrerRef.current = tradeReferrer;
       setPendingAction("sell");
       writeContract({
         address: contracts.bondingCurveManager,
         abi: bondingCurveManagerAbi,
-        functionName: "sell",
-        args: [tokenAddress, sellTokenWei, minOutWithSlippage(sellQuoteOut)],
+        functionName: tradeReferrer ? "sellWithReferrer" : "sell",
+        args: tradeReferrer
+          ? [tokenAddress, sellTokenWei, minOutWithSlippage(sellQuoteOut), tradeReferrer]
+          : [tokenAddress, sellTokenWei, minOutWithSlippage(sellQuoteOut)],
         chainId: pumpChain.id,
       });
     } catch (err) {

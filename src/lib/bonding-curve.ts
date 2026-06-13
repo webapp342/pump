@@ -168,11 +168,34 @@ export const bondingCurveManagerAbi = [
   },
   {
     type: "function",
+    name: "buyWithReferrer",
+    inputs: [
+      { name: "token", type: "address" },
+      { name: "minTokenOut", type: "uint256" },
+      { name: "referrer", type: "address" },
+    ],
+    outputs: [{ name: "tokenOut", type: "uint256" }],
+    stateMutability: "payable",
+  },
+  {
+    type: "function",
     name: "sell",
     inputs: [
       { name: "token", type: "address" },
       { name: "tokenIn", type: "uint256" },
       { name: "minZugOut", type: "uint256" },
+    ],
+    outputs: [{ name: "zugOut", type: "uint256" }],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "sellWithReferrer",
+    inputs: [
+      { name: "token", type: "address" },
+      { name: "tokenIn", type: "uint256" },
+      { name: "minZugOut", type: "uint256" },
+      { name: "referrer", type: "address" },
     ],
     outputs: [{ name: "zugOut", type: "uint256" }],
     stateMutability: "nonpayable",

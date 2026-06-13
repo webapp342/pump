@@ -1,10 +1,10 @@
 {
   "abiVersion": "pump-bsc-v1",
-  "bondingCurveManager": "0x5EC2aefAB163E12753f831deDEECD37cd8c7D317",
+  "bondingCurveManager": "0xCa871AAB4eC84EAA998D78B60c27f60bc6cc14D1",
   "chainId": 97,
   "deployer": "0x11Ea71d1BEb04Aece4d06a585D9dbc6F58836880",
-  "deploymentBlock": 113176599,
-  "launchpadLens": "0x45C1f01E71B09492111523ABB4E92C52d5f56308",
+  "deploymentBlock": 113185324,
+  "launchpadLens": "0xD4605c7D8b4837156430A17e6361277df89728e0",
   "launchpadTreasury": "0x9EFE93b528800aF08d0EA3033135B3D5964cc7b7",
   "memeFactory": "0x2Fa07dFd25f1C2F3E2C0b6084bc5e0b87c9997A2",
   "memeTokenImplementation": "0x458b760c6B110787ea789fb8a5183D6C1cC89fEC",

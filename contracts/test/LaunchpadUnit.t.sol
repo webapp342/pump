@@ -92,6 +92,29 @@ contract LaunchpadUnitTest is Test {
         bonding.setReferrer(trader);
     }
 
+    function testBuyWithReferrerBindsOnFirstTrade() public {
+        vm.prank(creator);
+        address token = factory.createMeme("One Tx Ref", "OTREF", "ipfs://one-tx-ref", 0);
+
+        vm.prank(trader);
+        bonding.buyWithReferrer{value: 1 ether}(token, 1, referrer);
+
+        assertEq(bonding.traderReferrer(trader), referrer);
+        assertGt(bonding.pendingReferrerFees(referrer), 0);
+        assertTrue(bonding.hasTraded(trader));
+    }
+
+    function testBuyWithReferrerSkipsInvalidReferrer() public {
+        vm.prank(creator);
+        address token = factory.createMeme("Skip Ref", "SKREF", "ipfs://skip-ref", 0);
+
+        vm.prank(trader);
+        bonding.buyWithReferrer{value: 1 ether}(token, 1, trader);
+
+        assertEq(bonding.traderReferrer(trader), address(0));
+        assertEq(bonding.pendingReferrerFees(referrer), 0);
+    }
+
     function testReferrerShareBpsConstraint() public {
         vm.startPrank(owner);
         vm.expectRevert(BondingCurveManager.InvalidConfig.selector);
