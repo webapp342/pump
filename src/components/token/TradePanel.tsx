@@ -1015,7 +1015,7 @@ export function TradePanel({
     isConnected &&
     (wrongChain || isBusy || paused || insufficientBalance || balancePending);
   const submitTone =
-    side === "sell" && isConnected && !wrongChain
+    side === "sell"
       ? "bg-pump-danger text-white"
       : "bg-pump-accent text-pump-accent-foreground";
 
