@@ -41,8 +41,6 @@ type PriceChartProps = {
   currentMcapUsd?: number | null;
   volume24hBnb?: number;
   price24hChangePct?: number | null;
-  price24hChangeUsd?: number | null;
-  mcap24hChangeUsd?: number | null;
 };
 
 const POLL_MS = 4_000;
@@ -90,8 +88,6 @@ export function PriceChart({
   currentMcapUsd = null,
   volume24hBnb = 0,
   price24hChangePct = null,
-  price24hChangeUsd = null,
-  mcap24hChangeUsd = null,
 }: PriceChartProps) {
   const { theme } = useTheme();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -435,7 +431,6 @@ export function PriceChart({
     currency === "usd"
       ? (currentPriceUsd != null ? formatPumpSubscriptPrice(currentPriceUsd, "$") : "—")
       : (currentMcapUsd != null ? formatUsd(currentMcapUsd, { compact: true }) ?? "—" : "—");
-  const summaryDeltaUsd = currency === "usd" ? price24hChangeUsd : mcap24hChangeUsd;
   const summaryDeltaPct = price24hChangePct;
   const summaryDeltaTone =
     summaryDeltaPct == null
@@ -447,10 +442,6 @@ export function PriceChart({
     summaryDeltaPct == null
       ? "—"
       : `${summaryDeltaPct >= 0 ? "+" : ""}${summaryDeltaPct.toFixed(2)}%`;
-  const summaryDeltaUsdText =
-    summaryDeltaUsd != null
-      ? formatUsdReadable(summaryDeltaUsd, { compact: true, signed: true })
-      : null;
 
   const volumeUsd = bnbToUsd(volume24hBnb, bnbUsd);
   const volumeUsdLabel =
@@ -461,57 +452,59 @@ export function PriceChart({
 
   return (
     <section className="panel-surface overflow-hidden">
-      <div className="px-4 py-3 md:py-4">
-        <div className="flex items-center justify-between gap-3">
-          <p className="section-label">{currency === "usd" ? "Price" : "Market cap"}</p>
-          <div className="inline-flex shrink-0 items-center gap-0.5 rounded-lg border border-pump-border/20 bg-pump-surface/25 p-0.5">
-            <button
-              type="button"
-              onClick={() => selectCurrency("usd")}
-              disabled={bnbUsd == null}
-              className={`rounded-md px-2.5 py-1 text-[11px] font-medium transition disabled:opacity-40 md:px-3 md:py-1.5 md:text-caption ${
-                currency === "usd"
-                  ? "bg-pump-accent text-pump-accent-foreground"
-                  : "text-pump-muted hover:text-pump-text"
-              }`}
-            >
-              USD
-            </button>
-            <button
-              type="button"
-              onClick={() => selectCurrency("mcap")}
-              disabled={bnbUsd == null}
-              className={`rounded-md px-2.5 py-1 text-[11px] font-medium transition disabled:opacity-40 md:px-3 md:py-1.5 md:text-caption ${
-                currency === "mcap"
-                  ? "bg-pump-accent text-pump-accent-foreground"
-                  : "text-pump-muted hover:text-pump-text"
-              }`}
-            >
-              MCAP
-            </button>
+      <div className="px-4 py-2.5 md:py-3">
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center justify-between gap-2">
+            <p className="section-label leading-none">
+              {currency === "usd" ? "Price" : "Market cap"}
+            </p>
+            <div className="inline-flex shrink-0 items-center gap-0.5 rounded-lg border border-pump-border/20 bg-pump-surface/25 p-0.5">
+                <button
+                  type="button"
+                  onClick={() => selectCurrency("usd")}
+                  disabled={bnbUsd == null}
+                  className={`rounded-md px-2 py-0.5 text-[10px] font-medium transition disabled:opacity-40 sm:px-2.5 sm:py-1 sm:text-[11px] md:text-caption ${
+                    currency === "usd"
+                      ? "bg-pump-accent text-pump-accent-foreground"
+                      : "text-pump-muted hover:text-pump-text"
+                  }`}
+                >
+                  USD
+                </button>
+                <button
+                  type="button"
+                  onClick={() => selectCurrency("mcap")}
+                  disabled={bnbUsd == null}
+                  className={`rounded-md px-2 py-0.5 text-[10px] font-medium transition disabled:opacity-40 sm:px-2.5 sm:py-1 sm:text-[11px] md:text-caption ${
+                    currency === "mcap"
+                      ? "bg-pump-accent text-pump-accent-foreground"
+                      : "text-pump-muted hover:text-pump-text"
+                  }`}
+                >
+                MCAP
+              </button>
+            </div>
           </div>
-        </div>
 
-        <p className="financial-value mt-1 text-[1.65rem] font-semibold leading-tight text-pump-text md:text-display">
-          {summaryValue}
-        </p>
-
-        <div className="mt-2 inline-flex max-w-full flex-wrap items-center gap-x-2 gap-y-1 rounded-md border border-pump-border/15 bg-pump-surface/35 px-2.5 py-1.5 text-caption">
-          <span className={`financial-value font-medium ${summaryDeltaTone}`}>
-            {summaryDeltaPctText}
-          </span>
-          {summaryDeltaUsdText ? (
-            <>
-              <span className="text-pump-muted/40">·</span>
-              <span className={`financial-value ${summaryDeltaTone}`}>{summaryDeltaUsdText}</span>
-            </>
-          ) : null}
-          <span className="text-pump-muted/40">·</span>
-          <span className="text-pump-muted">Vol</span>
-          <span className="financial-value font-medium text-pump-text">
-            {volumeUsdLabel ?? "—"}
-          </span>
-          <span className="text-pump-muted">24h</span>
+          <div className="flex items-end justify-between gap-2">
+            <div className="flex min-w-0 items-end gap-x-1.5 gap-y-0">
+              <p className="financial-value text-[1.5rem] font-semibold leading-none text-pump-text sm:text-[1.65rem] md:text-[1.75rem]">
+                {summaryValue}
+              </p>
+              <span
+                className={`financial-value pb-px text-[11px] font-semibold leading-none sm:text-body-sm ${summaryDeltaTone}`}
+              >
+                {summaryDeltaPctText}
+              </span>
+            </div>
+            <div className="flex shrink-0 items-center gap-x-1 whitespace-nowrap text-[10px] leading-none sm:text-[11px] md:text-caption">
+              <span className="text-pump-muted">Vol</span>
+              <span className="financial-value font-semibold text-pump-text">
+                {volumeUsdLabel ?? "—"}
+              </span>
+              <span className="text-pump-muted">24h</span>
+            </div>
+          </div>
         </div>
       </div>
 

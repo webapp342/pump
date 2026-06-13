@@ -7,7 +7,6 @@ import { useReadContract } from "wagmi";
 import type { TokenDetail, TradeItem } from "@/lib/db/launchpad";
 import { bondingCurveManagerAbi, bondingCurveSnapshotFromTuple, displayTokenPriceBnb } from "@/lib/bonding-curve";
 import {
-  DEFAULT_TOKEN_TOTAL_SUPPLY,
   estimateFdvUsd,
   tokenPriceUsd,
 } from "@/lib/format-usd";
@@ -427,8 +426,6 @@ export function TokenDetailLive({
     () => compute24hPriceChange(trades, displayPrice, bnbUsd),
     [trades, displayPrice, bnbUsd]
   );
-  const mcap24hChangeUsd =
-    change24h?.changeUsd != null ? change24h.changeUsd * DEFAULT_TOKEN_TOTAL_SUPPLY : null;
 
   async function onCopyAddress() {
     const ok = await copyToClipboard(liveToken.address);
@@ -502,6 +499,26 @@ export function TokenDetailLive({
     </div>
   );
 
+  const creatorElapsedMeta = (
+    <>
+      {creatorMeta}
+      <span className="text-pump-muted/45" aria-hidden>
+        ·
+      </span>
+      <span className="shrink-0">{elapsed}</span>
+    </>
+  );
+
+  const tokenMetaLine = (
+    <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-caption text-pump-muted">
+      <span className="financial-value font-medium text-pump-text">${liveToken.symbol}</span>
+      <span className="text-pump-muted/45" aria-hidden>
+        ·
+      </span>
+      {creatorElapsedMeta}
+    </div>
+  );
+
   return (
     <div className="mt-3 space-y-5 pb-20 md:mt-4 md:space-y-6 xl:pb-0">
       <header className="xl:hidden">
@@ -516,12 +533,8 @@ export function TokenDetailLive({
             <h1 className="financial-value truncate text-h2 font-semibold tracking-tight text-pump-text">
               ${liveToken.symbol}
             </h1>
-            <div className="mt-1 flex min-w-0 items-center gap-1.5">
-              {creatorMeta}
-              <span className="shrink-0 text-pump-muted/45" aria-hidden>
-                ·
-              </span>
-              <span className="shrink-0 text-caption text-pump-muted">{elapsed}</span>
+            <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-caption text-pump-muted">
+              {creatorElapsedMeta}
             </div>
           </div>
           {tokenActions}
@@ -546,17 +559,7 @@ export function TokenDetailLive({
               <h1 className="min-w-0 truncate section-heading">{liveToken.name}</h1>
               <TokenSocialLinksBar links={liveToken.socialLinks} inline />
             </div>
-            <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-caption text-pump-muted">
-              <span>${liveToken.symbol}</span>
-              <span className="text-pump-muted/45" aria-hidden>
-                ·
-              </span>
-              {creatorMeta}
-              <span className="text-pump-muted/45" aria-hidden>
-                ·
-              </span>
-              <span>{elapsed}</span>
-            </div>
+            <div className="mt-0.5">{tokenMetaLine}</div>
           </div>
         </div>
 
@@ -608,23 +611,23 @@ export function TokenDetailLive({
             currentMcapUsd={fdvUsd}
             volume24hBnb={volume24hBnb}
             price24hChangePct={change24h?.changePct ?? null}
-            price24hChangeUsd={change24h?.changeUsd ?? null}
-            mcap24hChangeUsd={mcap24hChangeUsd}
           />
 
           {indexerSyncing ? (
             <p className="text-caption text-pump-muted">Indexer syncing…</p>
           ) : null}
 
-          <TradeTape
-            tokenAddress={tokenAddress}
-            creatorAddress={liveToken.creatorAddress}
-            trades={trades}
-            wsConnected={wsConnected}
-            currentPriceBnb={displayPrice}
-            bnbUsd={bnbUsd}
-            onAddressClick={setProfileAddress}
-          />
+          <div className="pt-3">
+            <TradeTape
+              tokenAddress={tokenAddress}
+              creatorAddress={liveToken.creatorAddress}
+              trades={trades}
+              wsConnected={wsConnected}
+              currentPriceBnb={displayPrice}
+              bnbUsd={bnbUsd}
+              onAddressClick={setProfileAddress}
+            />
+          </div>
         </div>
 
         <aside className="min-w-0 w-full space-y-4 xl:sticky xl:top-20 xl:self-start">

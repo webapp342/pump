@@ -5,13 +5,12 @@ export default function MissionsPage() {
   return (
     <AppShell>
       <div className="space-y-3 md:space-y-4">
-        <div>
-          <h2 className="section-heading">Missions</h2>
-          <p className="mt-1 hidden text-body-sm text-pump-muted md:block">
-            Complete on-chain tasks to earn Pump Points for our upcoming app airdrop. This is
-            separate from token campaigns on the Airdrops tab.
-          </p>
-        </div>
+      <div>
+        <h2 className="section-heading">Missions</h2>
+        <p className="mt-1 text-caption text-pump-muted md:text-body-sm">
+          Earn Pump Points from on-chain activity.
+        </p>
+      </div>
 
         <MissionsPanel />
       </div>

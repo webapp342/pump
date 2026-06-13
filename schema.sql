@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 1OKPqjkPPi4fTgfW9S8bWwA762AnHwgVynbN9zhb3yiscdg7T3cdbUfYiArU3mY
+\restrict r16V34uDDIjlRqEypzXm97XZ5dnvpE4SStU9Wt4OpWMXPiQxvIPo6NMQwgpD1Qw
 
 -- Dumped from database version 16.14 (Ubuntu 16.14-0ubuntu0.24.04.1)
 -- Dumped by pg_dump version 16.14 (Ubuntu 16.14-0ubuntu0.24.04.1)
@@ -17,6 +17,20 @@ SET check_function_bodies = false;
 SET xmloption = content;
 SET client_min_messages = warning;
 SET row_security = off;
+
+--
+-- Name: pg_stat_statements; Type: EXTENSION; Schema: -; Owner: -
+--
+
+CREATE EXTENSION IF NOT EXISTS pg_stat_statements WITH SCHEMA public;
+
+
+--
+-- Name: EXTENSION pg_stat_statements; Type: COMMENT; Schema: -; Owner: -
+--
+
+COMMENT ON EXTENSION pg_stat_statements IS 'track planning and execution statistics of all SQL statements executed';
+
 
 --
 -- Name: launchpad_award_points(text, text, text, text, date, jsonb); Type: FUNCTION; Schema: public; Owner: -
@@ -643,6 +657,113 @@ ALTER SEQUENCE public.launchpad_user_task_completions_id_seq OWNED BY public.lau
 
 
 --
+-- Name: tokens; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.tokens (
+    address text NOT NULL,
+    chain_id integer DEFAULT 97 NOT NULL,
+    creator_address text NOT NULL,
+    name text NOT NULL,
+    symbol text NOT NULL,
+    decimals integer DEFAULT 18 NOT NULL,
+    description text,
+    logo_url text,
+    metadata_uri text,
+    launch_tx_hash text NOT NULL,
+    launch_block_number bigint NOT NULL,
+    status text DEFAULT 'BONDING'::text NOT NULL,
+    is_hidden boolean DEFAULT false NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    social_links jsonb DEFAULT '{}'::jsonb NOT NULL,
+    CONSTRAINT tokens_address_check CHECK ((address = lower(address))),
+    CONSTRAINT tokens_creator_address_check CHECK ((creator_address = lower(creator_address))),
+    CONSTRAINT tokens_status_check CHECK ((status = ANY (ARRAY['BONDING'::text, 'PAUSED'::text, 'FAILED'::text])))
+);
+
+
+--
+-- Name: trades; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.trades (
+    id bigint NOT NULL,
+    event_id text NOT NULL,
+    token_address text NOT NULL,
+    trader_address text NOT NULL,
+    side text NOT NULL,
+    zug_amount numeric(78,18) NOT NULL,
+    token_amount numeric(78,18) NOT NULL,
+    price_zug numeric(78,18) NOT NULL,
+    fee_zug numeric(78,18) DEFAULT 0 NOT NULL,
+    creator_fee_zug numeric(78,18) DEFAULT 0 NOT NULL,
+    treasury_fee_zug numeric(78,18) DEFAULT 0 NOT NULL,
+    tx_hash text NOT NULL,
+    log_index integer NOT NULL,
+    block_number bigint NOT NULL,
+    block_time timestamp with time zone NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT trades_creator_fee_zug_check CHECK ((creator_fee_zug >= (0)::numeric)),
+    CONSTRAINT trades_fee_zug_check CHECK ((fee_zug >= (0)::numeric)),
+    CONSTRAINT trades_price_zug_check CHECK ((price_zug >= (0)::numeric)),
+    CONSTRAINT trades_side_check CHECK ((side = ANY (ARRAY['BUY'::text, 'SELL'::text]))),
+    CONSTRAINT trades_token_amount_check CHECK ((token_amount >= (0)::numeric)),
+    CONSTRAINT trades_trader_address_check CHECK ((trader_address = lower(trader_address))),
+    CONSTRAINT trades_treasury_fee_zug_check CHECK ((treasury_fee_zug >= (0)::numeric)),
+    CONSTRAINT trades_zug_amount_check CHECK ((zug_amount >= (0)::numeric))
+);
+
+
+--
+-- Name: mv_token_price_anchors; Type: MATERIALIZED VIEW; Schema: public; Owner: -
+--
+
+CREATE MATERIALIZED VIEW public.mv_token_price_anchors AS
+ SELECT address AS token_address,
+    ( SELECT tr.price_zug
+           FROM public.trades tr
+          WHERE ((tr.token_address = t.address) AND (tr.block_time >= (now() - '01:00:00'::interval)))
+          ORDER BY tr.block_time, tr.block_number, tr.log_index
+         LIMIT 1) AS price_1h_ago,
+    ( SELECT tr.price_zug
+           FROM public.trades tr
+          WHERE ((tr.token_address = t.address) AND (tr.block_time >= (now() - '06:00:00'::interval)))
+          ORDER BY tr.block_time, tr.block_number, tr.log_index
+         LIMIT 1) AS price_6h_ago,
+    ( SELECT tr.price_zug
+           FROM public.trades tr
+          WHERE ((tr.token_address = t.address) AND (tr.block_time <= (now() - '24:00:00'::interval)))
+          ORDER BY tr.block_time DESC, tr.block_number DESC, tr.log_index DESC
+         LIMIT 1) AS price_24h_ago,
+    ( SELECT tr.price_zug
+           FROM public.trades tr
+          WHERE (tr.token_address = t.address)
+          ORDER BY tr.block_time, tr.block_number, tr.log_index
+         LIMIT 1) AS price_first
+   FROM public.tokens t
+  WHERE (is_hidden = false)
+  WITH NO DATA;
+
+
+--
+-- Name: mv_token_trade_stats; Type: MATERIALIZED VIEW; Schema: public; Owner: -
+--
+
+CREATE MATERIALIZED VIEW public.mv_token_trade_stats AS
+ SELECT token_address,
+    (count(*))::integer AS trade_count,
+    (COALESCE(sum(GREATEST((zug_amount - COALESCE(fee_zug, (0)::numeric)), (0)::numeric)) FILTER (WHERE (block_time >= (now() - '24:00:00'::interval))), (0)::numeric))::text AS volume_24h_zug,
+    (COALESCE(sum(GREATEST((zug_amount - COALESCE(fee_zug, (0)::numeric)), (0)::numeric)) FILTER (WHERE ((block_time >= (now() - '48:00:00'::interval)) AND (block_time < (now() - '24:00:00'::interval)))), (0)::numeric))::text AS volume_24h_prev_zug,
+    (count(*) FILTER (WHERE (block_time < (now() - '24:00:00'::interval))))::integer AS trade_count_24h_ago,
+    (count(DISTINCT trader_address) FILTER (WHERE (block_time >= (now() - '24:00:00'::interval))))::integer AS traders_24h,
+    max(price_zug) AS ath_price_zug
+   FROM public.trades tr
+  GROUP BY token_address
+  WITH NO DATA;
+
+
+--
 -- Name: points_audit_log; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -721,65 +842,6 @@ CREATE SEQUENCE public.token_media_id_seq
 --
 
 ALTER SEQUENCE public.token_media_id_seq OWNED BY public.token_media.id;
-
-
---
--- Name: tokens; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.tokens (
-    address text NOT NULL,
-    chain_id integer DEFAULT 97 NOT NULL,
-    creator_address text NOT NULL,
-    name text NOT NULL,
-    symbol text NOT NULL,
-    decimals integer DEFAULT 18 NOT NULL,
-    description text,
-    logo_url text,
-    metadata_uri text,
-    launch_tx_hash text NOT NULL,
-    launch_block_number bigint NOT NULL,
-    status text DEFAULT 'BONDING'::text NOT NULL,
-    is_hidden boolean DEFAULT false NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    social_links jsonb DEFAULT '{}'::jsonb NOT NULL,
-    CONSTRAINT tokens_address_check CHECK ((address = lower(address))),
-    CONSTRAINT tokens_creator_address_check CHECK ((creator_address = lower(creator_address))),
-    CONSTRAINT tokens_status_check CHECK ((status = ANY (ARRAY['BONDING'::text, 'PAUSED'::text, 'FAILED'::text])))
-);
-
-
---
--- Name: trades; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.trades (
-    id bigint NOT NULL,
-    event_id text NOT NULL,
-    token_address text NOT NULL,
-    trader_address text NOT NULL,
-    side text NOT NULL,
-    zug_amount numeric(78,18) NOT NULL,
-    token_amount numeric(78,18) NOT NULL,
-    price_zug numeric(78,18) NOT NULL,
-    fee_zug numeric(78,18) DEFAULT 0 NOT NULL,
-    creator_fee_zug numeric(78,18) DEFAULT 0 NOT NULL,
-    treasury_fee_zug numeric(78,18) DEFAULT 0 NOT NULL,
-    tx_hash text NOT NULL,
-    log_index integer NOT NULL,
-    block_number bigint NOT NULL,
-    block_time timestamp with time zone NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT trades_creator_fee_zug_check CHECK ((creator_fee_zug >= (0)::numeric)),
-    CONSTRAINT trades_fee_zug_check CHECK ((fee_zug >= (0)::numeric)),
-    CONSTRAINT trades_price_zug_check CHECK ((price_zug >= (0)::numeric)),
-    CONSTRAINT trades_side_check CHECK ((side = ANY (ARRAY['BUY'::text, 'SELL'::text]))),
-    CONSTRAINT trades_token_amount_check CHECK ((token_amount >= (0)::numeric)),
-    CONSTRAINT trades_trader_address_check CHECK ((trader_address = lower(trader_address))),
-    CONSTRAINT trades_treasury_fee_zug_check CHECK ((treasury_fee_zug >= (0)::numeric)),
-    CONSTRAINT trades_zug_amount_check CHECK ((zug_amount >= (0)::numeric))
-);
 
 
 --
@@ -1325,6 +1387,13 @@ CREATE INDEX idx_airdrops_status_qualify_end ON public.airdrops USING btree (sta
 
 
 --
+-- Name: idx_bonding_states_mcap; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_bonding_states_mcap ON public.bonding_states USING btree (market_cap_zug DESC) WHERE (market_cap_zug > (0)::numeric);
+
+
+--
 -- Name: idx_contract_registry_active; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1374,6 +1443,20 @@ CREATE INDEX idx_launchpad_task_completions_address ON public.launchpad_user_tas
 
 
 --
+-- Name: idx_mv_token_price_anchors_token; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_mv_token_price_anchors_token ON public.mv_token_price_anchors USING btree (token_address);
+
+
+--
+-- Name: idx_mv_token_trade_stats_token; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_mv_token_trade_stats_token ON public.mv_token_trade_stats USING btree (token_address);
+
+
+--
 -- Name: idx_points_audit_log_address; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1402,6 +1485,13 @@ CREATE INDEX idx_tokens_status_created ON public.tokens USING btree (status, cre
 
 
 --
+-- Name: idx_tokens_visible_created; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_tokens_visible_created ON public.tokens USING btree (created_at DESC) WHERE (is_hidden = false);
+
+
+--
 -- Name: idx_trades_block; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1416,6 +1506,13 @@ CREATE INDEX idx_trades_token_block ON public.trades USING btree (token_address,
 
 
 --
+-- Name: idx_trades_token_side_time; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_trades_token_side_time ON public.trades USING btree (token_address, side, block_time DESC);
+
+
+--
 -- Name: idx_trades_token_time; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1423,10 +1520,31 @@ CREATE INDEX idx_trades_token_time ON public.trades USING btree (token_address, 
 
 
 --
+-- Name: idx_trades_token_time_asc; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_trades_token_time_asc ON public.trades USING btree (token_address, block_time, block_number, log_index);
+
+
+--
 -- Name: idx_trades_trader_time; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_trades_trader_time ON public.trades USING btree (trader_address, block_time DESC);
+
+
+--
+-- Name: idx_user_positions_address_holders; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_user_positions_address_holders ON public.user_positions USING btree (address) WHERE (token_balance > (0)::numeric);
+
+
+--
+-- Name: idx_user_positions_token_holders; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_user_positions_token_holders ON public.user_positions USING btree (token_address) WHERE (token_balance > (0)::numeric);
 
 
 --
@@ -1574,5 +1692,5 @@ ALTER TABLE ONLY public.user_positions
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 1OKPqjkPPi4fTgfW9S8bWwA762AnHwgVynbN9zhb3yiscdg7T3cdbUfYiArU3mY
+\unrestrict r16V34uDDIjlRqEypzXm97XZ5dnvpE4SStU9Wt4OpWMXPiQxvIPo6NMQwgpD1Qw
 

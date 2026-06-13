@@ -42,21 +42,14 @@ const BURST_DURATION_MS = 60_000;
 
 const missionKindLabel: Record<Mission["taskKind"], string> = {
   DAILY: "Daily",
-  ONE_TIME: "One-time",
+  ONE_TIME: "Once",
   MILESTONE: "Milestone",
 };
 
-function missionStatusBadgeClass(done: boolean, syncing: boolean): string {
-  const base =
-    "inline-flex shrink-0 items-center rounded-sm px-2.5 py-1 text-label font-semibold uppercase";
-
-  if (done) {
-    return `${base} border border-pump-success/35 bg-pump-success/15 text-pump-success`;
-  }
-  if (syncing) {
-    return `${base} border border-pump-warning/35 bg-pump-warning/15 text-pump-warning`;
-  }
-  return `${base} border border-pump-accent/35 bg-pump-accent/15 text-pump-accent`;
+function missionStatusClass(done: boolean, syncing: boolean): string {
+  if (done) return "text-pump-success";
+  if (syncing) return "text-pump-warning";
+  return "text-pump-muted";
 }
 
 function missionStatusLabel(done: boolean, syncing: boolean): string {
@@ -81,55 +74,48 @@ function MissionRow({
   const showSyncing = syncing && !done;
 
   return (
-    <article className="p-2.5 md:p-3">
-      <div className="flex items-start justify-between gap-2">
+    <article className="px-3 py-2.5 md:px-4 md:py-3">
+      <div className="flex items-start gap-3">
         <div className="min-w-0 flex-1">
-          <div className="flex min-w-0 items-center gap-2">
-            <p className="truncate text-body-sm font-medium text-pump-text">{mission.title}</p>
-            <span className="status-badge shrink-0 text-[10px] md:text-[inherit]">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+            <p className="text-body-sm font-medium text-pump-text">{mission.title}</p>
+            <span className="text-[10px] font-medium uppercase tracking-wide text-pump-muted/80">
               {missionKindLabel[mission.taskKind]}
             </span>
           </div>
           {mission.description ? (
-            <p className="mt-1 text-caption leading-snug text-pump-muted">{mission.description}</p>
+            <p className="mt-0.5 line-clamp-2 text-caption text-pump-muted">{mission.description}</p>
+          ) : null}
+          {mission.progress && !done ? (
+            <div className="mt-2 space-y-1">
+              <div className="flex items-center justify-between gap-2 text-[11px] leading-none text-pump-muted">
+                <span className="financial-value tabular-nums text-pump-text">
+                  {mission.progress.current.toFixed(2)} / {mission.progress.target}{" "}
+                  {mission.progress.unit}
+                </span>
+                <span>{Math.round(progressPct)}%</span>
+              </div>
+              <div className="h-1 overflow-hidden rounded-full bg-pump-surface/70">
+                <div
+                  className="h-full rounded-full bg-pump-accent transition-all duration-300"
+                  style={{ width: `${progressPct}%` }}
+                />
+              </div>
+            </div>
           ) : null}
         </div>
-        <span className={missionStatusBadgeClass(done, showSyncing)}>
-          {missionStatusLabel(done, showSyncing)}
-        </span>
-      </div>
 
-      <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-        <span className="financial-value text-caption font-semibold text-pump-accent">
-          +{mission.rewardPoints} pts
-        </span>
-        {showSyncing ? (
-          <span className="text-caption text-pump-warning">Syncing via indexer…</span>
-        ) : null}
-        {done && mission.pointsAwarded > 0 ? (
-          <span className="text-caption text-pump-muted">
-            Awarded {mission.pointsAwarded.toLocaleString()} pts
+        <div className="flex shrink-0 flex-col items-end gap-1 text-right">
+          <span className="financial-value text-body-sm font-semibold text-pump-accent">
+            +{mission.rewardPoints}
           </span>
-        ) : null}
-      </div>
-
-      {mission.progress && !done ? (
-        <div className="mt-2 rounded-md border border-pump-border/15 bg-pump-surface/35 px-2.5 py-2">
-          <div className="flex items-center justify-between gap-2 text-caption">
-            <span className="section-label text-[10px]">Progress</span>
-            <span className="financial-value font-medium text-pump-text">
-              {mission.progress.current.toFixed(2)} / {mission.progress.target}{" "}
-              {mission.progress.unit}
-            </span>
-          </div>
-          <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-pump-surface/70">
-            <div
-              className="h-full rounded-full bg-pump-accent transition-all duration-300"
-              style={{ width: `${progressPct}%` }}
-            />
-          </div>
+          <span
+            className={`text-[11px] font-semibold uppercase tracking-wide ${missionStatusClass(done, showSyncing)}`}
+          >
+            {missionStatusLabel(done, showSyncing)}
+          </span>
         </div>
-      ) : null}
+      </div>
     </article>
   );
 }
@@ -248,8 +234,7 @@ export function MissionsPanel() {
     return (
       <div className="panel-surface p-8 text-center">
         <p className="text-body-sm text-pump-muted">
-          Connect your wallet to track Pump Points and mission progress for our upcoming app
-          airdrop.
+          Connect your wallet to track Pump Points and mission progress.
         </p>
         <button
           type="button"
@@ -281,139 +266,94 @@ export function MissionsPanel() {
 
       {data && !error ? (
         <>
-          <section className="rounded-lg border border-pump-accent/25 bg-gradient-to-br from-pump-accent/12 via-pump-card/70 to-pump-surface/55 p-3 md:p-4">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="section-label text-[10px] md:text-[inherit]">Pump Points</p>
-                <h3 className="mt-1 text-body-sm font-semibold text-pump-text md:card-title">
-                  Upcoming app airdrop
-                </h3>
-                <p className="mt-1 text-caption leading-snug text-pump-muted md:text-body-sm">
-                  Earn points from on-chain missions. These count toward a future Pump app airdrop —
-                  not token campaigns listed under Airdrops.
+          <section className="rounded-lg border border-pump-border/15 bg-pump-card/80 p-3 md:p-4">
+            <div className="flex items-end justify-between gap-3">
+              <div>
+                <p className="section-label leading-none">Pump Points</p>
+                <p className="financial-value mt-1 text-[1.75rem] font-semibold leading-none text-pump-accent md:text-display">
+                  {data.totalPoints.toLocaleString()}
                 </p>
               </div>
-              <span className="status-badge shrink-0 text-[10px] text-pump-accent md:text-[inherit]">
-                Points live
-              </span>
+              <p className="text-right text-caption text-pump-muted">
+                <span className="financial-value font-medium text-pump-text">
+                  {completedCount}/{totalCount}
+                </span>{" "}
+                done
+                <span className="mx-1.5 text-pump-muted/40">·</span>
+                <span className="financial-value font-medium text-pump-text">
+                  +{pointsToEarn.toLocaleString()}
+                </span>{" "}
+                left
+              </p>
             </div>
 
-            <dl className="mt-3 grid grid-cols-2 gap-2 md:mt-4 md:grid-cols-4 md:gap-2">
-              <div className="flex min-w-0 flex-col gap-1 md:contents">
-                <dt className="section-label text-[10px] md:sr-only">Total points</dt>
-                <dd className="col-span-2 m-0 rounded-md border border-pump-border/15 bg-pump-surface/35 px-2.5 py-2 md:col-span-1 md:flex md:flex-nowrap md:items-center md:justify-between md:gap-2 md:px-3">
-                  <span className="section-label hidden shrink-0 whitespace-nowrap md:inline">
-                    Total points
-                  </span>
-                  <span className="financial-value text-body-sm font-semibold text-pump-accent">
-                    {data.totalPoints.toLocaleString()}
-                  </span>
-                </dd>
-              </div>
-              <div className="flex min-w-0 flex-col gap-1">
-                <dt className="section-label text-[10px] md:hidden">Completed</dt>
-                <dd className="m-0 rounded-md border border-pump-border/15 bg-pump-surface/35 px-2.5 py-2 md:flex md:flex-nowrap md:items-center md:justify-between md:gap-2 md:px-3">
-                  <span className="section-label hidden shrink-0 whitespace-nowrap md:inline">
-                    Completed
-                  </span>
-                  <span className="financial-value text-body-sm font-semibold text-pump-text">
-                    {completedCount}/{totalCount}
-                  </span>
-                </dd>
-              </div>
-              <div className="flex min-w-0 flex-col gap-1">
-                <dt className="section-label text-[10px] md:hidden">Available</dt>
-                <dd className="m-0 rounded-md border border-pump-border/15 bg-pump-surface/35 px-2.5 py-2 md:flex md:flex-nowrap md:items-center md:justify-between md:gap-2 md:px-3">
-                  <span className="section-label hidden shrink-0 whitespace-nowrap md:inline">
-                    Available
-                  </span>
-                  <span className="financial-value text-body-sm font-semibold text-pump-text">
-                    +{pointsToEarn.toLocaleString()} pts
-                  </span>
-                </dd>
-              </div>
-              <div className="flex min-w-0 flex-col gap-1">
-                <dt className="section-label text-[10px] md:hidden">Volume</dt>
-                <dd className="m-0 rounded-md border border-pump-border/15 bg-pump-surface/35 px-2.5 py-2 md:flex md:flex-nowrap md:items-center md:justify-between md:gap-2 md:px-3">
-                  <span className="section-label hidden shrink-0 whitespace-nowrap md:inline">
-                    Volume
-                  </span>
-                  <span className="financial-value text-body-sm font-semibold text-pump-text">
-                    {data.tradingVolumeBnb.toFixed(2)} BNB
-                  </span>
-                </dd>
-              </div>
-            </dl>
-
-            <p className="mt-2 hidden text-caption text-pump-muted md:block">
-              Daily missions reset at UTC midnight ({data.todayUtc}).
-            </p>
+            <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-caption text-pump-muted">
+              <span>
+                Vol{" "}
+                <span className="financial-value font-medium text-pump-text">
+                  {data.tradingVolumeBnb.toFixed(2)} BNB
+                </span>
+              </span>
+              <span className="text-pump-muted/40">·</span>
+              <span>Daily reset {data.todayUtc} UTC</span>
+            </div>
           </section>
 
-          <div className="space-y-2 md:space-y-3">
-            <div className="flex items-center justify-between gap-3">
-              <h3 className="section-heading text-h3">Your missions</h3>
-              <button
-                type="button"
-                onClick={() => loadMissions(address)}
-                disabled={loading}
-                className="chip-button shrink-0 disabled:opacity-50"
-              >
-                {loading ? "Refreshing…" : "Refresh"}
-              </button>
-            </div>
-
-            <div className="-mx-2 flex gap-1.5 overflow-x-auto px-2 pb-0.5 md:mx-0 md:flex-wrap md:overflow-visible md:px-0 md:pb-0">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex gap-1.5">
               {(
                 [
-                  ["all", "All", "All"],
-                  ["open", "Open", "Open"],
-                  ["done", "Done", "Done"],
+                  ["open", "Open"],
+                  ["all", "All"],
+                  ["done", "Done"],
                 ] as const
-              ).map(([key, mobileLabel, desktopLabel]) => {
+              ).map(([key, label]) => {
                 const count = filterCounts[key] ?? 0;
                 return (
                   <button
                     key={key}
                     type="button"
                     onClick={() => setActiveFilter(key)}
-                    className={`shrink-0 max-md:px-2.5 max-md:py-1.5 ${
+                    className={
                       activeFilter === key ? "chip-button chip-button-active" : "chip-button"
-                    }`}
+                    }
                   >
-                    <span className="md:hidden">
-                      {mobileLabel} ({count})
-                    </span>
-                    <span className="hidden md:inline">
-                      {desktopLabel} ({count})
-                    </span>
+                    {label} ({count})
                   </button>
                 );
               })}
             </div>
-
-            <section className="rounded-lg border border-pump-border/15 bg-transparent">
-              {boardMissions.length > 0 ? (
-                <div className="divide-y divide-pump-border/10">
-                  {boardMissions.map((mission) => (
-                    <MissionRow
-                      key={mission.taskKey}
-                      mission={mission}
-                      syncing={pendingKeys.includes(mission.taskKey)}
-                    />
-                  ))}
-                </div>
-              ) : (
-                <p className="p-8 text-center text-body-sm text-pump-muted">
-                  {activeFilter === "done"
-                    ? "No completed missions yet."
-                    : activeFilter === "open"
-                      ? "All missions completed."
-                      : "No missions available."}
-                </p>
-              )}
-            </section>
+            <button
+              type="button"
+              onClick={() => loadMissions(address)}
+              disabled={loading}
+              className="chip-button shrink-0 disabled:opacity-50"
+            >
+              {loading ? "…" : "Refresh"}
+            </button>
           </div>
+
+          <section className="rounded-lg border border-pump-border/15 bg-transparent">
+            {boardMissions.length > 0 ? (
+              <div className="divide-y divide-pump-border/10">
+                {boardMissions.map((mission) => (
+                  <MissionRow
+                    key={mission.taskKey}
+                    mission={mission}
+                    syncing={pendingKeys.includes(mission.taskKey)}
+                  />
+                ))}
+              </div>
+            ) : (
+              <p className="p-8 text-center text-body-sm text-pump-muted">
+                {activeFilter === "done"
+                  ? "Nothing completed yet."
+                  : activeFilter === "open"
+                    ? "All caught up."
+                    : "No missions yet."}
+              </p>
+            )}
+          </section>
         </>
       ) : null}
     </div>
