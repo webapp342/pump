@@ -37,7 +37,8 @@ export const contracts = {
   airdropManager: process.env.NEXT_PUBLIC_AIRDROP_MANAGER as `0x${string}` | undefined,
 };
 
-export function shortAddress(address: string): string {
+export function shortAddress(address: string, compact = false): string {
+  if (compact) return `${address.slice(0, 4)}…${address.slice(-3)}`;
   return `${address.slice(0, 6)}…${address.slice(-4)}`;
 }
 

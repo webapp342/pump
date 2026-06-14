@@ -178,6 +178,10 @@ export function TradePanel({
   const [sellInputMode, setSellInputMode] = useState<TradeInputMode>("usd");
   const [amount, setAmount] = useState("");
   const prefillAppliedRef = useRef(false);
+  const sellMaxPendingRef = useRef(false);
+  const buyMaxPendingRef = useRef(false);
+  const autoSubmitPendingRef = useRef(false);
+  const autoSubmitTriggeredRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const [receiveExpanded, setReceiveExpanded] = useState(false);
   const [pendingAction, setPendingAction] = useState<"buy" | "sell" | "approve" | null>(null);
@@ -192,14 +196,25 @@ export function TradePanel({
     if (!prefill || prefillAppliedRef.current) return;
     prefillAppliedRef.current = true;
     setSide(prefill.side);
-    if (prefill.side === "buy" && prefill.buyMode) {
-      setBuyInputMode(prefill.buyMode);
+    if (prefill.side === "buy") {
+      if (prefill.buyMode) {
+        setBuyInputMode(prefill.buyMode);
+      }
+      if (prefill.buyMax) {
+        buyMaxPendingRef.current = true;
+      }
     }
-    if (prefill.side === "sell" && prefill.buyMode) {
-      setSellInputMode(prefill.buyMode);
+    if (prefill.side === "sell") {
+      setSellInputMode(prefill.buyMode ?? "token");
+      if (prefill.sellMax) {
+        sellMaxPendingRef.current = true;
+      }
     }
     if (prefill.amount) {
       setAmount(prefill.amount);
+    }
+    if (prefill.autoSubmit) {
+      autoSubmitPendingRef.current = true;
     }
   }, [prefill]);
 
@@ -916,8 +931,7 @@ export function TradePanel({
     });
   }
 
-  async function onSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function submitTrade() {
     setError(null);
 
     if (!isConnected || !address) {
@@ -1038,7 +1052,44 @@ export function TradePanel({
     }
   }
 
+  useEffect(() => {
+    if (!sellMaxPendingRef.current || side !== "sell") return;
+    if (maxSellTokenWei === 0n) return;
+    if (!bondingCurve || protocolFeeBps === undefined) return;
+    sellMaxPendingRef.current = false;
+    applySellTokenWei(maxSellTokenWei);
+  }, [side, maxSellTokenWei, bondingCurve, protocolFeeBps]);
+
+  useEffect(() => {
+    if (!buyMaxPendingRef.current || side !== "buy") return;
+    if (maxBuySpendWei === 0n) return;
+    if (!bondingCurve || protocolFeeBps === undefined) return;
+    buyMaxPendingRef.current = false;
+    applyBuySliderPercent(100);
+  }, [side, maxBuySpendWei, bondingCurve, protocolFeeBps]);
+
+  async function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    await submitTrade();
+  }
+
   const isBusy = isPending || isConfirming;
+
+  useEffect(() => {
+    if (!autoSubmitPendingRef.current || autoSubmitTriggeredRef.current) return;
+    if (balancePending || isBusy) return;
+    if (side === "sell") {
+      if (sellTokenWei === 0n || !sellQuoteOut) return;
+    } else if (side === "buy") {
+      if (buyCostWei === 0n) return;
+    } else {
+      return;
+    }
+    autoSubmitPendingRef.current = false;
+    autoSubmitTriggeredRef.current = true;
+    void submitTrade();
+  }, [side, sellTokenWei, sellQuoteOut, buyCostWei, balancePending, isBusy]);
+
   const submitLabel = !isConnected
     ? "Connect wallet to trade"
     : wrongChain

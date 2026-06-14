@@ -43,21 +43,19 @@ import {
 } from "@/lib/airdrop-rules";
 import type { TokenListItem } from "@/lib/db/launchpad";
 import {
-  CLAIM_WINDOW_SEC,
   defaultQualifyEndLocal,
   defaultQualifyStartLocal,
   endAfterStartOrDefault,
   formatDurationDhM,
-  formatUtcPreview,
   localDatetimeToUnix,
   minDatetimeLocal,
   QUALIFY_END_MIN_LEAD_SEC,
   QUALIFY_MIN_DURATION_SEC,
   QUALIFY_START_MIN_LEAD_SEC,
   unixToDatetimeLocal,
-  userTimezoneLabel,
   validateQualifyWindow,
 } from "@/lib/airdrop-datetime";
+import { formatCampaignAmountLabel } from "@/lib/airdrop-board-format";
 
 const ZERO = "0x0000000000000000000000000000000000000000" as const;
 
@@ -98,6 +96,7 @@ export function CreateAirdropForm() {
     defaultQualifyEndLocal(defaultQualifyStartLocal())
   );
   const [socialTasks, setSocialTasks] = useState<SocialTaskDraft[]>(createDefaultSocialTasks);
+  const [socialOpen, setSocialOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pendingAction, setPendingAction] = useState<"approve" | "create" | null>(null);
   const [nowTick, setNowTick] = useState(0);
@@ -468,8 +467,6 @@ export function CreateAirdropForm() {
     submitCreate(pending);
   }
 
-  const tzLabel = useMemo(() => userTimezoneLabel(), []);
-
   const startMinLocal = useMemo(
     () => minDatetimeLocal(Math.ceil(QUALIFY_START_MIN_LEAD_SEC / 60)),
     [nowTick]
@@ -489,12 +486,8 @@ export function CreateAirdropForm() {
     const check = validateQualifyWindow(qualifyStartLocal, qualifyEndLocal);
     if (!check.ok) return null;
     const duration = formatDurationDhM(check.endSec - check.startSec);
-    const claimWindow = formatDurationDhM(CLAIM_WINDOW_SEC);
-    return `${duration} qualification · claim opens at end · ${claimWindow} claim window`;
+    return `${duration} qualify window`;
   }, [qualifyStartLocal, qualifyEndLocal]);
-
-  const startUtcPreview = formatUtcPreview(qualifyStartLocal);
-  const endUtcPreview = formatUtcPreview(qualifyEndLocal);
 
   function handleQualifyStartChange(value: string) {
     setQualifyStartLocal(value);
@@ -655,87 +648,72 @@ export function CreateAirdropForm() {
         ? "Creating…"
         : "Create campaign";
 
+  const rewardAssetLabel = isBnbReward ? "BNB" : selectedRewardSymbol;
+  const rewardAmountLabel =
+    parsedRewardAmount != null
+      ? formatCampaignAmountLabel(parsedRewardAmount, rewardAssetLabel)
+      : "—";
+  const createFeeLabel =
+    createFee !== undefined ? formatCampaignAmountLabel(createFee, "BNB") : "…";
+  const totalBnbLabel =
+    totalBnbCost != null ? formatCampaignAmountLabel(totalBnbCost, "BNB") : "—";
+
   return (
     <form
       onSubmit={onSubmit}
-      className="grid gap-4 xl:grid-cols-[5fr_7fr] xl:items-start"
+      className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(280px,320px)] xl:items-start"
     >
-      <div className="space-y-4 xl:max-w-[640px]">
+      <div className="space-y-4">
         <section className="panel-surface p-4 md:p-5">
-          <p className="section-label">Target token</p>
-          <p className="mt-1 field-hint">
-            Participants qualify by holding or buying this launchpad token.
-          </p>
-
-          <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-start">
-            {selectedLinkedToken ? (
-              <div className="flex shrink-0 flex-col items-center gap-2">
-                <TokenAvatar
-                  address={selectedLinkedToken.address}
-                  symbol={selectedLinkedToken.symbol}
-                  logoUrl={selectedLinkedToken.logoUrl}
-                  size={72}
-                />
-                <p className="text-caption font-medium text-pump-text">
-                  ${selectedLinkedToken.symbol}
-                </p>
-              </div>
-            ) : (
-              <div className="flex h-[72px] w-[72px] shrink-0 items-center justify-center rounded-full border border-dashed border-pump-border/30 bg-pump-surface/40 text-caption text-pump-muted">
-                Pool
-              </div>
-            )}
-
-            <div className="min-w-0 flex-1">
-              <LaunchpadTokenPicker
-                id="linkedToken"
-                modalTitle="Select pool token"
-                label={
-                  <>
-                    Pool token <span className="text-pump-accent">*</span>
-                  </>
-                }
-                value={linkedToken}
-                onChange={setLinkedToken}
-                tokens={tokens}
-                priorityTokens={createdTokens}
-                balances={creatorBalanceMap}
-                loading={tokensLoading}
-                placeholder="Select a launchpad token"
-                hint={
-                  selectedLinkedToken ? (
-                    <p className="field-hint">
-                      <Link
-                        href={`/token/${selectedLinkedToken.address}`}
-                        className="text-pump-accent hover:underline"
-                      >
-                        View ${selectedLinkedToken.symbol} on Arena
-                      </Link>
-                    </p>
-                  ) : null
-                }
-              />
-            </div>
-          </div>
-        </section>
-
-        <section className="panel-surface p-4 md:p-5">
-          <p className="section-label">Campaign info</p>
+          <p className="section-label">1 · Campaign</p>
+          <p className="mt-1 field-hint">Pool token, title, and short description.</p>
 
           <div className="mt-4 space-y-4">
+            <LaunchpadTokenPicker
+              id="linkedToken"
+              modalTitle="Select pool token"
+              label={
+                <>
+                  Pool token <span className="text-pump-accent">*</span>
+                </>
+              }
+              value={linkedToken}
+              onChange={setLinkedToken}
+              tokens={tokens}
+              priorityTokens={createdTokens}
+              balances={creatorBalanceMap}
+              loading={tokensLoading}
+              placeholder="Select a launchpad token"
+              hint={
+                selectedLinkedToken ? (
+                  <p className="field-hint">
+                    Holders and buyers of{" "}
+                    <Link
+                      href={`/token/${selectedLinkedToken.address}`}
+                      className="text-pump-accent hover:underline"
+                    >
+                      ${selectedLinkedToken.symbol}
+                    </Link>{" "}
+                    can qualify.
+                  </p>
+                ) : null
+              }
+            />
+
             <div>
               <label className="field-label" htmlFor="campaignTitle">
-                Campaign title
+                Title <span className="text-pump-accent">*</span>
               </label>
               <input
                 id="campaignTitle"
                 className="field-input"
-                placeholder="e.g. Early holder rewards"
+                placeholder="Early holder rewards"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 maxLength={120}
               />
             </div>
+
             <div>
               <label className="field-label" htmlFor="campaignDescription">
                 Description
@@ -743,8 +721,8 @@ export function CreateAirdropForm() {
               <textarea
                 id="campaignDescription"
                 className="field-textarea"
-                rows={4}
-                placeholder="Explain who qualifies and how rewards are distributed."
+                rows={3}
+                placeholder="Who qualifies and how rewards are split."
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 maxLength={2000}
@@ -755,9 +733,9 @@ export function CreateAirdropForm() {
         </section>
 
         <section className="panel-surface p-4 md:p-5">
-          <p className="section-label">Reward pool</p>
+          <p className="section-label">2 · Reward & timing</p>
           <p className="mt-1 field-hint">
-            Funds are locked in on-chain escrow. TOP 100 wallets split the pool after qualify ends.
+            Escrow locks until qualify ends. TOP 100 wallets split the pool.
           </p>
 
           <div className="mt-4 space-y-4">
@@ -766,7 +744,7 @@ export function CreateAirdropForm() {
               modalTitle="Select reward asset"
               label={
                 <>
-                  Reward token <span className="text-pump-accent">*</span>
+                  Reward <span className="text-pump-accent">*</span>
                 </>
               }
               value={rewardAsset}
@@ -778,15 +756,12 @@ export function CreateAirdropForm() {
                 bnbBalance != null ? formatEther(bnbBalance.value) : isConnected ? "0" : null
               }
               loading={tokensLoading}
-              placeholder="Select reward asset"
+              placeholder="BNB or launchpad token"
               hint={
                 !isConnected ? (
-                  <p className="field-hint">Connect wallet to see BNB and token balances.</p>
+                  <p className="field-hint">Connect wallet to see balances.</p>
                 ) : !isBnbReward ? (
-                  <p className="field-hint">
-                    Token rewards require a one-time approval, plus{" "}
-                    {createFee !== undefined ? formatEther(createFee) : "…"} BNB create fee.
-                  </p>
+                  <p className="field-hint">Token rewards need one approval + create fee in BNB.</p>
                 ) : null
               }
             />
@@ -794,12 +769,10 @@ export function CreateAirdropForm() {
             <div>
               <div className="flex items-baseline justify-between gap-2">
                 <label className="field-label" htmlFor="rewardAmountSlider">
-                  Total reward amount <span className="text-pump-accent">*</span>
+                  Pool size <span className="text-pump-accent">*</span>
                 </label>
                 <p className="financial-value text-body-sm font-semibold text-pump-text">
-                  {parsedRewardAmount
-                    ? `${formatEther(parsedRewardAmount)} ${isBnbReward ? "BNB" : selectedRewardSymbol}`
-                    : "—"}
+                  {rewardAmountLabel}
                 </p>
               </div>
 
@@ -842,73 +815,50 @@ export function CreateAirdropForm() {
                   Max
                 </button>
               </div>
+            </div>
 
-              <p className="mt-1.5 field-hint">
-                {canUseRewardSlider
-                  ? `${rewardSliderPct}% of available balance${
-                      isBnbReward ? " (after fee & gas reserve)" : ""
-                    }`
-                  : isConnected
-                    ? "Insufficient balance for a reward pool."
-                    : "Connect wallet to set reward amount."}
+            <div className="grid gap-4 border-t border-pump-border/15 pt-4 sm:grid-cols-2">
+              <div>
+                <label className="field-label" htmlFor="qualifyStart">
+                  Qualify starts
+                </label>
+                <input
+                  id="qualifyStart"
+                  type="datetime-local"
+                  className="field-input"
+                  value={qualifyStartLocal}
+                  min={startMinLocal}
+                  onChange={(e) => handleQualifyStartChange(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="field-label" htmlFor="qualifyEnd">
+                  Qualify ends
+                </label>
+                <input
+                  id="qualifyEnd"
+                  type="datetime-local"
+                  className="field-input"
+                  value={qualifyEndLocal}
+                  min={endMinLocal}
+                  onChange={(e) => setQualifyEndLocal(e.target.value)}
+                />
+              </div>
+            </div>
+
+            {qualifyDurationLabel ? (
+              <p className="field-hint">{qualifyDurationLabel}</p>
+            ) : (
+              <p className="text-caption text-pump-warning">
+                End must be at least 15 minutes after start.
               </p>
-            </div>
+            )}
           </div>
         </section>
 
         <section className="panel-surface p-4 md:p-5">
-          <p className="section-label">Qualification window</p>
-          <p className="mt-1 field-hint">
-            Local timezone ({tzLabel}). Stored on-chain as UTC. Past times cannot be selected.
-          </p>
-
-          <div className="mt-4 grid gap-4 sm:grid-cols-2">
-            <div>
-              <label className="field-label" htmlFor="qualifyStart">
-                Start
-              </label>
-              <input
-                id="qualifyStart"
-                type="datetime-local"
-                className="field-input"
-                value={qualifyStartLocal}
-                min={startMinLocal}
-                onChange={(e) => handleQualifyStartChange(e.target.value)}
-              />
-              {startUtcPreview ? (
-                <p className="mt-1 field-hint">On-chain: {startUtcPreview}</p>
-              ) : null}
-            </div>
-            <div>
-              <label className="field-label" htmlFor="qualifyEnd">
-                End
-              </label>
-              <input
-                id="qualifyEnd"
-                type="datetime-local"
-                className="field-input"
-                value={qualifyEndLocal}
-                min={endMinLocal}
-                onChange={(e) => setQualifyEndLocal(e.target.value)}
-              />
-              {endUtcPreview ? (
-                <p className="mt-1 field-hint">On-chain: {endUtcPreview}</p>
-              ) : null}
-            </div>
-          </div>
-
-          {qualifyDurationLabel ? (
-            <p className="mt-3 field-hint">{qualifyDurationLabel}</p>
-          ) : (
-            <p className="mt-3 text-caption text-pump-warning">
-              End must be at least 15 minutes after start and in the future.
-            </p>
-          )}
-        </section>
-
-        <section className="panel-surface p-4 md:p-5">
-          <p className="section-label">On-chain rules</p>
-          <p className="mt-1 field-hint">At least one rule is required to qualify wallets.</p>
+          <p className="section-label">3 · Who qualifies</p>
+          <p className="mt-1 field-hint">Set at least one on-chain rule.</p>
 
           <AirdropQualifyRulesEditor
             linkedToken={selectedLinkedToken}
@@ -919,17 +869,36 @@ export function CreateAirdropForm() {
           />
         </section>
 
-        <AirdropSocialTasksEditor
-          tasks={socialTasks}
-          onToggle={toggleSocialTask}
-          onUrlChange={updateSocialTaskUrl}
-        />
+        <section className="panel-surface overflow-hidden">
+          <button
+            type="button"
+            onClick={() => setSocialOpen((open) => !open)}
+            className="flex w-full items-center justify-between px-4 py-3.5 text-left transition hover:bg-pump-surface/40 md:px-5"
+            aria-expanded={socialOpen}
+          >
+            <div>
+              <p className="section-label">Social tasks</p>
+              <p className="mt-0.5 field-hint">Optional — skip if not needed.</p>
+            </div>
+            <span className="text-caption text-pump-muted">{socialOpen ? "−" : "+"}</span>
+          </button>
+          {socialOpen ? (
+            <div className="border-t border-pump-border/15 px-4 pb-4 pt-2 md:px-5">
+              <AirdropSocialTasksEditor
+                tasks={socialTasks}
+                onToggle={toggleSocialTask}
+                onUrlChange={updateSocialTaskUrl}
+                embedded
+              />
+            </div>
+          ) : null}
+        </section>
       </div>
 
-      <aside className="space-y-2.5 xl:sticky xl:top-16 xl:min-w-0">
-        <section className="rounded-lg border border-pump-accent/25 bg-gradient-to-br from-pump-accent/12 via-pump-card/70 to-pump-surface/55 p-3 md:p-4">
+      <aside className="space-y-3 xl:sticky xl:top-20">
+        <section className="panel-surface p-4">
           <p className="section-label">Preview</p>
-          <div className="mt-2 flex items-center gap-2.5">
+          <div className="mt-3 flex items-center gap-2.5">
             {selectedLinkedToken ? (
               <TokenAvatar
                 address={selectedLinkedToken.address}
@@ -948,73 +917,61 @@ export function CreateAirdropForm() {
             </div>
           </div>
           {description.trim() ? (
-            <p className="mt-2 text-caption leading-snug text-pump-muted line-clamp-2">
+            <p className="mt-2 text-caption leading-snug text-pump-muted line-clamp-3">
               {description.trim()}
             </p>
-          ) : (
-            <p className="mt-2 text-caption leading-snug text-pump-warning">
-              Add a description so participants understand the campaign.
-            </p>
-          )}
-          <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 border-t border-pump-border/15 pt-2 text-caption">
-            <dt className="text-pump-muted">Qualify</dt>
-            <dd className="financial-value text-right text-pump-text">
-              {qualifyDurationLabel ?? "Set window"}
-            </dd>
-            <dt className="self-start text-pump-muted">Rules</dt>
-            <dd>
-              <AirdropQualifyRulesPreview
-                linkedToken={selectedLinkedToken}
-                minHoldTokens={minHoldTokens}
-                minBuyBnb={minBuyBnb}
-              />
-            </dd>
-            <AirdropSocialTasksPreview tasks={socialTasksForSync} />
+          ) : null}
+          <dl className="mt-3 space-y-1.5 border-t border-pump-border/15 pt-3 text-caption">
+            <div className="flex justify-between gap-2">
+              <dt className="text-pump-muted">Reward</dt>
+              <dd className="financial-value text-right text-pump-text">{rewardAmountLabel}</dd>
+            </div>
+            <div className="flex justify-between gap-2">
+              <dt className="text-pump-muted">Qualify</dt>
+              <dd className="financial-value text-right text-pump-text">
+                {qualifyDurationLabel ?? "Set window"}
+              </dd>
+            </div>
+            <div className="flex justify-between gap-2">
+              <dt className="shrink-0 text-pump-muted">Rules</dt>
+              <dd className="text-right">
+                <AirdropQualifyRulesPreview
+                  linkedToken={selectedLinkedToken}
+                  minHoldTokens={minHoldTokens}
+                  minBuyBnb={minBuyBnb}
+                />
+              </dd>
+            </div>
           </dl>
+          <AirdropSocialTasksPreview tasks={socialTasksForSync} />
         </section>
 
         <AirdropRewardSplitPreview
           totalReward={parsedRewardAmount}
-          assetLabel={isBnbReward ? "BNB" : selectedRewardSymbol}
+          assetLabel={rewardAssetLabel}
         />
 
-        <section className="panel-surface p-3 md:p-4">
-          <p className="section-label">Campaign summary</p>
-          <dl className="mt-2 space-y-1.5 text-caption">
+        <section className="panel-surface p-4">
+          <p className="section-label">Summary</p>
+          <dl className="mt-3 space-y-2 text-body-sm">
             <div className="flex items-center justify-between gap-2">
               <dt className="text-pump-muted">Reward pool</dt>
-              <dd className="financial-value font-medium text-pump-text">
-                {parsedRewardAmount
-                  ? `${formatEther(parsedRewardAmount)} ${isBnbReward ? "BNB" : selectedRewardSymbol}`
-                  : "—"}
-              </dd>
+              <dd className="financial-value font-medium text-pump-text">{rewardAmountLabel}</dd>
             </div>
             <div className="flex items-center justify-between gap-2">
               <dt className="text-pump-muted">Create fee</dt>
-              <dd className="financial-value font-medium text-pump-text">
-                {createFee !== undefined ? `${formatEther(createFee)} BNB` : "…"}
-              </dd>
+              <dd className="financial-value font-medium text-pump-text">{createFeeLabel}</dd>
             </div>
-            {!isBnbReward && parsedRewardAmount ? (
-              <div className="flex items-center justify-between gap-2">
-                <dt className="text-pump-muted">Token escrow</dt>
-                <dd className="financial-value font-medium text-pump-text">
-                  {formatEther(parsedRewardAmount)} {selectedRewardSymbol}
-                </dd>
-              </div>
-            ) : null}
-            <div className="flex items-center justify-between gap-2 border-t border-pump-border/15 pt-1.5">
+            <div className="flex items-center justify-between gap-2 border-t border-pump-border/15 pt-2">
               <dt className="font-medium text-pump-text">Total BNB</dt>
-              <dd className="financial-value text-body-sm font-semibold text-pump-text">
-                {totalBnbCost != null ? `${formatEther(totalBnbCost)} BNB` : "—"}
-              </dd>
+              <dd className="financial-value font-semibold text-pump-text">{totalBnbLabel}</dd>
             </div>
           </dl>
 
-          {error ? <p className="notice-error mt-2 text-caption">{error}</p> : null}
+          {error ? <p className="notice-error mt-3 text-caption">{error}</p> : null}
 
           {formValidation.warnings.length > 0 ? (
-            <ul className="mt-2 space-y-1 rounded-md border border-pump-warning/30 bg-pump-warning/5 px-2.5 py-2">
+            <ul className="mt-3 space-y-1 rounded-md border border-pump-warning/30 bg-pump-warning/5 px-2.5 py-2">
               {formValidation.warnings.map((warning) => (
                 <li key={warning} className="text-[11px] leading-snug text-pump-warning">
                   {warning}
@@ -1026,7 +983,7 @@ export function CreateAirdropForm() {
           <button
             type="submit"
             disabled={submitDisabled}
-            className="primary-button mt-3 flex w-full items-center justify-center gap-2"
+            className="primary-button mt-4 flex w-full items-center justify-center gap-2"
           >
             {busy ? (
               <span

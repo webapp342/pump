@@ -430,26 +430,6 @@ export function CreateMemeForm() {
               starting price.
             </p>
           </div>
-
-          {showReceivePreview ? (
-            <div className="mt-4 rounded-lg border border-pump-border/15 bg-pump-surface/35 p-4">
-              <p className="section-label">You will receive</p>
-              <div className="mt-3 flex items-center gap-3">
-                <TokenAvatar
-                  address="0x0000000000000000000000000000000000000000"
-                  symbol={displaySymbol}
-                  previewUrl={logoPreview}
-                  size={44}
-                />
-                <div className="min-w-0">
-                  <p className="financial-value text-h3 font-semibold text-pump-text">
-                    {formatTokenAmountCompact(estimatedTokens)}
-                  </p>
-                  <p className="text-body-sm text-pump-muted">${displaySymbol}</p>
-                </div>
-              </div>
-            </div>
-          ) : null}
         </section>
 
         <section className="panel-surface overflow-hidden">

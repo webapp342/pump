@@ -15,7 +15,7 @@ export function AppNav() {
   const pathname = usePathname();
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-pump-border/50 bg-pump-card md:hidden">
+    <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-pump-border/50 bg-pump-card pb-[env(safe-area-inset-bottom,0px)] md:hidden">
       <div className={`flex ${shellInnerClass}`}>
         {links.map((link) => {
           const active =

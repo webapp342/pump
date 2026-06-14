@@ -700,7 +700,7 @@ export function ArenaListClient() {
             placeholder="Search coin or symbol"
             className="field-input h-9 w-full bg-pump-surface/75 md:max-w-xs"
           />
-          <div className="sheet-tabs -mx-2 overflow-x-auto px-2 md:mx-0 md:px-0">
+          <div className="sheet-tabs -mx-2 overflow-x-auto px-2 md:mx-0 md:px-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {(
             [
               ["new", "New", "Newest"],

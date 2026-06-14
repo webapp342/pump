@@ -2,6 +2,12 @@ export type TradePrefillConfig = {
   side: "buy" | "sell";
   buyMode?: "bnb" | "token" | "usd";
   amount?: string;
+  /** Prefill sell with full on-chain token balance. */
+  sellMax?: boolean;
+  /** Prefill buy with max spend (BNB balance minus gas). */
+  buyMax?: boolean;
+  /** After prefill (and sellMax/buyMax), submit the trade once quotes are ready. */
+  autoSubmit?: boolean;
 };
 
 function trimTrailingZeros(value: string): string {

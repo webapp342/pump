@@ -1,16 +1,8 @@
 "use client";
 
 import { useMemo } from "react";
-import { formatEther } from "viem";
-import { getAirdropDistributionTiers, perWinnerSharePct } from "@/lib/airdrop-distribution";
-
-function formatSplitAmount(value: bigint): string {
-  const n = Number(formatEther(value));
-  if (!Number.isFinite(n) || n <= 0) return "—";
-  if (n >= 1) return n.toFixed(4);
-  if (n >= 0.0001) return n.toFixed(6);
-  return n.toFixed(8);
-}
+import { getAirdropDistributionTiers, formatPerWinnerSharePct } from "@/lib/airdrop-distribution";
+import { formatCampaignAmount } from "@/lib/airdrop-board-format";
 
 type AirdropRewardSplitPreviewProps = {
   totalReward: bigint | null;
@@ -27,19 +19,19 @@ export function AirdropRewardSplitPreview({
   );
 
   const hasAmount = totalReward != null && totalReward > 0n;
-  const eachPct = perWinnerSharePct();
+  const eachPctLabel = formatPerWinnerSharePct();
 
   return (
-    <section className="panel-surface p-3 md:p-4">
+    <section className="panel-surface p-4">
       <p className="section-label">TOP 100 split</p>
 
-      <div className="mt-2 overflow-x-auto">
-        <table className="w-full min-w-[240px] text-caption">
+      <div className="mt-3 overflow-x-auto">
+        <table className="w-full text-caption">
           <thead>
             <tr className="border-b border-pump-border/15 text-left text-pump-muted">
-              <th className="section-label pb-1.5 pr-2 text-[10px] font-medium">Rank</th>
-              <th className="section-label pb-1.5 pr-2 text-[10px] font-medium">Pool %</th>
-              <th className="section-label pb-1.5 text-right text-[10px] font-medium">Reward</th>
+              <th className="pb-1.5 pr-2 font-medium">Rank</th>
+              <th className="pb-1.5 pr-2 font-medium">Share</th>
+              <th className="pb-1.5 text-right font-medium">Reward</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-pump-border/10">
@@ -48,13 +40,13 @@ export function AirdropRewardSplitPreview({
                 <td className="py-1.5 pr-2 font-medium text-pump-text">{tier.rankLabel}</td>
                 <td className="py-1.5 pr-2 text-pump-muted">
                   {tier.perWinner
-                    ? `${tier.poolSharePct}% · ${eachPct.toFixed(2)}% ea`
+                    ? `${tier.poolSharePct}% · ${eachPctLabel}% ea`
                     : `${tier.poolSharePct}%`}
                 </td>
-                <td className="py-1.5 text-right financial-value whitespace-nowrap text-pump-text">
+                <td className="py-1.5 text-right financial-value text-pump-text">
                   {hasAmount ? (
                     <>
-                      {formatSplitAmount(tier.amount)}
+                      {formatCampaignAmount(tier.amount)}
                       <span className="text-pump-muted">
                         {" "}
                         {assetLabel}
@@ -71,8 +63,8 @@ export function AirdropRewardSplitPreview({
         </table>
       </div>
 
-      <p className="mt-1.5 text-[10px] leading-snug text-pump-muted">
-        100 winners · #4–#100 share 70% equally
+      <p className="mt-2 text-[11px] leading-snug text-pump-muted">
+        Ranks #4–#100 share 70% equally.
       </p>
     </section>
   );

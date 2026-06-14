@@ -40,8 +40,9 @@ export function ReferralRewardsCard({
 
   return (
     <PortfolioMetricBox
-      label="Fees"
+      label="Referral fees"
       value={formatUsdReadable(totalUsd, { compact: true })}
+      actionsLayout="split"
       actions={
         <>
           <button type="button" onClick={() => void copyLink()} className="secondary-button">

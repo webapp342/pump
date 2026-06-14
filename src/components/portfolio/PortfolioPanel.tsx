@@ -20,7 +20,10 @@ import { useUserAvatar } from "@/components/user/UserAvatarProvider";
 import { shortAddress } from "@/config/chain";
 import { TokenBoardTable } from "@/components/arena/TokenBoardTable";
 import { PortfolioPanelSkeleton } from "@/components/portfolio/PortfolioPanelSkeleton";
+import { HoldingSwipeRow } from "@/components/portfolio/HoldingSwipeRow";
+import { HoldingsSwipeHint } from "@/components/portfolio/HoldingsSwipeHint";
 import { TokenAvatar } from "@/components/token/TokenAvatar";
+import { TradeSheet } from "@/components/token/TradeSheet";
 import type { TokenListItem } from "@/lib/db/launchpad";
 import { useBnbUsdPrice } from "@/hooks/useBnbUsdPrice";
 import { bnbToUsd, formatUsdReadable } from "@/lib/format-usd";
@@ -64,6 +67,12 @@ type WalletLaunchpadHolding = {
   tokenBalance: string;
   lastPriceBnb: string;
   estimatedValueBnb: number;
+};
+
+type PortfolioQuickTradeTarget = {
+  tokenAddress: `0x${string}`;
+  symbol: string;
+  side: "buy" | "sell";
 };
 
 type TradeRow = {
@@ -172,10 +181,20 @@ function PortfolioStatBox({
   );
 }
 
-function PnlCell({ usd, pct }: { usd: number | null; pct: number | null }) {
+function PnlCell({
+  usd,
+  pct,
+  align = "end",
+}: {
+  usd: number | null;
+  pct: number | null;
+  align?: "start" | "end";
+}) {
   const tone = pct != null && Number.isFinite(pct) ? pnlTone(pct) : "text-pump-muted";
   return (
-    <div className="flex items-center justify-end gap-2 whitespace-nowrap">
+    <div
+      className={`flex items-center gap-2 whitespace-nowrap ${align === "start" ? "justify-start" : "justify-end"}`}
+    >
       <span className={`financial-value text-body-sm font-semibold ${tone}`}>
         {formatUsdReadable(usd, { compact: true, signed: true })}
       </span>
@@ -186,60 +205,112 @@ function PnlCell({ usd, pct }: { usd: number | null; pct: number | null }) {
   );
 }
 
+function HoldingQuickActions({
+  onBuyMax,
+  onSellMax,
+}: {
+  onBuyMax: () => void;
+  onSellMax: () => void;
+}) {
+  const baseClass =
+    "shrink-0 rounded px-2 py-0.5 text-caption font-semibold transition-[opacity,background-color,border-color,color] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-pump-accent/40";
+
+  return (
+    <div className="flex items-center justify-end gap-1.5">
+      <button
+        type="button"
+        title="Buy max"
+        onClick={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          onBuyMax();
+        }}
+        className={`${baseClass} border border-pump-accent/30 bg-pump-accent/8 text-pump-accent/85 hover:border-pump-accent/50 hover:bg-pump-accent/15 hover:text-pump-accent group-hover:border-pump-accent/45 group-hover:bg-pump-accent/12 group-hover:text-pump-accent`}
+      >
+        Buy max
+      </button>
+      <button
+        type="button"
+        title="Sell max"
+        onClick={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          onSellMax();
+        }}
+        className={`${baseClass} border border-pump-danger/30 bg-pump-danger/8 text-pump-danger/85 hover:border-pump-danger/50 hover:bg-pump-danger/15 hover:text-pump-danger group-hover:border-pump-danger/45 group-hover:bg-pump-danger/12 group-hover:text-pump-danger`}
+      >
+        Sell max
+      </button>
+    </div>
+  );
+}
+
 function WalletHoldingMobileRow({
   holding,
   bnbUsd,
+  onBuyMax,
+  onSellMax,
+  peekOnMount = false,
 }: {
   holding: WalletLaunchpadHolding;
   bnbUsd: number | null;
+  onBuyMax: () => void;
+  onSellMax: () => void;
+  peekOnMount?: boolean;
 }) {
   const balance = Number(holding.tokenBalance);
   const positionValueUsd = bnbToUsd(balance * Number(holding.lastPriceBnb), bnbUsd);
 
   return (
-    <article className="grid grid-cols-[1.75rem_1fr_auto] gap-x-2 gap-y-2 p-2.5">
-      <TokenAvatar
-        address={holding.tokenAddress}
-        symbol={holding.symbol}
-        logoUrl={holding.logoUrl}
-        size={28}
-        className="row-span-2 self-start"
-      />
-      <Link
-        href={`/token/${holding.tokenAddress}`}
-        className="self-center truncate text-body-sm font-medium text-pump-text"
-      >
-        ${holding.symbol}
-        <span className="ml-1 text-caption font-normal text-pump-muted">· on-chain</span>
-      </Link>
-      <div className="self-center text-caption text-pump-muted">—</div>
-      <div className="col-span-2 col-start-2 flex w-full items-center justify-between gap-2 text-[11px] leading-tight">
-        <span className="financial-value min-w-0 truncate text-pump-text">
-          <span className="text-pump-muted">VAL </span>
-          {formatUsdReadable(positionValueUsd, { compact: true })}
-        </span>
-        <span className="financial-value min-w-0 truncate text-pump-text">
-          <span className="text-pump-muted">BAL </span>
-          {formatTokenBalance(balance)}
-        </span>
-        <span className="financial-value min-w-0 truncate text-right text-pump-muted">—</span>
-      </div>
-    </article>
+    <HoldingSwipeRow onBuyMax={onBuyMax} onSellMax={onSellMax} peekOnMount={peekOnMount}>
+      <article className="grid grid-cols-[1.75rem_1fr_auto] gap-x-2 gap-y-2 p-2.5">
+        <TokenAvatar
+          address={holding.tokenAddress}
+          symbol={holding.symbol}
+          logoUrl={holding.logoUrl}
+          size={28}
+          className="row-span-2 self-start"
+        />
+        <Link
+          href={`/token/${holding.tokenAddress}`}
+          className="self-center truncate text-body-sm font-medium text-pump-text"
+        >
+          ${holding.symbol}
+          <span className="ml-1 text-caption font-normal text-pump-muted">· on-chain</span>
+        </Link>
+        <div className="self-center text-caption text-pump-muted">—</div>
+        <div className="col-span-2 col-start-2 flex w-full items-center justify-between gap-2 text-[11px] leading-tight">
+          <span className="financial-value min-w-0 truncate text-pump-text">
+            <span className="text-pump-muted">VAL </span>
+            {formatUsdReadable(positionValueUsd, { compact: true })}
+          </span>
+          <span className="financial-value min-w-0 truncate text-pump-text">
+            <span className="text-pump-muted">BAL </span>
+            {formatTokenBalance(balance)}
+          </span>
+          <span className="financial-value min-w-0 truncate text-right text-pump-muted">—</span>
+        </div>
+      </article>
+    </HoldingSwipeRow>
   );
 }
 
 function WalletHoldingDesktopRow({
   holding,
   bnbUsd,
+  onBuyMax,
+  onSellMax,
 }: {
   holding: WalletLaunchpadHolding;
   bnbUsd: number | null;
+  onBuyMax: () => void;
+  onSellMax: () => void;
 }) {
   const balance = Number(holding.tokenBalance);
   const positionValueUsd = bnbToUsd(balance * Number(holding.lastPriceBnb), bnbUsd);
 
   return (
-    <tr className="border-b border-pump-border/10 last:border-b-0">
+    <tr className="group border-b border-pump-border/10 last:border-b-0">
       <td className="px-4 py-3">
         <Link
           href={`/token/${holding.tokenAddress}`}
@@ -264,7 +335,10 @@ function WalletHoldingDesktopRow({
       </td>
       <td className="px-4 py-3 financial-value text-pump-text">{formatTokenBalance(balance)}</td>
       <td className="px-4 py-3 financial-value text-pump-muted">—</td>
-      <td className="px-4 py-3 text-right text-caption text-pump-muted">—</td>
+      <td className="w-[1%] whitespace-nowrap px-4 py-3 text-caption text-pump-muted">—</td>
+      <td className="w-[1%] whitespace-nowrap px-4 py-3">
+        <HoldingQuickActions onBuyMax={onBuyMax} onSellMax={onSellMax} />
+      </td>
     </tr>
   );
 }
@@ -439,6 +513,7 @@ export function PortfolioPanel() {
   const [walletHoldings, setWalletHoldings] = useState<WalletLaunchpadHolding[]>([]);
   const [onChainBalances, setOnChainBalances] = useState<Record<string, string>>({});
   const [holdingsReady, setHoldingsReady] = useState(false);
+  const [quickTradeTarget, setQuickTradeTarget] = useState<PortfolioQuickTradeTarget | null>(null);
   const burstUntilRef = useRef(0);
   const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const loadGenerationRef = useRef(0);
@@ -524,6 +599,21 @@ export function PortfolioPanel() {
       }
     }
   }, []);
+
+  const openQuickTrade = useCallback(
+    (tokenAddress: string, symbol: string, side: "buy" | "sell") => {
+      if (!isConnected) {
+        openConnectModal?.();
+        return;
+      }
+      setQuickTradeTarget({
+        tokenAddress: tokenAddress.toLowerCase() as `0x${string}`,
+        symbol,
+        side,
+      });
+    },
+    [isConnected, openConnectModal]
+  );
 
   useEffect(() => {
     if (!isConnected || !address) {
@@ -633,6 +723,12 @@ export function PortfolioPanel() {
   const totalEstimatedUsd = bnbToUsd(totalEstimated, bnbUsd);
   const totalNetPnlUsd =
     bnbUsd != null && Number.isFinite(totalNetPnl) ? totalNetPnl * bnbUsd : null;
+  const totalCostBasis = verifiedPositionViews.reduce(
+    (sum, view) => sum + view.remainingCostBasis,
+    0
+  );
+  const portfolioValuePct =
+    totalCostBasis > 0 ? (totalNetPnl / totalCostBasis) * 100 : null;
   const claimedBnb = data?.creatorFeesClaimedBnb ?? 0;
   const pendingBnb = pendingWei != null ? Number(formatEther(pendingWei)) : 0;
   const creatorFeesTotalBnb = claimedBnb + pendingBnb;
@@ -673,6 +769,29 @@ export function PortfolioPanel() {
 
       <AvatarPickerModal open={avatarPickerOpen} onClose={() => setAvatarPickerOpen(false)} />
 
+      {quickTradeTarget ? (
+        <TradeSheet
+          key={`${quickTradeTarget.tokenAddress}-${quickTradeTarget.side}`}
+          open
+          presentation="modal"
+          onClose={() => setQuickTradeTarget(null)}
+          tokenAddress={quickTradeTarget.tokenAddress}
+          symbol={quickTradeTarget.symbol}
+          status=""
+          prefill={{
+            side: quickTradeTarget.side,
+            ...(quickTradeTarget.side === "sell"
+              ? { sellMax: true, autoSubmit: true }
+              : { buyMax: true, autoSubmit: true }),
+          }}
+          onTradeConfirmed={() => {
+            setQuickTradeTarget(null);
+            if (address) void loadPortfolio(address);
+            window.dispatchEvent(new Event("pump:activity"));
+          }}
+        />
+      ) : null}
+
       <div className="space-y-3 md:space-y-4">
         <section className="rounded-lg border border-pump-accent/25 bg-gradient-to-br from-pump-accent/12 via-pump-card/70 to-pump-surface/55 p-3 md:p-4">
           <div className="flex items-center gap-3">
@@ -689,16 +808,18 @@ export function PortfolioPanel() {
               <div className="h-12 w-12 shrink-0 animate-pulse rounded-full bg-pump-surface/60 md:h-14 md:w-14" />
             )}
             <div className="min-w-0 flex-1">
-              <p className="financial-value text-body-sm font-semibold text-pump-text md:text-body">
-                {shortAddress(address)}
-              </p>
-              <button
-                type="button"
-                onClick={() => setAvatarPickerOpen(true)}
-                className="mt-0.5 text-caption font-medium text-pump-accent hover:underline"
-              >
-                Change avatar
-              </button>
+              <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
+                <p className="financial-value text-body-sm font-semibold text-pump-text md:text-body">
+                  {shortAddress(address)}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setAvatarPickerOpen(true)}
+                  className="shrink-0 text-caption font-medium text-pump-accent hover:underline"
+                >
+                  Change avatar
+                </button>
+              </div>
               <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-caption md:mt-2 md:text-body-sm">
                 <button
                   type="button"
@@ -728,7 +849,17 @@ export function PortfolioPanel() {
           <dl className="mt-3 grid grid-cols-2 items-stretch gap-2 md:mt-4 lg:grid-cols-4">
             <PortfolioStatBox
               label="Portfolio value"
-              value={formatUsdReadable(totalEstimatedUsd, { compact: true })}
+              value={
+                <>
+                  <span>{formatUsdReadable(totalEstimatedUsd, { compact: true })}</span>
+                  <span
+                    className={`text-caption font-medium ${pnlTone(portfolioValuePct ?? totalNetPnl)}`}
+                  >
+                    {formatSignedPct(portfolioValuePct)}
+                  </span>
+                </>
+              }
+              valueClassName="inline-flex flex-wrap items-baseline gap-x-2 gap-y-0.5 financial-value text-body-sm font-semibold text-pump-text"
             />
             <PortfolioStatBox
               label="Net PnL"
@@ -758,6 +889,7 @@ export function PortfolioPanel() {
           <>
             <div className="space-y-2 md:space-y-3">
               <h3 className="section-heading text-h3">Holdings ({holdingsCount})</h3>
+              {holdingsCount > 0 ? <HoldingsSwipeHint /> : null}
               {holdingsCount === 0 ? (
                 <p className="panel-surface p-6 text-center text-body-sm text-pump-muted">
                   No open positions. Buy from the Arena.
@@ -765,7 +897,7 @@ export function PortfolioPanel() {
               ) : (
                 <section className="rounded-lg border border-pump-border/15 bg-transparent">
                   <div className="lg:hidden divide-y divide-pump-border/10">
-                    {verifiedPositionViews.map((view) => {
+                    {verifiedPositionViews.map((view, index) => {
                       const { position, balance, remainingCostBasis, avgEntry } = view;
                       const avgEntryUsd = avgEntry != null ? bnbToUsd(avgEntry, bnbUsd) : null;
                       const positionValueUsd = bnbToUsd(
@@ -778,48 +910,55 @@ export function PortfolioPanel() {
                         remainingCostBasis > 0 ? (netPnl / remainingCostBasis) * 100 : null;
 
                       return (
-                        <article
+                        <HoldingSwipeRow
                           key={position.tokenAddress}
-                          className="grid grid-cols-[1.75rem_1fr_auto] gap-x-2 gap-y-2 p-2.5"
+                          peekOnMount={index === 0}
+                          onBuyMax={() => openQuickTrade(position.tokenAddress, position.symbol, "buy")}
+                          onSellMax={() => openQuickTrade(position.tokenAddress, position.symbol, "sell")}
                         >
-                          <TokenAvatar
-                            address={position.tokenAddress}
-                            symbol={position.symbol}
-                            logoUrl={position.logoUrl}
-                            size={28}
-                            className="row-span-2 self-start"
-                          />
-                          <Link
-                            href={`/token/${position.tokenAddress}`}
-                            className="self-center truncate text-body-sm font-medium text-pump-text"
-                          >
-                            ${position.symbol}
-                          </Link>
-                          <div className="self-center">
-                            <PnlCell usd={netPnlUsd} pct={netPnlPct} />
-                          </div>
-                          <div className="col-span-2 col-start-2 flex w-full items-center justify-between gap-2 text-[11px] leading-tight">
-                            <span className="financial-value min-w-0 truncate text-pump-text">
-                              <span className="text-pump-muted">VAL </span>
-                              {formatUsdReadable(positionValueUsd, { compact: true })}
-                            </span>
-                            <span className="financial-value min-w-0 truncate text-pump-text">
-                              <span className="text-pump-muted">BAL </span>
-                              {formatTokenBalance(balance)}
-                            </span>
-                            <span className="financial-value min-w-0 truncate text-right text-pump-text">
-                              <span className="text-pump-muted">ENTRY </span>
-                              {formatUsdReadable(avgEntryUsd, { compact: true })}
-                            </span>
-                          </div>
-                        </article>
+                          <article className="grid grid-cols-[1.75rem_1fr_auto] gap-x-2 gap-y-2 p-2.5">
+                            <TokenAvatar
+                              address={position.tokenAddress}
+                              symbol={position.symbol}
+                              logoUrl={position.logoUrl}
+                              size={28}
+                              className="row-span-2 self-start"
+                            />
+                            <Link
+                              href={`/token/${position.tokenAddress}`}
+                              className="self-center truncate text-body-sm font-medium text-pump-text"
+                            >
+                              ${position.symbol}
+                            </Link>
+                            <div className="self-center">
+                              <PnlCell usd={netPnlUsd} pct={netPnlPct} />
+                            </div>
+                            <div className="col-span-2 col-start-2 flex w-full items-center justify-between gap-2 text-[11px] leading-tight">
+                              <span className="financial-value min-w-0 truncate text-pump-text">
+                                <span className="text-pump-muted">VAL </span>
+                                {formatUsdReadable(positionValueUsd, { compact: true })}
+                              </span>
+                              <span className="financial-value min-w-0 truncate text-pump-text">
+                                <span className="text-pump-muted">BAL </span>
+                                {formatTokenBalance(balance)}
+                              </span>
+                              <span className="financial-value min-w-0 truncate text-right text-pump-text">
+                                <span className="text-pump-muted">ENTRY </span>
+                                {formatUsdReadable(avgEntryUsd, { compact: true })}
+                              </span>
+                            </div>
+                          </article>
+                        </HoldingSwipeRow>
                       );
                     })}
-                    {walletHoldings.map((holding) => (
+                    {walletHoldings.map((holding, index) => (
                       <WalletHoldingMobileRow
                         key={holding.tokenAddress}
                         holding={holding}
                         bnbUsd={bnbUsd}
+                        peekOnMount={verifiedPositionViews.length === 0 && index === 0}
+                        onBuyMax={() => openQuickTrade(holding.tokenAddress, holding.symbol, "buy")}
+                        onSellMax={() => openQuickTrade(holding.tokenAddress, holding.symbol, "sell")}
                       />
                     ))}
                   </div>
@@ -832,7 +971,8 @@ export function PortfolioPanel() {
                           <th>Value</th>
                           <th>Balance</th>
                           <th>Entry</th>
-                          <th className="text-right">Net PnL</th>
+                          <th className="w-[1%] whitespace-nowrap">Net PnL</th>
+                          <th className="w-[1%] whitespace-nowrap text-right">Trade</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -850,7 +990,7 @@ export function PortfolioPanel() {
                             remainingCostBasis > 0 ? (netPnl / remainingCostBasis) * 100 : null;
 
                           return (
-                            <tr key={position.tokenAddress}>
+                            <tr key={position.tokenAddress} className="group">
                               <td>
                                 <Link
                                   href={`/token/${position.tokenAddress}`}
@@ -881,8 +1021,18 @@ export function PortfolioPanel() {
                               <td className="px-4 py-3 financial-value text-pump-text">
                                 {formatUsdReadable(avgEntryUsd, { compact: true })}
                               </td>
-                              <td className="px-4 py-3">
-                                <PnlCell usd={netPnlUsd} pct={netPnlPct} />
+                              <td className="w-[1%] whitespace-nowrap px-4 py-3">
+                                <PnlCell usd={netPnlUsd} pct={netPnlPct} align="start" />
+                              </td>
+                              <td className="w-[1%] whitespace-nowrap px-4 py-3">
+                                <HoldingQuickActions
+                                  onBuyMax={() =>
+                                    openQuickTrade(position.tokenAddress, position.symbol, "buy")
+                                  }
+                                  onSellMax={() =>
+                                    openQuickTrade(position.tokenAddress, position.symbol, "sell")
+                                  }
+                                />
                               </td>
                             </tr>
                           );
@@ -892,6 +1042,10 @@ export function PortfolioPanel() {
                             key={holding.tokenAddress}
                             holding={holding}
                             bnbUsd={bnbUsd}
+                            onBuyMax={() => openQuickTrade(holding.tokenAddress, holding.symbol, "buy")}
+                            onSellMax={() =>
+                              openQuickTrade(holding.tokenAddress, holding.symbol, "sell")
+                            }
                           />
                         ))}
                       </tbody>

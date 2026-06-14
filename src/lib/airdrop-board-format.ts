@@ -46,6 +46,22 @@ export function formatAirdropRewardCompact(value: string): string {
   return n.toLocaleString(undefined, { maximumFractionDigits: 2 });
 }
 
+/** Human-readable BNB / token amount from wei (create campaign UI). */
+export function formatCampaignAmount(wei: bigint): string {
+  const n = Number(formatEther(wei));
+  if (!Number.isFinite(n) || n <= 0) return "0";
+  if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(2)}B`;
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)}M`;
+  if (n >= 100_000) return `${(n / 1_000).toFixed(2)}K`;
+  if (n >= 1) return n.toFixed(4);
+  if (n >= 0.001) return n.toFixed(6);
+  return n.toFixed(8);
+}
+
+export function formatCampaignAmountLabel(wei: bigint, assetLabel: string): string {
+  return `${formatCampaignAmount(wei)} ${assetLabel}`;
+}
+
 export function formatTimeRemaining(endIso: string): string {
   const ms = new Date(endIso).getTime() - Date.now();
   if (!Number.isFinite(ms) || ms <= 0) return "Ended";

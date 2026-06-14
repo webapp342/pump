@@ -21,6 +21,15 @@ html[data-theme="light"] {
   --tracking-heading: -0.02em;
   --tracking-label: 0.06em;
 
+  /* Fixed mobile chrome — keep trade dock flush with bottom nav */
+  --mobile-nav-height: calc(
+    1.25rem + var(--text-caption) * var(--leading-caption) + env(safe-area-inset-bottom, 0px)
+  );
+  --mobile-trade-dock-height: calc(
+    1.25rem + 1.5rem + var(--text-body-sm) * var(--leading-body)
+  );
+  --mobile-token-footer-height: calc(var(--mobile-nav-height) + var(--mobile-trade-dock-height));
+
   --modal-overlay-opacity: 0.92;
   --modal-overlay-blur: 32px;
   --modal-overlay-saturate: 160%;
@@ -314,7 +323,7 @@ code,
   /* Sheet tabs — Excel-style filter / section tabs */
   .sheet-tabs {
     display: flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     gap: 0;
     border-bottom: 1px solid rgb(var(--pump-border) / 0.5);
   }
@@ -610,30 +619,25 @@ code,
   .portfolio-metric-box {
     display: flex;
     height: 100%;
-    min-height: 2.75rem;
+    min-height: 3.25rem;
     flex-direction: column;
-    justify-content: center;
-    gap: 6px;
+    justify-content: space-between;
+    gap: 8px;
     border: 1px solid rgb(var(--pump-border) / 0.15);
     background: rgb(var(--pump-surface) / 0.35);
     padding: 8px 10px;
   }
 
-  @media (min-width: 640px) {
-    .portfolio-metric-box {
-      flex-direction: row;
-      align-items: center;
-      justify-content: space-between;
-    }
+  .portfolio-metric-box--with-actions {
+    min-height: 5.75rem;
   }
 
   .portfolio-metric-box-main {
     display: flex;
     min-width: 0;
-    flex: 1;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 6px 10px;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
   }
 
   .portfolio-metric-box-label {
@@ -641,11 +645,22 @@ code,
   }
 
   .portfolio-metric-box-actions {
-    display: flex;
-    flex-shrink: 0;
-    flex-wrap: wrap;
-    align-items: center;
+    display: grid;
+    width: 100%;
     gap: 6px;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .portfolio-metric-box-actions-split {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .portfolio-metric-box-actions .primary-button,
+  .portfolio-metric-box-actions .secondary-button {
+    width: 100%;
+    min-height: 1.875rem;
+    padding-inline: 0.5rem;
+    font-size: var(--text-caption);
   }
 
   .primary-button {

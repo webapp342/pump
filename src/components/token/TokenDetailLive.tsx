@@ -517,8 +517,13 @@ export function TokenDetailLive({
     </div>
   );
 
+  const openMobileTrade = useCallback((side: "buy" | "sell") => {
+    setTradePrefill({ side });
+    setTradeSheetOpen(true);
+  }, []);
+
   return (
-    <div className="mt-3 space-y-5 pb-20 md:mt-4 md:space-y-6 xl:pb-0">
+    <div className="mt-3 space-y-5 pb-[var(--mobile-token-footer-height)] md:mt-4 md:space-y-6 xl:pb-0">
       <header className="xl:hidden">
         <div className="flex items-center gap-3">
           <TokenAvatar
@@ -657,14 +662,21 @@ export function TokenDetailLive({
         </aside>
       </div>
 
-      <div className="pointer-events-none fixed bottom-[4.25rem] left-0 right-0 z-30 px-4 xl:hidden">
-        <div className="pointer-events-auto mx-auto w-full max-w-lg">
+      <div className="fixed inset-x-0 bottom-[var(--mobile-nav-height)] z-[35] border-t border-pump-border/20 bg-pump-bg/95 px-4 py-2.5 backdrop-blur-md xl:hidden">
+        <div className="mx-auto flex max-w-lg gap-2">
           <button
             type="button"
-            onClick={() => setTradeSheetOpen(true)}
-            className="primary-button flex w-full items-center justify-center gap-2 py-3.5 text-body-sm active:scale-[0.99]"
+            onClick={() => openMobileTrade("buy")}
+            className="primary-button flex flex-1 items-center justify-center py-3 text-body-sm"
           >
             Buy ${symbol}
+          </button>
+          <button
+            type="button"
+            onClick={() => openMobileTrade("sell")}
+            className="secondary-button flex flex-1 items-center justify-center border-pump-danger/35 py-3 text-body-sm text-pump-danger"
+          >
+            Sell ${symbol}
           </button>
         </div>
       </div>

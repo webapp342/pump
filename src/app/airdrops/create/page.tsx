@@ -14,9 +14,8 @@ export default function CreateAirdropPage() {
             ← Airdrops
           </Link>
           <h2 className="section-heading mt-1">Create campaign</h2>
-          <p className="mt-1 hidden text-body-sm text-pump-muted md:block">
-            Fund an on-chain escrow pool. TOP 100 holders and buyers split rewards after the
-            qualification window ends.
+          <p className="mt-1 text-body-sm text-pump-muted">
+            Three steps: pick token, set reward & timing, define who qualifies.
           </p>
         </div>
         <CreateAirdropForm />

@@ -76,3 +76,8 @@ export function getAirdropDistributionTiers(totalReward: bigint): AirdropDistrib
 export function perWinnerSharePct(): number {
   return 70 / Number(RANK4_100_COUNT);
 }
+
+/** Display string for rank #4–#100 share (70% ÷ 97 ≈ 0.72%). */
+export function formatPerWinnerSharePct(): string {
+  return perWinnerSharePct().toFixed(2);
+}

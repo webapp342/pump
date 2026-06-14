@@ -58,22 +58,14 @@ function rewardUsdValue(
 const createCampaignButtonClass =
   "toolbar-btn toolbar-btn-accent shrink-0";
 
-function CreateCampaignLink({
-  variant,
-  className = "",
-}: {
-  variant: "mobile" | "desktop" | "empty";
-  className?: string;
-}) {
-  const label = variant === "mobile" ? "+ Create" : "+ Create campaign";
-
+function CreateCampaignLink({ className = "" }: { className?: string }) {
   return (
     <Link
       href="/airdrops/create"
       prefetch={true}
       className={`${createCampaignButtonClass} ${className}`}
     >
-      <span>{label}</span>
+      <span>Create airdrop</span>
     </Link>
   );
 }
@@ -231,11 +223,11 @@ function HighlightAirdropCard({
   const symbol = poolSymbol(item);
 
   return (
-    <div className="flex min-w-0 flex-col gap-1">
+    <div className="flex h-full min-w-0 flex-col gap-1">
       <p className="section-label md:hidden">{label}</p>
       <Link
         href={href}
-        className="panel-interactive flex min-w-0 flex-nowrap items-center gap-2 px-2.5 py-2.5 md:justify-between md:gap-3 md:px-3 md:py-3"
+        className="panel-interactive flex min-h-[2.625rem] flex-1 min-w-0 flex-nowrap items-center gap-2 px-2.5 py-2.5 md:min-h-[3rem] md:justify-between md:gap-3 md:px-3 md:py-3"
       >
         <p className="section-label hidden shrink-0 md:inline">{label}</p>
         <div className="flex min-w-0 shrink-0 items-center gap-1.5">
@@ -243,6 +235,21 @@ function HighlightAirdropCard({
           <p className="truncate text-caption font-medium text-pump-text">${symbol}</p>
         </div>
       </Link>
+    </div>
+  );
+}
+
+function HighlightAirdropPlaceholder({ label }: { label: string }) {
+  return (
+    <div className="flex h-full min-w-0 flex-col gap-1">
+      <p className="section-label md:hidden">{label}</p>
+      <div className="panel-surface flex min-h-[2.625rem] flex-1 min-w-0 flex-nowrap items-center gap-2 px-2.5 py-2.5 md:min-h-[3rem] md:justify-between md:gap-3 md:px-3 md:py-3">
+        <p className="section-label hidden shrink-0 md:inline">{label}</p>
+        <div className="flex min-w-0 shrink-0 items-center gap-1.5">
+          <span className="inline-block h-[18px] w-[18px] shrink-0" aria-hidden />
+          <p className="text-caption font-medium text-pump-muted">—</p>
+        </div>
+      </div>
     </div>
   );
 }
@@ -410,7 +417,7 @@ export function AirdropsListClient() {
         <p className="mt-2 text-caption text-pump-muted">
           Launch holder and buyer rewards with on-chain escrow and Merkle claims.
         </p>
-        <CreateCampaignLink variant="empty" className="mt-4 h-10 px-5 text-body-sm" />
+        <CreateCampaignLink className="mt-4 h-10 px-5 text-body-sm" />
       </div>
     );
   }
@@ -545,7 +552,7 @@ export function AirdropsListClient() {
         </section>
       ) : null}
 
-      <section className="grid grid-cols-2 gap-2 md:grid-cols-3 md:gap-3">
+      <section className="grid grid-cols-2 items-stretch gap-2 md:grid-cols-3 md:gap-3">
         <div className="col-span-2 flex min-w-0 flex-col gap-1 md:col-span-1">
           <p className="section-label md:hidden">Total pool</p>
           <div className="panel-surface flex flex-nowrap items-center justify-between gap-2 px-2.5 py-2.5 md:gap-3 md:px-3 md:py-3">
@@ -566,13 +573,7 @@ export function AirdropsListClient() {
             item={largestReward}
           />
         ) : (
-          <div className="flex min-w-0 flex-col gap-1">
-            <p className="section-label md:hidden">Largest pool</p>
-            <div className="panel-surface flex flex-nowrap items-center gap-2 px-2.5 py-2.5 md:justify-between md:gap-3 md:px-3 md:py-3">
-              <p className="section-label hidden shrink-0 md:inline">Largest pool</p>
-              <p className="shrink-0 text-body-sm text-pump-muted">—</p>
-            </div>
-          </div>
+          <HighlightAirdropPlaceholder label="Largest pool" />
         )}
 
         {endingSoonest ? (
@@ -582,21 +583,15 @@ export function AirdropsListClient() {
             item={endingSoonest}
           />
         ) : (
-          <div className="flex min-w-0 flex-col gap-1">
-            <p className="section-label md:hidden">Ending soon</p>
-            <div className="panel-surface flex flex-nowrap items-center gap-2 px-2.5 py-2.5 md:justify-between md:gap-3 md:px-3 md:py-3">
-              <p className="section-label hidden shrink-0 md:inline">Ending soon</p>
-              <p className="shrink-0 text-body-sm text-pump-muted">—</p>
-            </div>
-          </div>
+          <HighlightAirdropPlaceholder label="Ending soon" />
         )}
       </section>
 
       <div className="space-y-2 md:space-y-3">
         <div className="flex items-center justify-between gap-3">
-          <h2 className="section-heading">Explore campaigns</h2>
-          <CreateCampaignLink variant="mobile" className="h-8 px-2.5 text-caption md:hidden" />
-          <CreateCampaignLink variant="desktop" className="hidden h-9 whitespace-nowrap px-4 text-body-sm md:inline-flex" />
+          <h2 className="section-heading">Explore airdrops</h2>
+          <CreateCampaignLink className="h-8 px-2.5 text-caption md:hidden" />
+          <CreateCampaignLink className="hidden h-9 whitespace-nowrap px-4 text-body-sm md:inline-flex" />
         </div>
 
         <div className="flex flex-col gap-2">

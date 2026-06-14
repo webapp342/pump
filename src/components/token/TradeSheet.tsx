@@ -16,6 +16,8 @@ type TradeSheetProps = {
   prefill?: TradePrefillConfig | null;
   onTradeConfirmed?: (payload: TradeConfirmedPayload) => void;
   chainCurveSnapshot?: BondingCurveSnapshot;
+  /** Bottom sheet on mobile token page; centered modal for portfolio quick actions. */
+  presentation?: "sheet" | "modal";
 };
 
 export function TradeSheet({
@@ -28,6 +30,7 @@ export function TradeSheet({
   prefill = null,
   onTradeConfirmed,
   chainCurveSnapshot,
+  presentation = "sheet",
 }: TradeSheetProps) {
   const [mounted, setMounted] = useState(false);
 
@@ -55,27 +58,41 @@ export function TradeSheet({
 
   if (!open || !mounted) return null;
 
+  const isModal = presentation === "modal";
+  const tradeSide = prefill?.side ?? "buy";
+  const tradeTitle = tradeSide === "sell" ? `Sell $${symbol}` : `Buy $${symbol}`;
+
   return createPortal(
     <>
       <button
         type="button"
-        className="modal-backdrop modal-backdrop-dismiss z-[100] cursor-default transition-opacity xl:hidden"
+        className={`modal-backdrop modal-backdrop-dismiss z-[100] cursor-default transition-opacity ${isModal ? "" : "xl:hidden"}`}
         aria-label="Close trade panel"
         onClick={onClose}
       />
       <div
-        className="fixed inset-0 z-[101] flex items-end justify-center pointer-events-none xl:hidden"
+        className={`fixed inset-0 z-[101] flex pointer-events-none ${
+          isModal ? "items-center justify-center p-4" : "items-end justify-center xl:hidden"
+        }`}
         role="dialog"
         aria-modal="true"
         aria-label={`Trade ${symbol}`}
       >
-        <div className="modal-panel pointer-events-auto flex w-full max-h-[min(85dvh,720px)] flex-col overflow-hidden border-x-0 border-b-0">
-          <div className="shrink-0 border-b border-pump-border/45 px-4 pb-3 pt-2">
-            <div className="mb-2 flex justify-center" aria-hidden>
-              <div className="h-1 w-9 bg-pump-border/45" />
-            </div>
+        <div
+          className={`modal-panel pointer-events-auto flex flex-col overflow-hidden ${
+            isModal
+              ? "w-full max-w-md max-h-[min(85dvh,640px)]"
+              : "w-full max-h-[min(85dvh,720px)] border-x-0 border-b-0"
+          }`}
+        >
+          <div className={`shrink-0 border-b border-pump-border/45 px-4 pb-3 ${isModal ? "pt-4" : "pt-2"}`}>
+            {!isModal ? (
+              <div className="mb-2 flex justify-center" aria-hidden>
+                <div className="h-1 w-9 bg-pump-border/45" />
+              </div>
+            ) : null}
             <div className="flex items-center justify-between gap-3">
-              <h2 className="text-h3 font-semibold text-pump-text">Trade ${symbol}</h2>
+              <h2 className="text-h3 font-semibold text-pump-text">{tradeTitle}</h2>
               <button
                 type="button"
                 onClick={onClose}

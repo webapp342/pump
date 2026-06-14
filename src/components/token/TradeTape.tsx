@@ -22,6 +22,9 @@ type HolderRow = {
 };
 
 const HOLDER_BALANCE_EPSILON = ON_CHAIN_BALANCE_EPSILON;
+const cellClass = "px-2 py-2 lg:px-4 lg:py-3";
+const accountCellClass = `${cellClass} w-px whitespace-nowrap !pr-1 lg:!pr-4`;
+const sideCellClass = `${cellClass} w-px whitespace-nowrap !pl-1 lg:!pl-4`;
 
 function tradeNetBnb(trade: TradeItem): number {
   if (trade.netBnb != null) return Number(trade.netBnb);
@@ -97,7 +100,7 @@ function mapApiHoldersToRows(holders: TokenHolderSnapshot[]): HolderRow[] {
 
 function CreatorBadge() {
   return (
-    <span className="shrink-0 rounded-full bg-pump-accent/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-pump-accent">
+    <span className="shrink-0 rounded-full bg-pump-accent/15 px-1.5 py-px text-[9px] font-semibold uppercase tracking-wide text-pump-accent">
       Creator
     </span>
   );
@@ -112,15 +115,15 @@ function IdentityPill({
   showCreatorBadge?: boolean;
   onAddressClick: (address: string) => void;
 }) {
-  const label = shortAddress(address);
+  const label = shortAddress(address, true);
   return (
     <button
       type="button"
       onClick={() => onAddressClick(address)}
-      className="inline-flex min-w-0 items-center gap-2 text-left text-pump-text transition hover:text-pump-accent"
+      className="inline-flex w-max max-w-full items-center gap-1 text-left text-caption text-pump-text transition hover:text-pump-accent"
       aria-label={`View profile ${label}`}
     >
-      <UserAvatarForAddress address={address} size={32} />
+      <UserAvatarForAddress address={address} size={24} />
       <span className="truncate font-medium">{label}</span>
       {showCreatorBadge ? <CreatorBadge /> : null}
     </button>
@@ -210,17 +213,17 @@ export function TradeTape({
           </button>
         </div>
 
-      {tab === "holders" ? (
+        {tab === "holders" ? (
           !holdersReady ? (
             <p className="px-4 py-6 text-body-sm text-pump-muted">Verifying holders on-chain…</p>
           ) : holderRows.length === 0 ? (
             <p className="px-4 py-6 text-body-sm text-pump-muted">No holders yet.</p>
           ) : (
             <div className="overflow-x-auto">
-              <table className="sheet-grid min-w-[720px]">
+              <table className="sheet-grid w-full lg:min-w-[720px]">
                 <thead>
                   <tr>
-                    <th>Account</th>
+                    <th className="w-px whitespace-nowrap">Account</th>
                     <th>Balance</th>
                     <th>Supply</th>
                     <th>Entry</th>
@@ -252,28 +255,28 @@ export function TradeTape({
 
                     return (
                       <tr key={row.address} className="border-b border-pump-border/10 last:border-b-0">
-                        <td className="px-4 py-3">
+                        <td className={accountCellClass}>
                           <IdentityPill
                             address={row.address}
                             showCreatorBadge={row.address.toLowerCase() === creatorKey}
                             onAddressClick={onAddressClick}
                           />
                         </td>
-                        <td className="px-4 py-3 financial-value text-pump-text">
+                        <td className={`${cellClass} financial-value text-pump-text`}>
                           {formatTokenAmount(row.netTokens)}
                         </td>
-                        <td className="px-4 py-3 financial-value text-pump-text">
+                        <td className={`${cellClass} financial-value text-pump-text`}>
                           {formatSupplyShare(row.netTokens)}
                         </td>
-                        <td className="px-4 py-3 financial-value text-pump-text">
+                        <td className={`${cellClass} financial-value text-pump-text`}>
                           {formatUsdReadable(avgEntryUsd)}
                         </td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center justify-end gap-2 whitespace-nowrap">
-                            <span className={`financial-value text-body-sm font-semibold ${pnlTone}`}>
+                        <td className={cellClass}>
+                          <div className="flex items-center justify-end gap-1.5 whitespace-nowrap lg:gap-2">
+                            <span className={`financial-value text-caption font-semibold lg:text-body-sm ${pnlTone}`}>
                               {formatUsdReadable(unrealizedPnlUsd)}
                             </span>
-                            <span className={`financial-value text-caption ${pnlTone}`}>
+                            <span className={`financial-value text-[11px] lg:text-caption ${pnlTone}`}>
                               {formatPercent(unrealizedPnlPct)}
                             </span>
                           </div>
@@ -285,86 +288,90 @@ export function TradeTape({
               </table>
             </div>
           )
-      ) : trades.length === 0 ? (
-            <p className="px-4 py-6 text-body-sm text-pump-muted">No trades yet.</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="sheet-grid min-w-[860px]">
-                <thead>
-                  <tr>
-                    <th>Account</th>
-                    <th>Side</th>
-                    <th>Amount</th>
-                    <th>Tokens</th>
-                    <th>Price</th>
-                    <th>Time</th>
-                    <th className="text-right">Txn</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {trades.map((trade) => {
-                    const isBuy = trade.side === "BUY";
-                    const isOptimistic = trade.id.startsWith("optimistic:");
-                    const tradePriceUsd =
-                      bnbUsd != null ? Number(trade.priceBnb) * bnbUsd : null;
-                    const tradeNetUsd = bnbToUsd(tradeNetBnb(trade), bnbUsd);
-                    return (
-                      <tr
-                        key={trade.id}
-                        className={`border-b border-pump-border/10 last:border-b-0 ${tradeRowClass(
-                          trade.id,
-                          trade.side,
-                          isOptimistic
-                        )}`}
-                      >
-                        <td className="px-4 py-3">
-                          <IdentityPill
-                            address={trade.traderAddress}
-                            showCreatorBadge={trade.traderAddress.toLowerCase() === creatorKey}
-                            onAddressClick={onAddressClick}
-                          />
-                        </td>
-                        <td className="px-4 py-3">
-                          <span
-                            className={`text-caption font-medium ${isBuy ? "text-pump-success" : "text-pump-danger"}`}
-                          >
-                            {isBuy ? "Buy" : "Sell"}
+        ) : trades.length === 0 ? (
+          <p className="px-4 py-6 text-body-sm text-pump-muted">No trades yet.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="sheet-grid w-full lg:min-w-[860px]">
+              <thead>
+                <tr>
+                  <th className="w-px whitespace-nowrap">Account</th>
+                  <th className="w-px whitespace-nowrap">Side</th>
+                  <th>Amount</th>
+                  <th>Tokens</th>
+                  <th>Price</th>
+                  <th>Time</th>
+                  <th className="text-right">Txn</th>
+                </tr>
+              </thead>
+              <tbody>
+                {trades.map((trade) => {
+                  const isBuy = trade.side === "BUY";
+                  const isOptimistic = trade.id.startsWith("optimistic:");
+                  const tradePriceUsd =
+                    bnbUsd != null ? Number(trade.priceBnb) * bnbUsd : null;
+                  const tradeNetUsd = bnbToUsd(tradeNetBnb(trade), bnbUsd);
+                  return (
+                    <tr
+                      key={trade.id}
+                      className={`border-b border-pump-border/10 last:border-b-0 ${tradeRowClass(
+                        trade.id,
+                        trade.side,
+                        isOptimistic
+                      )}`}
+                    >
+                      <td className={accountCellClass}>
+                        <IdentityPill
+                          address={trade.traderAddress}
+                          showCreatorBadge={trade.traderAddress.toLowerCase() === creatorKey}
+                          onAddressClick={onAddressClick}
+                        />
+                      </td>
+                      <td className={sideCellClass}>
+                        <span
+                          className={`text-caption font-medium ${isBuy ? "text-pump-success" : "text-pump-danger"}`}
+                        >
+                          {isBuy ? "Buy" : "Sell"}
+                        </span>
+                        {isOptimistic ? (
+                          <span className="ml-1 text-[10px] text-pump-accent lg:ml-2 lg:text-caption">
+                            Live
                           </span>
-                          {isOptimistic ? (
-                            <span className="ml-2 text-caption text-pump-accent">Live</span>
-                          ) : isLanding(trade.id) ? (
-                            <span className="ml-2 text-caption text-pump-muted">New</span>
-                          ) : null}
-                        </td>
-                        <td className="px-4 py-3 financial-value text-pump-text">
-                          {formatUsdReadable(tradeNetUsd)}
-                        </td>
-                        <td className="px-4 py-3 financial-value text-pump-text">
-                          {formatTokenAmount(Number(trade.tokenAmount))}
-                        </td>
-                        <td className="px-4 py-3 financial-value text-pump-text">
-                          {formatUsdReadable(tradePriceUsd)}
-                        </td>
-                        <td className="px-4 py-3 text-caption text-pump-muted">
-                          {formatRelativeTime(trade.blockTime)}
-                        </td>
-                        <td className="px-4 py-3 text-right">
-                          <a
-                            href={explorerTxUrl(trade.txHash)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="financial-value text-pump-muted hover:text-pump-accent"
-                          >
-                            {shortAddress(trade.txHash)}
-                          </a>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
+                        ) : isLanding(trade.id) ? (
+                          <span className="ml-1 text-[10px] text-pump-muted lg:ml-2 lg:text-caption">
+                            New
+                          </span>
+                        ) : null}
+                      </td>
+                      <td className={`${cellClass} financial-value text-pump-text`}>
+                        {formatUsdReadable(tradeNetUsd)}
+                      </td>
+                      <td className={`${cellClass} financial-value text-pump-text`}>
+                        {formatTokenAmount(Number(trade.tokenAmount))}
+                      </td>
+                      <td className={`${cellClass} financial-value text-pump-text`}>
+                        {formatUsdReadable(tradePriceUsd)}
+                      </td>
+                      <td className={`${cellClass} text-caption text-pump-muted`}>
+                        {formatRelativeTime(trade.blockTime)}
+                      </td>
+                      <td className={`${cellClass} text-right`}>
+                        <a
+                          href={explorerTxUrl(trade.txHash)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="financial-value text-caption text-pump-muted hover:text-pump-accent"
+                        >
+                          {shortAddress(trade.txHash, true)}
+                        </a>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </section>
   );
