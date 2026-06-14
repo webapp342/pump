@@ -15,6 +15,7 @@ import {
   pctTone,
 } from "@/lib/arena-board-format";
 import { useLiveChannel, resolveLivePollDelay } from "@/hooks/useLiveChannel";
+import { useLiveBoardAnimations } from "@/hooks/useLiveBoardAnimations";
 
 type FlashTone = "up" | "down";
 type BoardFilter = "all" | "new" | "highVol" | "movers" | "kothContenders" | "favorites";
@@ -78,8 +79,8 @@ function HighlightStatCard({
 }
 
 function flashText(toneValue: FlashTone | undefined): string {
-  if (toneValue === "up") return "text-pump-success";
-  if (toneValue === "down") return "text-pump-danger";
+  if (toneValue === "up") return "live-metric-flash-up";
+  if (toneValue === "down") return "live-metric-flash-down";
   return "";
 }
 
@@ -168,7 +169,7 @@ export function ArenaListClient() {
   const [flashes, setFlashes] = useState<Record<string, FlashTone>>({});
   const [animatedCaps, setAnimatedCaps] = useState<Record<string, number>>({});
   const [search, setSearch] = useState("");
-  const [activeFilter, setActiveFilter] = useState<BoardFilter>("all");
+  const [activeFilter, setActiveFilter] = useState<BoardFilter>("new");
   const [sortKey, setSortKey] = useState<SortKey>("mcap");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const { favorites, isFavorite, toggleFavorite } = useFavorites();
@@ -176,6 +177,7 @@ export function ArenaListClient() {
   const flashTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const capAnimFrameRef = useRef<Record<string, number>>({});
   const animatedCapsRef = useRef<Record<string, number>>({});
+  const mobileListRef = useRef<HTMLDivElement>(null);
 
   const triggerFlash = useCallback((key: string, toneValue: FlashTone) => {
     setFlashes((prev) => ({ ...prev, [key]: toneValue }));
@@ -454,6 +456,16 @@ export function ArenaListClient() {
     kothContenderAddresses,
   ]);
 
+  const boardKeys = useMemo(
+    () => marketTokens.map((token) => token.address.toLowerCase()),
+    [marketTokens]
+  );
+  const boardResetKey = `${activeFilter}|${sortKey}|${sortDir}|${search.trim().toLowerCase()}`;
+  const { rowClass: boardRowClass, rankClass: boardRankClass } = useLiveBoardAnimations(
+    boardKeys,
+    { flipContainerRef: mobileListRef, resetKey: boardResetKey }
+  );
+
   const filterCounts = useMemo(() => {
     const all = resolvedTokens.length;
     const newCount = resolvedTokens.filter((token) =>
@@ -691,8 +703,8 @@ export function ArenaListClient() {
           <div className="sheet-tabs -mx-2 overflow-x-auto px-2 md:mx-0 md:px-0">
           {(
             [
+              ["new", "New", "Newest"],
               ["all", "All", "All"],
-                ["new", "New", "Newest"],
               ["highVol", "Vol", "High Vol"],
               ["movers", "Movers", "Movers"],
               ["kothContenders", "KOTH", "KOTH contenders"],
@@ -737,7 +749,7 @@ export function ArenaListClient() {
         </div>
 
         <section className="panel-surface overflow-hidden">
-        <div className="sheet-list lg:hidden">
+        <div ref={mobileListRef} className="sheet-list lg:hidden">
           {marketTokens.map((token, index) => {
             const addressKey = token.address.toLowerCase();
             const mcapUsd =
@@ -749,9 +761,14 @@ export function ArenaListClient() {
             return (
               <article
                 key={token.address}
-                className="grid grid-cols-[0.875rem_1.75rem_1fr_auto] gap-x-2 gap-y-2 p-2.5 md:p-3"
+                data-board-key={addressKey}
+                className={`grid grid-cols-[0.875rem_1.75rem_1fr_auto] gap-x-2 gap-y-2 p-2.5 md:p-3 ${boardRowClass(addressKey)}`}
               >
-                <span className="financial-value self-center text-[10px] text-pump-muted">{index + 1}</span>
+                <span
+                  className={`financial-value self-center text-[10px] text-pump-muted ${boardRankClass(addressKey)}`}
+                >
+                  {index + 1}
+                </span>
                 <TokenAvatar
                   address={token.address}
                   symbol={token.symbol}
@@ -841,7 +858,7 @@ export function ArenaListClient() {
               ];
               const trendPositive = (token.change24hPct ?? 0) >= 0;
               return (
-                <tr key={token.address}>
+                <tr key={token.address} data-board-key={addressKey} className={boardRowClass(addressKey)}>
                   <td>
                     <button
                       type="button"
@@ -858,7 +875,9 @@ export function ArenaListClient() {
                   </td>
                   <td className="px-4 py-3">
                     <Link href={`/token/${token.address}`} className="flex min-w-0 items-center gap-3">
-                      <span className="financial-value w-4 text-caption text-pump-muted">
+                      <span
+                        className={`financial-value w-4 text-caption text-pump-muted ${boardRankClass(addressKey)}`}
+                      >
                         {index + 1}
                       </span>
                       <TokenAvatar
@@ -877,14 +896,14 @@ export function ArenaListClient() {
                     <TrendSparkline points={trendPoints} positive={trendPositive} />
                   </td>
                   <td
-                    className={`px-4 py-3 financial-value font-semibold transition-colors ${flashText(
+                    className={`px-4 py-3 financial-value font-semibold ${flashText(
                       flashes[`${token.address.toLowerCase()}:mcap`]
                     )}`}
                   >
                     {formatCapForBoard(mcapUsd)}
                   </td>
                   <td
-                    className={`px-4 py-3 transition-colors ${flashText(
+                    className={`px-4 py-3 ${flashText(
                       flashes[`${token.address.toLowerCase()}:ath`]
                     )}`}
                   >
@@ -894,21 +913,21 @@ export function ArenaListClient() {
                   </td>
                   <td className="px-4 py-3 text-pump-text">{formatAge(token.createdAt)}</td>
                   <td
-                    className={`px-4 py-3 financial-value transition-colors ${flashText(
+                    className={`px-4 py-3 financial-value ${flashText(
                       flashes[`${token.address.toLowerCase()}:txns`]
                     )}`}
                   >
                     {token.tradeCount ?? 0}
                   </td>
                   <td
-                    className={`px-4 py-3 financial-value transition-colors ${flashText(
+                    className={`px-4 py-3 financial-value ${flashText(
                       flashes[`${token.address.toLowerCase()}:vol24h`]
                     )}`}
                   >
                     {formatUsdReadable(vol24hUsd, { compact: true })}
                   </td>
                   <td
-                    className={`px-4 py-3 financial-value transition-colors ${flashText(
+                    className={`px-4 py-3 financial-value ${flashText(
                       flashes[`${token.address.toLowerCase()}:traders`]
                     )}`}
                   >

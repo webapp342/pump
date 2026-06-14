@@ -824,4 +824,215 @@ code,
     color: rgb(var(--pump-text));
     background: rgb(var(--pump-border) / 0.06);
   }
+
+  /* Live feed — pump-style land / rank / trade animations */
+  @keyframes live-land-in {
+    0% {
+      opacity: 0;
+      transform: translateY(-14px) scale(0.988);
+      box-shadow: inset 3px 0 0 rgb(var(--pump-accent) / 0.85);
+      background-color: rgb(var(--pump-accent) / 0.14);
+    }
+    35% {
+      opacity: 1;
+      background-color: rgb(var(--pump-accent) / 0.1);
+    }
+    100% {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+      box-shadow: inset 3px 0 0 transparent;
+      background-color: transparent;
+    }
+  }
+
+  @keyframes live-rank-shift-up {
+    0% {
+      background-color: transparent;
+    }
+    12% {
+      background-color: rgb(var(--pump-success) / 0.16);
+      box-shadow: inset 3px 0 0 rgb(var(--pump-success) / 0.75);
+    }
+    100% {
+      background-color: transparent;
+      box-shadow: inset 3px 0 0 transparent;
+    }
+  }
+
+  @keyframes live-rank-shift-down {
+    0% {
+      background-color: transparent;
+    }
+    12% {
+      background-color: rgb(var(--pump-danger) / 0.12);
+      box-shadow: inset 3px 0 0 rgb(var(--pump-danger) / 0.55);
+    }
+    100% {
+      background-color: transparent;
+      box-shadow: inset 3px 0 0 transparent;
+    }
+  }
+
+  @keyframes live-rank-badge-up {
+    0%,
+    100% {
+      transform: translateY(0);
+      color: rgb(var(--pump-muted));
+    }
+    20% {
+      transform: translateY(-2px);
+      color: rgb(var(--pump-success));
+    }
+  }
+
+  @keyframes live-rank-badge-down {
+    0%,
+    100% {
+      transform: translateY(0);
+      color: rgb(var(--pump-muted));
+    }
+    20% {
+      transform: translateY(2px);
+      color: rgb(var(--pump-danger));
+    }
+  }
+
+  @keyframes live-metric-flash-up {
+    0%,
+    100% {
+      color: inherit;
+    }
+    25% {
+      color: rgb(var(--pump-success));
+    }
+  }
+
+  @keyframes live-metric-flash-down {
+    0%,
+    100% {
+      color: inherit;
+    }
+    25% {
+      color: rgb(var(--pump-danger));
+    }
+  }
+
+  @keyframes live-trade-land-buy {
+    0% {
+      opacity: 0;
+      transform: translateY(-10px);
+      background-color: rgb(var(--pump-success) / 0.2);
+      box-shadow: inset 3px 0 0 rgb(var(--pump-success) / 0.85);
+    }
+    40% {
+      opacity: 1;
+      background-color: rgb(var(--pump-success) / 0.1);
+    }
+    100% {
+      opacity: 1;
+      transform: translateY(0);
+      background-color: transparent;
+      box-shadow: inset 3px 0 0 transparent;
+    }
+  }
+
+  @keyframes live-trade-land-sell {
+    0% {
+      opacity: 0;
+      transform: translateY(-10px);
+      background-color: rgb(var(--pump-danger) / 0.16);
+      box-shadow: inset 3px 0 0 rgb(var(--pump-danger) / 0.75);
+    }
+    40% {
+      opacity: 1;
+      background-color: rgb(var(--pump-danger) / 0.08);
+    }
+    100% {
+      opacity: 1;
+      transform: translateY(0);
+      background-color: transparent;
+      box-shadow: inset 3px 0 0 transparent;
+    }
+  }
+
+  @keyframes live-trade-pending-pulse {
+    0%,
+    100% {
+      background-color: rgb(var(--pump-accent) / 0.05);
+    }
+    50% {
+      background-color: rgb(var(--pump-accent) / 0.1);
+    }
+  }
+
+  .live-land-in {
+    animation: live-land-in 0.72s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    will-change: transform, opacity, background-color;
+  }
+
+  .live-rank-up {
+    animation: live-rank-shift-up 0.9s ease-out forwards;
+  }
+
+  .live-rank-down {
+    animation: live-rank-shift-down 0.9s ease-out forwards;
+  }
+
+  .live-rank-badge-up {
+    animation: live-rank-badge-up 0.9s ease-out forwards;
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+  }
+
+  .live-rank-badge-down {
+    animation: live-rank-badge-down 0.9s ease-out forwards;
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+  }
+
+  .live-metric-flash-up {
+    animation: live-metric-flash-up 0.75s ease-out forwards;
+  }
+
+  .live-metric-flash-down {
+    animation: live-metric-flash-down 0.75s ease-out forwards;
+  }
+
+  .live-trade-land-buy {
+    animation: live-trade-land-buy 0.62s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    will-change: transform, opacity, background-color;
+  }
+
+  .live-trade-land-sell {
+    animation: live-trade-land-sell 0.62s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    will-change: transform, opacity, background-color;
+  }
+
+  .live-trade-pending {
+    animation: live-trade-pending-pulse 1.4s ease-in-out infinite;
+  }
+
+  [data-board-key] {
+    will-change: transform;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .live-land-in,
+    .live-rank-up,
+    .live-rank-down,
+    .live-rank-badge-up,
+    .live-rank-badge-down,
+    .live-metric-flash-up,
+    .live-metric-flash-down,
+    .live-trade-land-buy,
+    .live-trade-land-sell,
+    .live-trade-pending,
+    [data-board-key] {
+      animation: none !important;
+      transition: none !important;
+      transform: none !important;
+    }
+  }
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { TokenHolderSnapshot, TradeItem } from "@/lib/db/launchpad";
 import { explorerTxUrl, shortAddress } from "@/config/chain";
 import { UserAvatarForAddress } from "@/components/user/UserAvatarForAddress";
@@ -10,6 +10,7 @@ import {
   resolveVerifiedTokenBalance,
   scaleCostBasisForBalance,
 } from "@/lib/onchain-balance";
+import { useLiveTradeAnimations } from "@/hooks/useLiveTradeAnimations";
 
 type ActivityTab = "holders" | "trades";
 
@@ -147,6 +148,9 @@ export function TradeTape({
   const [tab, setTab] = useState<ActivityTab>("trades");
   const [holderRows, setHolderRows] = useState<HolderRow[]>([]);
   const [holdersReady, setHoldersReady] = useState(false);
+
+  const tradeIds = useMemo(() => trades.map((t) => t.id), [trades]);
+  const { rowClass: tradeRowClass, isLanding } = useLiveTradeAnimations(tradeIds);
 
   useEffect(() => {
     let cancelled = false;
@@ -307,9 +311,11 @@ export function TradeTape({
                     return (
                       <tr
                         key={trade.id}
-                        className={`border-b border-pump-border/10 last:border-b-0 ${
-                          isOptimistic ? "bg-pump-accent/5" : ""
-                        }`}
+                        className={`border-b border-pump-border/10 last:border-b-0 ${tradeRowClass(
+                          trade.id,
+                          trade.side,
+                          isOptimistic
+                        )}`}
                       >
                         <td className="px-4 py-3">
                           <IdentityPill
@@ -326,6 +332,8 @@ export function TradeTape({
                           </span>
                           {isOptimistic ? (
                             <span className="ml-2 text-caption text-pump-accent">Live</span>
+                          ) : isLanding(trade.id) ? (
+                            <span className="ml-2 text-caption text-pump-muted">New</span>
                           ) : null}
                         </td>
                         <td className="px-4 py-3 financial-value text-pump-text">
