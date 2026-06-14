@@ -8,15 +8,19 @@ export function AdminGate({ children }: { children: React.ReactNode }) {
   const { address, isConnected, isConnecting } = useAccount();
 
   if (isConnecting) {
-    return <p className="text-body-sm text-pump-muted">Loading…</p>;
+    return (
+      <div className="admin-page">
+        <p className="admin-empty">Verifying access…</p>
+      </div>
+    );
   }
 
   if (!isConnected || !isAdminWallet(address)) {
     return (
-      <div className="py-16 text-center">
-        <p className="text-4xl font-semibold text-pump-muted">404</p>
-        <p className="mt-2 text-body-sm text-pump-muted">This page could not be found.</p>
-        <Link href="/" className="mt-6 inline-block text-sm text-pump-accent hover:underline">
+      <div className="admin-page py-16 text-center">
+        <p className="admin-title">404</p>
+        <p className="admin-meta mt-2">Page not found.</p>
+        <Link href="/" className="admin-link mt-4 inline-block">
           Back to Arena
         </Link>
       </div>

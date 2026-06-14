@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { formatEther, isAddress, parseEther } from "viem";
 import {
   useAccount,
@@ -20,19 +20,32 @@ import {
   formatAirdropReward,
   formatQualifyDateTime,
 } from "@/lib/airdrop-board-format";
-import { TokenAvatar } from "@/components/token/TokenAvatar";
-import { BnbLogo } from "@/components/token/BnbLogo";
 import { AdminAirdropCreateFeeModal } from "@/components/admin/AdminAirdropCreateFeeModal";
 import { AdminCreatorShareModal } from "@/components/admin/AdminCreatorShareModal";
 import { AdminReferrerShareModal } from "@/components/admin/AdminReferrerShareModal";
 import { AdminMemeCreateFeeModal } from "@/components/admin/AdminMemeCreateFeeModal";
 import { AdminProtocolFeeModal } from "@/components/admin/AdminProtocolFeeModal";
 import { AdminSystemHealth } from "@/components/admin/AdminSystemHealth";
+import {
+  AdminAlert,
+  AdminBlock,
+  AdminBtn,
+  AdminDataRow,
+  AdminDataTable,
+  AdminEmptyState,
+  AdminGridTable,
+  AdminNum,
+  AdminPageHeader,
+  AdminShell,
+  AdminTabPanel,
+  AdminTabs,
+  AdminTextButton,
+  type AdminTabId,
+} from "@/components/admin/AdminChrome";
 import { useBnbUsdPrice } from "@/hooks/useBnbUsdPrice";
 import { bnbToUsd, formatBnbWithUsd, formatUsdReadable } from "@/lib/format-usd";
 import {
   creatorShareBpsToPercent,
-  effectiveTradeFeePercent,
   protocolFeeBpsToPercent,
   referrerShareBpsToPercent,
   treasurySharePercentFromSplit,
@@ -114,42 +127,27 @@ function sweepStatusLabel(status: string): string {
   }
 }
 
-function sweepStatusBadgeClass(status: string): string {
-  switch (status) {
-    case "ready":
-      return "status-badge border-pump-accent/30 bg-pump-accent/10 text-pump-accent";
-    case "claim_window_open":
-      return "status-badge border-pump-warning/30 bg-pump-warning/10 text-pump-warning";
-    case "swept":
-    case "nothing_to_sweep":
-      return "status-badge border-pump-border/25 bg-pump-surface/40 text-pump-muted";
-    default:
-      return "status-badge";
-  }
-}
-
-function StatCell({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div className="flex min-w-0 flex-col gap-1">
-      <dt className="section-label text-[10px] md:text-[inherit]">{label}</dt>
-      <dd className="m-0 rounded-md border border-pump-border/15 bg-pump-surface/35 px-2.5 py-2 md:px-3">
-        {children}
-      </dd>
-    </div>
-  );
-}
-
 function BnbAmountWithUsd({
   bnb,
   bnbUsd,
   compact = false,
+  inline = false,
 }: {
   bnb: string;
   bnbUsd: number | null;
   compact?: boolean;
+  inline?: boolean;
 }) {
   const n = Number(bnb);
   const formatted = formatBnbWithUsd(Number.isFinite(n) ? n : 0, bnbUsd, { compact });
+  if (inline) {
+    return (
+      <span className="admin-num">
+        {formatted.bnb}
+        {formatted.usd ? <span className="admin-meta"> · {formatted.usd}</span> : null}
+      </span>
+    );
+  }
   const amountClass = compact
     ? "financial-value text-caption font-semibold text-pump-text"
     : "financial-value text-body-sm font-semibold text-pump-text";
@@ -164,54 +162,45 @@ function BnbAmountWithUsd({
   );
 }
 
-function RewardAmountWithUsd({
+function AdminRewardText({
   amount,
   rewardToken,
   rewardSymbol,
   rewardPriceBnb,
   bnbUsd,
-  compact = false,
 }: {
   amount: string;
   rewardToken: string | null;
   rewardSymbol: string | null;
   rewardPriceBnb: string | null;
   bnbUsd: number | null;
-  compact?: boolean;
 }) {
   const isBnb = !rewardToken;
+  const text = formatAirdropReward(amount, { isBnb, symbol: rewardSymbol });
   const usd = airdropRewardAmountUsd(
     amount,
     { rewardToken, rewardSymbol, rewardPriceBnb, totalFunded: amount },
     bnbUsd
   );
-  const amountClass = compact
-    ? "financial-value text-caption font-semibold text-pump-text"
-    : "financial-value text-body-sm font-semibold text-pump-text";
-
   return (
-    <div className="flex min-w-0 items-center gap-1.5">
-      {isBnb ? (
-        <BnbLogo size={compact ? 16 : 18} />
-      ) : (
-        <TokenAvatar
-          address={rewardToken}
-          symbol={rewardSymbol ?? "?"}
-          size={compact ? 16 : 18}
-        />
-      )}
-      <div className="min-w-0">
-        <p className={amountClass}>
-          {formatAirdropReward(amount, { isBnb, symbol: rewardSymbol })}
-        </p>
-        {usd != null ? (
-          <p className="text-[10px] text-pump-muted md:text-caption">
-            {formatUsdReadable(usd, { compact: true })}
-          </p>
-        ) : null}
-      </div>
-    </div>
+    <span className="admin-num">
+      {text}
+      {usd != null ? <span className="admin-meta"> · {formatUsdReadable(usd, { compact: true })}</span> : null}
+    </span>
   );
+}
+
+function sweepStatusClass(status: string): string {
+  switch (status) {
+    case "ready":
+      return "admin-status-ok";
+    case "claim_window_open":
+      return "admin-status-warn";
+    case "down":
+      return "admin-status-bad";
+    default:
+      return "";
+  }
 }
 
 export function AdminPanel() {
@@ -240,6 +229,7 @@ export function AdminPanel() {
   const [referrerShareModalOpen, setReferrerShareModalOpen] = useState(false);
   const [memeCreateFeeModalOpen, setMemeCreateFeeModalOpen] = useState(false);
   const [airdropCreateFeeModalOpen, setAirdropCreateFeeModalOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<AdminTabId>("dashboard");
 
   const isAdmin = isAdminWallet(address);
   const treasuryContract = protocol?.treasury.address as `0x${string}` | undefined;
@@ -254,21 +244,6 @@ export function AdminPanel() {
   const bondingOwner = protocol?.bondingCurveManager.owner;
   const memeFactoryOwner = protocol?.memeFactory.owner;
   const airdropAdmin = protocol?.airdropManager?.admin;
-  const canEditBondingFees =
-    isAdmin &&
-    Boolean(address) &&
-    bondingOwner != null &&
-    address!.toLowerCase() === bondingOwner.toLowerCase();
-  const canEditMemeCreateFee =
-    isAdmin &&
-    Boolean(address) &&
-    memeFactoryOwner != null &&
-    address!.toLowerCase() === memeFactoryOwner.toLowerCase();
-  const canEditAirdropCreateFee =
-    isAdmin &&
-    Boolean(address) &&
-    airdropAdmin != null &&
-    address!.toLowerCase() === airdropAdmin.toLowerCase();
 
   const { data: treasuryLiveBalance, refetch: refetchTreasuryBalance } = useBalance({
     address: treasuryContract,
@@ -335,6 +310,10 @@ export function AdminPanel() {
   useEffect(() => {
     void load();
     void loadPromoTasks();
+  }, [load, loadPromoTasks]);
+
+  const refreshAll = useCallback(async () => {
+    await Promise.all([load(), loadPromoTasks()]);
   }, [load, loadPromoTasks]);
 
   useEffect(() => {
@@ -537,15 +516,9 @@ export function AdminPanel() {
   const creatorFeeShareBps = protocol?.bondingCurveManager.creatorFeeShareBps ?? 0;
   const referrerShareBps = protocol?.bondingCurveManager.referrerShareBps ?? 0;
   const treasuryFeeSharePct = treasurySharePercentFromSplit(creatorFeeShareBps, referrerShareBps);
-  const creatorEffectivePct = effectiveTradeFeePercent(protocolFeeBps, creatorFeeShareBps);
-  const referrerEffectivePct = effectiveTradeFeePercent(protocolFeeBps, referrerShareBps);
-  const treasuryEffectivePct = effectiveTradeFeePercent(
-    protocolFeeBps,
-    10_000 - creatorFeeShareBps - referrerShareBps
-  );
 
   return (
-    <div className="space-y-4 md:space-y-5">
+    <AdminShell>
       <AdminProtocolFeeModal
         open={protocolFeeModalOpen}
         onClose={() => setProtocolFeeModalOpen(false)}
@@ -584,741 +557,570 @@ export function AdminPanel() {
         airdropAdmin={airdropAdmin ?? ADMIN_ADDRESS}
         onUpdated={() => void load()}
       />
-      {error ? (
-        <div className="notice-error rounded-lg border border-pump-danger/30 bg-pump-danger/5 px-3 py-2 text-body-sm">
-          {error}
-        </div>
-      ) : null}
 
-      {address ? <AdminSystemHealth address={address} /> : null}
+      <AdminPageHeader
+        address={address}
+        onRefreshAll={() => void refreshAll()}
+        refreshing={loading || promoLoading}
+      />
 
-      <section className="panel-surface overflow-hidden">
-        <div className="border-b border-pump-border/15 px-4 py-3.5 md:px-5">
-          <p className="section-label">Overview</p>
-          <p className="mt-0.5 field-hint">
-            Protocol treasury, airdrop escrow, and sweepable remainders · USD est. from live BNB
-            price
-          </p>
-        </div>
-        <dl className="grid grid-cols-2 gap-2 p-4 md:grid-cols-4 md:p-5">
-          <StatCell label="Treasury balance">
-            <BnbAmountWithUsd bnb={treasuryBnb} bnbUsd={bnbUsd} />
-          </StatCell>
-          <StatCell label="Airdrop escrow">
-            <BnbAmountWithUsd bnb={escrowBnb} bnbUsd={bnbUsd} />
-          </StatCell>
-          <StatCell label="Ready to sweep">
-            <p className="financial-value text-body-sm font-semibold text-pump-text">
-              {loading ? "—" : `${sweepStats.readyCount} campaign${sweepStats.readyCount === 1 ? "" : "s"}`}
-            </p>
-            {sweepStats.remainingUsd != null ? (
-              <p className="text-caption text-pump-muted">
-                {formatUsdReadable(sweepStats.remainingUsd, { compact: true })} unclaimed
-              </p>
-            ) : null}
-          </StatCell>
-          <StatCell label="Total campaigns">
-            <p className="financial-value text-body-sm font-semibold text-pump-text">
-              {loading ? "—" : airdrops.length}
-            </p>
-            <p className="text-caption text-pump-muted">On-chain airdrops tracked</p>
-          </StatCell>
-        </dl>
-      </section>
+      {error ? <AdminAlert>{error}</AdminAlert> : null}
 
-      <section className="panel-surface overflow-hidden">
-        <div className="flex flex-wrap items-start justify-between gap-3 border-b border-pump-border/15 px-4 py-3.5 md:px-5">
-          <div>
-            <p className="section-label">Promo link tasks</p>
-            <p className="mt-0.5 field-hint">
-              Create click-to-complete missions for users — opens your link, then awards points
-            </p>
-          </div>
-          <button
-            type="button"
-            className="chip-button"
-            onClick={() => void loadPromoTasks()}
-            disabled={promoLoading}
-          >
-            {promoLoading ? "Refreshing…" : "Refresh"}
-          </button>
-        </div>
+      <AdminTabs active={activeTab} onChange={setActiveTab} />
 
-        <div className="border-b border-pump-border/10 p-4 md:p-5">
-          <p className="section-label">New task</p>
-          <div className="mt-3 grid gap-2 sm:grid-cols-2">
-            <input
-              type="text"
-              placeholder="Title"
-              value={promoTitle}
-              onChange={(e) => setPromoTitle(e.target.value)}
-              className="field-input h-10 bg-pump-bg/80 sm:col-span-2"
-            />
-            <input
-              type="text"
-              placeholder="Description (optional)"
-              value={promoDescription}
-              onChange={(e) => setPromoDescription(e.target.value)}
-              className="field-input h-10 bg-pump-bg/80 sm:col-span-2"
-            />
-            <input
-              type="number"
-              min={0}
-              step={1}
-              placeholder="Points"
-              value={promoPoints}
-              onChange={(e) => setPromoPoints(e.target.value)}
-              className="field-input h-10 bg-pump-bg/80"
-            />
-            <input
-              type="url"
-              placeholder="https://…"
-              value={promoUrl}
-              onChange={(e) => setPromoUrl(e.target.value)}
-              className="field-input h-10 bg-pump-bg/80"
-            />
-          </div>
-          <button
-            type="button"
-            className="primary-button mt-3"
-            disabled={promoSaving || !promoTitle.trim() || !promoUrl.trim() || !promoPoints.trim()}
-            onClick={() => void onCreatePromoTask()}
-          >
-            {promoSaving ? "Creating…" : "Create promo task"}
-          </button>
-        </div>
+      <AdminTabPanel id="dashboard" active={activeTab}>
+        {address ? <AdminSystemHealth address={address} /> : null}
 
-        {promoLoading ? (
-          <p className="p-4 text-body-sm text-pump-muted md:p-5">Loading promo tasks…</p>
-        ) : promoTasks.length === 0 ? (
-          <p className="p-4 text-body-sm text-pump-muted md:p-5">No promo tasks yet.</p>
-        ) : (
-          <div className="divide-y divide-pump-border/10">
-            {promoTasks.map((task) => (
-              <article
-                key={task.taskKey}
-                className="flex flex-wrap items-start justify-between gap-3 px-4 py-3 md:px-5"
-              >
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="text-body-sm font-medium text-pump-text">{task.title}</p>
-                    <span
-                      className={
-                        task.isActive
-                          ? "status-badge border-pump-accent/30 bg-pump-accent/10 text-pump-accent"
-                          : "status-badge border-pump-border/25 bg-pump-surface/40 text-pump-muted"
-                      }
-                    >
-                      {task.isActive ? "Active" : "Inactive"}
-                    </span>
-                  </div>
-                  {task.description ? (
-                    <p className="mt-0.5 text-caption text-pump-muted">{task.description}</p>
-                  ) : null}
-                  <p className="mt-1 truncate text-caption text-pump-muted">
-                    <a
-                      href={task.targetUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-pump-accent hover:underline"
-                    >
-                      {task.targetUrl}
-                    </a>
-                  </p>
-                  <p className="mt-1 text-caption text-pump-muted">
-                    +{task.rewardPoints} pts · {task.completionCount} completion
-                    {task.completionCount === 1 ? "" : "s"}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  className="chip-button shrink-0 border-pump-danger/30 text-pump-danger hover:bg-pump-danger/10"
-                  disabled={deletingKey === task.taskKey}
-                  onClick={() => void onDeletePromoTask(task.taskKey, task.title)}
-                >
-                  {deletingKey === task.taskKey ? "…" : "Delete"}
-                </button>
-              </article>
-            ))}
-          </div>
-        )}
-      </section>
+        <AdminBlock title="Overview">
+          <AdminDataTable>
+            <AdminDataRow label="Treasury balance" loading={loading && !protocol}>
+              <BnbAmountWithUsd bnb={treasuryBnb} bnbUsd={bnbUsd} inline />
+            </AdminDataRow>
+            <AdminDataRow label="Airdrop escrow" loading={loading && !protocol}>
+              <BnbAmountWithUsd bnb={escrowBnb} bnbUsd={bnbUsd} inline />
+            </AdminDataRow>
+            <AdminDataRow label="Ready to sweep" loading={loading && !protocol}>
+              {sweepStats.readyCount} campaign{sweepStats.readyCount === 1 ? "" : "s"}
+              {sweepStats.remainingUsd != null
+                ? ` · ${formatUsdReadable(sweepStats.remainingUsd, { compact: true })}`
+                : ""}
+            </AdminDataRow>
+            <AdminDataRow label="Total campaigns" loading={loading && !protocol}>
+              {airdrops.length}
+            </AdminDataRow>
+          </AdminDataTable>
+        </AdminBlock>
+      </AdminTabPanel>
 
-      <section className="panel-surface p-4 md:p-5">
-        <p className="section-label">Protocol fee treasury</p>
-        <p className="mt-1 field-hint">
-          Launch and trade fees route directly to the treasury wallet — not a separate fee contract.
-        </p>
+      <AdminTabPanel id="treasury" active={activeTab}>
+        <AdminBlock title="Fee settings">
+          <AdminDataTable>
+            <AdminDataRow
+              label="Trade protocol fee"
+              loading={!protocol}
+              action={
+                protocol ? (
+                  <AdminTextButton onClick={() => setProtocolFeeModalOpen(true)}>Edit</AdminTextButton>
+                ) : undefined
+              }
+            >
+              {protocol ? (
+                <>
+                  {protocolFeeBpsToPercent(protocolFeeBps).toFixed(2)}%
+                  <span className="admin-meta">
+                    {" "}
+                    · creator {creatorShareBpsToPercent(creatorFeeShareBps).toFixed(0)}% · referrer{" "}
+                    {referrerShareBpsToPercent(referrerShareBps).toFixed(0)}% · treasury{" "}
+                    {treasuryFeeSharePct.toFixed(0)}%
+                  </span>
+                </>
+              ) : (
+                "—"
+              )}
+            </AdminDataRow>
+            <AdminDataRow
+              label="Creator share"
+              loading={!protocol}
+              action={
+                protocol ? (
+                  <AdminTextButton onClick={() => setCreatorShareModalOpen(true)}>Edit</AdminTextButton>
+                ) : undefined
+              }
+            >
+              {protocol
+                ? `${creatorShareBpsToPercent(creatorFeeShareBps).toFixed(2)}% of protocol fee`
+                : "—"}
+            </AdminDataRow>
+            <AdminDataRow
+              label="Referrer share"
+              loading={!protocol}
+              action={
+                protocol ? (
+                  <AdminTextButton onClick={() => setReferrerShareModalOpen(true)}>Edit</AdminTextButton>
+                ) : undefined
+              }
+            >
+              {protocol
+                ? `${referrerShareBpsToPercent(referrerShareBps).toFixed(2)}% of protocol fee`
+                : "—"}
+            </AdminDataRow>
+            <AdminDataRow
+              label="Meme launch fee"
+              loading={!protocol}
+              action={
+                protocol ? (
+                  <AdminTextButton onClick={() => setMemeCreateFeeModalOpen(true)}>Edit</AdminTextButton>
+                ) : undefined
+              }
+            >
+              {protocol ? (
+                <>
+                  {formatBnb(protocol.memeFactory.createFeeBnb)} BNB
+                  {memeFeeUsd != null
+                    ? ` · ${formatUsdReadable(memeFeeUsd, { compact: true })}`
+                    : ""}
+                </>
+              ) : (
+                "—"
+              )}
+            </AdminDataRow>
+            <AdminDataRow
+              label="Airdrop create fee"
+              loading={!protocol?.airdropManager}
+              action={
+                protocol?.airdropManager ? (
+                  <AdminTextButton onClick={() => setAirdropCreateFeeModalOpen(true)}>Edit</AdminTextButton>
+                ) : undefined
+              }
+            >
+              {protocol?.airdropManager ? (
+                <>
+                  {formatBnb(protocol.airdropManager.createFeeBnb)} BNB
+                  {airdropFeeUsd != null
+                    ? ` · ${formatUsdReadable(airdropFeeUsd, { compact: true })}`
+                    : ""}
+                </>
+              ) : (
+                "—"
+              )}
+            </AdminDataRow>
+          </AdminDataTable>
+        </AdminBlock>
 
-        <dl className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          <div className="rounded-md border border-pump-border/15 bg-pump-surface/35 px-3 py-2.5">
-            <dt className="section-label text-[10px]">Treasury contract</dt>
-            <dd className="mt-1">
+        <AdminBlock title="Treasury">
+          <AdminDataTable>
+            <AdminDataRow label="Contract">
               {treasuryContract ? (
                 <a
                   href={explorerAddressUrl(treasuryContract)}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-body-sm font-medium text-pump-accent hover:underline"
+                  className="admin-link admin-num"
                 >
                   {shortAddress(treasuryContract)}
                 </a>
               ) : (
                 "—"
               )}
-            </dd>
-          </div>
-          <div className="rounded-md border border-pump-border/15 bg-pump-surface/35 px-3 py-2.5">
-            <dt className="section-label text-[10px]">Treasury owner</dt>
-            <dd className="mt-1 text-body-sm font-medium text-pump-text">
-              {treasuryOwner ? shortAddress(treasuryOwner) : shortAddress(ADMIN_ADDRESS)}
-            </dd>
-          </div>
-          <div className="rounded-md border border-pump-border/15 bg-pump-surface/35 px-3 py-2.5">
-            <dt className="section-label text-[10px]">Meme launch fee</dt>
-            <dd className="mt-1">
-              {protocol ? (
-                <>
-                  <p className="financial-value text-body-sm font-semibold text-pump-text">
-                    {formatBnb(protocol.memeFactory.createFeeBnb)} BNB
-                  </p>
-                  {memeFeeUsd != null ? (
-                    <p className="text-caption text-pump-muted">
-                      {formatUsdReadable(memeFeeUsd, { compact: true })} / launch · 100% → treasury
-                    </p>
-                  ) : null}
-                  <button
-                    type="button"
-                    className="chip-button mt-2"
-                    onClick={() => setMemeCreateFeeModalOpen(true)}
-                  >
-                    Edit launch fee
-                  </button>
-                  {!canEditMemeCreateFee && isAdmin ? (
-                    <p className="mt-1 text-caption text-pump-muted">
-                      MemeFactory owner: {shortAddress(memeFactoryOwner ?? ADMIN_ADDRESS)}
-                    </p>
-                  ) : null}
-                </>
-              ) : (
-                "—"
-              )}
-            </dd>
-          </div>
-          <div className="rounded-md border border-pump-border/15 bg-pump-surface/35 px-3 py-2.5">
-            <dt className="section-label text-[10px]">Trade protocol fee</dt>
-            <dd className="mt-1">
-              {protocol ? (
-                <>
-                  <p className="financial-value text-body-sm font-semibold text-pump-text">
-                    {protocolFeeBpsToPercent(protocolFeeBps).toFixed(2)}% per trade
-                  </p>
-                  <p className="text-caption text-pump-muted">
-                    Creator {creatorShareBpsToPercent(creatorFeeShareBps).toFixed(2)}% · Referrer{" "}
-                    {referrerShareBpsToPercent(referrerShareBps).toFixed(2)}% · Treasury{" "}
-                    {treasuryFeeSharePct.toFixed(2)}% of fee
-                  </p>
-                  <p className="text-caption text-pump-muted">
-                    Effective ~{creatorEffectivePct.toFixed(3)}% creator · ~
-                    {referrerEffectivePct.toFixed(3)}% referrer · ~
-                    {treasuryEffectivePct.toFixed(3)}% treasury on trade volume
-                  </p>
-                  <button
-                    type="button"
-                    className="chip-button mt-2"
-                    onClick={() => setProtocolFeeModalOpen(true)}
-                  >
-                    Edit protocol fee
-                  </button>
-                </>
-              ) : (
-                "—"
-              )}
-            </dd>
-          </div>
-          <div className="rounded-md border border-pump-border/15 bg-pump-surface/35 px-3 py-2.5">
-            <dt className="section-label text-[10px]">Creator fee share</dt>
-            <dd className="mt-1">
-              {protocol ? (
-                <>
-                  <p className="financial-value text-body-sm font-semibold text-pump-text">
-                    {creatorShareBpsToPercent(creatorFeeShareBps).toFixed(2)}% of protocol fee
-                  </p>
-                  <p className="text-caption text-pump-muted">
-                    Treasury auto-receives the remaining {treasuryFeeSharePct.toFixed(2)}%
-                  </p>
-                  <button
-                    type="button"
-                    className="chip-button mt-2"
-                    onClick={() => setCreatorShareModalOpen(true)}
-                  >
-                    Edit creator share
-                  </button>
-                </>
-              ) : (
-                "—"
-              )}
-            </dd>
-          </div>
-          <div className="rounded-md border border-pump-border/15 bg-pump-surface/35 px-3 py-2.5">
-            <dt className="section-label text-[10px]">Referrer fee share</dt>
-            <dd className="mt-1">
-              {protocol ? (
-                <>
-                  <p className="financial-value text-body-sm font-semibold text-pump-text">
-                    {referrerShareBpsToPercent(referrerShareBps).toFixed(2)}% of protocol fee
-                  </p>
-                  <p className="text-caption text-pump-muted">
-                    Paid to invitee&apos;s referrer when bound before first trade
-                  </p>
-                  <button
-                    type="button"
-                    className="chip-button mt-2"
-                    onClick={() => setReferrerShareModalOpen(true)}
-                  >
-                    Edit referrer share
-                  </button>
-                </>
-              ) : (
-                "—"
-              )}
-            </dd>
-          </div>
-          <div className="rounded-md border border-pump-border/15 bg-pump-surface/35 px-3 py-2.5 sm:col-span-2 lg:col-span-1">
-            <dt className="section-label text-[10px]">Bonding curve owner</dt>
-            <dd className="mt-1 text-body-sm font-medium text-pump-text">
-              {bondingOwner ? shortAddress(bondingOwner) : shortAddress(ADMIN_ADDRESS)}
-            </dd>
-            {!canEditBondingFees && isAdmin ? (
-              <p className="mt-1 text-caption text-pump-muted">
-                Connect owner wallet to change fees on-chain.
-              </p>
-            ) : null}
-          </div>
-          <div className="rounded-md border border-pump-border/15 bg-pump-surface/35 px-3 py-2.5">
-            <dt className="section-label text-[10px]">Airdrop create fee</dt>
-            <dd className="mt-1">
-              {protocol?.airdropManager ? (
-                <>
-                  <p className="financial-value text-body-sm font-semibold text-pump-text">
-                    {formatBnb(protocol.airdropManager.createFeeBnb)} BNB
-                  </p>
-                  {airdropFeeUsd != null ? (
-                    <p className="text-caption text-pump-muted">
-                      {formatUsdReadable(airdropFeeUsd, { compact: true })} → treasury
-                    </p>
-                  ) : null}
-                  <button
-                    type="button"
-                    className="chip-button mt-2"
-                    onClick={() => setAirdropCreateFeeModalOpen(true)}
-                  >
-                    Edit airdrop fee
-                  </button>
-                  {!canEditAirdropCreateFee && isAdmin && protocol?.airdropManager ? (
-                    <p className="mt-1 text-caption text-pump-muted">
-                      Airdrop admin: {shortAddress(airdropAdmin ?? ADMIN_ADDRESS)}
-                    </p>
-                  ) : null}
-                </>
-              ) : (
-                "—"
-              )}
-            </dd>
-          </div>
-          <div className="rounded-md border border-pump-border/15 bg-pump-surface/35 px-3 py-2.5">
-            <dt className="section-label text-[10px]">Sweep recipient</dt>
-            <dd className="mt-1 text-body-sm font-medium text-pump-text">
-              {shortAddress(protocol?.airdropManager?.admin ?? ADMIN_ADDRESS)}
-            </dd>
-          </div>
-          <div className="rounded-md border border-pump-border/15 bg-pump-surface/35 px-3 py-2.5">
-            <dt className="section-label text-[10px]">Bonding curve balance</dt>
-            <dd className="mt-1">
+            </AdminDataRow>
+            <AdminDataRow label="Owner">
+              {shortAddress(treasuryOwner ?? ADMIN_ADDRESS)}
+            </AdminDataRow>
+            <AdminDataRow label="Balance">
+              <BnbAmountWithUsd bnb={treasuryBnb} bnbUsd={bnbUsd} inline />
+            </AdminDataRow>
+            <AdminDataRow label="Bonding curve balance">
               {protocol ? (
                 <BnbAmountWithUsd
                   bnb={protocol.bondingCurveManager.contractBalanceBnb}
                   bnbUsd={bnbUsd}
-                  compact
+                  inline
                 />
               ) : (
                 "—"
               )}
-            </dd>
-          </div>
-        </dl>
+            </AdminDataRow>
+            <AdminDataRow label="Bonding curve owner">
+              {shortAddress(bondingOwner ?? ADMIN_ADDRESS)}
+            </AdminDataRow>
+            <AdminDataRow label="Sweep recipient">
+              {shortAddress(protocol?.airdropManager?.admin ?? ADMIN_ADDRESS)}
+            </AdminDataRow>
+          </AdminDataTable>
+        </AdminBlock>
 
         {canWithdrawTreasury ? (
-          <div className="mt-4 rounded-md border border-pump-border/15 bg-pump-surface/35 p-4">
-            <p className="section-label">Claim protocol fees</p>
-            <p className="mt-1 field-hint">
-              Withdraw accumulated fees from LaunchpadTreasury — meme launch fees, trade treasury
-              share ({treasuryFeeSharePct.toFixed(0)}% of protocol fee), and airdrop create fees.
-            </p>
-
-            <div className="mt-3 flex flex-wrap gap-2">
-              <button
-                type="button"
-                className={withdrawMode === "bnb" ? "chip-button chip-button-active" : "chip-button"}
-                onClick={() => setWithdrawMode("bnb")}
-              >
-                BNB
-              </button>
-              <button
-                type="button"
-                className={
-                  withdrawMode === "token" ? "chip-button chip-button-active" : "chip-button"
-                }
-                onClick={() => setWithdrawMode("token")}
-              >
-                ERC20 token
-              </button>
-            </div>
-
-            <div className="mt-3 grid gap-2 sm:grid-cols-2">
-              <input
-                type="text"
-                placeholder="Recipient 0x…"
-                value={withdrawTo}
-                onChange={(e) => setWithdrawTo(e.target.value)}
-                className="field-input h-10 bg-pump-bg/80 sm:col-span-2"
-              />
-              {withdrawMode === "bnb" ? (
-                <>
-                  <div className="relative sm:col-span-2">
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      placeholder="Amount BNB"
-                      value={withdrawAmount}
-                      onChange={(e) => setWithdrawAmount(e.target.value)}
-                      className="field-input h-10 w-full bg-pump-bg/80 pr-16"
-                    />
+          <AdminBlock title="Withdraw">
+            <table className="admin-grid">
+              <tbody>
+                <tr>
+                  <th scope="row">Type</th>
+                  <td colSpan={2}>
                     <button
                       type="button"
-                      className="chip-button absolute right-1 top-1/2 -translate-y-1/2 px-2 py-0.5 text-[10px]"
-                      onClick={fillMaxTreasuryBnb}
-                      disabled={!treasuryLiveBalance?.value}
+                      className="admin-btn mr-2"
+                      onClick={() => setWithdrawMode("bnb")}
                     >
-                      Max
+                      BNB {withdrawMode === "bnb" ? "●" : ""}
                     </button>
-                  </div>
-                  <p className="text-caption text-pump-muted sm:col-span-2">
-                    Available: {formatBnb(treasuryBnb)} BNB
-                    {bnbToUsd(Number(treasuryBnb), bnbUsd) != null
-                      ? ` (${formatUsdReadable(bnbToUsd(Number(treasuryBnb), bnbUsd)!, { compact: true })})`
-                      : ""}
-                  </p>
-                </>
-              ) : (
-                <>
-                  <input
-                    type="text"
-                    placeholder="Token contract 0x…"
-                    value={withdrawTokenAddress}
-                    onChange={(e) => setWithdrawTokenAddress(e.target.value)}
-                    className="field-input h-10 bg-pump-bg/80 sm:col-span-2"
-                  />
-                  <div className="relative sm:col-span-2">
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      placeholder="Token amount"
-                      value={withdrawTokenAmount}
-                      onChange={(e) => setWithdrawTokenAmount(e.target.value)}
-                      className="field-input h-10 w-full bg-pump-bg/80 pr-16"
-                    />
                     <button
                       type="button"
-                      className="chip-button absolute right-1 top-1/2 -translate-y-1/2 px-2 py-0.5 text-[10px]"
-                      onClick={fillMaxTreasuryToken}
-                      disabled={treasuryTokenBalance == null || treasuryTokenBalance === 0n}
+                      className="admin-btn"
+                      onClick={() => setWithdrawMode("token")}
                     >
-                      Max
+                      Token {withdrawMode === "token" ? "●" : ""}
                     </button>
-                  </div>
-                  {tokenWithdrawAddress && treasuryTokenBalance != null ? (
-                    <p className="text-caption text-pump-muted sm:col-span-2">
-                      Treasury balance: {formatEther(treasuryTokenBalance)} tokens
-                    </p>
-                  ) : null}
-                </>
-              )}
-            </div>
-
-            <button
-              type="button"
-              className="primary-button mt-3"
-              disabled={adminTxPending}
-              onClick={
-                withdrawMode === "bnb" ? onWithdrawTreasuryBnb : onWithdrawTreasuryToken
-              }
-            >
-              {adminTxPending
-                ? "Withdrawing…"
-                : withdrawMode === "bnb"
-                  ? "Withdraw BNB from treasury"
-                  : "Withdraw token from treasury"}
-            </button>
-
+                  </td>
+                </tr>
+                <tr>
+                  <th scope="row">Recipient</th>
+                  <td colSpan={2}>
+                    <input
+                      type="text"
+                      value={withdrawTo}
+                      onChange={(e) => setWithdrawTo(e.target.value)}
+                      className="admin-input admin-num"
+                    />
+                  </td>
+                </tr>
+                {withdrawMode === "bnb" ? (
+                  <>
+                    <tr>
+                      <th scope="row">Amount BNB</th>
+                      <td>
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          value={withdrawAmount}
+                          onChange={(e) => setWithdrawAmount(e.target.value)}
+                          className="admin-input admin-num"
+                        />
+                      </td>
+                      <td>
+                        <AdminBtn onClick={fillMaxTreasuryBnb} disabled={!treasuryLiveBalance?.value}>
+                          Max
+                        </AdminBtn>
+                      </td>
+                    </tr>
+                    <tr>
+                      <th scope="row">Available</th>
+                      <td colSpan={2}>
+                        <AdminNum>{formatBnb(treasuryBnb)} BNB</AdminNum>
+                      </td>
+                    </tr>
+                  </>
+                ) : (
+                  <>
+                    <tr>
+                      <th scope="row">Token contract</th>
+                      <td colSpan={2}>
+                        <input
+                          type="text"
+                          value={withdrawTokenAddress}
+                          onChange={(e) => setWithdrawTokenAddress(e.target.value)}
+                          className="admin-input admin-num"
+                        />
+                      </td>
+                    </tr>
+                    <tr>
+                      <th scope="row">Amount</th>
+                      <td>
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          value={withdrawTokenAmount}
+                          onChange={(e) => setWithdrawTokenAmount(e.target.value)}
+                          className="admin-input admin-num"
+                        />
+                      </td>
+                      <td>
+                        <AdminBtn
+                          onClick={fillMaxTreasuryToken}
+                          disabled={treasuryTokenBalance == null || treasuryTokenBalance === 0n}
+                        >
+                          Max
+                        </AdminBtn>
+                      </td>
+                    </tr>
+                  </>
+                )}
+                <tr>
+                  <th scope="row">Action</th>
+                  <td colSpan={2}>
+                    <AdminBtn
+                      onClick={
+                        withdrawMode === "bnb" ? onWithdrawTreasuryBnb : onWithdrawTreasuryToken
+                      }
+                      disabled={adminTxPending}
+                    >
+                      {adminTxPending ? "Withdrawing…" : "Withdraw"}
+                    </AdminBtn>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
             {adminTxHash && !sweepingId ? (
-              <p className="mt-2 text-caption text-pump-muted">
+              <p className="admin-note">
                 Tx{" "}
-                <a
-                  href={explorerTxUrl(adminTxHash)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-pump-accent hover:underline"
-                >
+                <a href={explorerTxUrl(adminTxHash)} target="_blank" rel="noopener noreferrer" className="admin-link admin-num">
                   {shortAddress(adminTxHash)}
                 </a>
               </p>
             ) : null}
-          </div>
+          </AdminBlock>
         ) : isAdmin ? (
-          <p className="mt-4 text-caption text-pump-muted">
-            Treasury withdrawals require the LaunchpadTreasury owner wallet (
-            {shortAddress(treasuryOwner ?? ADMIN_ADDRESS)}).
+          <p className="admin-note">
+            Withdrawals require treasury owner ({shortAddress(treasuryOwner ?? ADMIN_ADDRESS)}).
           </p>
         ) : null}
-      </section>
+      </AdminTabPanel>
 
-      <section className="panel-surface overflow-hidden">
-        <div className="flex flex-wrap items-start justify-between gap-3 border-b border-pump-border/15 px-4 py-3.5 md:px-5">
-          <div>
-            <p className="section-label">Airdrop remainder sweeps</p>
-            <p className="mt-0.5 field-hint">
-              Unclaimed escrow after the claim window · swept to admin wallet
-            </p>
-          </div>
-          <button type="button" className="chip-button" onClick={() => void load()} disabled={loading}>
-            {loading ? "Refreshing…" : "Refresh"}
-          </button>
-        </div>
-
-        {loading ? (
-          <p className="p-4 text-body-sm text-pump-muted md:p-5">Loading campaigns…</p>
-        ) : airdrops.length === 0 ? (
-          <p className="p-4 text-body-sm text-pump-muted md:p-5">No on-chain airdrops yet.</p>
-        ) : (
-          <>
-            {readySweeps.length > 0 ? (
-              <p className="border-b border-pump-border/10 bg-pump-accent/5 px-4 py-2.5 text-body-sm text-pump-accent md:px-5">
-                {readySweeps.length} campaign{readySweeps.length === 1 ? "" : "s"} ready to sweep
-                {sweepStats.remainingUsd != null
-                  ? ` · ${formatUsdReadable(sweepStats.remainingUsd, { compact: true })} total remaining`
-                  : ""}
-              </p>
-            ) : null}
-
-            <div className="divide-y divide-pump-border/10 lg:hidden">
-              {airdrops.map((row) => (
-                <article key={row.id} className="space-y-2 p-3">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <Link
-                        href={`/airdrops/${row.id}`}
-                        className="truncate text-body-sm font-medium text-pump-accent hover:underline"
-                      >
-                        {row.title ?? row.linkedSymbol ?? `#${row.id}`}
-                      </Link>
-                      {row.linkedSymbol ? (
-                        <p className="text-caption text-pump-muted">Pool ${row.linkedSymbol}</p>
-                      ) : null}
-                    </div>
-                    <span className={sweepStatusBadgeClass(row.sweepStatus)}>
-                      {sweepStatusLabel(row.sweepStatus)}
-                    </span>
-                  </div>
-                  <dl className="grid grid-cols-2 gap-2 text-caption">
-                    <div>
-                      <dt className="section-label text-[10px]">Reward pool</dt>
-                      <dd className="mt-1">
-                        <RewardAmountWithUsd
-                          amount={row.totalFunded}
-                          rewardToken={row.rewardToken}
-                          rewardSymbol={row.rewardSymbol}
-                          rewardPriceBnb={row.rewardPriceBnb}
-                          bnbUsd={bnbUsd}
-                          compact
-                        />
-                      </dd>
-                    </div>
-                    <div>
-                      <dt className="section-label text-[10px]">Remaining</dt>
-                      <dd className="mt-1">
-                        <RewardAmountWithUsd
-                          amount={row.remainingBnb}
-                          rewardToken={row.rewardToken}
-                          rewardSymbol={row.rewardSymbol}
-                          rewardPriceBnb={row.rewardPriceBnb}
-                          bnbUsd={bnbUsd}
-                          compact
-                        />
-                      </dd>
-                    </div>
-                    <div className="col-span-2">
-                      <dt className="section-label text-[10px]">Claim until</dt>
-                      <dd className="mt-0.5 text-pump-muted">
-                        {row.claimEnd ? formatQualifyDateTime(row.claimEnd) : "—"}
-                      </dd>
-                    </div>
-                  </dl>
-                  {row.canSweep ? (
-                    <button
-                      type="button"
-                      className="primary-button w-full"
-                      disabled={adminTxPending && sweepingId === row.onChainId}
-                      onClick={() => onSweep(row)}
-                    >
-                      {adminTxPending && sweepingId === row.onChainId
-                        ? "Sweeping…"
-                        : "Sweep remainder"}
-                    </button>
-                  ) : null}
-                </article>
-              ))}
-            </div>
-
-            <div className="hidden overflow-x-auto lg:block">
-              <table className="min-w-[960px] w-full text-body-sm">
-                <thead className="border-b border-pump-border/15 bg-pump-surface/55">
-                  <tr className="text-left">
-                    <th className="section-label px-4 py-3">Campaign</th>
-                    <th className="section-label px-4 py-3">Reward pool</th>
-                    <th className="section-label px-4 py-3">Claimed</th>
-                    <th className="section-label px-4 py-3">Remaining</th>
-                    <th className="section-label px-4 py-3">Claim until</th>
-                    <th className="section-label px-4 py-3">Status</th>
-                    <th className="section-label px-4 py-3 text-right">Action</th>
+      <AdminTabPanel id="airdrops" active={activeTab}>
+        <AdminBlock
+          title="Airdrop sweeps"
+          actions={
+            <AdminBtn onClick={() => void load()} disabled={loading}>
+              {loading ? "…" : "Refresh"}
+            </AdminBtn>
+          }
+        >
+          {loading ? (
+            <p className="admin-empty">Loading…</p>
+          ) : airdrops.length === 0 ? (
+            <AdminEmptyState title="No airdrops" />
+          ) : (
+            <>
+              {readySweeps.length > 0 ? (
+                <p className="admin-note">
+                  {readySweeps.length} ready to sweep
+                  {sweepStats.remainingUsd != null
+                    ? ` · ${formatUsdReadable(sweepStats.remainingUsd, { compact: true })}`
+                    : ""}
+                </p>
+              ) : null}
+              <AdminGridTable>
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Campaign</th>
+                    <th>Symbol</th>
+                    <th>Reward pool</th>
+                    <th>Claimed</th>
+                    <th>Remaining</th>
+                    <th>Claim until</th>
+                    <th>Status</th>
+                    <th>Action</th>
                   </tr>
                 </thead>
                 <tbody>
                   {airdrops.map((row) => (
-                    <tr
-                      key={row.id}
-                      className="border-b border-pump-border/10 last:border-b-0 hover:bg-pump-surface/20"
-                    >
-                      <td className="px-4 py-3">
-                        <Link
-                          href={`/airdrops/${row.id}`}
-                          className="font-medium text-pump-accent hover:underline"
-                        >
+                    <tr key={row.id}>
+                      <td className="admin-num">{row.onChainId}</td>
+                      <td>
+                        <Link href={`/airdrops/${row.id}`} className="admin-link">
                           {row.title ?? row.linkedSymbol ?? `#${row.id}`}
                         </Link>
-                        <p className="text-caption text-pump-muted">
-                          {row.linkedSymbol ? `Pool $${row.linkedSymbol}` : `ID ${row.onChainId}`}
-                        </p>
                       </td>
-                      <td className="px-4 py-3">
-                        <RewardAmountWithUsd
+                      <td>{row.linkedSymbol ? `$${row.linkedSymbol}` : "—"}</td>
+                      <td>
+                        <AdminRewardText
                           amount={row.totalFunded}
                           rewardToken={row.rewardToken}
                           rewardSymbol={row.rewardSymbol}
                           rewardPriceBnb={row.rewardPriceBnb}
                           bnbUsd={bnbUsd}
-                          compact
                         />
                       </td>
-                      <td className="px-4 py-3">
-                        <RewardAmountWithUsd
+                      <td>
+                        <AdminRewardText
                           amount={row.totalClaimedBnb}
                           rewardToken={row.rewardToken}
                           rewardSymbol={row.rewardSymbol}
                           rewardPriceBnb={row.rewardPriceBnb}
                           bnbUsd={bnbUsd}
-                          compact
                         />
                       </td>
-                      <td className="px-4 py-3">
-                        <RewardAmountWithUsd
+                      <td>
+                        <AdminRewardText
                           amount={row.remainingBnb}
                           rewardToken={row.rewardToken}
                           rewardSymbol={row.rewardSymbol}
                           rewardPriceBnb={row.rewardPriceBnb}
                           bnbUsd={bnbUsd}
-                          compact
                         />
                       </td>
-                      <td className="px-4 py-3 text-caption text-pump-muted">
+                      <td className="admin-num">
                         {row.claimEnd ? formatQualifyDateTime(row.claimEnd) : "—"}
                       </td>
-                      <td className="px-4 py-3">
-                        <span className={sweepStatusBadgeClass(row.sweepStatus)}>
-                          {sweepStatusLabel(row.sweepStatus)}
-                        </span>
+                      <td className={sweepStatusClass(row.sweepStatus)}>
+                        {sweepStatusLabel(row.sweepStatus)}
                       </td>
-                      <td className="px-4 py-3 text-right">
+                      <td>
                         {row.canSweep ? (
-                          <button
-                            type="button"
-                            className="chip-button chip-button-active"
-                            disabled={adminTxPending && sweepingId === row.onChainId}
+                          <AdminBtn
                             onClick={() => onSweep(row)}
+                            disabled={adminTxPending && sweepingId === row.onChainId}
                           >
-                            {adminTxPending && sweepingId === row.onChainId ? "Sweeping…" : "Sweep"}
-                          </button>
+                            {adminTxPending && sweepingId === row.onChainId ? "…" : "Sweep"}
+                          </AdminBtn>
                         ) : (
-                          <span className="text-pump-muted">—</span>
+                          "—"
                         )}
                       </td>
                     </tr>
                   ))}
                 </tbody>
-              </table>
-            </div>
-          </>
-        )}
+              </AdminGridTable>
+              {adminTxHash && sweepingId ? (
+                <p className="admin-note">
+                  Last sweep tx{" "}
+                  <a
+                    href={explorerTxUrl(adminTxHash)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="admin-link admin-num"
+                  >
+                    {shortAddress(adminTxHash)}
+                  </a>
+                </p>
+              ) : null}
+            </>
+          )}
+        </AdminBlock>
+      </AdminTabPanel>
 
-        {adminTxHash && sweepingId ? (
-          <p className="border-t border-pump-border/10 px-4 py-2.5 text-caption text-pump-muted md:px-5">
-            Last sweep tx{" "}
-            <a
-              href={explorerTxUrl(adminTxHash)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-pump-accent hover:underline"
-            >
-              {shortAddress(adminTxHash)}
-            </a>
-          </p>
-        ) : null}
-      </section>
+      <AdminTabPanel id="promo" active={activeTab}>
+        <AdminBlock
+          title="New promo task"
+          actions={
+            <AdminBtn onClick={() => void loadPromoTasks()} disabled={promoLoading}>
+              {promoLoading ? "…" : "Refresh"}
+            </AdminBtn>
+          }
+        >
+          <table className="admin-grid">
+            <tbody>
+              <tr>
+                <th scope="row">Title</th>
+                <td colSpan={2}>
+                  <input
+                    type="text"
+                    value={promoTitle}
+                    onChange={(e) => setPromoTitle(e.target.value)}
+                    className="admin-input"
+                  />
+                </td>
+              </tr>
+              <tr>
+                <th scope="row">Description</th>
+                <td colSpan={2}>
+                  <input
+                    type="text"
+                    value={promoDescription}
+                    onChange={(e) => setPromoDescription(e.target.value)}
+                    className="admin-input"
+                  />
+                </td>
+              </tr>
+              <tr>
+                <th scope="row">Points</th>
+                <td>
+                  <input
+                    type="number"
+                    min={0}
+                    step={1}
+                    value={promoPoints}
+                    onChange={(e) => setPromoPoints(e.target.value)}
+                    className="admin-input admin-num"
+                  />
+                </td>
+                <td rowSpan={2} className="align-middle">
+                  <AdminBtn
+                    onClick={() => void onCreatePromoTask()}
+                    disabled={
+                      promoSaving || !promoTitle.trim() || !promoUrl.trim() || !promoPoints.trim()
+                    }
+                  >
+                    {promoSaving ? "…" : "Create"}
+                  </AdminBtn>
+                </td>
+              </tr>
+              <tr>
+                <th scope="row">URL</th>
+                <td>
+                  <input
+                    type="url"
+                    value={promoUrl}
+                    onChange={(e) => setPromoUrl(e.target.value)}
+                    className="admin-input"
+                  />
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </AdminBlock>
 
-      <section className="panel-surface p-4 md:p-5">
-        <p className="section-label">Contract addresses</p>
-        <dl className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-          {[
-            ["MemeFactory", protocol?.memeFactory.address ?? contracts.memeFactory],
-            ["BondingCurve", protocol?.bondingCurveManager.address ?? contracts.bondingCurveManager],
-            [
-              "AirdropManager",
-              protocol?.airdropManager?.address ?? contracts.airdropManager ?? "—",
-            ],
-          ].map(([label, addr]) => (
-            <div
-              key={label}
-              className="rounded-md border border-pump-border/15 bg-pump-surface/35 px-3 py-2"
-            >
-              <dt className="section-label text-[10px]">{label}</dt>
-              <dd className="mt-1">
+        <AdminBlock title="Promo tasks">
+          {promoLoading ? (
+            <p className="admin-empty">Loading…</p>
+          ) : promoTasks.length === 0 ? (
+            <AdminEmptyState title="No promo tasks" />
+          ) : (
+            <AdminGridTable>
+              <thead>
+                <tr>
+                  <th>Title</th>
+                  <th>Description</th>
+                  <th>URL</th>
+                  <th>Points</th>
+                  <th>Completions</th>
+                  <th>Active</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {promoTasks.map((task) => (
+                  <tr key={task.taskKey}>
+                    <td>{task.title}</td>
+                    <td>{task.description ?? "—"}</td>
+                    <td>
+                      <a
+                        href={task.targetUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="admin-link"
+                      >
+                        {task.targetUrl}
+                      </a>
+                    </td>
+                    <td className="admin-num">{task.rewardPoints}</td>
+                    <td className="admin-num">{task.completionCount}</td>
+                    <td>{task.isActive ? "Yes" : "No"}</td>
+                    <td>
+                      <AdminBtn
+                        onClick={() => void onDeletePromoTask(task.taskKey, task.title)}
+                        disabled={deletingKey === task.taskKey}
+                      >
+                        {deletingKey === task.taskKey ? "…" : "Delete"}
+                      </AdminBtn>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </AdminGridTable>
+          )}
+        </AdminBlock>
+      </AdminTabPanel>
+
+      <AdminTabPanel id="contracts" active={activeTab}>
+        <AdminBlock title="Contracts">
+          <AdminDataTable>
+            {[
+              ["MemeFactory", protocol?.memeFactory.address ?? contracts.memeFactory],
+              ["BondingCurve", protocol?.bondingCurveManager.address ?? contracts.bondingCurveManager],
+              [
+                "AirdropManager",
+                protocol?.airdropManager?.address ?? contracts.airdropManager ?? "—",
+              ],
+            ].map(([label, addr]) => (
+              <AdminDataRow key={label} label={String(label)}>
                 {addr && addr !== "—" ? (
                   <a
                     href={explorerAddressUrl(String(addr))}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-caption font-medium text-pump-accent hover:underline"
+                    className="admin-link admin-num"
                   >
                     {shortAddress(String(addr))}
                   </a>
                 ) : (
-                  <span className="text-caption text-pump-muted">—</span>
+                  "—"
                 )}
-              </dd>
-            </div>
-          ))}
-        </dl>
-      </section>
-    </div>
+              </AdminDataRow>
+            ))}
+          </AdminDataTable>
+        </AdminBlock>
+      </AdminTabPanel>
+    </AdminShell>
   );
 }
