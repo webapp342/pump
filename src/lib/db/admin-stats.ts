@@ -2,6 +2,7 @@ import { getLaunchpadPool } from "@/lib/db/launchpad";
 
 export type AdminDbStats = {
   usersRegistered: number;
+  usersRegistered24h: number;
   usersTraded: number;
   totalTrades: number;
   trades24h: number;
@@ -33,6 +34,7 @@ export async function getAdminDbStats(): Promise<AdminDbStats> {
   const pool = getLaunchpadPool();
   const result = await pool.query<{
     users_registered: number;
+    users_registered_24h: number;
     users_traded: number;
     total_trades: number;
     trades_24h: number;
@@ -49,6 +51,10 @@ export async function getAdminDbStats(): Promise<AdminDbStats> {
     `
       SELECT
         (SELECT COUNT(*)::int FROM users) AS users_registered,
+        (
+          SELECT COUNT(*)::int FROM users
+          WHERE created_at >= now() - interval '24 hours'
+        ) AS users_registered_24h,
         (SELECT COUNT(*)::int FROM user_volumes) AS users_traded,
         (SELECT COUNT(*)::int FROM trades) AS total_trades,
         (SELECT COUNT(*)::int FROM trades WHERE block_time >= now() - interval '24 hours') AS trades_24h,
@@ -75,6 +81,7 @@ export async function getAdminDbStats(): Promise<AdminDbStats> {
   if (!row) {
     return {
       usersRegistered: 0,
+      usersRegistered24h: 0,
       usersTraded: 0,
       totalTrades: 0,
       trades24h: 0,
@@ -101,6 +108,7 @@ export async function getAdminDbStats(): Promise<AdminDbStats> {
 
   return {
     usersRegistered: row.users_registered,
+    usersRegistered24h: row.users_registered_24h,
     usersTraded: row.users_traded,
     totalTrades: row.total_trades,
     trades24h: row.trades_24h,

@@ -104,6 +104,7 @@ type AdminLinkTask = {
 
 type AdminPlatformStats = {
   usersRegistered: number;
+  usersRegistered24h: number;
   usersTraded: number;
   totalTrades: number;
   trades24h: number;
@@ -618,6 +619,10 @@ export function AdminPanel() {
             <AdminDataRow label="Users (registered)" loading={statsLoading && !stats}>
               <AdminNum>{stats?.usersRegistered ?? "—"}</AdminNum>
               {stats ? <span className="admin-meta"> · app / points profile</span> : null}
+            </AdminDataRow>
+            <AdminDataRow label="New users (24h)" loading={statsLoading && !stats}>
+              <AdminNum>{stats?.usersRegistered24h ?? "—"}</AdminNum>
+              {stats ? <span className="admin-meta"> · registered last 24h</span> : null}
             </AdminDataRow>
             <AdminDataRow label="Users (traded)" loading={statsLoading && !stats}>
               <AdminNum>{stats?.usersTraded ?? "—"}</AdminNum>
