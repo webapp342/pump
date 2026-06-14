@@ -13,6 +13,8 @@ log() {
 
 cd "$APP_DIR"
 
+chmod +x deploy/vm/system-health.sh 2>/dev/null || true
+
 log "Syncing repo to origin/main (discards local changes to tracked files)"
 git fetch origin main
 git reset --hard origin/main
