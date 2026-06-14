@@ -1,34 +1,38 @@
 "use client";
 
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
-
-type ThemeMode = "light" | "dark";
+import {
+  getColorScheme,
+  isValidTheme,
+  THEME_STORAGE_KEY,
+  type ThemeId,
+} from "@/lib/theme";
 
 type ThemeContextValue = {
-  theme: ThemeMode;
-  setTheme: (theme: ThemeMode) => void;
+  theme: ThemeId;
+  setTheme: (theme: ThemeId) => void;
   toggleTheme: () => void;
 };
 
-const THEME_STORAGE_KEY = "pump-theme";
-
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
-function applyTheme(theme: ThemeMode) {
+function applyTheme(theme: ThemeId) {
   document.documentElement.dataset.theme = theme;
-  document.documentElement.style.colorScheme = theme;
+  document.documentElement.style.colorScheme = getColorScheme(theme);
   window.localStorage.setItem(THEME_STORAGE_KEY, theme);
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setThemeState] = useState<ThemeMode>("dark");
+  const [theme, setThemeState] = useState<ThemeId>("dark");
 
   useEffect(() => {
     const stored = window.localStorage.getItem(THEME_STORAGE_KEY);
-    const next =
-      stored === "light" || stored === "dark"
-        ? stored
-        : (document.documentElement.dataset.theme as ThemeMode | undefined) ?? "dark";
+    const fromDom = document.documentElement.dataset.theme;
+    const next = isValidTheme(stored)
+      ? stored
+      : isValidTheme(fromDom)
+        ? fromDom
+        : "dark";
 
     setThemeState(next);
     applyTheme(next);

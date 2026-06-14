@@ -28,9 +28,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             __html: `
               try {
                 var storedTheme = localStorage.getItem("pump-theme");
-                var theme = storedTheme === "light" || storedTheme === "dark" ? storedTheme : "dark";
+                var valid = storedTheme === "light" || storedTheme === "dark" || storedTheme === "navy" || storedTheme === "slate";
+                var theme = valid ? storedTheme : "dark";
                 document.documentElement.dataset.theme = theme;
-                document.documentElement.style.colorScheme = theme;
+                document.documentElement.style.colorScheme = theme === "dark" || theme === "navy" ? "dark" : "light";
               } catch (error) {}
             `,
           }}

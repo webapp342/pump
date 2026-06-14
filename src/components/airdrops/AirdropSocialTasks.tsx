@@ -123,7 +123,7 @@ export function AirdropSocialTasksPreview({ tasks }: AirdropSocialTasksPreviewPr
 
   return (
     <>
-      <dt className="col-span-2 border-t border-pump-border/15 pt-2 section-label text-[10px]">
+      <dt className="col-span-2 border-t border-pump-border/15 pt-2 section-label">
         Step 1 — Social
       </dt>
       <dd className="col-span-2">

@@ -46,7 +46,7 @@ export function InviteLinkPanel({
 
   return (
     <div className="mt-2 rounded-md border border-pump-border/15 bg-pump-surface/25 p-2.5">
-      <p className="section-label text-[10px]">Your invite link</p>
+      <p className="section-label">Your invite link</p>
       <div className="mt-1.5 flex flex-col gap-2 sm:flex-row sm:items-center">
         <p className="min-w-0 flex-1 truncate font-mono text-caption text-pump-muted">{inviteUrl}</p>
         <button type="button" onClick={() => void copyLink()} className="chip-button shrink-0">

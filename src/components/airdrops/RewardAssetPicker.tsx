@@ -4,6 +4,7 @@ import { useEffect, useId, useMemo, useState, type ReactNode } from "react";
 import type { TokenListItem } from "@/lib/db/launchpad";
 import { BnbLogo } from "@/components/token/BnbLogo";
 import { TokenAvatar } from "@/components/token/TokenAvatar";
+import { ModalPortal } from "@/components/ui/ModalPortal";
 
 export const BNB_REWARD_ASSET = "__BNB__";
 
@@ -302,8 +303,9 @@ export function RewardAssetPicker({
       {hint ? <div className="mt-1.5">{hint}</div> : null}
 
       {open ? (
+        <ModalPortal open={open}>
         <div
-          className="fixed inset-0 z-[70] flex items-end justify-center bg-black/75 sm:items-center sm:p-4"
+          className="modal-backdrop modal-backdrop-shell z-[70]"
           role="dialog"
           aria-modal="true"
           aria-labelledby={titleId}
@@ -394,7 +396,7 @@ export function RewardAssetPicker({
                   {otherList.length > 0 ? (
                     <section>
                       <div className="flex items-center justify-between gap-2 px-2 pb-1.5">
-                        <p className="section-label text-[10px]">
+                        <p className="section-label">
                           {priorityList.length > 0 ? "All tokens" : "Recent tokens"}
                         </p>
                         {otherListCapped && !search.trim() ? (
@@ -418,6 +420,7 @@ export function RewardAssetPicker({
             </div>
           </div>
         </div>
+        </ModalPortal>
       ) : null}
     </div>
   );

@@ -9,6 +9,8 @@ import { useReadContract } from "wagmi";
 import { contracts, pumpChain } from "@/config/chain";
 import { bondingCurveManagerAbi } from "@/lib/bonding-curve";
 import { ClaimCreatorFeesModal } from "@/components/portfolio/ClaimCreatorFeesModal";
+import { CreatorFeesCard } from "@/components/portfolio/CreatorFeesCard";
+import { PortfolioMetricBox } from "@/components/portfolio/PortfolioMetricBox";
 import { ClaimReferrerFeesModal } from "@/components/portfolio/ClaimReferrerFeesModal";
 import { ReferralRewardsCard } from "@/components/referrals/ReferralRewardsCard";
 import { FollowNetworkModal } from "@/components/portfolio/FollowNetworkModal";
@@ -128,12 +130,6 @@ function formatFeeBnb(value: number): string {
   return value.toFixed(8);
 }
 
-function formatSignedBnb(value: number): string {
-  if (!Number.isFinite(value)) return "—";
-  const sign = value > 0 ? "+" : value < 0 ? "-" : "";
-  return `${sign}${Math.abs(value).toFixed(4)} BNB`;
-}
-
 function pnlTone(value: number): string {
   if (value > 0) return "text-pump-success";
   if (value < 0) return "text-pump-danger";
@@ -162,16 +158,17 @@ function PortfolioStatBox({
   className?: string;
 }) {
   return (
-    <div className={`flex min-w-0 flex-col gap-1 ${className}`}>
-      <p className="section-label text-[10px] md:hidden">{label}</p>
-      <div className="rounded-md border border-pump-border/15 bg-pump-surface/35 px-2.5 py-2 md:flex md:flex-nowrap md:items-center md:justify-between md:gap-2 md:px-3 md:py-2.5">
-        <span className="section-label hidden shrink-0 whitespace-nowrap md:inline">{label}</span>
-        <div className="min-w-0 md:text-right">
-          <p className={valueClassName}>{value}</p>
-          {sub ? <p className="mt-0.5 text-caption text-pump-muted">{sub}</p> : null}
-        </div>
-      </div>
-    </div>
+    <PortfolioMetricBox
+      label={label}
+      value={
+        <>
+          {value}
+          {sub ? <span className="mt-0.5 block text-caption text-pump-muted">{sub}</span> : null}
+        </>
+      }
+      valueClassName={valueClassName}
+      className={className}
+    />
   );
 }
 
@@ -639,8 +636,6 @@ export function PortfolioPanel() {
   const claimedBnb = data?.creatorFeesClaimedBnb ?? 0;
   const pendingBnb = pendingWei != null ? Number(formatEther(pendingWei)) : 0;
   const creatorFeesTotalBnb = claimedBnb + pendingBnb;
-  const creatorFeesTotalUsd = bnbToUsd(creatorFeesTotalBnb, bnbUsd);
-  const canClaimCreatorFees = pendingBnb > 0;
   const holdingsCount = verifiedPositionViews.length + walletHoldings.length;
 
   return (
@@ -659,6 +654,8 @@ export function PortfolioPanel() {
         open={referrerClaimOpen}
         onClose={() => setReferrerClaimOpen(false)}
         claimedBnb={referralStats?.claimedBnb ?? 0}
+        inviteCount={referralStats?.inviteCount ?? 0}
+        referralVolumeBnb={referralStats?.referralVolumeBnb ?? 0}
         onClaimed={() => {
           void refetchReferrerPending();
           if (address) {
@@ -728,57 +725,28 @@ export function PortfolioPanel() {
             </div>
           </div>
 
-          <dl className="mt-3 grid grid-cols-2 gap-2 md:mt-4 md:grid-cols-4 md:gap-2">
+          <dl className="mt-3 grid grid-cols-2 items-stretch gap-2 md:mt-4 lg:grid-cols-4">
             <PortfolioStatBox
               label="Portfolio value"
               value={formatUsdReadable(totalEstimatedUsd, { compact: true })}
-              sub={`${totalEstimated.toFixed(4)} BNB`}
             />
             <PortfolioStatBox
               label="Net PnL"
               value={formatUsdReadable(totalNetPnlUsd, { compact: true, signed: true })}
-              sub={<span className={pnlTone(totalNetPnl)}>{formatSignedBnb(totalNetPnl)}</span>}
               valueClassName={`financial-value text-body-sm font-semibold ${pnlTone(totalNetPnl)}`}
             />
-            <div className="col-span-2 flex min-w-0 flex-col gap-1 md:col-span-2">
-                <p className="section-label text-[10px] md:hidden">Creator fees</p>
-                <div className="rounded-md border border-pump-border/15 bg-pump-surface/35 p-2.5 md:flex md:items-center md:justify-between md:gap-3 md:p-3">
-                  <div className="min-w-0 md:flex md:flex-1 md:items-center md:justify-between md:gap-3">
-                    <span className="section-label hidden shrink-0 md:inline">Creator fees</span>
-                    <div className="min-w-0">
-                      <p className="financial-value text-body-sm font-semibold text-pump-text">
-                        {formatUsdReadable(creatorFeesTotalUsd, { compact: true })}
-                      </p>
-                      <p className="mt-0.5 text-caption text-pump-muted">
-                        {formatFeeBnb(creatorFeesTotalBnb)} BNB · {formatFeeBnb(claimedBnb)} claimed ·{" "}
-                        {formatFeeBnb(pendingBnb)} pending
-                      </p>
-                      {creatorFeesTotalBnb <= 0 ? (
-                        <p className="mt-1 text-[11px] text-pump-muted">
-                          Launch a meme — earn BNB from every trade on your token.
-                        </p>
-                      ) : null}
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    disabled={!canClaimCreatorFees}
-                    onClick={() => setClaimOpen(true)}
-                    className="chip-button chip-button-active mt-2 w-full shrink-0 disabled:cursor-not-allowed disabled:opacity-50 md:mt-0 md:w-auto"
-                  >
-                    Claim fees
-                  </button>
-                </div>
-              </div>
+            <CreatorFeesCard
+              totalBnb={creatorFeesTotalBnb}
+              bnbUsd={bnbUsd}
+              onOpenModal={() => setClaimOpen(true)}
+            />
             {address ? (
               <ReferralRewardsCard
                 address={address}
                 claimedBnb={referralStats?.claimedBnb ?? 0}
                 pendingWei={pendingReferrerWei}
-                inviteCount={referralStats?.inviteCount ?? 0}
-                referralVolumeBnb={referralStats?.referralVolumeBnb ?? 0}
                 bnbUsd={bnbUsd}
-                onClaimClick={() => setReferrerClaimOpen(true)}
+                onOpenModal={() => setReferrerClaimOpen(true)}
               />
             ) : null}
           </dl>
@@ -857,14 +825,14 @@ export function PortfolioPanel() {
                   </div>
 
                   <div className="hidden lg:block overflow-x-auto">
-                    <table className="min-w-[820px] w-full text-body-sm">
-                      <thead className="border-b border-pump-border/15 bg-pump-surface/55 text-left">
+                    <table className="sheet-grid min-w-[820px]">
+                      <thead>
                         <tr>
-                          <th className="section-label px-4 py-3">Coin</th>
-                          <th className="section-label px-4 py-3">Value</th>
-                          <th className="section-label px-4 py-3">Balance</th>
-                          <th className="section-label px-4 py-3">Entry</th>
-                          <th className="section-label px-4 py-3 text-right">Net PnL</th>
+                          <th>Coin</th>
+                          <th>Value</th>
+                          <th>Balance</th>
+                          <th>Entry</th>
+                          <th className="text-right">Net PnL</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -882,11 +850,8 @@ export function PortfolioPanel() {
                             remainingCostBasis > 0 ? (netPnl / remainingCostBasis) * 100 : null;
 
                           return (
-                            <tr
-                              key={position.tokenAddress}
-                              className="border-b border-pump-border/10 last:border-b-0"
-                            >
-                              <td className="px-4 py-3">
+                            <tr key={position.tokenAddress}>
+                              <td>
                                 <Link
                                   href={`/token/${position.tokenAddress}`}
                                   className="flex min-w-0 items-center gap-3"

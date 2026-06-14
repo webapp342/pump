@@ -50,6 +50,8 @@ import {
   referrerShareBpsToPercent,
   treasurySharePercentFromSplit,
 } from "@/lib/trade-fee-config";
+import { BnbLogo } from "@/components/token/BnbLogo";
+import { TokenAvatar } from "@/components/token/TokenAvatar";
 
 type ProtocolSnapshot = {
   memeFactory: { address: string; owner: string; treasury: string; createFeeBnb: string };
@@ -206,9 +208,20 @@ function AdminRewardText({
     bnbUsd
   );
   return (
-    <span className="admin-num">
-      {text}
-      {usd != null ? <span className="admin-meta"> · {formatUsdReadable(usd, { compact: true })}</span> : null}
+    <span className="inline-flex items-center gap-1.5 admin-num">
+      {isBnb ? (
+        <BnbLogo size={14} />
+      ) : (
+        <TokenAvatar
+          address={rewardToken}
+          symbol={rewardSymbol ?? "?"}
+          size={14}
+        />
+      )}
+      <span>
+        {text}
+        {usd != null ? <span className="admin-meta"> · {formatUsdReadable(usd, { compact: true })}</span> : null}
+      </span>
     </span>
   );
 }

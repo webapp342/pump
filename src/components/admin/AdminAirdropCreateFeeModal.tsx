@@ -5,6 +5,7 @@ import { parseEther } from "viem";
 import { useAccount, useWaitForTransactionReceipt, useWriteContract } from "wagmi";
 import { contracts, explorerTxUrl, pumpChain, shortAddress } from "@/config/chain";
 import { pumpAirdropManagerAbi } from "@/lib/abis/pump-airdrop-manager";
+import { ModalPortal } from "@/components/ui/ModalPortal";
 
 type AdminAirdropCreateFeeModalProps = {
   open: boolean;
@@ -48,8 +49,9 @@ export function AdminAirdropCreateFeeModal({
 
   if (!contracts.airdropManager) {
     return (
+      <ModalPortal open={open}>
       <div
-        className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-4 sm:items-center"
+        className="modal-backdrop modal-backdrop-shell z-50"
         role="dialog"
         aria-modal="true"
       >
@@ -61,6 +63,7 @@ export function AdminAirdropCreateFeeModal({
           </button>
         </div>
       </div>
+      </ModalPortal>
     );
   }
 
@@ -98,8 +101,9 @@ export function AdminAirdropCreateFeeModal({
   const wrongChain = chain?.id !== pumpChain.id;
 
   return (
+    <ModalPortal open={open}>
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-4 sm:items-center"
+      className="modal-backdrop modal-backdrop-shell z-50"
       role="dialog"
       aria-modal="true"
       aria-labelledby="admin-airdrop-create-fee-title"
@@ -115,7 +119,7 @@ export function AdminAirdropCreateFeeModal({
         </p>
 
         <div className="mt-4 rounded-md border border-pump-border/15 bg-pump-surface/35 px-3 py-2.5">
-          <p className="section-label text-[10px]">Current on-chain</p>
+          <p className="section-label">Current on-chain</p>
           <p className="financial-value mt-1 text-body-sm font-semibold text-pump-text">
             {currentFeeBnb} BNB
           </p>
@@ -179,5 +183,6 @@ export function AdminAirdropCreateFeeModal({
         </div>
       </div>
     </div>
+    </ModalPortal>
   );
 }

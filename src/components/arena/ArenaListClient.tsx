@@ -528,7 +528,7 @@ export function ArenaListClient() {
         <section className="space-y-2 md:space-y-3">
           <Link
             href={`/token/${kothToken.address}`}
-            className="block rounded-lg border border-pump-accent/25 bg-gradient-to-br from-pump-accent/12 via-pump-card/70 to-pump-surface/55 p-3 transition hover:border-pump-accent/45 md:p-4"
+            className="block panel-surface p-3 transition hover:bg-pump-border/6 md:p-4"
           >
             <div className="flex items-start justify-between gap-2 md:gap-4">
               <div className="flex min-w-0 items-center gap-2.5 md:gap-3">
@@ -559,7 +559,7 @@ export function ArenaListClient() {
             <dl className="mt-3 grid grid-cols-2 gap-x-2 gap-y-2 md:mt-4 md:grid-cols-3 md:gap-2">
               <div className="flex min-w-0 flex-col gap-1">
                 <dt className="section-label whitespace-nowrap text-[10px] md:hidden">MCAP</dt>
-                <dd className="m-0 rounded-md border border-pump-border/15 bg-pump-surface/35 px-3 py-2 md:flex md:flex-nowrap md:items-center md:justify-between md:gap-2">
+                <dd className="m-0 border border-pump-border/45 bg-pump-border/4 px-3 py-2 md:flex md:flex-nowrap md:items-center md:justify-between md:gap-2">
                   <span className="section-label hidden shrink-0 whitespace-nowrap md:inline">MCAP</span>
                   <MetricValueWith24hChange
                     compact
@@ -570,7 +570,7 @@ export function ArenaListClient() {
               </div>
               <div className="flex min-w-0 flex-col gap-1">
                 <dt className="section-label whitespace-nowrap text-[10px] md:hidden">24H VOL</dt>
-                <dd className="m-0 rounded-md border border-pump-border/15 bg-pump-surface/35 px-3 py-2 md:flex md:flex-nowrap md:items-center md:justify-between md:gap-2">
+                <dd className="m-0 border border-pump-border/45 bg-pump-border/4 px-3 py-2 md:flex md:flex-nowrap md:items-center md:justify-between md:gap-2">
                   <span className="section-label hidden shrink-0 whitespace-nowrap md:inline">24H VOL</span>
                   <MetricValueWith24hChange
                     compact
@@ -585,7 +585,7 @@ export function ArenaListClient() {
                 </dd>
               </div>
               <div className="hidden min-w-0 md:block">
-                <dd className="m-0 rounded-md border border-pump-border/15 bg-pump-surface/35 px-3 py-2 md:flex md:flex-nowrap md:items-center md:justify-between md:gap-2">
+                <dd className="m-0 border border-pump-border/45 bg-pump-border/4 px-3 py-2 md:flex md:flex-nowrap md:items-center md:justify-between md:gap-2">
                   <span className="section-label shrink-0 whitespace-nowrap">TIME AS KING</span>
                   <span className="financial-value shrink-0 text-body-sm font-semibold text-pump-text">
                     {formatDurationSince(kothCrownedAt)}
@@ -602,7 +602,7 @@ export function ArenaListClient() {
                 <Link
                   key={`${item.tokenAddress}:${item.crownedAt}`}
                   href={`/token/${item.tokenAddress}`}
-                  className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-pump-border/20 bg-pump-surface/35 px-2 py-0.5 text-caption text-pump-muted hover:text-pump-text md:gap-2 md:px-2.5 md:py-1"
+                  className="inline-flex shrink-0 items-center gap-1.5 border border-pump-border/45 bg-pump-border/4 px-2 py-0.5 text-caption text-pump-muted hover:text-pump-text md:gap-2 md:px-2.5 md:py-1"
                 >
                   <TokenAvatar
                     address={item.tokenAddress}
@@ -673,7 +673,7 @@ export function ArenaListClient() {
           <Link
             href="/create"
             prefetch={true}
-            className="inline-flex h-8 shrink-0 items-center gap-1 rounded-full border border-transparent bg-pump-accent px-2.5 text-caption font-semibold text-pump-accent-foreground shadow-sm transition hover:bg-pump-accent-strong md:hidden"
+            className="toolbar-btn toolbar-btn-accent shrink-0 md:hidden"
           >
             <svg viewBox="0 0 24 24" aria-hidden className="h-3.5 w-3.5 shrink-0 fill-none stroke-current">
               <path d="M12 5v14M5 12h14" strokeWidth="2" strokeLinecap="round" />
@@ -688,7 +688,7 @@ export function ArenaListClient() {
             placeholder="Search coin or symbol"
             className="field-input h-9 w-full bg-pump-surface/75 md:max-w-xs"
           />
-          <div className="-mx-2 flex gap-1.5 overflow-x-auto px-2 pb-0.5 md:mx-0 md:flex-wrap md:overflow-visible md:px-0 md:pb-0">
+          <div className="sheet-tabs -mx-2 overflow-x-auto px-2 md:mx-0 md:px-0">
           {(
             [
               ["all", "All", "All"],
@@ -736,8 +736,8 @@ export function ArenaListClient() {
           </div>
         </div>
 
-        <section className="rounded-lg border border-pump-border/15 bg-transparent">
-        <div className="lg:hidden divide-y divide-pump-border/10">
+        <section className="panel-surface overflow-hidden">
+        <div className="sheet-list lg:hidden">
           {marketTokens.map((token, index) => {
             const addressKey = token.address.toLowerCase();
             const mcapUsd =
@@ -804,21 +804,21 @@ export function ArenaListClient() {
         </div>
 
         <div className="hidden lg:block overflow-x-auto">
-          <table className="min-w-[1180px] w-full text-body-sm">
-          <thead className="border-b border-pump-border/15 bg-pump-surface/55 text-left">
+          <table className="sheet-grid min-w-[1180px]">
+          <thead>
             <tr>
-              <th className="px-2 py-3" />
-              <th className="section-label px-4 py-3">Coin</th>
-              <th className="section-label px-4 py-3">Graph</th>
-              <th className="section-label sticky top-0 px-4 py-3"><button type="button" onClick={() => onSort("mcap")} className={sortHeadClass("mcap")}>MCAP {sortLabel("mcap")}</button></th>
-              <th className="section-label sticky top-0 px-4 py-3"><button type="button" onClick={() => onSort("ath")} className={sortHeadClass("ath")}>ATH {sortLabel("ath")}</button></th>
-              <th className="section-label sticky top-0 px-4 py-3"><button type="button" onClick={() => onSort("age")} className={sortHeadClass("age")}>Age {sortLabel("age")}</button></th>
-              <th className="section-label sticky top-0 px-4 py-3"><button type="button" onClick={() => onSort("txns")} className={sortHeadClass("txns")}>TXNS {sortLabel("txns")}</button></th>
-              <th className="section-label sticky top-0 px-4 py-3"><button type="button" onClick={() => onSort("vol24h")} className={sortHeadClass("vol24h")}>24H VOL {sortLabel("vol24h")}</button></th>
-              <th className="section-label sticky top-0 px-4 py-3"><button type="button" onClick={() => onSort("traders")} className={sortHeadClass("traders")}>TRADERS {sortLabel("traders")}</button></th>
-              <th className="section-label sticky top-0 px-4 py-3"><button type="button" onClick={() => onSort("h1")} className={sortHeadClass("h1")}>1H {sortLabel("h1")}</button></th>
-              <th className="section-label sticky top-0 px-4 py-3"><button type="button" onClick={() => onSort("h6")} className={sortHeadClass("h6")}>6H {sortLabel("h6")}</button></th>
-              <th className="section-label sticky top-0 px-4 py-3"><button type="button" onClick={() => onSort("h24")} className={sortHeadClass("h24")}>24H {sortLabel("h24")}</button></th>
+              <th />
+              <th>Coin</th>
+              <th>Graph</th>
+              <th><button type="button" onClick={() => onSort("mcap")} className={sortHeadClass("mcap")}>MCAP {sortLabel("mcap")}</button></th>
+              <th><button type="button" onClick={() => onSort("ath")} className={sortHeadClass("ath")}>ATH {sortLabel("ath")}</button></th>
+              <th><button type="button" onClick={() => onSort("age")} className={sortHeadClass("age")}>Age {sortLabel("age")}</button></th>
+              <th><button type="button" onClick={() => onSort("txns")} className={sortHeadClass("txns")}>TXNS {sortLabel("txns")}</button></th>
+              <th><button type="button" onClick={() => onSort("vol24h")} className={sortHeadClass("vol24h")}>24H VOL {sortLabel("vol24h")}</button></th>
+              <th><button type="button" onClick={() => onSort("traders")} className={sortHeadClass("traders")}>TRADERS {sortLabel("traders")}</button></th>
+              <th><button type="button" onClick={() => onSort("h1")} className={sortHeadClass("h1")}>1H {sortLabel("h1")}</button></th>
+              <th><button type="button" onClick={() => onSort("h6")} className={sortHeadClass("h6")}>6H {sortLabel("h6")}</button></th>
+              <th><button type="button" onClick={() => onSort("h24")} className={sortHeadClass("h24")}>24H {sortLabel("h24")}</button></th>
             </tr>
           </thead>
           <tbody>
@@ -841,11 +841,8 @@ export function ArenaListClient() {
               ];
               const trendPositive = (token.change24hPct ?? 0) >= 0;
               return (
-                <tr
-                  key={token.address}
-                  className="border-b border-pump-border/10 bg-transparent last:border-b-0"
-                >
-                  <td className="px-2 py-3">
+                <tr key={token.address}>
+                  <td>
                     <button
                       type="button"
                       onClick={() => toggleFavorite(token.address)}

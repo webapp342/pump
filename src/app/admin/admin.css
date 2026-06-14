@@ -226,18 +226,7 @@
   color: rgb(var(--pump-danger));
 }
 
-/* Modal overlay — still spreadsheet style */
-.admin-modal-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 50;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgb(0 0 0 / 0.55);
-  padding: 16px;
-}
-
+/* Modal overlay — uses same tokens as .modal-backdrop in globals.css */
 .admin-modal {
   display: flex;
   max-height: min(92dvh, 900px);

@@ -10,6 +10,7 @@ import {
   referrerShareBpsToPercent,
   treasurySharePercentFromSplit,
 } from "@/lib/trade-fee-config";
+import { ModalPortal } from "@/components/ui/ModalPortal";
 
 type AdminReferrerShareModalProps = {
   open: boolean;
@@ -107,8 +108,9 @@ export function AdminReferrerShareModal({
   const protocolPct = protocolFeeBps / 100;
 
   return (
+    <ModalPortal open={open}>
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-4 sm:items-center"
+      className="modal-backdrop modal-backdrop-shell z-50"
       role="dialog"
       aria-modal="true"
       aria-labelledby="admin-referrer-share-title"
@@ -124,7 +126,7 @@ export function AdminReferrerShareModal({
         </p>
 
         <div className="mt-4 rounded-md border border-pump-border/15 bg-pump-surface/35 px-3 py-2.5">
-          <p className="section-label text-[10px]">Current split of protocol fee</p>
+          <p className="section-label">Current split of protocol fee</p>
           <p className="mt-1 text-body-sm text-pump-text">
             Creator{" "}
             <span className="financial-value font-semibold">{creatorPct.toFixed(2)}%</span>
@@ -204,5 +206,6 @@ export function AdminReferrerShareModal({
         </div>
       </div>
     </div>
+    </ModalPortal>
   );
 }

@@ -56,23 +56,23 @@ export function TokenBoardTable({
 
   return (
     <div className="overflow-x-auto">
-      <table className={`w-full text-body-sm ${isArena ? "min-w-[1180px]" : "min-w-[900px]"}`}>
-        <thead className="border-b border-pump-border/15 bg-pump-surface/55 text-left">
+      <table className={`sheet-grid ${isArena ? "min-w-[1180px]" : "min-w-[900px]"}`}>
+        <thead>
           <tr>
-            {isArena ? <th className="px-2 py-3" /> : null}
-            <th className="section-label px-4 py-3">Coin</th>
-            <th className="section-label px-4 py-3">Graph</th>
-            <th className="section-label px-4 py-3">MCAP</th>
-            <th className="section-label px-4 py-3">ATH</th>
-            <th className="section-label px-4 py-3">Age</th>
-            <th className="section-label px-4 py-3">TXNS</th>
-            <th className="section-label px-4 py-3">24H VOL</th>
+            {isArena ? <th /> : null}
+            <th>Coin</th>
+            <th>Graph</th>
+            <th>MCAP</th>
+            <th>ATH</th>
+            <th>Age</th>
+            <th>TXNS</th>
+            <th>24H VOL</th>
             {isArena ? (
               <>
-                <th className="section-label px-4 py-3">TRADERS</th>
-                <th className="section-label px-4 py-3">1H</th>
-                <th className="section-label px-4 py-3">6H</th>
-                <th className="section-label px-4 py-3">24H</th>
+                <th>TRADERS</th>
+                <th>1H</th>
+                <th>6H</th>
+                <th>24H</th>
               </>
             ) : null}
           </tr>
@@ -94,10 +94,7 @@ export function TokenBoardTable({
             const trendPositive = (token.change24hPct ?? 0) >= 0;
 
             return (
-              <tr
-                key={token.address}
-                className="border-b border-pump-border/10 last:border-b-0"
-              >
+              <tr key={token.address}>
                 {isArena ? <td className="px-2 py-3" /> : null}
                 <td className="px-4 py-3">
                   <Link href={`/token/${token.address}`} className="flex min-w-0 items-center gap-3">

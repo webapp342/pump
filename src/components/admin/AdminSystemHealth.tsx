@@ -9,6 +9,7 @@ import {
   AdminGridTable,
   AdminTextButton,
 } from "@/components/admin/AdminChrome";
+import { ModalPortal } from "@/components/ui/ModalPortal";
 
 type ServiceHealthStatus = "healthy" | "degraded" | "down";
 
@@ -226,7 +227,8 @@ function SystemHealthDetailModal({
   const total = report?.checks.length ?? 0;
 
   return (
-    <div className="admin-modal-backdrop" role="dialog" aria-modal="true">
+    <ModalPortal open={open}>
+    <div className="modal-backdrop modal-backdrop-shell z-50" role="dialog" aria-modal="true">
       <button
         type="button"
         className="absolute inset-0 cursor-default border-0 bg-transparent p-0"
@@ -266,6 +268,7 @@ function SystemHealthDetailModal({
         </div>
       </div>
     </div>
+    </ModalPortal>
   );
 }
 

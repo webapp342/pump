@@ -213,14 +213,14 @@ export function TradeTape({
             <p className="px-4 py-6 text-body-sm text-pump-muted">No holders yet.</p>
           ) : (
             <div className="overflow-x-auto">
-              <table className="min-w-[720px] w-full text-body-sm">
-                <thead className="border-b border-pump-border/15 bg-pump-surface/55 text-left">
+              <table className="sheet-grid min-w-[720px]">
+                <thead>
                   <tr>
-                    <th className="section-label px-4 py-3">Account</th>
-                    <th className="section-label px-4 py-3">Balance</th>
-                    <th className="section-label px-4 py-3">Supply</th>
-                    <th className="section-label px-4 py-3">Entry</th>
-                    <th className="section-label px-4 py-3 text-right">P/L</th>
+                    <th>Account</th>
+                    <th>Balance</th>
+                    <th>Supply</th>
+                    <th>Entry</th>
+                    <th className="text-right">P/L</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -285,16 +285,16 @@ export function TradeTape({
             <p className="px-4 py-6 text-body-sm text-pump-muted">No trades yet.</p>
           ) : (
             <div className="overflow-x-auto">
-              <table className="min-w-[860px] w-full text-body-sm">
-                <thead className="border-b border-pump-border/15 bg-pump-surface/55 text-left">
+              <table className="sheet-grid min-w-[860px]">
+                <thead>
                   <tr>
-                    <th className="section-label px-4 py-3">Account</th>
-                    <th className="section-label px-4 py-3">Side</th>
-                    <th className="section-label px-4 py-3">Amount</th>
-                    <th className="section-label px-4 py-3">Tokens</th>
-                    <th className="section-label px-4 py-3">Price</th>
-                    <th className="section-label px-4 py-3">Time</th>
-                    <th className="section-label px-4 py-3 text-right">Txn</th>
+                    <th>Account</th>
+                    <th>Side</th>
+                    <th>Amount</th>
+                    <th>Tokens</th>
+                    <th>Price</th>
+                    <th>Time</th>
+                    <th className="text-right">Txn</th>
                   </tr>
                 </thead>
                 <tbody>

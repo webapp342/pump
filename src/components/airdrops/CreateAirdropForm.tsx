@@ -928,7 +928,7 @@ export function CreateAirdropForm() {
 
       <aside className="space-y-2.5 xl:sticky xl:top-16 xl:min-w-0">
         <section className="rounded-lg border border-pump-accent/25 bg-gradient-to-br from-pump-accent/12 via-pump-card/70 to-pump-surface/55 p-3 md:p-4">
-          <p className="section-label text-[10px]">Preview</p>
+          <p className="section-label">Preview</p>
           <div className="mt-2 flex items-center gap-2.5">
             {selectedLinkedToken ? (
               <TokenAvatar
@@ -979,7 +979,7 @@ export function CreateAirdropForm() {
         />
 
         <section className="panel-surface p-3 md:p-4">
-          <p className="section-label text-[10px]">Campaign summary</p>
+          <p className="section-label">Campaign summary</p>
           <dl className="mt-2 space-y-1.5 text-caption">
             <div className="flex items-center justify-between gap-2">
               <dt className="text-pump-muted">Reward pool</dt>

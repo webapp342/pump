@@ -1089,7 +1089,7 @@ export function TradePanel({
       className={embedded ? "overflow-hidden p-0" : "panel-surface overflow-hidden p-0"}
     >
       <form onSubmit={onSubmit}>
-        <div className="flex gap-2 px-4 pt-4">
+        <div className="trade-side-group">
           <button
             type="button"
             onClick={() => {
@@ -1099,11 +1099,7 @@ export function TradePanel({
               setLinkedSellTokenWei(null);
               setError(null);
             }}
-            className={
-              side === "buy"
-                ? "flex-1 rounded-full bg-pump-accent py-2 text-center text-caption font-semibold text-pump-accent-foreground"
-                : "trade-side-button"
-            }
+            className={side === "buy" ? "trade-side-button-active-buy" : "trade-side-button"}
           >
             Buy
           </button>
@@ -1116,11 +1112,7 @@ export function TradePanel({
               setLinkedSellTokenWei(null);
               setError(null);
             }}
-            className={
-              side === "sell"
-                ? "flex-1 rounded-full bg-pump-danger py-2 text-center text-caption font-semibold text-white"
-                : "trade-side-button"
-            }
+            className={side === "sell" ? "trade-side-button-active-sell" : "trade-side-button"}
           >
             Sell
           </button>
@@ -1278,7 +1270,7 @@ export function TradePanel({
           <button
             type="submit"
             disabled={submitDisabled}
-            className={`w-full rounded-xl py-3.5 text-body-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${submitTone}`}
+            className={`primary-button w-full py-3 text-body-sm disabled:cursor-not-allowed disabled:opacity-50 ${submitTone}`}
           >
             {submitLabel}
           </button>

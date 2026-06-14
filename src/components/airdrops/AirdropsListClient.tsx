@@ -56,7 +56,7 @@ function rewardUsdValue(
 }
 
 const createCampaignButtonClass =
-  "inline-flex shrink-0 items-center justify-center gap-1.5 rounded-full border border-transparent bg-pump-accent font-semibold text-pump-accent-foreground shadow-sm transition hover:bg-pump-accent-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pump-accent/40";
+  "toolbar-btn toolbar-btn-accent shrink-0";
 
 function CreateCampaignLink({
   variant,
@@ -232,7 +232,7 @@ function HighlightAirdropCard({
 
   return (
     <div className="flex min-w-0 flex-col gap-1">
-      <p className="section-label text-[10px] md:hidden">{label}</p>
+      <p className="section-label md:hidden">{label}</p>
       <Link
         href={href}
         className="panel-interactive flex min-w-0 flex-nowrap items-center gap-2 px-2.5 py-2.5 md:justify-between md:gap-3 md:px-3 md:py-3"
@@ -421,7 +421,7 @@ export function AirdropsListClient() {
         <section className="space-y-2 md:space-y-3">
           <Link
             href={`/airdrops/${featured.id}`}
-            className="block rounded-lg border border-pump-accent/25 bg-gradient-to-br from-pump-accent/12 via-pump-card/70 to-pump-surface/55 p-3 transition hover:border-pump-accent/45 md:p-4"
+            className="panel-interactive block p-3 md:p-4"
           >
             <div className="flex items-start justify-between gap-2 md:gap-4">
               <div className="flex min-w-0 items-center gap-2.5 md:gap-3">
@@ -456,8 +456,8 @@ export function AirdropsListClient() {
 
             <dl className="mt-3 grid grid-cols-1 gap-2 md:mt-4 md:grid-cols-4 md:gap-2">
               <div className="flex min-w-0 flex-col gap-1 md:col-span-1">
-                <dt className="section-label text-[10px] md:text-[inherit]">Reward pool</dt>
-                <dd className="m-0 rounded-md border border-pump-border/15 bg-pump-surface/35 px-2.5 py-2 md:px-3">
+                <dt className="section-label md:text-[inherit]">Reward pool</dt>
+                <dd className="sheet-cell m-0 md:px-3">
                   <RewardPoolDisplay
                     item={featured}
                     bnbUsd={bnbUsd}
@@ -468,8 +468,8 @@ export function AirdropsListClient() {
                 </dd>
               </div>
               <div className="flex min-w-0 flex-col gap-1">
-                <dt className="section-label text-[10px] md:text-[inherit]">Progress</dt>
-                <dd className="m-0 rounded-md border border-pump-border/15 bg-pump-surface/35 px-2.5 py-2 md:px-3">
+                <dt className="section-label md:text-[inherit]">Progress</dt>
+                <dd className="sheet-cell m-0 md:px-3">
                   <div className="flex items-center justify-between gap-2">
                     <span className="financial-value text-caption font-semibold text-pump-text">
                       {timeLeftLabel(featured)}
@@ -481,9 +481,9 @@ export function AirdropsListClient() {
                       %
                     </span>
                   </div>
-                  <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-pump-surface/60">
+                  <div className="mt-1.5 h-1.5 overflow-hidden border border-pump-border/45 bg-pump-border/8">
                     <div
-                      className="h-full rounded-full bg-pump-accent transition-all duration-500"
+                      className="h-full bg-pump-accent transition-all duration-500"
                       style={{
                         width: `${qualifyWindowProgress(featured.qualifyStart, featured.qualifyEnd)}%`,
                       }}
@@ -493,7 +493,7 @@ export function AirdropsListClient() {
               </div>
               <div className="hidden min-w-0 flex-col gap-1 md:flex">
                 <dt className="section-label">Pool token</dt>
-                <dd className="m-0 rounded-md border border-pump-border/15 bg-pump-surface/35 px-3 py-2">
+                <dd className="sheet-cell m-0">
                   <span className="financial-value text-body-sm font-semibold text-pump-text">
                     ${poolSymbol(featured)}
                   </span>
@@ -501,7 +501,7 @@ export function AirdropsListClient() {
               </div>
               <div className="hidden min-w-0 flex-col gap-1 md:flex">
                 <dt className="section-label">Status</dt>
-                <dd className="m-0 rounded-md border border-pump-border/15 bg-pump-surface/35 px-3 py-2">
+                <dd className="sheet-cell m-0">
                   <span
                     className={`text-body-sm font-semibold ${airdropStatusBadgeClass(featured.displayStatus)}`}
                   >
@@ -533,7 +533,7 @@ export function AirdropsListClient() {
                   <Link
                     key={item.id}
                     href={`/airdrops/${item.id}`}
-                    className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-pump-border/20 bg-pump-surface/35 px-2 py-0.5 text-caption text-pump-muted hover:text-pump-text md:gap-2 md:px-2.5 md:py-1"
+                    className="inline-flex shrink-0 items-center gap-1.5 border border-pump-border/45 bg-pump-border/4 px-2 py-0.5 text-caption text-pump-muted hover:text-pump-text md:gap-2 md:px-2.5 md:py-1"
                   >
                     <TokenAvatar address={item.linkedToken} symbol={poolSymbol(item)} size={16} className="md:hidden" />
                     <TokenAvatar address={item.linkedToken} symbol={poolSymbol(item)} size={18} className="hidden md:block" />
@@ -547,7 +547,7 @@ export function AirdropsListClient() {
 
       <section className="grid grid-cols-2 gap-2 md:grid-cols-3 md:gap-3">
         <div className="col-span-2 flex min-w-0 flex-col gap-1 md:col-span-1">
-          <p className="section-label text-[10px] md:hidden">Total pool</p>
+          <p className="section-label md:hidden">Total pool</p>
           <div className="panel-surface flex flex-nowrap items-center justify-between gap-2 px-2.5 py-2.5 md:gap-3 md:px-3 md:py-3">
             <p className="section-label hidden shrink-0 md:inline">Total pool</p>
             <p className="financial-value shrink-0 text-body-sm font-semibold text-pump-text">
@@ -567,7 +567,7 @@ export function AirdropsListClient() {
           />
         ) : (
           <div className="flex min-w-0 flex-col gap-1">
-            <p className="section-label text-[10px] md:hidden">Largest pool</p>
+            <p className="section-label md:hidden">Largest pool</p>
             <div className="panel-surface flex flex-nowrap items-center gap-2 px-2.5 py-2.5 md:justify-between md:gap-3 md:px-3 md:py-3">
               <p className="section-label hidden shrink-0 md:inline">Largest pool</p>
               <p className="shrink-0 text-body-sm text-pump-muted">—</p>
@@ -583,7 +583,7 @@ export function AirdropsListClient() {
           />
         ) : (
           <div className="flex min-w-0 flex-col gap-1">
-            <p className="section-label text-[10px] md:hidden">Ending soon</p>
+            <p className="section-label md:hidden">Ending soon</p>
             <div className="panel-surface flex flex-nowrap items-center gap-2 px-2.5 py-2.5 md:justify-between md:gap-3 md:px-3 md:py-3">
               <p className="section-label hidden shrink-0 md:inline">Ending soon</p>
               <p className="shrink-0 text-body-sm text-pump-muted">—</p>
@@ -606,7 +606,7 @@ export function AirdropsListClient() {
             placeholder="Search campaign or token"
             className="field-input h-9 w-full bg-pump-surface/75 md:max-w-xs"
           />
-          <div className="-mx-2 flex gap-1.5 overflow-x-auto px-2 pb-0.5 md:mx-0 md:flex-wrap md:overflow-visible md:px-0 md:pb-0">
+          <div className="sheet-tabs -mx-2 overflow-x-auto px-2 md:mx-0 md:px-0">
             {(
               [
                 ["all", "All", "All"],
@@ -640,7 +640,7 @@ export function AirdropsListClient() {
           </div>
         </div>
 
-        <section className="rounded-lg border border-pump-border/15 bg-transparent">
+        <section className="panel-surface overflow-hidden">
           {boardItems.length === 0 ? (
             <div className="p-8 text-center text-body-sm text-pump-muted">
               No campaigns match your filters.
@@ -696,36 +696,33 @@ export function AirdropsListClient() {
               </div>
 
               <div className="hidden lg:block overflow-x-auto">
-                <table className="min-w-[960px] w-full text-body-sm">
-                  <thead className="border-b border-pump-border/15 bg-pump-surface/55 text-left">
+                <table className="sheet-grid min-w-[960px]">
+                  <thead>
                     <tr>
-                      <th className="section-label px-4 py-3">Campaign</th>
-                      <th className="section-label px-4 py-3">Pool</th>
-                      <th className="section-label px-4 py-3">
+                      <th>Campaign</th>
+                      <th>Pool</th>
+                      <th>
                         <button type="button" onClick={() => onSort("reward")} className={sortHeadClass("reward")}>
                           Reward pool {sortLabel("reward")}
                         </button>
                       </th>
-                      <th className="section-label px-4 py-3">
+                      <th>
                         <button type="button" onClick={() => onSort("status")} className={sortHeadClass("status")}>
                           Status {sortLabel("status")}
                         </button>
                       </th>
-                      <th className="section-label px-4 py-3">
+                      <th>
                         <button type="button" onClick={() => onSort("end")} className={sortHeadClass("end")}>
                           Deadline {sortLabel("end")}
                         </button>
                       </th>
-                      <th className="section-label px-4 py-3">Time left</th>
+                      <th>Time left</th>
                     </tr>
                   </thead>
                   <tbody>
                     {boardItems.map((item) => (
-                        <tr
-                          key={item.id}
-                          className="border-b border-pump-border/10 last:border-b-0 hover:bg-pump-surface/20"
-                        >
-                          <td className="px-4 py-3">
+                        <tr key={item.id}>
+                          <td>
                             <Link
                               href={`/airdrops/${item.id}`}
                               className="flex min-w-0 items-center gap-3"

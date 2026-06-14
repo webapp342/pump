@@ -9,6 +9,7 @@ import {
   percentToProtocolFeeBps,
   protocolFeeBpsToPercent,
 } from "@/lib/trade-fee-config";
+import { ModalPortal } from "@/components/ui/ModalPortal";
 
 type AdminProtocolFeeModalProps = {
   open: boolean;
@@ -83,8 +84,9 @@ export function AdminProtocolFeeModal({
   const maxPercent = protocolFeeBpsToPercent(MAX_PROTOCOL_FEE_BPS);
 
   return (
+    <ModalPortal open={open}>
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-4 sm:items-center"
+      className="modal-backdrop modal-backdrop-shell z-50"
       role="dialog"
       aria-modal="true"
       aria-labelledby="admin-protocol-fee-title"
@@ -100,7 +102,7 @@ export function AdminProtocolFeeModal({
         </p>
 
         <div className="mt-4 rounded-md border border-pump-border/15 bg-pump-surface/35 px-3 py-2.5">
-          <p className="section-label text-[10px]">Current on-chain</p>
+          <p className="section-label">Current on-chain</p>
           <p className="financial-value mt-1 text-body-sm font-semibold text-pump-text">
             {protocolFeeBpsToPercent(currentProtocolFeeBps).toFixed(2)}%
           </p>
@@ -160,5 +162,6 @@ export function AdminProtocolFeeModal({
         </div>
       </div>
     </div>
+    </ModalPortal>
   );
 }

@@ -82,7 +82,7 @@ export function TokenSocialLinksBar({
             href={links[key]}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-pump-border/20 bg-pump-surface/35 px-3 text-caption font-medium text-pump-muted transition hover:border-pump-accent/30 hover:bg-pump-surface/60 hover:text-pump-text"
+            className="toolbar-btn shrink-0"
           >
             <SocialIcon type={key} />
             <span>{mobileLabel}</span>
@@ -108,8 +108,8 @@ export function TokenSocialLinksBar({
           rel="noopener noreferrer"
           className={
             inline
-              ? "inline-flex items-center gap-1.5 rounded-md border border-pump-border/20 bg-pump-surface/50 px-2.5 py-1 text-caption font-medium text-pump-muted transition hover:border-pump-accent/35 hover:text-pump-text"
-              : "inline-flex items-center gap-2 rounded-md border border-pump-border/20 bg-pump-surface/50 px-3 py-1.5 text-xs font-medium text-pump-muted transition hover:border-pump-accent/35 hover:text-pump-text"
+              ? "toolbar-btn !h-auto py-1"
+              : "toolbar-btn !h-auto py-1.5"
           }
         >
           <SocialIcon type={key} />

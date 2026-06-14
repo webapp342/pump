@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import type { CreatorFollowNetwork } from "@/lib/db/launchpad";
 import { shortAddress } from "@/config/chain";
 import { CreatorProfileModal } from "@/components/creators/CreatorProfileModal";
+import { ModalPortal } from "@/components/ui/ModalPortal";
 import { UserAvatarForAddress } from "@/components/user/UserAvatarForAddress";
 
 type FollowTab = "following" | "followers";
@@ -136,8 +137,9 @@ export function FollowNetworkModal({
       />
 
       {!profileOpen ? (
+      <ModalPortal open={open}>
       <div
-        className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-4 sm:items-center"
+        className="modal-backdrop modal-backdrop-shell z-50"
         role="dialog"
         aria-modal="true"
         aria-labelledby="follow-network-title"
@@ -200,6 +202,7 @@ export function FollowNetworkModal({
           </button>
         </div>
       </div>
+      </ModalPortal>
       ) : null}
     </>
   );

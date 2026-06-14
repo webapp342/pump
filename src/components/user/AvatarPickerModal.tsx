@@ -8,6 +8,7 @@ import {
   type UserAvatarId,
 } from "@/lib/user-avatars";
 import { UserAvatar } from "@/components/user/UserAvatar";
+import { ModalPortal } from "@/components/ui/ModalPortal";
 import { useUserAvatar } from "@/components/user/UserAvatarProvider";
 
 type AvatarPickerModalProps = {
@@ -40,8 +41,9 @@ export function AvatarPickerModal({ open, onClose }: AvatarPickerModalProps) {
   }
 
   return (
-    <div
-      className="fixed inset-0 z-[70] flex items-end justify-center bg-black/75 p-4 sm:items-center"
+    <ModalPortal open={open}>
+      <div
+        className="modal-backdrop modal-backdrop-shell z-[70]"
       role="dialog"
       aria-modal="true"
       aria-labelledby="avatar-picker-title"
@@ -56,11 +58,8 @@ export function AvatarPickerModal({ open, onClose }: AvatarPickerModalProps) {
         <h2 id="avatar-picker-title" className="text-h2 font-semibold text-pump-text">
           Choose avatar
         </h2>
-        <p className="mt-1 text-sm text-pump-muted">
-          DiceBear styles — your wallet address makes each one unique. Pick the look you like.
-        </p>
 
-        <div className="mt-5 grid grid-cols-3 gap-3 sm:grid-cols-4">
+        <div className="mt-4 grid grid-cols-3 gap-3 sm:grid-cols-4">
           {USER_AVATAR_IDS.map((id) => {
             const isSelected = id === current;
             const isPending = pendingId === id;
@@ -97,5 +96,6 @@ export function AvatarPickerModal({ open, onClose }: AvatarPickerModalProps) {
         </button>
       </div>
     </div>
+    </ModalPortal>
   );
 }

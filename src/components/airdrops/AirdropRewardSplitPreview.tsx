@@ -31,7 +31,7 @@ export function AirdropRewardSplitPreview({
 
   return (
     <section className="panel-surface p-3 md:p-4">
-      <p className="section-label text-[10px]">TOP 100 split</p>
+      <p className="section-label">TOP 100 split</p>
 
       <div className="mt-2 overflow-x-auto">
         <table className="w-full min-w-[240px] text-caption">

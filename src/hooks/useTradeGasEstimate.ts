@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import { usePublicClient } from "wagmi";
 import { contracts, pumpChain } from "@/config/chain";
 import { erc20Abi, maxUint256 } from "@/lib/abis/erc20";

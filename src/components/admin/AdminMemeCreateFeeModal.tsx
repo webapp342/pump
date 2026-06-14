@@ -10,6 +10,7 @@ import {
 } from "wagmi";
 import { contracts, explorerTxUrl, pumpChain, shortAddress } from "@/config/chain";
 import { memeFactoryAbi } from "@/lib/abis/meme-factory";
+import { ModalPortal } from "@/components/ui/ModalPortal";
 
 type AdminMemeCreateFeeModalProps = {
   open: boolean;
@@ -150,8 +151,9 @@ export function AdminMemeCreateFeeModal({
   const configReady = configReads?.every((item) => item.status === "success") ?? false;
 
   return (
+    <ModalPortal open={open}>
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-4 sm:items-center"
+      className="modal-backdrop modal-backdrop-shell z-50"
       role="dialog"
       aria-modal="true"
       aria-labelledby="admin-meme-create-fee-title"
@@ -166,7 +168,7 @@ export function AdminMemeCreateFeeModal({
         </p>
 
         <div className="mt-4 rounded-md border border-pump-border/15 bg-pump-surface/35 px-3 py-2.5">
-          <p className="section-label text-[10px]">Current on-chain</p>
+          <p className="section-label">Current on-chain</p>
           <p className="financial-value mt-1 text-body-sm font-semibold text-pump-text">
             {currentFeeBnb} BNB
           </p>
@@ -230,5 +232,6 @@ export function AdminMemeCreateFeeModal({
         </div>
       </div>
     </div>
+    </ModalPortal>
   );
 }

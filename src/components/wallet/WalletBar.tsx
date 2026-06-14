@@ -108,7 +108,7 @@ function WalletMenu({
 
   return (
     <div
-      className="absolute right-0 top-[calc(100%+0.5rem)] z-50 w-[min(18rem,calc(100vw-2rem))] rounded-xl border border-pump-border/20 bg-pump-surface p-4 shadow-panel"
+      className="absolute right-0 top-[calc(100%+0.5rem)] z-50 w-[min(18rem,calc(100vw-2rem))] border border-pump-border/50 bg-pump-card p-3"
       role="menu"
     >
       <p className="section-label text-pump-muted">Your balance</p>
@@ -131,7 +131,7 @@ function WalletMenu({
       <button
         type="button"
         onClick={(event) => void onCopyAddress(event)}
-        className="mt-4 flex w-full items-center justify-between gap-2 rounded-lg border border-pump-border/18 bg-pump-card/40 px-3 py-2 text-caption text-pump-text transition hover:border-pump-accent/25"
+        className="mt-4 flex w-full items-center justify-between gap-2 border border-pump-border/45 bg-pump-border/4 px-3 py-2 text-caption text-pump-text transition hover:bg-pump-border/8"
         aria-label={copied ? "Address copied" : "Copy wallet address"}
       >
         <span className="financial-value">{shortAddress(address)}</span>
@@ -144,7 +144,7 @@ function WalletMenu({
         <Link
           href="/portfolio"
           onClick={onClose}
-          className="flex flex-col items-center gap-2 rounded-lg border border-pump-border/15 bg-pump-card/35 px-3 py-3 text-center transition hover:border-pump-accent/25 hover:bg-pump-card/55"
+          className="flex flex-col items-center gap-2 border border-pump-border/45 bg-pump-border/4 px-3 py-3 text-center transition hover:bg-pump-border/8"
         >
           <span className="text-pump-muted">
             <PortfolioIcon />
@@ -155,7 +155,7 @@ function WalletMenu({
         <Link
           href="/"
           onClick={onClose}
-          className="flex flex-col items-center gap-2 rounded-lg border border-pump-border/15 bg-pump-card/35 px-3 py-3 text-center transition hover:border-pump-accent/25 hover:bg-pump-card/55"
+          className="flex flex-col items-center gap-2 border border-pump-border/45 bg-pump-border/4 px-3 py-3 text-center transition hover:bg-pump-border/8"
         >
           <span className="text-pump-muted">
             <TradeIcon />
@@ -168,7 +168,7 @@ function WalletMenu({
       <button
         type="button"
         onClick={onDisconnect}
-        className="mt-3 w-full rounded-lg py-2.5 text-body-sm font-medium text-pump-danger transition hover:bg-pump-danger/10"
+        className="mt-3 w-full py-2.5 text-body-sm font-medium text-pump-danger transition hover:bg-pump-danger/10"
       >
         Disconnect
       </button>
@@ -218,12 +218,12 @@ function ConnectedWalletButton({ address }: { address: string }) {
       <button
         type="button"
         onClick={() => setOpen((value) => !value)}
-        className="inline-flex h-10 items-center gap-2 rounded-full border border-pump-border/18 bg-pump-surface/52 px-2.5 text-sm font-medium text-pump-text transition hover:border-pump-accent/25"
+        className="toolbar-btn"
         aria-expanded={open}
         aria-haspopup="menu"
       >
         {avatarId ? (
-          <UserAvatar address={address} avatarId={avatarId} size={28} />
+          <UserAvatar address={address} avatarId={avatarId} size={22} />
         ) : (
           <span className="h-2 w-2 shrink-0 rounded-full bg-pump-success" aria-hidden />
         )}
@@ -277,7 +277,7 @@ export function WalletBar() {
               <button
                 type="button"
                 onClick={openConnectModal}
-                className="primary-button h-11 px-4 py-0"
+                className="primary-button h-8 px-3 py-0"
               >
                 Connect wallet
               </button>
@@ -285,7 +285,7 @@ export function WalletBar() {
               <button
                 type="button"
                 onClick={openChainModal}
-                className="inline-flex h-11 items-center rounded-md border border-pump-danger/30 bg-pump-danger/10 px-3 text-sm font-semibold text-pump-danger"
+                className="toolbar-btn border-pump-danger/45 bg-pump-danger/10 text-pump-danger"
               >
                 Wrong network
               </button>

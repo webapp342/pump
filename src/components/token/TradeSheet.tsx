@@ -59,7 +59,7 @@ export function TradeSheet({
     <>
       <button
         type="button"
-        className="fixed inset-0 z-[100] cursor-default bg-pump-bg/55 backdrop-blur-[3px] xl:hidden"
+        className="modal-backdrop modal-backdrop-dismiss z-[100] cursor-default transition-opacity xl:hidden"
         aria-label="Close trade panel"
         onClick={onClose}
       />
@@ -69,16 +69,16 @@ export function TradeSheet({
         aria-modal="true"
         aria-label={`Trade ${symbol}`}
       >
-        <div className="panel-surface pointer-events-auto relative w-full max-h-[min(82dvh,720px)] overflow-hidden rounded-t-2xl shadow-panel">
-          <div className="flex justify-center pt-2.5">
-            <div className="h-1 w-10 rounded-full bg-pump-border/50" aria-hidden />
+        <div className="panel-surface pointer-events-auto relative w-full max-h-[min(82dvh,720px)] overflow-hidden border-b-0">
+          <div className="flex justify-center border-b border-pump-border/45 py-2">
+            <div className="h-0.5 w-10 bg-pump-border/50" aria-hidden />
           </div>
-          <div className="flex items-center justify-between gap-3 px-4 pb-1.5 pt-0.5">
+          <div className="flex items-center justify-between gap-3 border-b border-pump-border/45 px-4 py-2">
             <h2 className="text-body font-semibold text-pump-text">Trade ${symbol}</h2>
             <button
               type="button"
               onClick={onClose}
-              className="inline-flex h-9 w-9 items-center justify-center rounded-md text-pump-muted transition hover:bg-pump-surface/80 hover:text-pump-text"
+              className="inline-flex h-8 w-8 items-center justify-center text-pump-muted transition hover:bg-pump-border/10 hover:text-pump-text"
               aria-label="Close"
             >
               <span className="text-xl leading-none">×</span>

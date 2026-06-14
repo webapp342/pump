@@ -249,7 +249,7 @@ export function CreatorProfileModal({ open, onClose, creatorAddress }: CreatorPr
     <>
       <button
         type="button"
-        className="fixed inset-0 z-[100] cursor-default bg-pump-bg/55 backdrop-blur-[3px] transition-opacity"
+        className="modal-backdrop modal-backdrop-dismiss z-[100] cursor-default transition-opacity"
         aria-label="Close"
         onClick={onClose}
       />
@@ -369,7 +369,7 @@ export function CreatorProfileModal({ open, onClose, creatorAddress }: CreatorPr
                   <p className="mt-2 text-body-sm text-pump-muted">No token holdings yet.</p>
                 ) : (
                   <div className="mt-2 max-h-[min(28dvh,220px)] overflow-y-auto overscroll-contain rounded-lg border border-pump-border/15 -mx-1 [touch-action:pan-x_pan-y]">
-                    <table className="min-w-[400px] w-full text-body-sm">
+                    <table className="sheet-grid min-w-[400px]">
                       <thead className="border-b border-pump-border/15 bg-pump-surface/55 text-left">
                         <tr>
                           <th className="section-label px-3 py-2.5">Coin</th>
@@ -397,7 +397,7 @@ export function CreatorProfileModal({ open, onClose, creatorAddress }: CreatorPr
                   <p className="mt-2 text-body-sm text-pump-muted">No launched tokens yet.</p>
                 ) : (
                   <div className="mt-2 max-h-[min(28dvh,220px)] overflow-y-auto overscroll-contain rounded-lg border border-pump-border/15 -mx-1 [touch-action:pan-x_pan-y]">
-                    <table className="min-w-[520px] w-full text-body-sm">
+                    <table className="sheet-grid min-w-[520px]">
                       <thead className="border-b border-pump-border/15 bg-pump-surface/55 text-left">
                         <tr>
                           <th className="section-label px-3 py-2.5">Coin</th>

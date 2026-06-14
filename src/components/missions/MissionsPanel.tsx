@@ -53,16 +53,16 @@ function isAdminLinkMission(mission: Mission): boolean {
   return mission.taskKind === "ADMIN_LINK" || mission.taskSource === "admin_link";
 }
 
-function missionStatusClass(done: boolean, syncing: boolean): string {
-  if (done) return "text-pump-success";
-  if (syncing) return "text-pump-warning";
-  return "text-pump-muted";
-}
-
 function missionStatusLabel(done: boolean, syncing: boolean): string {
   if (done) return "Done";
   if (syncing) return "Syncing";
   return "Open";
+}
+
+function missionStatusBadgeClass(done: boolean, syncing: boolean): string {
+  if (done) return "border-pump-success/40 bg-pump-success/10 text-pump-success";
+  if (syncing) return "border-pump-warning/40 bg-pump-warning/10 text-pump-warning";
+  return "border-pump-border/45 bg-pump-border/10 text-pump-muted";
 }
 
 function MissionRow({
@@ -86,62 +86,69 @@ function MissionRow({
   const isLinkTask = isAdminLinkMission(mission) && Boolean(mission.targetUrl);
   const clickable = isLinkTask && !done && !completing;
 
+  const cardClassName = [
+    "sheet-cell block w-full p-3 text-left transition md:p-4",
+    done ? "bg-pump-border/4" : "bg-pump-card/60",
+    clickable ? "cursor-pointer hover:bg-pump-border/8" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   const content = (
-    <>
-      <div className="flex items-start gap-3">
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-            <p className="text-body-sm font-medium text-pump-text">{mission.title}</p>
-            <span className="text-[10px] font-medium uppercase tracking-wide text-pump-muted/80">
-              {missionKindLabel[mission.taskKind]}
-            </span>
-          </div>
-          {mission.description ? (
-            <p className="mt-0.5 line-clamp-2 text-caption text-pump-muted">{mission.description}</p>
-          ) : null}
-          {isLinkTask && !done ? (
-            <p className="mt-1 text-[11px] text-pump-accent">
-              {completing ? "Completing…" : "Tap to open link and earn points"}
-            </p>
-          ) : null}
-          {mission.progress && !done ? (
-            <div className="mt-2 space-y-1">
-              <div className="flex items-center justify-between gap-2 text-[11px] leading-none text-pump-muted">
-                <span className="financial-value tabular-nums text-pump-text">
-                  {mission.progress.current.toFixed(2)} / {mission.progress.target}{" "}
-                  {mission.progress.unit}
-                </span>
-                <span>{Math.round(progressPct)}%</span>
-              </div>
-              <div className="h-1 overflow-hidden rounded-full bg-pump-surface/70">
-                <div
-                  className="h-full rounded-full bg-pump-accent transition-all duration-300"
-                  style={{ width: `${progressPct}%` }}
-                />
-              </div>
-            </div>
-          ) : null}
+    <div className="flex items-start gap-3">
+      <div className="min-w-0 flex-1 space-y-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <h3 className="text-body-sm font-semibold text-pump-text">{mission.title}</h3>
+          <span className="status-badge shrink-0">{missionKindLabel[mission.taskKind]}</span>
         </div>
 
-        <div className="flex shrink-0 flex-col items-end gap-1 text-right">
-          <span className="financial-value text-body-sm font-semibold text-pump-accent">
-            +{mission.rewardPoints}
-          </span>
-          <span
-            className={`text-[11px] font-semibold uppercase tracking-wide ${missionStatusClass(done, showSyncing)}`}
-          >
-            {completing ? "Opening…" : missionStatusLabel(done, showSyncing)}
-          </span>
-        </div>
+        {mission.description ? (
+          <p className="text-caption leading-relaxed text-pump-muted">{mission.description}</p>
+        ) : null}
+
+        {isLinkTask && !done ? (
+          <p className="text-caption font-medium text-pump-accent">
+            {completing ? "Completing…" : "Tap to open link and earn points"}
+          </p>
+        ) : null}
+
+        {mission.progress && !done ? (
+          <div className="space-y-1.5 border-t border-pump-border/20 pt-2">
+            <div className="flex items-center justify-between gap-2 text-caption text-pump-muted">
+              <span className="financial-value tabular-nums text-pump-text">
+                {mission.progress.current.toFixed(2)} / {mission.progress.target}{" "}
+                {mission.progress.unit}
+              </span>
+              <span className="financial-value font-medium">{Math.round(progressPct)}%</span>
+            </div>
+            <div className="h-1.5 overflow-hidden bg-pump-border/20">
+              <div
+                className="h-full bg-pump-accent transition-all duration-300"
+                style={{ width: `${progressPct}%` }}
+              />
+            </div>
+          </div>
+        ) : null}
       </div>
-    </>
+
+      <div className="flex shrink-0 flex-col items-end gap-2 text-right">
+        <span className="financial-value text-body font-semibold text-pump-accent">
+          +{mission.rewardPoints}
+        </span>
+        <span
+          className={`status-badge ${missionStatusBadgeClass(done, showSyncing)}`}
+        >
+          {completing ? "Opening…" : missionStatusLabel(done, showSyncing)}
+        </span>
+      </div>
+    </div>
   );
 
   if (clickable) {
     return (
       <button
         type="button"
-        className="block w-full px-3 py-2.5 text-left transition-colors hover:bg-pump-surface/25 md:px-4 md:py-3"
+        className={cardClassName}
         onClick={() => onAdminLinkClick?.(mission)}
         disabled={completing}
       >
@@ -150,11 +157,7 @@ function MissionRow({
     );
   }
 
-  return (
-    <article className="px-3 py-2.5 md:px-4 md:py-3">
-      {content}
-    </article>
-  );
+  return <article className={cardClassName}>{content}</article>;
 }
 
 export function MissionsPanel() {
@@ -405,21 +408,19 @@ export function MissionsPanel() {
             </button>
           </div>
 
-          <section className="rounded-lg border border-pump-border/15 bg-transparent">
+          <section className="space-y-2">
             {boardMissions.length > 0 ? (
-              <div className="divide-y divide-pump-border/10">
-                {boardMissions.map((mission) => (
-                  <MissionRow
-                    key={mission.taskKey}
-                    mission={mission}
-                    syncing={pendingKeys.includes(mission.taskKey)}
-                    onAdminLinkClick={(m) => void onAdminLinkClick(m)}
-                    completing={completingKey === mission.taskKey}
-                  />
-                ))}
-              </div>
+              boardMissions.map((mission) => (
+                <MissionRow
+                  key={mission.taskKey}
+                  mission={mission}
+                  syncing={pendingKeys.includes(mission.taskKey)}
+                  onAdminLinkClick={(m) => void onAdminLinkClick(m)}
+                  completing={completingKey === mission.taskKey}
+                />
+              ))
             ) : (
-              <p className="p-8 text-center text-body-sm text-pump-muted">
+              <p className="panel-surface p-8 text-center text-body-sm text-pump-muted">
                 {activeFilter === "done"
                   ? "Nothing completed yet."
                   : activeFilter === "open"

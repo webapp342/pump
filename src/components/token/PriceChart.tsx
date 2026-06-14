@@ -458,15 +458,15 @@ export function PriceChart({
             <p className="section-label leading-none">
               {currency === "usd" ? "Price" : "Market cap"}
             </p>
-            <div className="inline-flex shrink-0 items-center gap-0.5 rounded-lg border border-pump-border/20 bg-pump-surface/25 p-0.5">
+            <div className="segment-control shrink-0">
                 <button
                   type="button"
                   onClick={() => selectCurrency("usd")}
                   disabled={bnbUsd == null}
-                  className={`rounded-md px-2 py-0.5 text-[10px] font-medium transition disabled:opacity-40 sm:px-2.5 sm:py-1 sm:text-[11px] md:text-caption ${
+                  className={`px-2 py-0.5 text-[10px] font-medium transition disabled:opacity-40 sm:px-2.5 sm:py-1 sm:text-[11px] md:text-caption ${
                     currency === "usd"
-                      ? "bg-pump-accent text-pump-accent-foreground"
-                      : "text-pump-muted hover:text-pump-text"
+                      ? "chip-button-active"
+                      : "chip-button chip-button-ghost"
                   }`}
                 >
                   USD
@@ -475,10 +475,10 @@ export function PriceChart({
                   type="button"
                   onClick={() => selectCurrency("mcap")}
                   disabled={bnbUsd == null}
-                  className={`rounded-md px-2 py-0.5 text-[10px] font-medium transition disabled:opacity-40 sm:px-2.5 sm:py-1 sm:text-[11px] md:text-caption ${
+                  className={`px-2 py-0.5 text-[10px] font-medium transition disabled:opacity-40 sm:px-2.5 sm:py-1 sm:text-[11px] md:text-caption ${
                     currency === "mcap"
-                      ? "bg-pump-accent text-pump-accent-foreground"
-                      : "text-pump-muted hover:text-pump-text"
+                      ? "chip-button-active"
+                      : "chip-button chip-button-ghost"
                   }`}
                 >
                 MCAP
@@ -511,16 +511,16 @@ export function PriceChart({
       <div className="flex items-center justify-between gap-2 border-t border-pump-border/10 px-3 py-2.5">
         <div className="min-w-0 flex-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <div className="inline-flex min-w-max items-center gap-2">
-            <div className="inline-flex gap-0.5 rounded-lg border border-pump-border/20 bg-pump-surface/25 p-0.5">
+            <div className="segment-control">
               {CANDLE_INTERVALS.map((item) => (
                 <button
                   key={item.id}
                   type="button"
                   onClick={() => selectInterval(item.id)}
-                  className={`shrink-0 rounded-md px-2.5 py-1.5 text-[11px] font-medium transition md:px-3 md:text-caption ${
+                  className={`shrink-0 px-2.5 py-1.5 text-[11px] font-medium transition md:px-3 md:text-caption ${
                     timeInterval === item.id
-                      ? "bg-pump-accent text-pump-accent-foreground"
-                      : "text-pump-muted hover:text-pump-text"
+                      ? "chip-button-active"
+                      : "chip-button chip-button-ghost"
                   }`}
                 >
                   {item.label}

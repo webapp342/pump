@@ -456,7 +456,7 @@ export function TokenDetailLive({
     <button
       type="button"
       onClick={() => setProfileAddress(liveToken.creatorAddress)}
-      className="inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-md text-caption text-pump-muted transition hover:text-pump-text"
+      className="inline-flex min-w-0 max-w-full items-center gap-1.5 text-caption text-pump-muted transition hover:text-pump-text"
       aria-label={`View creator profile ${creatorLabel}`}
     >
       <UserAvatarForAddress address={liveToken.creatorAddress} size={20} />
@@ -465,33 +465,31 @@ export function TokenDetailLive({
   );
 
   const tokenActions = (
-    <div className="inline-flex items-center rounded-xl border border-pump-border/20 bg-pump-surface/35 p-1">
+    <div className="segment-control">
       <button
         type="button"
         onClick={() => void onShare()}
-        className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-pump-muted transition hover:bg-pump-surface/80 hover:text-pump-text"
+        className="inline-flex h-8 w-8 items-center justify-center text-pump-muted transition hover:bg-pump-border/10 hover:text-pump-text"
         aria-label="Share"
       >
         <ShareIcon />
       </button>
-      <span className="h-5 w-px bg-pump-border/25" aria-hidden />
       <button
         type="button"
         onClick={() => void onCopyAddress()}
-        className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-pump-muted transition hover:bg-pump-surface/80 hover:text-pump-text"
+        className="inline-flex h-8 w-8 items-center justify-center text-pump-muted transition hover:bg-pump-border/10 hover:text-pump-text"
         aria-label={copiedAddress ? "Address copied" : "Copy token address"}
       >
         {copiedAddress ? <CheckIcon /> : <CopyIcon />}
       </button>
-      <span className="h-5 w-px bg-pump-border/25" aria-hidden />
       <button
         type="button"
         onClick={() => toggleFavorite(tokenAddress)}
         aria-label={favorited ? "Remove from favorites" : "Add to favorites"}
         className={
           favorited
-            ? "inline-flex h-9 w-9 items-center justify-center rounded-lg text-lg leading-none text-pump-accent transition hover:bg-pump-accent/10"
-            : "inline-flex h-9 w-9 items-center justify-center rounded-lg text-lg leading-none text-pump-muted transition hover:bg-pump-surface/80 hover:text-pump-text"
+            ? "inline-flex h-8 w-8 items-center justify-center text-lg leading-none text-pump-accent transition hover:bg-pump-accent/10"
+            : "inline-flex h-8 w-8 items-center justify-center text-lg leading-none text-pump-muted transition hover:bg-pump-border/10 hover:text-pump-text"
         }
       >
         {favorited ? "★" : "☆"}
@@ -567,7 +565,7 @@ export function TokenDetailLive({
           <button
             type="button"
             onClick={() => void onShare()}
-            className="secondary-button inline-flex h-10 items-center gap-2 px-3.5 text-body-sm"
+            className="secondary-button inline-flex h-8 items-center gap-2 px-3 text-body-sm"
             aria-label="Share"
           >
             <ShareIcon />
@@ -576,7 +574,7 @@ export function TokenDetailLive({
           <button
             type="button"
             onClick={() => void onCopyAddress()}
-            className="secondary-button inline-flex h-10 items-center gap-2 px-3.5 text-body-sm"
+            className="secondary-button inline-flex h-8 items-center gap-2 px-3 text-body-sm"
             aria-label={copiedAddress ? "Address copied" : "Copy token address"}
           >
             {copiedAddress ? <CheckIcon /> : <CopyIcon />}
@@ -589,8 +587,8 @@ export function TokenDetailLive({
             aria-label={favorited ? "Remove from favorites" : "Add to favorites"}
             className={
               favorited
-                ? "inline-flex h-10 w-10 items-center justify-center rounded-md border border-pump-accent/35 bg-pump-accent/12 text-lg leading-none text-pump-accent transition hover:border-pump-accent/50 hover:bg-pump-accent/18 hover:text-pump-accent"
-                : "secondary-button inline-flex h-10 w-10 items-center justify-center text-lg leading-none"
+                ? "toolbar-btn !w-10 border-pump-accent/45 bg-pump-accent/12 text-lg leading-none text-pump-accent"
+                : "secondary-button inline-flex h-8 w-10 items-center justify-center text-lg leading-none"
             }
           >
             {favorited ? "★" : "☆"}
@@ -664,7 +662,7 @@ export function TokenDetailLive({
           <button
             type="button"
             onClick={() => setTradeSheetOpen(true)}
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-pump-accent py-3.5 text-body-sm font-semibold text-pump-accent-foreground shadow-panelDark transition hover:opacity-95 active:scale-[0.99]"
+            className="primary-button flex w-full items-center justify-center gap-2 py-3.5 text-body-sm active:scale-[0.99]"
           >
             Buy ${symbol}
           </button>

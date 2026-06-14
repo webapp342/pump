@@ -90,7 +90,7 @@ function timeLeftLabel(status: AirdropDisplayStatus, detail: AirdropDetail): str
 function StatCell({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="flex min-w-0 flex-col gap-1">
-      <dt className="section-label text-[10px] md:text-[inherit]">{label}</dt>
+      <dt className="section-label md:text-[inherit]">{label}</dt>
       <dd className="m-0 rounded-md border border-pump-border/15 bg-pump-surface/35 px-2.5 py-2 md:px-3">
         {children}
       </dd>
