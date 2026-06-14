@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 import { normalizeAddressParam } from "@/lib/address";
 import { contracts, pumpChain } from "@/config/chain";
 import { bondingCurveManagerAbi } from "@/lib/bonding-curve";
-import { getCreatorProfile } from "@/lib/db/launchpad";
+import { getCreatorProfile, getReferralStats } from "@/lib/db/launchpad";
 
 const publicClient = createPublicClient({
   chain: pumpChain,
@@ -22,10 +22,12 @@ export async function GET(_request: NextRequest, context: RouteContext) {
 
   try {
     const profile = await getCreatorProfile(creatorAddress);
+    const referralStats = await getReferralStats(creatorAddress);
     let bnbBalance = "0";
     let creatorFeesPendingBnb = 0;
+    let referralFeesPendingBnb = 0;
     try {
-      const [balanceWei, pendingWei] = await Promise.all([
+      const [balanceWei, pendingCreatorWei, pendingReferrerWei] = await Promise.all([
         publicClient.getBalance({ address: creatorAddress as `0x${string}` }),
         publicClient.readContract({
           address: contracts.bondingCurveManager,
@@ -33,14 +35,22 @@ export async function GET(_request: NextRequest, context: RouteContext) {
           functionName: "pendingCreatorFees",
           args: [creatorAddress as `0x${string}`],
         }),
+        publicClient.readContract({
+          address: contracts.bondingCurveManager,
+          abi: bondingCurveManagerAbi,
+          functionName: "pendingReferrerFees",
+          args: [creatorAddress as `0x${string}`],
+        }),
       ]);
       bnbBalance = formatEther(balanceWei);
-      creatorFeesPendingBnb = Number(formatEther(pendingWei));
+      creatorFeesPendingBnb = Number(formatEther(pendingCreatorWei));
+      referralFeesPendingBnb = Number(formatEther(pendingReferrerWei));
     } catch {
       // RPC unavailable — profile still useful without live balance / pending fees
     }
 
     const creatorFeesTotalBnb = profile.creatorFeesClaimedBnb + creatorFeesPendingBnb;
+    const referralFeesTotalBnb = referralStats.claimedBnb + referralFeesPendingBnb;
 
     return NextResponse.json({
       data: {
@@ -48,6 +58,8 @@ export async function GET(_request: NextRequest, context: RouteContext) {
         bnbBalance,
         creatorFeesPendingBnb,
         creatorFeesTotalBnb,
+        referralFeesPendingBnb,
+        referralFeesTotalBnb,
       },
     });
   } catch (error) {

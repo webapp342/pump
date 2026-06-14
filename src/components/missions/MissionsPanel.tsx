@@ -1,12 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useConnectModal } from "@rainbow-me/rainbowkit";
 import { useAccount } from "wagmi";
 import {
   listPendingMissionKeys,
   type OptimisticActivity,
 } from "@/lib/optimistic-activity";
+import { getMissionHref, isAdminLinkMission } from "@/lib/mission-routes";
 import { MissionsPanelSkeleton } from "@/components/missions/MissionsPanelSkeleton";
 
 type MissionProgress = {
@@ -49,10 +51,6 @@ const missionKindLabel: Record<Mission["taskKind"], string> = {
   ADMIN_LINK: "Promo",
 };
 
-function isAdminLinkMission(mission: Mission): boolean {
-  return mission.taskKind === "ADMIN_LINK" || mission.taskSource === "admin_link";
-}
-
 function missionStatusLabel(done: boolean, syncing: boolean): string {
   if (done) return "Done";
   if (syncing) return "Syncing";
@@ -76,6 +74,7 @@ function MissionRow({
   onAdminLinkClick?: (mission: Mission) => void;
   completing?: boolean;
 }) {
+  const router = useRouter();
   const progressPct =
     mission.progress && mission.progress.target > 0
       ? Math.min(100, (mission.progress.current / mission.progress.target) * 100)
@@ -84,12 +83,14 @@ function MissionRow({
   const done = mission.completed;
   const showSyncing = syncing && !done;
   const isLinkTask = isAdminLinkMission(mission) && Boolean(mission.targetUrl);
-  const clickable = isLinkTask && !done && !completing;
+  const adminClickable = isLinkTask && !done && !completing;
+  const href = getMissionHref(mission);
+  const navigable = href != null;
 
   const cardClassName = [
     "sheet-cell block w-full p-3 text-left transition md:p-4",
     done ? "bg-pump-border/4" : "bg-pump-card/60",
-    clickable ? "cursor-pointer hover:bg-pump-border/8" : "",
+    adminClickable || navigable ? "cursor-pointer hover:bg-pump-border/8" : "",
   ]
     .filter(Boolean)
     .join(" ");
@@ -106,9 +107,13 @@ function MissionRow({
           <p className="text-caption leading-relaxed text-pump-muted">{mission.description}</p>
         ) : null}
 
-        {isLinkTask && !done ? (
+        {adminClickable ? (
           <p className="text-caption font-medium text-pump-accent">
             {completing ? "Completing…" : "Tap to open link and earn points"}
+          </p>
+        ) : navigable && !done ? (
+          <p className="text-caption font-medium text-pump-accent">
+            Tap to go to {href === "/create" ? "Create" : "Arena"}
           </p>
         ) : null}
 
@@ -135,21 +140,27 @@ function MissionRow({
         <span className="financial-value text-body font-semibold text-pump-accent">
           +{mission.rewardPoints}
         </span>
-        <span
-          className={`status-badge ${missionStatusBadgeClass(done, showSyncing)}`}
-        >
+        <span className={`status-badge ${missionStatusBadgeClass(done, showSyncing)}`}>
           {completing ? "Opening…" : missionStatusLabel(done, showSyncing)}
         </span>
       </div>
     </div>
   );
 
-  if (clickable) {
+  function handleClick() {
+    if (adminClickable) {
+      onAdminLinkClick?.(mission);
+      return;
+    }
+    if (href) router.push(href);
+  }
+
+  if (adminClickable || navigable) {
     return (
       <button
         type="button"
         className={cardClassName}
-        onClick={() => onAdminLinkClick?.(mission)}
+        onClick={handleClick}
         disabled={completing}
       >
         {content}

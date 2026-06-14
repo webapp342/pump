@@ -411,6 +411,10 @@ code,
     padding-top: 1rem;
   }
 
+  .trade-panel-embedded .trade-side-group {
+    padding-top: 0.75rem;
+  }
+
   .trade-side-group .trade-side-button:not(:last-child),
   .trade-side-group .trade-side-button-active-buy:not(:last-child),
   .trade-side-group .trade-side-button-active-sell:not(:last-child) {

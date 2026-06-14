@@ -179,7 +179,7 @@ export function TradePanel({
   const [amount, setAmount] = useState("");
   const prefillAppliedRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
-  const [receiveExpanded, setReceiveExpanded] = useState(true);
+  const [receiveExpanded, setReceiveExpanded] = useState(false);
   const [pendingAction, setPendingAction] = useState<"buy" | "sell" | "approve" | null>(null);
   const pendingSellRef = useRef<{ amountWei: bigint; minBnbOut: bigint } | null>(null);
   const pendingTradeReferrerRef = useRef<`0x${string}` | null>(null);
@@ -1086,7 +1086,7 @@ export function TradePanel({
 
   return (
     <section
-      className={embedded ? "overflow-hidden p-0" : "panel-surface overflow-hidden p-0"}
+      className={embedded ? "trade-panel-embedded overflow-hidden p-0" : "panel-surface overflow-hidden p-0"}
     >
       <form onSubmit={onSubmit}>
         <div className="trade-side-group">

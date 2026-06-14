@@ -69,32 +69,34 @@ export function TradeSheet({
         aria-modal="true"
         aria-label={`Trade ${symbol}`}
       >
-        <div className="panel-surface pointer-events-auto relative w-full max-h-[min(82dvh,720px)] overflow-hidden border-b-0">
-          <div className="flex justify-center border-b border-pump-border/45 py-2">
-            <div className="h-0.5 w-10 bg-pump-border/50" aria-hidden />
+        <div className="modal-panel pointer-events-auto flex w-full max-h-[min(85dvh,720px)] flex-col overflow-hidden border-x-0 border-b-0">
+          <div className="shrink-0 border-b border-pump-border/45 px-4 pb-3 pt-2">
+            <div className="mb-2 flex justify-center" aria-hidden>
+              <div className="h-1 w-9 bg-pump-border/45" />
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-h3 font-semibold text-pump-text">Trade ${symbol}</h2>
+              <button
+                type="button"
+                onClick={onClose}
+                className="inline-flex h-8 w-8 shrink-0 items-center justify-center text-pump-muted transition hover:bg-pump-border/10 hover:text-pump-text"
+                aria-label="Close"
+              >
+                <span className="text-xl leading-none">×</span>
+              </button>
+            </div>
           </div>
-          <div className="flex items-center justify-between gap-3 border-b border-pump-border/45 px-4 py-2">
-            <h2 className="text-body font-semibold text-pump-text">Trade ${symbol}</h2>
-            <button
-              type="button"
-              onClick={onClose}
-              className="inline-flex h-8 w-8 items-center justify-center text-pump-muted transition hover:bg-pump-border/10 hover:text-pump-text"
-              aria-label="Close"
-            >
-              <span className="text-xl leading-none">×</span>
-            </button>
-          </div>
-          <div className="max-h-[calc(82dvh-4rem)] overflow-y-auto overscroll-contain pb-[max(1rem,env(safe-area-inset-bottom))]">
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pb-[max(1rem,env(safe-area-inset-bottom))]">
             <TradePanel
               embedded
               tokenAddress={tokenAddress}
               symbol={symbol}
               status={status}
               reserveBnb={reserveBnb}
-            prefill={prefill}
-            onTradeConfirmed={onTradeConfirmed}
-            chainCurveSnapshot={chainCurveSnapshot}
-          />
+              prefill={prefill}
+              onTradeConfirmed={onTradeConfirmed}
+              chainCurveSnapshot={chainCurveSnapshot}
+            />
           </div>
         </div>
       </div>

@@ -24,13 +24,9 @@ type CreatorProfileData = CreatorProfile & {
   bnbBalance: string;
   creatorFeesPendingBnb: number;
   creatorFeesTotalBnb: number;
+  referralFeesPendingBnb: number;
+  referralFeesTotalBnb: number;
 };
-
-function formatFeeBnb(value: number): string {
-  if (!Number.isFinite(value) || value <= 0) return "0";
-  if (value >= 0.0001) return value.toFixed(6);
-  return value.toFixed(8);
-}
 
 type CreatorProfileModalProps = {
   open: boolean;
@@ -234,14 +230,6 @@ export function CreatorProfileModal({ open, onClose, creatorAddress }: CreatorPr
 
   if (!open || !mounted) return null;
 
-  const bnbBalance = profile ? Number(profile.bnbBalance) : 0;
-  const walletBnbLabel =
-    bnbBalance >= 1
-      ? bnbBalance.toFixed(4)
-      : bnbBalance >= 0.0001
-        ? bnbBalance.toFixed(6)
-        : bnbBalance.toFixed(8);
-  const walletUsdLabel = formatUsdReadable(bnbToUsd(bnbBalance, bnbUsd));
   const isSelf = address?.toLowerCase() === creatorAddress.toLowerCase();
   const following = isFollowing(creatorAddress);
 
@@ -308,10 +296,18 @@ export function CreatorProfileModal({ open, onClose, creatorAddress }: CreatorPr
           <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-3 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-5 sm:py-4 [touch-action:pan-y]">
           {loading ? (
             <div className="space-y-3">
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                {Array.from({ length: 4 }).map((_, i) => (
+              <div className="grid grid-cols-2 gap-3">
+                {Array.from({ length: 2 }).map((_, i) => (
                   <div key={i} className="h-20 animate-pulse rounded-md bg-pump-surface/60" />
                 ))}
+              </div>
+              <div className="space-y-2">
+                <div className="h-5 w-24 animate-pulse rounded-md bg-pump-surface/60" />
+                <div className="grid grid-cols-2 gap-3">
+                  {Array.from({ length: 2 }).map((_, i) => (
+                    <div key={i} className="h-20 animate-pulse rounded-md bg-pump-surface/60" />
+                  ))}
+                </div>
               </div>
               <div className="h-32 animate-pulse rounded-md bg-pump-surface/60" />
             </div>
@@ -319,12 +315,7 @@ export function CreatorProfileModal({ open, onClose, creatorAddress }: CreatorPr
             <p className="notice-error p-4 text-body-sm">{error}</p>
           ) : profile ? (
             <div className="space-y-4">
-              <section className="grid grid-cols-2 gap-2.5 sm:grid-cols-4 sm:gap-3">
-                <StatCard
-                  label="Wallet BNB"
-                  value={`${walletBnbLabel} BNB`}
-                  sub={walletUsdLabel !== "—" ? walletUsdLabel : undefined}
-                />
+              <section className="grid grid-cols-2 gap-2.5">
                 <StatCard
                   label="Tokens launched"
                   value={String(profile.createdTokens.length)}
@@ -333,32 +324,27 @@ export function CreatorProfileModal({ open, onClose, creatorAddress }: CreatorPr
                   label="Followers"
                   value={profile.followerCount.toLocaleString()}
                 />
-                <StatCard
-                  label="Trading volume"
-                  value={formatUsdReadable(bnbToUsd(profile.totalVolumeBnb, bnbUsd), {
-                    compact: true,
-                  })}
-                  sub={`${profile.totalVolumeBnb.toFixed(4)} BNB`}
-                />
               </section>
 
-              <div className="rounded-md border border-pump-border/15 bg-pump-surface/30 px-3 py-2.5">
-                <div className="flex flex-wrap items-baseline justify-between gap-2">
-                  <span className="text-body-sm text-pump-muted">Creator fees</span>
-                  <span className="financial-value text-body font-semibold text-pump-text">
-                    {formatFeeBnb(profile.creatorFeesTotalBnb)} BNB
-                  </span>
+              <section>
+                <h3 className="section-heading">Earnings</h3>
+                <div className="mt-2 grid grid-cols-2 gap-2.5">
+                  <StatCard
+                    label="Creator fees"
+                    value={formatUsdReadable(
+                      bnbToUsd(profile.creatorFeesTotalBnb, bnbUsd),
+                      { compact: true }
+                    )}
+                  />
+                  <StatCard
+                    label="Referral fees"
+                    value={formatUsdReadable(
+                      bnbToUsd(profile.referralFeesTotalBnb, bnbUsd),
+                      { compact: true }
+                    )}
+                  />
                 </div>
-                <p className="mt-1 text-caption text-pump-muted">
-                  {formatFeeBnb(profile.creatorFeesClaimedBnb)} claimed ·{" "}
-                  {formatFeeBnb(profile.creatorFeesPendingBnb)} pending
-                </p>
-                {profile.creatorFeesTotalBnb <= 0 ? (
-                  <p className="mt-1 text-[11px] text-pump-muted">
-                    Launch a meme — earn BNB from every trade on your token.
-                  </p>
-                ) : null}
-              </div>
+              </section>
 
               <section>
                 <h3 className="section-heading">Holdings</h3>
