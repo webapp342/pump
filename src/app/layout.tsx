@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { CreatorFollowsProvider } from "@/components/creators/CreatorFollowsProvider";
 import { FavoritesProvider } from "@/components/favorites/FavoritesProvider";
 import { AirdropSavesProvider } from "@/components/airdrops/AirdropSavesProvider";
@@ -38,11 +39,14 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const headersList = await headers();
+  const cookies = headersList.get("cookie");
+
   return (
     <html
       lang="en"
-      data-theme="dark"
+      data-theme="slate"
       suppressHydrationWarning
       className={`${inter.variable} ${ibmPlexMono.variable}`}
     >
@@ -53,7 +57,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               try {
                 var storedTheme = localStorage.getItem("pump-theme");
                 var valid = storedTheme === "light" || storedTheme === "dark" || storedTheme === "navy" || storedTheme === "slate";
-                var theme = valid ? storedTheme : "dark";
+                var theme = valid ? storedTheme : "slate";
                 document.documentElement.dataset.theme = theme;
                 document.documentElement.style.colorScheme = theme === "dark" || theme === "navy" ? "dark" : "light";
               } catch (error) {}
@@ -61,7 +65,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           }}
         />
         <ThemeProvider>
-          <Web3Provider>
+          <Web3Provider cookies={cookies}>
             <FavoritesProvider>
               <AirdropSavesProvider>
               <CreatorFollowsProvider>

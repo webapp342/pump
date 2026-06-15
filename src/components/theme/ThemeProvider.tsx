@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import {
   getColorScheme,
+  DEFAULT_THEME_ID,
   isValidTheme,
   THEME_STORAGE_KEY,
   type ThemeId,
@@ -23,7 +24,7 @@ function applyTheme(theme: ThemeId) {
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setThemeState] = useState<ThemeId>("dark");
+  const [theme, setThemeState] = useState<ThemeId>(DEFAULT_THEME_ID);
 
   useEffect(() => {
     const stored = window.localStorage.getItem(THEME_STORAGE_KEY);
@@ -32,7 +33,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       ? stored
       : isValidTheme(fromDom)
         ? fromDom
-        : "dark";
+        : DEFAULT_THEME_ID;
 
     setThemeState(next);
     applyTheme(next);

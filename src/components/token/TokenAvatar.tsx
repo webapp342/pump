@@ -39,8 +39,8 @@ export function TokenAvatar({
 
   const fallback = (
     <span
-      className={`inline-flex shrink-0 items-center justify-center rounded-full border border-pump-border/20 bg-pump-surface/70 text-sm font-semibold text-pump-text ring-2 ring-pump-border/15 ${className}`}
-      style={{ width: size, height: size }}
+      className={`flex shrink-0 items-center justify-center overflow-hidden rounded-full border border-pump-border/20 bg-pump-surface/70 text-sm font-semibold text-pump-text ring-2 ring-pump-border/15 ${className}`}
+      style={{ width: size, height: size, minWidth: size, minHeight: size }}
     >
       {letter}
     </span>

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Bookmark } from "lucide-react";
-import { useConnectModal } from "@rainbow-me/rainbowkit";
+import { useOpenConnectModal } from "@/hooks/useOpenConnectModal";
 import { useAccount } from "wagmi";
 import type { AirdropListItem } from "@/lib/db/airdrops";
 import {
@@ -91,7 +91,7 @@ export function AirdropsSavedSheet({ items, bnbUsd }: AirdropsSavedSheetProps) {
   const [open, setOpen] = useState(false);
   const { saves, toggleSave, loading } = useAirdropSaves();
   const { isConnected } = useAccount();
-  const { openConnectModal } = useConnectModal();
+  const { openConnectModal } = useOpenConnectModal();
 
   const savedItems = useMemo(
     () => items.filter((item) => saves.has(item.id)),

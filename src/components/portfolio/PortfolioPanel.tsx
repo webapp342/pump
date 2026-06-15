@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { formatEther } from "viem";
-import { useConnectModal } from "@rainbow-me/rainbowkit";
+import { useOpenConnectModal } from "@/hooks/useOpenConnectModal";
 import { useAccount } from "wagmi";
 import { useReadContract } from "wagmi";
 import { contracts, pumpChain } from "@/config/chain";
@@ -506,7 +506,7 @@ async function fetchVerifiedHoldingsSnapshot(
 
 export function PortfolioPanel() {
   const { address, isConnected } = useAccount();
-  const { openConnectModal } = useConnectModal();
+  const { openConnectModal } = useOpenConnectModal();
   const { bnbUsd } = useBnbUsdPrice();
   const [data, setData] = useState<PortfolioData | null>(null);
   const [error, setError] = useState<string | null>(null);

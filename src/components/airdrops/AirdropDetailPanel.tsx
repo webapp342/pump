@@ -15,7 +15,7 @@ import {
 } from "@/components/airdrops/AirdropMetricCells";
 import { type ReactNode, useCallback, useEffect, useState } from "react";
 import { parseEther } from "viem";
-import { useConnectModal } from "@rainbow-me/rainbowkit";
+import { useOpenConnectModal } from "@/hooks/useOpenConnectModal";
 import { useAccount, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
 import { contracts, shortAddress } from "@/config/chain";
 import { pumpAirdropManagerAbi } from "@/lib/abis/pump-airdrop-manager";
@@ -906,7 +906,7 @@ function OnchainRequirementsContent({
 }
 
 export function AirdropDetailPanel({ airdropId }: { airdropId: string }) {
-  const { openConnectModal } = useConnectModal();
+  const { openConnectModal } = useOpenConnectModal();
   const { address, isConnected } = useAccount();
   const { isSaved, toggleSave } = useAirdropSaves();
   const { bnbUsd } = useBnbUsdPrice();

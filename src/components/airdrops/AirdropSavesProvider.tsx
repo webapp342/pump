@@ -9,7 +9,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { useConnectModal } from "@rainbow-me/rainbowkit";
+import { useOpenConnectModal } from "@/hooks/useOpenConnectModal";
 import { useAccount } from "wagmi";
 
 type AirdropSavesContextValue = {
@@ -23,7 +23,7 @@ const AirdropSavesContext = createContext<AirdropSavesContextValue | null>(null)
 
 export function AirdropSavesProvider({ children }: { children: React.ReactNode }) {
   const { address, isConnected } = useAccount();
-  const { openConnectModal } = useConnectModal();
+  const { openConnectModal } = useOpenConnectModal();
   const [saves, setSaves] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
   const pendingRef = useRef<Set<string>>(new Set());

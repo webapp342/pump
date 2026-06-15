@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { formatEther, formatUnits, parseEther, parseUnits } from "viem";
 import type { TransactionReceipt } from "viem";
-import { useConnectModal } from "@rainbow-me/rainbowkit";
+import { useOpenConnectModal } from "@/hooks/useOpenConnectModal";
 import {
   useAccount,
   useBalance,
@@ -171,7 +171,7 @@ export function TradePanel({
 }: TradePanelProps) {
   const { address, isConnected, chain } = useAccount();
   const { data: gasPrice } = useGasPrice({ chainId: pumpChain.id });
-  const { openConnectModal } = useConnectModal();
+  const { openConnectModal } = useOpenConnectModal();
   const { bnbUsd } = useBnbUsdPrice();
   const [side, setSide] = useState<Side>("buy");
   const [buyInputMode, setBuyInputMode] = useState<TradeInputMode>("usd");

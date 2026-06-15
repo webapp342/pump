@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Star } from "lucide-react";
 import { useAccount } from "wagmi";
-import { useConnectModal } from "@rainbow-me/rainbowkit";
+import { useOpenConnectModal } from "@/hooks/useOpenConnectModal";
 import type { TokenListItem } from "@/lib/db/launchpad";
 import { TokenAvatar } from "@/components/token/TokenAvatar";
 import { useFavorites } from "@/components/favorites/FavoritesProvider";
@@ -42,7 +42,7 @@ export function WatchlistContent({
 }: WatchlistContentProps) {
   const { toggleFavorite, loading } = useFavorites();
   const { isConnected } = useAccount();
-  const { openConnectModal } = useConnectModal();
+  const { openConnectModal } = useOpenConnectModal();
   const watchlistTokens = useWatchlistTokens(tokens);
 
   if (!isConnected) {

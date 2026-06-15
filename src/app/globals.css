@@ -36,78 +36,78 @@ html[data-theme="light"] {
   --radius-xl: 12px;
   --radius-full: 9999px;
 
-  /* Classic Light — layered surfaces */
-  --pump-bg: 244 247 252;
-  --pump-surface: 250 252 255;
+  /* Classic Light — pearl canvas + terracotta (bright slate cousin; not teal/amber) */
+  --pump-bg: 247 248 246;
+  --pump-surface: 255 255 255;
   --pump-card: 255 255 255;
-  --pump-card-soft: 237 242 249;
-  --pump-border: 180 194 214;
-  --pump-accent: 28 78 180;
-  --pump-accent-strong: 22 65 158;
-  --pump-accent-foreground: 248 250 255;
-  --pump-text: 15 23 42;
-  --pump-muted: 71 85 105;
-  --pump-success: 15 133 88;
-  --pump-danger: 185 28 28;
-  --pump-warning: 180 83 9;
-  --pump-shadow: 5 12 24 / 0.1;
+  --pump-card-soft: 240 242 240;
+  --pump-border: 204 210 206;
+  --pump-accent: 184 78 56;
+  --pump-accent-strong: 160 64 44;
+  --pump-accent-foreground: 255 251 248;
+  --pump-text: 26 29 28;
+  --pump-muted: 92 98 96;
+  --pump-success: 28 120 88;
+  --pump-danger: 180 62 58;
+  --pump-warning: 154 104 40;
+  --pump-shadow: 26 29 28 / 0.07;
   color-scheme: light;
 }
 
 html[data-theme="dark"] {
-  /* Pro terminal dark — layered surfaces */
-  --pump-bg: 6 8 12;
-  --pump-surface: 11 15 22;
-  --pump-card: 16 22 34;
-  --pump-card-soft: 22 30 46;
-  --pump-border: 72 88 118;
-  --pump-accent: 96 132 255;
-  --pump-accent-strong: 124 156 255;
-  --pump-accent-foreground: 244 248 255;
-  --pump-text: 236 240 248;
-  --pump-muted: 132 146 170;
-  --pump-success: 46 196 140;
-  --pump-danger: 232 96 96;
-  --pump-warning: 232 176 76;
-  --pump-shadow: 0 0 0 / 0.4;
+  /* Classic Dark — warm ember terminal (Hearth / Caspian warm precision, 2026) */
+  --pump-bg: 18 16 14;
+  --pump-surface: 26 23 20;
+  --pump-card: 34 30 26;
+  --pump-card-soft: 44 39 34;
+  --pump-border: 76 68 60;
+  --pump-accent: 204 154 76;
+  --pump-accent-strong: 224 178 98;
+  --pump-accent-foreground: 18 16 14;
+  --pump-text: 242 237 228;
+  --pump-muted: 158 148 134;
+  --pump-success: 76 184 130;
+  --pump-danger: 224 108 96;
+  --pump-warning: 224 176 88;
+  --pump-shadow: 0 0 0 / 0.5;
   color-scheme: dark;
 }
 
 html[data-theme="navy"] {
-  /* Corporate Navy — layered institution palette */
-  --pump-bg: 8 18 34;
-  --pump-surface: 12 26 48;
-  --pump-card: 16 32 56;
-  --pump-card-soft: 22 40 66;
-  --pump-border: 72 96 130;
-  --pump-accent: 201 162 39;
-  --pump-accent-strong: 218 178 58;
-  --pump-accent-foreground: 10 22 40;
-  --pump-text: 236 240 248;
-  --pump-muted: 148 163 184;
-  --pump-success: 74 180 120;
-  --pump-danger: 220 100 100;
-  --pump-warning: 218 178 58;
-  --pump-shadow: 0 0 0 / 0.38;
+  /* Corporate Navy — slate midnight (Corporate Slate dark pair: warm navy + petrol teal) */
+  --pump-bg: 16 28 36;
+  --pump-surface: 20 36 46;
+  --pump-card: 26 44 54;
+  --pump-card-soft: 34 56 68;
+  --pump-border: 64 88 98;
+  --pump-accent: 56 146 140;
+  --pump-accent-strong: 72 164 156;
+  --pump-accent-foreground: 244 251 250;
+  --pump-text: 236 242 238;
+  --pump-muted: 120 140 144;
+  --pump-success: 56 168 124;
+  --pump-danger: 212 96 96;
+  --pump-warning: 196 156 88;
+  --pump-shadow: 8 20 28 / 0.46;
   color-scheme: dark;
 }
 
 html[data-theme="slate"] {
-  /* Corporate Slate — layered neutral */
-  --pump-bg: 245 247 250;
-  --pump-surface: 252 253 255;
+  /* Corporate Slate — warm stone canvas + petrol teal (JPM / neobank fintech light, 2026) */
+  --pump-bg: 234 239 237;
+  --pump-surface: 246 248 247;
   --pump-card: 255 255 255;
-  --pump-card-soft: 241 245 249;
-  --pump-border: 203 213 225;
-  --pump-accent: 15 118 110;
-  --pump-accent-strong: 13 148 136;
-  --pump-accent-foreground: 240 253 250;
-  --pump-text: 30 41 59;
-  --pump-muted: 71 85 105;
-  --pump-success: 5 150 105;
-  --pump-danger: 185 28 28;
-  --pump-warning: 180 83 9;
-  --pump-shadow: 15 23 42 / 0.08;
+  --pump-card-soft: 218 229 225;
+  --pump-border: 168 184 178;
+  --pump-accent: 26 118 122;
+  --pump-accent-strong: 18 99 104;
+  --pump-accent-foreground: 247 252 251;
+  --pump-text: 28 37 40;
+  --pump-muted: 87 101 105;
+  --pump-success: 4 120 87;
+  --pump-danger: 176 42 55;
+  --pump-warning: 146 98 10;
+  --pump-shadow: 12 48 44 / 0.11;
   color-scheme: light;
 }
 
@@ -716,9 +716,14 @@ code,
     display: flex;
     flex-shrink: 0;
     align-items: center;
-    align-self: stretch;
     gap: 6px;
   }
+
+  .app-header-actions .toolbar-btn {
+    height: 2.25rem;
+  }
+
+  /* AppKit connect modal inherits --apkt-font-family from appkit-theme.ts */
 
   .sheet-cell {
     border: 1px solid rgb(var(--pump-border) / 0.45);
@@ -1794,10 +1799,25 @@ code,
     }
   }
 
-  .mcap-ticker {
-    padding: 6px 0;
-    overflow: hidden;
+  .mcap-ticker-row {
+    padding-block: 6px;
     border-bottom: 1px solid rgb(var(--pump-border) / 0.2);
+  }
+
+  .mcap-ticker-label {
+    padding-left: 0.75rem;
+  }
+
+  @media (min-width: 768px) {
+    .mcap-ticker-label {
+      padding-left: 0;
+    }
+  }
+
+  .mcap-ticker {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
   }
 
   .mcap-ticker-viewport {
@@ -1845,13 +1865,13 @@ code,
     display: flex;
     width: max-content;
     gap: 1rem;
-    padding: 0 0.5rem;
+    padding: 0 0.75rem 0 0;
   }
 
   @media (min-width: 768px) {
     .mcap-ticker-static-row {
       gap: 1.25rem;
-      padding: 0 0.75rem;
+      padding: 0 0.75rem 0 0;
     }
   }
 
@@ -1860,7 +1880,7 @@ code,
     align-items: center;
     gap: 1rem;
     width: max-content;
-    padding-inline: 0.75rem;
+    padding-inline: 0 0.75rem;
     will-change: transform;
   }
 

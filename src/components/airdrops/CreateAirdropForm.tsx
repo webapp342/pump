@@ -29,7 +29,7 @@ import {
   validateSocialTaskUrl,
   type SocialTaskDraft,
 } from "@/lib/airdrop-social";
-import { useConnectModal } from "@rainbow-me/rainbowkit";
+import { useOpenConnectModal } from "@/hooks/useOpenConnectModal";
 import {
   useAccount,
   useBalance,
@@ -130,7 +130,7 @@ export function CreateAirdropForm({
   const socialTasksRef = useRef<SocialTaskDraft[]>([]);
   const rulesRef = useRef<AirdropRules>({});
 
-  const { openConnectModal } = useConnectModal();
+  const { openConnectModal } = useOpenConnectModal();
   const { address, isConnected } = useAccount();
   const [tokens, setTokens] = useState<TokenListItem[]>([]);
   const [createdTokens, setCreatedTokens] = useState<TokenListItem[]>([]);

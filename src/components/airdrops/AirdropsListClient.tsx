@@ -22,7 +22,7 @@ import {
 } from "@/lib/airdrop-board-format";
 import { Plus, Bookmark } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { useConnectModal } from "@rainbow-me/rainbowkit";
+import { useOpenConnectModal } from "@/hooks/useOpenConnectModal";
 import { useAccount } from "wagmi";
 import { AirdropsSkeleton } from "@/components/airdrops/AirdropsSkeleton";
 import { useAirdropSaves } from "@/components/airdrops/AirdropSavesProvider";
@@ -449,7 +449,7 @@ function pickFeatured(items: EnrichedAirdrop[]): EnrichedAirdrop | null {
 
 export function AirdropsListClient() {
   const { address, isConnected } = useAccount();
-  const { openConnectModal } = useConnectModal();
+  const { openConnectModal } = useOpenConnectModal();
   const { saves } = useAirdropSaves();
   const [items, setItems] = useState<AirdropListItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);

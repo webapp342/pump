@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { parseEther, parseEventLogs } from "viem";
-import { useConnectModal } from "@rainbow-me/rainbowkit";
+import { useOpenConnectModal } from "@/hooks/useOpenConnectModal";
 import {
   useAccount,
   useBalance,
@@ -166,7 +166,7 @@ export function CreateMemeForm() {
   const logoPreviewRef = useRef<string | null>(null);
   const descriptionRef = useRef("");
   const socialLinksRef = useRef({ twitter: "", website: "", telegram: "", discord: "" });
-  const { openConnectModal } = useConnectModal();
+  const { openConnectModal } = useOpenConnectModal();
   const { address, isConnected, chain } = useAccount();
   const [name, setName] = useState("");
   const [symbol, setSymbol] = useState("");
@@ -559,37 +559,37 @@ export function CreateMemeForm() {
           <p className="section-label">Token profile</p>
 
           <div className="mt-3 flex flex-col gap-4 sm:mt-4 sm:flex-row sm:items-start sm:gap-5">
-            <div className="flex shrink-0 items-center gap-3 sm:flex-col sm:items-center sm:gap-2">
+            <div className="flex min-w-0 items-center gap-3 sm:w-[5.75rem] sm:shrink-0 sm:flex-col sm:items-center sm:gap-2">
               <TokenAvatar
                 address="0x0000000000000000000000000000000000000000"
                 symbol={displaySymbol}
                 previewUrl={logoPreview}
                 size={56}
-                className="shrink-0 sm:hidden"
+                className="sm:hidden"
               />
               <TokenAvatar
                 address="0x0000000000000000000000000000000000000000"
                 symbol={displaySymbol}
                 previewUrl={logoPreview}
                 size={72}
-                className="hidden shrink-0 sm:block"
+                className="hidden sm:flex"
               />
-              <div className="flex min-w-0 flex-1 flex-col gap-1 sm:contents">
-                <label
-                  htmlFor="logo"
-                  className="secondary-button w-fit cursor-pointer px-3 py-2 text-caption sm:mt-0"
-                >
-                  Upload logo
-                </label>
-                <input
-                  id="logo"
-                  type="file"
-                  accept={LOGO_ACCEPT}
-                  onChange={onLogoChange}
-                  className="hidden"
-                />
-                <p className="field-hint sm:text-center">PNG, JPEG, WebP or GIF · max 2 MB</p>
-              </div>
+              <label
+                htmlFor="logo"
+                className="secondary-button w-fit cursor-pointer px-3 py-2 text-caption sm:w-full sm:justify-center sm:px-2"
+              >
+                Upload logo
+              </label>
+              <input
+                id="logo"
+                type="file"
+                accept={LOGO_ACCEPT}
+                onChange={onLogoChange}
+                className="hidden"
+              />
+              <p className="field-hint min-w-0 flex-1 sm:w-full sm:flex-none sm:text-center">
+                PNG, JPEG, WebP or GIF · max 2 MB
+              </p>
             </div>
 
             <div className="min-w-0 flex-1 space-y-3 md:space-y-4">

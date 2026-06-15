@@ -4,6 +4,8 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import type { TokenListItem } from "@/lib/db/launchpad";
 import { TokenAvatar } from "@/components/token/TokenAvatar";
+import { IconLabel } from "@/components/ui/IconLabel";
+import { MetricIcons } from "@/lib/metric-icons";
 import { formatSignedPct, pctTone } from "@/lib/arena-board-format";
 
 const MCAP_TICKER_LIMIT = 20;
@@ -280,46 +282,53 @@ export function ArenaMcapTicker({ tokens }: ArenaMcapTickerProps) {
   const loopReady = !reducedMotion && loopTokens.length > 0 && shiftPx > 0;
 
   return (
-    <div
-      className={`mcap-ticker${reducedMotion ? " mcap-ticker-static" : ""}`}
-      role="region"
-      aria-label="Top market cap tokens"
-    >
-      <div className="sr-only" aria-live="off">
-        Top tokens by market cap:{" "}
-        {topTokens.map((token) => `$${token.symbol}`).join(", ")}
-      </div>
-      <div ref={viewportRef} className="mcap-ticker-viewport">
-        <div ref={measureRef} className="mcap-ticker-measure" aria-hidden>
-          {topTokens.map((token) => (
-            <TickerItem key={`measure-${token.address}`} token={token} />
-          ))}
+    <div className="mcap-ticker-row scroll-strip-row" role="region" aria-label="Top market cap tokens">
+      <IconLabel
+        icon={MetricIcons.mcap}
+        hideIconMobile
+        className="section-label mcap-ticker-label shrink-0 text-caption md:text-[inherit]"
+      >
+        Top MC
+      </IconLabel>
+      <div
+        className={`mcap-ticker${reducedMotion ? " mcap-ticker-static" : ""}`}
+      >
+        <div className="sr-only" aria-live="off">
+          Top tokens by market cap:{" "}
+          {topTokens.map((token) => `$${token.symbol}`).join(", ")}
         </div>
-        <div
-          ref={trackRef}
-          className={`mcap-ticker-track${loopReady ? " mcap-ticker-track--active" : ""}`}
-        >
-          <div ref={segmentRef} className="mcap-ticker-segment">
-            {(loopTokens.length > 0 ? loopTokens : topTokens).map((token, index) => (
-              <TickerItem key={`a-${token.address}-${index}`} token={token} />
+        <div ref={viewportRef} className="mcap-ticker-viewport">
+          <div ref={measureRef} className="mcap-ticker-measure" aria-hidden>
+            {topTokens.map((token) => (
+              <TickerItem key={`measure-${token.address}`} token={token} />
             ))}
           </div>
-          {reducedMotion ? null : (
-            <div ref={segmentDupRef} className="mcap-ticker-segment" aria-hidden>
+          <div
+            ref={trackRef}
+            className={`mcap-ticker-track${loopReady ? " mcap-ticker-track--active" : ""}`}
+          >
+            <div ref={segmentRef} className="mcap-ticker-segment">
               {(loopTokens.length > 0 ? loopTokens : topTokens).map((token, index) => (
-                <TickerItem key={`b-${token.address}-${index}`} token={token} />
+                <TickerItem key={`a-${token.address}-${index}`} token={token} />
               ))}
             </div>
-          )}
+            {reducedMotion ? null : (
+              <div ref={segmentDupRef} className="mcap-ticker-segment" aria-hidden>
+                {(loopTokens.length > 0 ? loopTokens : topTokens).map((token, index) => (
+                  <TickerItem key={`b-${token.address}-${index}`} token={token} />
+                ))}
+              </div>
+            )}
+          </div>
         </div>
+        {reducedMotion ? (
+          <div className="mcap-ticker-static-row">
+            {topTokens.map((token) => (
+              <TickerItem key={token.address} token={token} />
+            ))}
+          </div>
+        ) : null}
       </div>
-      {reducedMotion ? (
-        <div className="mcap-ticker-static-row">
-          {topTokens.map((token) => (
-            <TickerItem key={token.address} token={token} />
-          ))}
-        </div>
-      ) : null}
     </div>
   );
 }

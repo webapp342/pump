@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState, type MouseEvent } from "react";
-import { ConnectButton } from "@rainbow-me/rainbowkit";
+import { useAppKit } from "@reown/appkit/react";
 import { formatEther } from "viem";
-import { useBalance, useDisconnect, useWatchBlockNumber } from "wagmi";
+import { useAccount, useBalance, useChainId, useDisconnect, useWatchBlockNumber } from "wagmi";
 import { pumpChain, shortAddress } from "@/config/chain";
 import { UserAvatar } from "@/components/user/UserAvatar";
 import { useUserAvatar } from "@/components/user/UserAvatarProvider";
@@ -245,56 +245,38 @@ function ConnectedWalletButton({ address }: { address: string }) {
 }
 
 export function WalletBar() {
-  return (
-    <ConnectButton.Custom>
-      {({
-        account,
-        chain,
-        authenticationStatus,
-        mounted,
-        openChainModal,
-        openConnectModal,
-      }) => {
-        const ready = mounted && authenticationStatus !== "loading";
-        const connected =
-          ready &&
-          account &&
-          chain &&
-          (!authenticationStatus || authenticationStatus === "authenticated");
+  const { open } = useAppKit();
+  const { address, isConnected, isConnecting, isReconnecting } = useAccount();
+  const chainId = useChainId();
+  const wrongNetwork = isConnected && chainId !== pumpChain.id;
+  const ready = !isConnecting && !isReconnecting;
 
-        return (
-          <div
-            {...(!ready && {
-              "aria-hidden": true,
-              style: {
-                opacity: 0,
-                pointerEvents: "none",
-                userSelect: "none",
-              },
-            })}
-          >
-            {!connected ? (
-              <button
-                type="button"
-                onClick={openConnectModal}
-                className="primary-button h-8 px-3 py-0"
-              >
-                Connect wallet
-              </button>
-            ) : chain.unsupported ? (
-              <button
-                type="button"
-                onClick={openChainModal}
-                className="toolbar-btn border-pump-danger/45 bg-pump-danger/10 text-pump-danger"
-              >
-                Wrong network
-              </button>
-            ) : (
-              <ConnectedWalletButton address={account.address} />
-            )}
-          </div>
-        );
-      }}
-    </ConnectButton.Custom>
+  return (
+    <div
+      {...(!ready && {
+        "aria-hidden": true,
+        style: {
+          opacity: 0,
+          pointerEvents: "none",
+          userSelect: "none",
+        },
+      })}
+    >
+      {!isConnected ? (
+        <button type="button" onClick={() => open()} className="toolbar-btn font-semibold">
+          Connect wallet
+        </button>
+      ) : wrongNetwork ? (
+        <button
+          type="button"
+          onClick={() => open({ view: "Networks" })}
+          className="toolbar-btn border-pump-danger/45 bg-pump-danger/10 text-pump-danger"
+        >
+          Wrong network
+        </button>
+      ) : address ? (
+        <ConnectedWalletButton address={address} />
+      ) : null}
+    </div>
   );
 }
