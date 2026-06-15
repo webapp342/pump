@@ -27,10 +27,11 @@ export function AdminPageHeader({
   refreshing?: boolean;
 }) {
   return (
-    <div className="admin-toolbar">
+    <div className="page-intro admin-toolbar">
       <div>
-        <h1 className="admin-title">Admin</h1>
-        <p className="admin-meta">Protocol operations console</p>
+        <p className="page-kicker">Operations</p>
+        <h1 className="page-title">Admin</h1>
+        <p className="page-copy">Protocol operations console — fees, treasury, sweeps, and promo tasks.</p>
       </div>
       <div className="flex items-center gap-3">
         {address ? (
@@ -197,7 +198,11 @@ export function AdminBtn({
 }
 
 export function AdminEmpty({ children }: { children: ReactNode }) {
-  return <p className="admin-empty">{children}</p>;
+  return (
+    <div className="empty-state admin-empty">
+      <p className="empty-state-copy">{children}</p>
+    </div>
+  );
 }
 
 export function AdminAlert({ children }: { children: ReactNode }) {

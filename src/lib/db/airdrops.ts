@@ -46,6 +46,7 @@ export type AirdropDetail = AirdropListItem & {
   totalAllocated: string | null;
   claimStart: string | null;
   createTxHash: string;
+  participantCount: number;
   rules: AirdropRules;
   socialTasks: AirdropSocialTask[];
 };
@@ -180,12 +181,14 @@ export async function getAirdropById(id: string, viewerAddress?: string): Promis
     reward_name: string | null;
     linked_price_bnb: string | null;
     reward_price_bnb: string | null;
+    participant_count: number;
   }>(
     `
       SELECT a.*, t.symbol, t.name,
              rt.symbol AS reward_symbol, rt.name AS reward_name,
              COALESCE(lb.last_price_zug, 0)::text AS linked_price_bnb,
-             COALESCE(rb.last_price_zug, 0)::text AS reward_price_bnb
+             COALESCE(rb.last_price_zug, 0)::text AS reward_price_bnb,
+             (SELECT COUNT(*)::int FROM airdrop_participants ap WHERE ap.airdrop_id = a.id) AS participant_count
       FROM airdrops a
       LEFT JOIN tokens t ON t.address = a.linked_token
       LEFT JOIN tokens rt ON rt.address = a.reward_token
@@ -246,6 +249,7 @@ export async function getAirdropById(id: string, viewerAddress?: string): Promis
     rewardSymbol: row.reward_symbol,
     rewardName: row.reward_name,
     rewardPriceBnb: row.reward_price_bnb,
+    participantCount: row.participant_count ?? 0,
     rules: row.rules_json ?? {},
     socialTasks: tasks.rows.map((task) => ({
       id: task.id,
@@ -664,6 +668,7 @@ export type MyAirdropParticipation = {
   linkedName: string | null;
   rewardToken: string | null;
   rewardSymbol: string | null;
+  rewardPriceBnb: string | null;
   totalFunded: string;
   status: string;
   qualifyStart: string;
@@ -802,9 +807,27 @@ export async function refreshParticipantSnapshot(
     [airdrop.id, normalized]
   );
 
-  const viewerRank = allocation.rows[0]?.rank ?? null;
+  let viewerRank = allocation.rows[0]?.rank ?? null;
   const claimableAmount = allocation.rows[0]?.amount ?? null;
   const claimedAt = claim.rows[0]?.block_time?.toISOString() ?? null;
+
+  const displayStatus = getAirdropDisplayStatus({
+    status: airdrop.status,
+    qualifyStart: airdrop.qualifyStart,
+    qualifyEnd: airdrop.qualifyEnd,
+    claimEnd: airdrop.claimEnd,
+    merkleRoot: airdrop.merkleRoot,
+  });
+
+  if (viewerRank == null && displayStatus === "QUALIFYING") {
+    const leaderboard = await getAirdropLeaderboard(airdrop.id, {
+      limit: 100,
+      viewerAddress: normalized,
+    });
+    if (leaderboard.viewer?.rank != null) {
+      viewerRank = leaderboard.viewer.rank;
+    }
+  }
 
   const snapshotProgressPct =
     viewerRank != null && !claimedAt ? 100 : progress.progressPct;
@@ -885,6 +908,7 @@ export async function listMyAirdropParticipations(
     symbol: string | null;
     name: string | null;
     reward_symbol: string | null;
+    reward_price_bnb: string | null;
     social_tasks_total: number | null;
     social_tasks_completed: number | null;
     hold_met: boolean | null;
@@ -910,6 +934,7 @@ export async function listMyAirdropParticipations(
         t.symbol,
         t.name,
         rt.symbol AS reward_symbol,
+        COALESCE(rb.last_price_zug, 0)::text AS reward_price_bnb,
         p.social_tasks_total,
         p.social_tasks_completed,
         p.hold_met,
@@ -940,6 +965,7 @@ export async function listMyAirdropParticipations(
       JOIN airdrops a ON a.id = joined.airdrop_id
       LEFT JOIN tokens t ON t.address = a.linked_token
       LEFT JOIN tokens rt ON rt.address = a.reward_token
+      LEFT JOIN bonding_states rb ON rb.token_address = a.reward_token
       LEFT JOIN airdrop_participants p
         ON p.airdrop_id = a.id AND p.address = $1
       LEFT JOIN airdrop_allocations aa
@@ -971,6 +997,7 @@ export async function listMyAirdropParticipations(
       linkedName: row.name,
       rewardToken: row.reward_token,
       rewardSymbol: row.reward_symbol,
+      rewardPriceBnb: row.reward_price_bnb,
       totalFunded: row.total_funded,
       status: row.status,
       qualifyStart: row.qualify_start.toISOString(),
@@ -987,7 +1014,11 @@ export async function listMyAirdropParticipations(
       viewerRank,
       claimableAmount: row.claimable_amount,
       claimedAt,
-      nextAction: deriveAirdropNextAction(displayStatus, { viewerRank, claimedAt }),
+      nextAction: deriveAirdropNextAction(displayStatus, {
+        viewerRank,
+        claimedAt,
+        onchainQualified: row.onchain_qualified ?? false,
+      }),
     };
   });
 }

@@ -51,9 +51,6 @@ type LaunchSuccess = {
 /** Headroom for create + initial-buy tx gas on top of fee + buy amount. */
 const CREATE_GAS_BUFFER_BNB = parseEther("0.003");
 
-/** Slider ceiling when wallet is not connected yet. */
-const DEFAULT_SLIDER_MAX_BNB = parseEther("1");
-
 async function fileToDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -61,6 +58,105 @@ async function fileToDataUrl(file: File): Promise<string> {
     reader.onerror = () => reject(new Error("Could not read logo file"));
     reader.readAsDataURL(file);
   });
+}
+
+function IssuanceSummaryRows({
+  feeWei,
+  initialBuyWei,
+  showReceivePreview,
+  estimatedTokens,
+  displaySymbol,
+  logoPreview,
+  totalValue,
+  variant = "desktop",
+}: {
+  feeWei: bigint;
+  initialBuyWei: bigint;
+  showReceivePreview: boolean;
+  estimatedTokens: bigint;
+  displaySymbol: string;
+  logoPreview: string | null;
+  totalValue: bigint;
+  variant?: "desktop" | "mobile";
+}) {
+  const isMobile = variant === "mobile";
+  const rowClass = `flex items-center justify-between gap-3 ${isMobile ? "text-caption" : "text-body-sm"}`;
+  const totalLogoSize = isMobile ? 16 : 20;
+  const totalAmountClass = isMobile
+    ? "financial-value text-body-sm font-semibold tabular-nums text-pump-text"
+    : "financial-value text-h3 font-semibold tabular-nums text-pump-text";
+  const totalSymbolClass = isMobile
+    ? "text-caption font-medium text-pump-muted"
+    : "text-body-sm font-medium text-pump-muted";
+
+  return (
+    <dl className={isMobile ? "space-y-2.5" : "mt-4 space-y-3"}>
+      <div className={rowClass}>
+        <dt className="text-pump-muted">Create fee</dt>
+        <dd className="min-w-0 shrink-0 text-right">
+          <BnbAmountDisplay
+            amount={formatCampaignAmount(feeWei)}
+            logoSize={isMobile ? 14 : 18}
+            amountClassName={
+              isMobile
+                ? "financial-value text-caption font-medium tabular-nums text-pump-text"
+                : undefined
+            }
+            symbolClassName={isMobile ? "text-caption font-medium text-pump-muted" : undefined}
+          />
+        </dd>
+      </div>
+      {initialBuyWei > 0n ? (
+        <div className={rowClass}>
+          <dt className="text-pump-muted">Initial buy</dt>
+          <dd className="min-w-0 shrink-0 text-right">
+            <BnbAmountDisplay
+              amount={formatCampaignAmount(initialBuyWei)}
+              logoSize={isMobile ? 14 : 18}
+              amountClassName={
+                isMobile
+                  ? "financial-value text-caption font-medium tabular-nums text-pump-text"
+                  : undefined
+              }
+              symbolClassName={isMobile ? "text-caption font-medium text-pump-muted" : undefined}
+            />
+          </dd>
+        </div>
+      ) : null}
+      {showReceivePreview ? (
+        <div className={rowClass}>
+          <dt className="text-pump-muted">You receive</dt>
+          <dd className="min-w-0 max-w-[58%] shrink-0 text-right">
+            <TokenAmountDisplay
+              amount={formatTokenAmountCompact(estimatedTokens)}
+              symbol={displaySymbol}
+              previewUrl={logoPreview}
+              logoSize={isMobile ? 14 : 18}
+              amountClassName={
+                isMobile
+                  ? "financial-value text-caption font-medium tabular-nums text-pump-text"
+                  : undefined
+              }
+              symbolClassName={isMobile ? "text-caption font-medium text-pump-muted" : undefined}
+            />
+          </dd>
+        </div>
+      ) : null}
+      <div
+        className={`${rowClass} border-t border-pump-border/15 ${isMobile ? "pt-2.5" : "pt-3"}`}
+      >
+        <dt className="font-medium text-pump-text">Total</dt>
+        <dd className="min-w-0 shrink-0 text-right">
+          <BnbAmountDisplay
+            amount={formatCampaignAmount(totalValue)}
+            logoSize={totalLogoSize}
+            amountClassName={totalAmountClass}
+            symbolClassName={totalSymbolClass}
+          />
+        </dd>
+      </div>
+    </dl>
+  );
 }
 
 export function CreateMemeForm() {
@@ -150,7 +246,7 @@ export function CreateMemeForm() {
     hash: txHash,
   });
 
-  const { data: bnbBalance } = useBalance({
+  const { data: bnbBalance, isLoading: bnbBalanceLoading } = useBalance({
     address,
     chainId: pumpChain.id,
     query: { enabled: Boolean(address) },
@@ -282,16 +378,39 @@ export function CreateMemeForm() {
 
   const maxInitialBuyWei = useMemo(() => {
     const overhead = feeWei + CREATE_GAS_BUFFER_BNB;
-    if (isConnected && bnbBalance !== undefined && bnbBalance.value > overhead) {
-      const afford = bnbBalance.value - overhead;
-      return afford > minInitialBuyWei ? afford : minInitialBuyWei;
+    if (!isConnected || bnbBalance === undefined) {
+      return minInitialBuyWei;
     }
-    const fallback =
-      DEFAULT_SLIDER_MAX_BNB > minInitialBuyWei ? DEFAULT_SLIDER_MAX_BNB : minInitialBuyWei;
-    return fallback;
+    if (bnbBalance.value <= overhead) {
+      return minInitialBuyWei;
+    }
+    const afford = bnbBalance.value - overhead;
+    return afford > minInitialBuyWei ? afford : minInitialBuyWei;
   }, [isConnected, bnbBalance, feeWei, minInitialBuyWei]);
 
-  const canUseInitialBuySlider = maxInitialBuyWei > minInitialBuyWei;
+  const canUseInitialBuySlider =
+    isConnected &&
+    !bnbBalanceLoading &&
+    bnbBalance !== undefined &&
+    maxInitialBuyWei > minInitialBuyWei;
+
+  const launchRequiredWei = useMemo(() => {
+    const buyWei =
+      initialBuyWei >= minInitialBuyWei
+        ? initialBuyWei
+        : initialBuyWei > 0n
+          ? initialBuyWei
+          : minInitialBuyWei;
+    return feeWei + buyWei + CREATE_GAS_BUFFER_BNB;
+  }, [feeWei, initialBuyWei, minInitialBuyWei]);
+
+  const bnbShortfallWei = useMemo(() => {
+    if (!isConnected || bnbBalanceLoading || bnbBalance === undefined) return 0n;
+    if (bnbBalance.value >= launchRequiredWei) return 0n;
+    return launchRequiredWei - bnbBalance.value;
+  }, [isConnected, bnbBalanceLoading, bnbBalance, launchRequiredWei]);
+
+  const showInitialBuySlider = canUseInitialBuySlider;
 
   const initialBuySliderPct = useMemo(() => {
     if (maxInitialBuyWei <= minInitialBuyWei) return 100;
@@ -309,13 +428,22 @@ export function CreateMemeForm() {
   const initialBuySliderFillPct = initialBuySliderPct;
   const maxInitialBuyLabel = formatCampaignAmount(maxInitialBuyWei);
 
+  function onInitialBuyChange(raw: string) {
+    const cleaned = raw.replace(/,/g, ".").replace(/[^\d.]/g, "");
+    setInitialBuyBnb(cleaned);
+  }
+
   function applyInitialBuySliderPct(pct: number) {
-    const clamped = Math.max(0, Math.min(100, pct));
-    if (maxInitialBuyWei <= minInitialBuyWei) {
+    if (!isConnected) {
+      openConnectModal?.();
+      return;
+    }
+    if (bnbBalance === undefined || maxInitialBuyWei <= minInitialBuyWei) {
       setInitialBuyBnb(minInitialBuyBnb);
       return;
     }
 
+    const clamped = Math.max(0, Math.min(100, pct));
     const range = maxInitialBuyWei - minInitialBuyWei;
     const wei =
       clamped >= 100
@@ -370,6 +498,12 @@ export function CreateMemeForm() {
       setError("Initial buy is too small for the bonding curve.");
       return;
     }
+    if (bnbBalance !== undefined && launchRequiredWei > bnbBalance.value) {
+      setError(
+        `Need ${formatCampaignAmount(launchRequiredWei - bnbBalance.value)} more BNB for create fee, initial buy, and gas.`
+      );
+      return;
+    }
 
     try {
       writeContract({
@@ -418,37 +552,47 @@ export function CreateMemeForm() {
   return (
     <form
       onSubmit={onSubmit}
-      className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(280px,360px)] xl:items-start"
+      className="create-meme-form grid gap-3 pb-[calc(var(--mobile-bottom-nav-height)+5.25rem)] md:gap-4 md:pb-0 xl:grid-cols-[minmax(0,1fr)_minmax(280px,360px)] xl:items-start"
     >
-      <div className="space-y-4">
-        <section className="panel-surface p-4 md:p-5">
+      <div className="space-y-3 md:space-y-4">
+        <section className="panel-surface p-3 md:p-5">
           <p className="section-label">Token profile</p>
 
-          <div className="mt-4 flex flex-col gap-5 sm:flex-row sm:items-start">
-            <div className="flex shrink-0 flex-col items-center gap-2">
+          <div className="mt-3 flex flex-col gap-4 sm:mt-4 sm:flex-row sm:items-start sm:gap-5">
+            <div className="flex shrink-0 items-center gap-3 sm:flex-col sm:items-center sm:gap-2">
+              <TokenAvatar
+                address="0x0000000000000000000000000000000000000000"
+                symbol={displaySymbol}
+                previewUrl={logoPreview}
+                size={56}
+                className="shrink-0 sm:hidden"
+              />
               <TokenAvatar
                 address="0x0000000000000000000000000000000000000000"
                 symbol={displaySymbol}
                 previewUrl={logoPreview}
                 size={72}
+                className="hidden shrink-0 sm:block"
               />
-              <label
-                htmlFor="logo"
-                className="secondary-button cursor-pointer px-3 py-1.5 text-caption"
-              >
-                Upload logo
-              </label>
-              <input
-                id="logo"
-                type="file"
-                accept={LOGO_ACCEPT}
-                onChange={onLogoChange}
-                className="hidden"
-              />
-              <p className="field-hint text-center">PNG, JPEG, WebP or GIF · max 2 MB</p>
+              <div className="flex min-w-0 flex-1 flex-col gap-1 sm:contents">
+                <label
+                  htmlFor="logo"
+                  className="secondary-button w-fit cursor-pointer px-3 py-2 text-caption sm:mt-0"
+                >
+                  Upload logo
+                </label>
+                <input
+                  id="logo"
+                  type="file"
+                  accept={LOGO_ACCEPT}
+                  onChange={onLogoChange}
+                  className="hidden"
+                />
+                <p className="field-hint sm:text-center">PNG, JPEG, WebP or GIF · max 2 MB</p>
+              </div>
             </div>
 
-            <div className="min-w-0 flex-1 space-y-4">
+            <div className="min-w-0 flex-1 space-y-3 md:space-y-4">
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
                   <label className="field-label" htmlFor="name">
@@ -487,11 +631,11 @@ export function CreateMemeForm() {
                 <textarea
                   id="description"
                   maxLength={2000}
-                  rows={4}
+                  rows={3}
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="What is this coin about?"
-                  className="field-textarea"
+                  className="field-textarea min-h-[5.5rem] md:min-h-[6.5rem]"
                 />
                 <p className="mt-1 field-hint">{description.length}/2000</p>
               </div>
@@ -499,14 +643,14 @@ export function CreateMemeForm() {
           </div>
         </section>
 
-        <section className="panel-surface p-4 md:p-5">
+        <section className="panel-surface p-3 md:p-5">
           <p className="section-label">Initial issuance</p>
 
-          <div className="mt-4">
+          <div className="mt-3 md:mt-4">
             <label className="field-label" htmlFor="initialBuy">
               Initial buy <span className="text-pump-accent">*</span>
             </label>
-            <div className="relative max-w-xs">
+            <div className="relative w-full sm:max-w-xs">
               <div className="pointer-events-none absolute inset-y-0 left-3 flex items-center">
                 <BnbLogo size={20} />
               </div>
@@ -515,7 +659,7 @@ export function CreateMemeForm() {
                 inputMode="decimal"
                 required
                 value={initialBuyBnb}
-                onChange={(e) => setInitialBuyBnb(e.target.value)}
+                onChange={(e) => onInitialBuyChange(e.target.value)}
                 placeholder={minInitialBuyBnb}
                 className="field-input financial-value w-full pl-11 pr-14"
               />
@@ -524,62 +668,101 @@ export function CreateMemeForm() {
               </div>
             </div>
 
-            <div className="mt-3 max-w-sm">
-              <div className="flex items-center gap-2.5">
-                <div className="relative min-w-0 flex-1 pt-1">
-                  <div
-                    className="pointer-events-none absolute top-1/2 h-1 w-full -translate-y-1/2 rounded-full bg-pump-border/25"
-                    aria-hidden
-                  />
-                  <div
-                    className="pointer-events-none absolute top-1/2 h-1 -translate-y-1/2 rounded-full bg-pump-accent/70 transition-[width] duration-75"
-                    style={{ width: `${initialBuySliderFillPct}%` }}
-                    aria-hidden
-                  />
-                  <input
-                    id="initialBuySlider"
-                    type="range"
-                    min={0}
-                    max={100}
-                    step={1}
-                    value={initialBuySliderPct}
-                    onChange={(e) => applyInitialBuySliderPct(Number(e.target.value))}
-                    disabled={!canUseInitialBuySlider}
-                    className="trade-amount-slider relative z-[1] w-full disabled:opacity-40"
-                    aria-label="Initial buy amount slider"
-                    aria-valuetext={
-                      initialBuySliderPct >= 100
-                        ? `Max (${maxInitialBuyLabel} BNB)`
-                        : `${initialBuySliderPct}% between ${minInitialBuyBnb} and ${maxInitialBuyLabel} BNB`
-                    }
-                  />
+            {showInitialBuySlider ? (
+              <div className="mt-3 w-full sm:max-w-sm">
+                <div className="flex items-center gap-2.5">
+                  <div className="relative min-w-0 flex-1 pt-1">
+                    <div
+                      className="pointer-events-none absolute top-1/2 h-1 w-full -translate-y-1/2 rounded-full bg-pump-border/25"
+                      aria-hidden
+                    />
+                    <div
+                      className="pointer-events-none absolute top-1/2 h-1 -translate-y-1/2 rounded-full bg-pump-accent/70 transition-[width] duration-75"
+                      style={{ width: `${initialBuySliderFillPct}%` }}
+                      aria-hidden
+                    />
+                    <input
+                      id="initialBuySlider"
+                      type="range"
+                      min={0}
+                      max={100}
+                      step={1}
+                      value={initialBuySliderPct}
+                      onChange={(e) => applyInitialBuySliderPct(Number(e.target.value))}
+                      className="trade-amount-slider relative z-[1] w-full"
+                      aria-label="Initial buy amount slider"
+                      aria-valuetext={
+                        initialBuySliderPct >= 100
+                          ? `Max (${maxInitialBuyLabel} BNB)`
+                          : `${initialBuySliderPct}% between ${minInitialBuyBnb} and ${maxInitialBuyLabel} BNB`
+                      }
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => applyInitialBuySliderPct(100)}
+                    className="chip-button shrink-0 px-2.5 py-1.5 text-caption"
+                  >
+                    Max
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onMouseDown={(e) => e.preventDefault()}
-                  disabled={!canUseInitialBuySlider}
-                  onClick={() => applyInitialBuySliderPct(100)}
-                  className="chip-button shrink-0 px-2.5 py-1 text-caption disabled:opacity-40"
-                >
-                  Max
-                </button>
+                <div className="mt-1.5 flex items-center justify-between gap-2 text-caption text-pump-muted">
+                  <BnbAmountLabel amount={minInitialBuyBnb} />
+                  <BnbAmountLabel amount={maxInitialBuyLabel} />
+                </div>
               </div>
-              <div className="mt-1.5 flex items-center justify-between gap-2 text-caption text-pump-muted">
-                <BnbAmountLabel amount={minInitialBuyBnb} />
-                <BnbAmountLabel amount={maxInitialBuyLabel} />
-              </div>
-            </div>
+            ) : null}
 
-            <p className="mt-1.5 field-hint">
+            <p className="mt-2 field-hint">
               Minimum {minInitialBuyBnb} BNB. A larger initial buy launches your coin at a higher
               starting price.
-              {isConnected && !canUseInitialBuySlider ? (
-                <span className="block text-pump-warning">
-                  Not enough BNB for a higher amount after fees and gas.
-                </span>
+              {!isConnected ? (
+                <span className="mt-1 block">Connect wallet to use your BNB balance on the slider.</span>
+              ) : bnbBalanceLoading ? (
+                <span className="mt-1 block text-pump-muted">Loading wallet balance…</span>
               ) : null}
             </p>
+            {bnbShortfallWei > 0n && isConnected && !bnbBalanceLoading ? (
+              <p className="mt-2 rounded-md border border-pump-warning/30 bg-pump-warning/10 px-2.5 py-2 text-caption leading-snug text-pump-warning">
+                Need{" "}
+                <BnbAmountDisplay
+                  amount={formatCampaignAmount(bnbShortfallWei)}
+                  logoSize={14}
+                  amountClassName="financial-value font-semibold tabular-nums text-pump-warning"
+                  symbolClassName="text-caption font-medium text-pump-warning/90"
+                />{" "}
+                more for create fee, initial buy, and gas.
+              </p>
+            ) : null}
           </div>
+        </section>
+
+        <section className="panel-surface p-3 md:hidden">
+          <p className="section-label">Issuance summary</p>
+          <IssuanceSummaryRows
+            variant="mobile"
+            feeWei={feeWei}
+            initialBuyWei={initialBuyWei}
+            showReceivePreview={showReceivePreview}
+            estimatedTokens={estimatedTokens}
+            displaySymbol={displaySymbol}
+            logoPreview={logoPreview}
+            totalValue={totalValue}
+          />
+          {error ? <p className="notice-error mt-3 text-caption leading-snug">{error}</p> : null}
+          {txHash ? (
+            <p className="mt-3 field-hint break-all">
+              Tx: {txHash}
+              {isConfirming
+                ? " — confirming…"
+                : uploadStatus
+                  ? ` — ${uploadStatus}`
+                  : launchSuccess
+                    ? " — confirmed"
+                    : null}
+            </p>
+          ) : null}
         </section>
 
         <section className="panel-surface overflow-hidden">
@@ -649,19 +832,19 @@ export function CreateMemeForm() {
         </section>
       </div>
 
-      <aside className="space-y-4 xl:sticky xl:top-20">
-        <section className="panel-surface p-4 md:p-5">
-          <p className="section-label">Preview</p>
+      <aside className="hidden space-y-4 md:block xl:sticky xl:top-[4.75rem]">
+        <section className="panel-surface overflow-hidden p-4 md:p-5">
+          <p className="section-label">Live preview</p>
           <div className="mt-4 flex items-center gap-3">
             <TokenAvatar
               address="0x0000000000000000000000000000000000000000"
               symbol={displaySymbol}
               previewUrl={logoPreview}
-              size={52}
+              size={56}
             />
             <div className="min-w-0">
               <p className="card-title truncate">{displayName}</p>
-              <p className="text-caption text-pump-muted">${displaySymbol}</p>
+              <p className="financial-value text-caption text-pump-muted">${displaySymbol}</p>
             </div>
           </div>
           {description.trim() ? (
@@ -675,45 +858,15 @@ export function CreateMemeForm() {
 
         <section className="panel-surface p-4 md:p-5">
           <p className="section-label">Issuance summary</p>
-          <dl className="mt-4 space-y-3">
-            <div className="flex items-center justify-between gap-3 text-body-sm">
-              <dt className="text-pump-muted">Create fee</dt>
-              <dd className="min-w-0 text-right">
-                <BnbAmountDisplay amount={formatCampaignAmount(feeWei)} />
-              </dd>
-            </div>
-            {initialBuyWei > 0n ? (
-              <div className="flex items-center justify-between gap-3 text-body-sm">
-                <dt className="text-pump-muted">Initial buy</dt>
-                <dd className="min-w-0 text-right">
-                  <BnbAmountDisplay amount={formatCampaignAmount(initialBuyWei)} />
-                </dd>
-              </div>
-            ) : null}
-            {showReceivePreview ? (
-              <div className="flex items-center justify-between gap-3 text-body-sm">
-                <dt className="text-pump-muted">You receive</dt>
-                <dd className="min-w-0 text-right">
-                  <TokenAmountDisplay
-                    amount={formatTokenAmountCompact(estimatedTokens)}
-                    symbol={displaySymbol}
-                    previewUrl={logoPreview}
-                  />
-                </dd>
-              </div>
-            ) : null}
-            <div className="flex items-center justify-between gap-3 border-t border-pump-border/15 pt-3 text-body-sm">
-              <dt className="font-medium text-pump-text">Total</dt>
-              <dd className="min-w-0 text-right">
-                <BnbAmountDisplay
-                  amount={formatCampaignAmount(totalValue)}
-                  logoSize={20}
-                  amountClassName="financial-value text-h3 font-semibold tabular-nums text-pump-text"
-                  symbolClassName="text-body-sm font-medium text-pump-muted"
-                />
-              </dd>
-            </div>
-          </dl>
+          <IssuanceSummaryRows
+            feeWei={feeWei}
+            initialBuyWei={initialBuyWei}
+            showReceivePreview={showReceivePreview}
+            estimatedTokens={estimatedTokens}
+            displaySymbol={displaySymbol}
+            logoPreview={logoPreview}
+            totalValue={totalValue}
+          />
 
           {error ? <p className="notice-error mt-4">{error}</p> : null}
 
@@ -753,6 +906,38 @@ export function CreateMemeForm() {
         onViewToken={goToTokenPage}
         onDismiss={() => setLaunchSuccess(null)}
       />
+
+      <div className="create-mobile-dock md:hidden">
+        {error ? <p className="notice-error mb-2 text-caption leading-snug">{error}</p> : null}
+        <div className="flex items-center gap-3">
+          <TokenAvatar
+            address="0x0000000000000000000000000000000000000000"
+            symbol={displaySymbol}
+            previewUrl={logoPreview}
+            size={36}
+            className="shrink-0"
+          />
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-caption font-semibold text-pump-text">{displayName}</p>
+            <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5">
+              <span className="text-caption text-pump-muted">Total</span>
+              <BnbAmountDisplay
+                amount={formatCampaignAmount(totalValue)}
+                logoSize={14}
+                amountClassName="financial-value text-caption font-semibold tabular-nums text-pump-text"
+                symbolClassName="text-caption text-pump-muted"
+              />
+            </div>
+          </div>
+          <button
+            type="submit"
+            disabled={submitDisabled}
+            className="primary-button min-h-11 shrink-0 px-4 text-caption"
+          >
+            {isBusy ? "Creating…" : !isConnected ? "Connect" : wrongChain ? "Switch net" : "Launch"}
+          </button>
+        </div>
+      </div>
     </form>
   );
 }

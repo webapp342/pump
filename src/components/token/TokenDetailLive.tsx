@@ -8,6 +8,7 @@ import type { TokenDetail, TradeItem } from "@/lib/db/launchpad";
 import { bondingCurveManagerAbi, bondingCurveSnapshotFromTuple, displayTokenPriceBnb } from "@/lib/bonding-curve";
 import {
   estimateFdvUsd,
+  formatUsdReadable,
   tokenPriceUsd,
 } from "@/lib/format-usd";
 import { useBnbUsdPrice } from "@/hooks/useBnbUsdPrice";
@@ -41,6 +42,7 @@ import { TokenSocialLinksBar } from "@/components/token/TokenSocialLinksBar";
 import { UserAvatarForAddress } from "@/components/user/UserAvatarForAddress";
 import { hasSocialLinks } from "@/lib/token-social";
 import { copyToClipboard } from "@/lib/copy-to-clipboard";
+import { shellPaddingXClass } from "@/components/layout/layout-shell";
 import { useLiveChannel, resolveLivePollDelay } from "@/hooks/useLiveChannel";
 
 const POLL_MS = 4_000;
@@ -195,9 +197,9 @@ export function TokenDetailLive({
   const [optimisticTrades, setOptimisticTrades] = useState<TradeItem[]>([]);
   const [indexerSyncing, setIndexerSyncing] = useState(false);
   const [copiedAddress, setCopiedAddress] = useState(false);
-  const [tradeSheetOpen, setTradeSheetOpen] = useState(false);
   const [profileAddress, setProfileAddress] = useState<string | null>(null);
   const [tradePrefill, setTradePrefill] = useState<TradePrefillConfig | null>(null);
+  const [tradeSheetOpen, setTradeSheetOpen] = useState(false);
   const tradePrefillCapturedRef = useRef(false);
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -216,11 +218,14 @@ export function TokenDetailLive({
 
     tradePrefillCapturedRef.current = true;
     setTradePrefill(parsed);
-    if (parsed.side === "buy") {
-      setTradeSheetOpen(true);
-    }
+    setTradeSheetOpen(true);
     router.replace(`/token/${tokenAddress}`, { scroll: false });
   }, [searchParams, router, tokenAddress]);
+
+  const openMobileTrade = useCallback((side: "buy" | "sell") => {
+    setTradePrefill({ side });
+    setTradeSheetOpen(true);
+  }, []);
 
   const trades = useMemo(
     () => mergeTrades(dbTrades, optimisticTrades),
@@ -456,10 +461,10 @@ export function TokenDetailLive({
     <button
       type="button"
       onClick={() => setProfileAddress(liveToken.creatorAddress)}
-      className="inline-flex min-w-0 max-w-full items-center gap-1.5 text-caption text-pump-muted transition hover:text-pump-text"
+      className="inline-flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden text-caption text-pump-muted transition hover:text-pump-text"
       aria-label={`View creator profile ${creatorLabel}`}
     >
-      <UserAvatarForAddress address={liveToken.creatorAddress} size={20} />
+      <UserAvatarForAddress address={liveToken.creatorAddress} size={20} className="shrink-0" />
       <span className="financial-value truncate">{creatorLabel}</span>
     </button>
   );
@@ -498,33 +503,28 @@ export function TokenDetailLive({
   );
 
   const creatorElapsedMeta = (
-    <>
+    <div className="flex min-w-0 items-center gap-x-2 overflow-hidden text-caption font-normal text-pump-muted">
       {creatorMeta}
-      <span className="text-pump-muted/45" aria-hidden>
+      <span className="shrink-0 text-pump-muted/40" aria-hidden>
         ·
       </span>
-      <span className="shrink-0">{elapsed}</span>
-    </>
+      <span className="shrink-0 whitespace-nowrap text-pump-muted/65">{elapsed}</span>
+    </div>
   );
 
   const tokenMetaLine = (
-    <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-caption text-pump-muted">
-      <span className="financial-value font-medium text-pump-text">${liveToken.symbol}</span>
-      <span className="text-pump-muted/45" aria-hidden>
+    <div className="flex min-w-0 items-center gap-x-2 overflow-hidden text-caption text-pump-muted">
+      <span className="financial-value shrink-0 font-medium text-pump-text">${liveToken.symbol}</span>
+      <span className="shrink-0 text-pump-muted/45" aria-hidden>
         ·
       </span>
       {creatorElapsedMeta}
     </div>
   );
 
-  const openMobileTrade = useCallback((side: "buy" | "sell") => {
-    setTradePrefill({ side });
-    setTradeSheetOpen(true);
-  }, []);
-
   return (
-    <div className="mt-3 space-y-5 pb-[var(--mobile-token-footer-height)] md:mt-4 md:space-y-6 xl:pb-0">
-      <header className="xl:hidden">
+    <div className="mt-3 space-y-5 pb-[var(--mobile-token-footer-height)] md:mt-4 md:space-y-6 lg:pb-0">
+      <header className="lg:hidden">
         <div className="flex items-center gap-3">
           <TokenAvatar
             address={liveToken.address}
@@ -536,7 +536,7 @@ export function TokenDetailLive({
             <h1 className="financial-value truncate text-h2 font-semibold tracking-tight text-pump-text">
               ${liveToken.symbol}
             </h1>
-            <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-caption text-pump-muted">
+            <div className="mt-0.5 min-w-0 overflow-hidden">
               {creatorElapsedMeta}
             </div>
           </div>
@@ -549,7 +549,7 @@ export function TokenDetailLive({
         ) : null}
       </header>
 
-      <header className="hidden flex-wrap items-start justify-between gap-4 xl:flex">
+      <header className="hidden flex-wrap items-start justify-between gap-4 lg:flex">
         <div className="flex min-w-0 items-start gap-3">
           <TokenAvatar
             address={liveToken.address}
@@ -601,7 +601,7 @@ export function TokenDetailLive({
         </div>
       </header>
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px] xl:items-start">
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start">
         <div className="min-w-0 space-y-6">
           <PriceChart
             tokenAddress={tokenAddress}
@@ -634,8 +634,8 @@ export function TokenDetailLive({
           </div>
         </div>
 
-        <aside className="min-w-0 w-full space-y-4 xl:sticky xl:top-20 xl:self-start">
-          <div className="hidden xl:block">
+        <aside className="min-w-0 w-full space-y-5 lg:sticky lg:top-[4.75rem] lg:self-start">
+          <div className="hidden lg:block">
             <TradePanel
               tokenAddress={tokenAddress as `0x${string}`}
               symbol={symbol}
@@ -663,22 +663,24 @@ export function TokenDetailLive({
         </aside>
       </div>
 
-      <div className="fixed inset-x-0 bottom-[var(--mobile-nav-height)] z-[35] border-t border-pump-border/20 bg-pump-bg/95 px-4 py-2.5 backdrop-blur-md xl:hidden">
-        <div className="mx-auto flex max-w-lg gap-2">
-          <button
-            type="button"
-            onClick={() => openMobileTrade("buy")}
-            className="primary-button flex flex-1 items-center justify-center py-3 text-body-sm"
-          >
-            Buy ${symbol}
-          </button>
-          <button
-            type="button"
-            onClick={() => openMobileTrade("sell")}
-            className="secondary-button flex flex-1 items-center justify-center border-pump-danger/35 py-3 text-body-sm text-pump-danger"
-          >
-            Sell ${symbol}
-          </button>
+      <div className="token-trade-dock lg:hidden" role="toolbar" aria-label="Trade actions">
+        <div className={`token-trade-dock-inner ${shellPaddingXClass}`}>
+          <div className="token-trade-dock-actions">
+            <button
+              type="button"
+              className="token-trade-dock-buy"
+              onClick={() => openMobileTrade("buy")}
+            >
+              Buy ${liveToken.symbol}
+            </button>
+            <button
+              type="button"
+              className="token-trade-dock-sell"
+              onClick={() => openMobileTrade("sell")}
+            >
+              Sell ${liveToken.symbol}
+            </button>
+          </div>
         </div>
       </div>
 

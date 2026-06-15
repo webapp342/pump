@@ -6,6 +6,7 @@ import {
   AirdropMetricsStrip,
 } from "@/components/airdrops/AirdropMetricsStrip";
 import {
+  AirdropParticipantsMetric,
   AirdropPoolTokenMetric,
   AirdropProgressMetric,
   AirdropRewardPoolMetric,
@@ -34,14 +35,13 @@ import {
 } from "@/lib/airdrop-status";
 import {
   airdropRewardAmountUsd,
+  airdropTimelineProgress,
   formatAirdropRewardCompact,
   formatDurationUntil,
-  formatQualifyDate,
-  formatQualifyDateTime,
   formatTimeRemaining,
   projectedRankRewardAmount,
   projectedRankRewardUsd,
-  qualifyWindowProgress,
+  showAirdropProgressBar,
 } from "@/lib/airdrop-board-format";
 import {
   socialTaskActionLabel,
@@ -109,9 +109,9 @@ function SectionHeader({
   accent?: boolean;
 }) {
   return (
-    <div>
+    <div className="min-w-0">
       <p className={`section-label ${accent ? "text-pump-accent" : ""}`}>{title}</p>
-      {hint ? <p className="mt-0.5 field-hint">{hint}</p> : null}
+      {hint ? <p className="mt-0.5 text-caption leading-snug text-pump-muted">{hint}</p> : null}
     </div>
   );
 }
@@ -130,7 +130,7 @@ function TokenSymbolInline({
   return (
     <span className={`inline-flex items-center gap-1.5 ${className}`}>
       <TokenAvatar address={address} symbol={symbol} size={size} className="shrink-0" />
-      <span>${symbol}</span>
+      <span className="truncate font-medium text-pump-text">{symbol}</span>
     </span>
   );
 }
@@ -239,35 +239,39 @@ function SocialTaskRow({
   completing: boolean;
   onComplete: () => void;
 }) {
+  const done = task.completed;
+
   return (
-    <li
-      className={`flex min-w-0 items-center justify-between gap-2 rounded-md px-2.5 py-2 transition ${
-        task.completed ? "bg-pump-accent/5" : "bg-pump-surface/35"
-      }`}
-    >
-      <span className="min-w-0 truncate text-[11px] font-medium text-pump-text md:text-caption">
-        {socialTaskPreviewLabel(task.taskType, task.targetUrl)}
-      </span>
-      {task.completed ? (
-        <span className="status-badge shrink-0 border-pump-accent/30 bg-pump-accent/10 text-[10px] text-pump-accent">
-          Done
+    <li>
+      <div
+        className={`mission-card flex min-w-0 items-center justify-between gap-3 ${
+          done ? "mission-card-done" : ""
+        }`}
+      >
+        <span className="min-w-0 truncate text-body-sm font-semibold text-pump-text">
+          {socialTaskPreviewLabel(task.taskType, task.targetUrl)}
         </span>
-      ) : (
-        <button
-          type="button"
-          className="chip-button flex shrink-0 items-center gap-1.5 whitespace-nowrap px-2 py-0.5 text-[10px] disabled:opacity-50"
-          disabled={qualifyEnded || completing}
-          onClick={onComplete}
-        >
-          {completing ? (
-            <span
-              className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent"
-              aria-hidden
-            />
-          ) : null}
-          {completing ? "Saving…" : qualifyEnded ? "Closed" : socialTaskActionLabel(task.taskType)}
-        </button>
-      )}
+        {done ? (
+          <span className="status-badge shrink-0 border-pump-success/40 bg-pump-success/10 text-pump-success">
+            Done
+          </span>
+        ) : (
+          <button
+            type="button"
+            className="chip-button flex shrink-0 items-center gap-1.5 whitespace-nowrap px-2.5 py-1 text-caption disabled:opacity-50"
+            disabled={qualifyEnded || completing}
+            onClick={onComplete}
+          >
+            {completing ? (
+              <span
+                className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent"
+                aria-hidden
+              />
+            ) : null}
+            {completing ? "Saving…" : qualifyEnded ? "Closed" : socialTaskActionLabel(task.taskType)}
+          </button>
+        )}
+      </div>
     </li>
   );
 }
@@ -279,6 +283,7 @@ function RewardCell({
   compact = false,
   align = "right",
   showSymbol = true,
+  showLabel = false,
 }: {
   amount: string;
   usd: number | null;
@@ -286,6 +291,7 @@ function RewardCell({
   compact?: boolean;
   align?: "left" | "right";
   showSymbol?: boolean;
+  showLabel?: boolean;
 }) {
   const isBnb = !detail.rewardToken;
   const alignClass = align === "right" ? "text-right" : "text-left";
@@ -317,17 +323,22 @@ function RewardCell({
 
   return (
     <div className={`min-w-0 ${alignClass}`}>
-      <div className={`flex items-center gap-1 ${flexAlign} ${compact ? "min-w-0 flex-nowrap" : "gap-1.5"}`}>
+      <div
+        className={`flex min-w-0 items-center gap-1 ${flexAlign} flex-nowrap ${compact ? "gap-1" : "gap-1.5"}`}
+      >
+        {showLabel ? (
+          <span className="koth-banner__tag m-0 shrink-0">Reward</span>
+        ) : null}
         <p className="financial-value shrink-0 text-caption font-medium tabular-nums text-pump-text">
           {amount}
         </p>
         {tokenBadge}
+        {usd != null ? (
+          <span className="financial-value shrink-0 text-caption tabular-nums text-pump-muted">
+            · {formatUsdReadable(usd, { compact: true })}
+          </span>
+        ) : null}
       </div>
-      {usd != null ? (
-        <p className="text-[10px] tabular-nums text-pump-muted">
-          {formatUsdReadable(usd, { compact: true })}
-        </p>
-      ) : null}
     </div>
   );
 }
@@ -388,7 +399,7 @@ function ViewerRankBanner({
   const rewardUsd = projectedRankRewardUsd(detail.totalFunded, viewer.rank, rewardMeta, bnbUsd);
 
   return (
-    <div className="mb-3 shrink-0 rounded-md bg-pump-accent/5 px-3 py-2.5">
+    <div className="mb-3 shrink-0 rounded-md bg-pump-accent/5 px-3 py-2.5 mx-3 mt-3 sm:mx-0 sm:mt-0">
       <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-body-sm font-semibold text-pump-accent">
         <span className="financial-value">Your rank #{viewer.rank}</span>
         <span>· est.</span>
@@ -495,12 +506,14 @@ function LeaderboardWalletCell({
   creatorAddress,
   claimed,
   onWalletClick,
+  compact = false,
 }: {
   walletAddress: string;
   viewerAddress?: string;
   creatorAddress: string;
   claimed?: boolean;
   onWalletClick?: (address: string) => void;
+  compact?: boolean;
 }) {
   const isYou =
     viewerAddress && walletAddress.toLowerCase() === viewerAddress.toLowerCase();
@@ -510,11 +523,15 @@ function LeaderboardWalletCell({
     <button
       type="button"
       onClick={() => onWalletClick?.(walletAddress)}
-      className="flex w-full min-w-0 items-start gap-2 rounded-md text-left transition hover:text-pump-accent active:opacity-80"
+      className={`flex w-full min-w-0 rounded-md text-left transition hover:text-pump-accent active:opacity-80 ${
+        compact ? "items-center gap-1.5" : "items-start gap-2"
+      }`}
     >
-      <UserAvatarForAddress address={walletAddress} size={26} className="shrink-0" />
+      <UserAvatarForAddress address={walletAddress} size={compact ? 22 : 26} className="shrink-0" />
       <span className="min-w-0 flex-1">
-        <span className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
+        <span
+          className={`flex flex-wrap items-center ${compact ? "gap-x-1 gap-y-0.5 text-caption" : "gap-x-1.5 gap-y-1"}`}
+        >
           <span className="font-medium text-pump-text">{shortAddress(walletAddress)}</span>
           {isYou ? <span className="text-caption text-pump-accent">(you)</span> : null}
           {claimed ? <span className="text-caption text-pump-accent">✓</span> : null}
@@ -742,6 +759,10 @@ function WinnersTable({
         <span>Wallet</span>
         <span className="text-right">Reward</span>
       </div>
+      <div className="sticky top-0 z-[1] grid grid-cols-[1.25rem_1fr] gap-x-2 border-b border-pump-border/10 bg-pump-card/95 px-3 py-2 sm:hidden">
+        <span className="koth-banner__tag m-0">#</span>
+        <span className="koth-banner__tag m-0">Wallet</span>
+      </div>
       <ul className="divide-y divide-pump-border/10">
         {rows.map((row) => {
           const isYou = address && row.address.toLowerCase() === address.toLowerCase();
@@ -750,29 +771,29 @@ function WinnersTable({
 
           return (
             <li key={`${row.rank}-${row.address}`} className={isYou ? "bg-pump-accent/8" : undefined}>
-              <div className="space-y-2 py-2.5 sm:hidden">
-                <div className="flex items-start gap-2.5 px-3">
-                  <span className="financial-value w-5 shrink-0 pt-1 font-semibold tabular-nums text-pump-muted">
-                    {row.rank}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <LeaderboardWalletCell
-                      walletAddress={row.address}
-                      viewerAddress={address}
-                      creatorAddress={detail.creatorAddress}
-                      claimed={row.claimed}
-                      onWalletClick={onWalletClick}
-                    />
-                  </div>
+              <div className="grid grid-cols-[1.25rem_1fr] gap-x-2 gap-y-1.5 px-3 py-2.5 sm:hidden">
+                <span className="financial-value self-center text-center text-caption font-semibold tabular-nums text-pump-muted">
+                  {row.rank}
+                </span>
+                <div className="min-w-0 self-center">
+                  <LeaderboardWalletCell
+                    walletAddress={row.address}
+                    viewerAddress={address}
+                    creatorAddress={detail.creatorAddress}
+                    claimed={row.claimed}
+                    onWalletClick={onWalletClick}
+                    compact
+                  />
                 </div>
-                <div className="px-3 pl-10">
-                  <LeaderboardMetricLabel>Reward</LeaderboardMetricLabel>
+                <div className="col-start-2 min-w-0 overflow-x-auto">
                   <RewardCell
                     amount={rewardCompact}
                     usd={rewardUsd}
                     detail={detail}
                     compact
                     align="left"
+                    showSymbol
+                    showLabel
                   />
                 </div>
               </div>
@@ -1093,7 +1114,12 @@ export function AirdropDetailPanel({ airdropId }: { airdropId: string }) {
   );
   const showOnchainSection =
     !detail.merkleRoot && hasOnchainRules && (hasSocialGate ? socialDone : onchainUnlocked);
-  const qualifyProgress = qualifyWindowProgress(detail.qualifyStart, detail.qualifyEnd);
+  const timelineProgress = airdropTimelineProgress(
+    displayStatus,
+    detail.qualifyStart,
+    detail.qualifyEnd,
+    detail.claimEnd
+  );
   const symbol = poolSymbol(detail);
   const title = campaignTitle(detail);
 
@@ -1142,7 +1168,7 @@ export function AirdropDetailPanel({ airdropId }: { airdropId: string }) {
   const saved = isSaved(airdropId);
 
   return (
-    <div className="space-y-4">
+    <div className="min-w-0 space-y-3 md:space-y-5">
       {error ? (
         <div className="notice-error rounded-lg border border-pump-danger/30 bg-pump-danger/5 px-3 py-2 text-body-sm">
           {error}
@@ -1150,87 +1176,124 @@ export function AirdropDetailPanel({ airdropId }: { airdropId: string }) {
       ) : null}
 
       <section className="panel-surface overflow-hidden">
-        <div className="border-b border-pump-border/15 bg-gradient-to-br from-pump-accent/10 via-pump-card/80 to-pump-surface/55 p-4 md:p-5">
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex min-w-0 items-start gap-3">
-              <TokenAvatar address={detail.linkedToken} symbol={symbol} size={56} className="md:hidden" />
-              <TokenAvatar
-                address={detail.linkedToken}
-                symbol={symbol}
-                size={64}
-                className="hidden md:block"
+        {/* Mobile hero */}
+        <div className="border-b border-pump-border/15 bg-gradient-to-br from-pump-accent/10 via-pump-card/80 to-pump-surface/55 p-3 md:hidden">
+          <div className="flex items-center gap-2.5">
+            <TokenAvatar
+              address={detail.linkedToken}
+              symbol={symbol}
+              size={40}
+              className="koth-banner__logo shrink-0 !ring-0"
+            />
+            <div className="min-w-0 flex-1">
+              <h1 className="featured-airdrop-banner__title">{title}</h1>
+              {detail.description ? (
+                <p className="mt-0.5 text-caption leading-snug text-pump-muted line-clamp-2">
+                  {detail.description}
+                </p>
+              ) : null}
+            </div>
+          </div>
+
+          <div className="mt-2.5 flex items-stretch gap-2">
+            <span
+              className={`${airdropStatusBadgeClass(displayStatus)} h-8 min-w-0 flex-1 items-center justify-center`}
+            >
+              {formatAirdropDisplayStatus(displayStatus)}
+            </span>
+            <button
+              type="button"
+              onClick={() => toggleSave(airdropId)}
+              className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-sm border transition ${
+                saved
+                  ? "border-pump-accent/35 bg-pump-accent/15 text-pump-accent"
+                  : "border-pump-border/25 bg-pump-surface/65 text-pump-muted hover:text-pump-text"
+              }`}
+              aria-label={saved ? "Remove from saved" : "Save campaign"}
+            >
+              <Bookmark
+                className={`h-4 w-4 ${saved ? "fill-current" : ""}`}
+                strokeWidth={ICON_STROKE}
+                aria-hidden
               />
-              <div className="min-w-0">
-                <h1 className="section-heading truncate">{title}</h1>
+            </button>
+          </div>
+        </div>
+
+        {/* Desktop hero */}
+        <div className="hidden border-b border-pump-border/15 bg-gradient-to-br from-pump-accent/10 via-pump-card/80 to-pump-surface/55 p-4 md:block md:px-5 md:py-4">
+          <div className="flex min-w-0 items-center gap-3 lg:gap-4">
+            <TokenAvatar
+              address={detail.linkedToken}
+              symbol={symbol}
+              size={56}
+              className="koth-banner__logo shrink-0"
+            />
+
+            <div className="flex min-w-0 flex-1 gap-3 lg:gap-4">
+              <div className="flex min-w-0 flex-1 flex-col gap-1">
+                <h1 className="featured-airdrop-banner__title truncate">{title}</h1>
                 {detail.description ? (
-                  <p className="mt-1 text-body-sm leading-relaxed text-pump-muted">{detail.description}</p>
+                  <p className="text-body-sm leading-relaxed text-pump-muted">{detail.description}</p>
                 ) : null}
-                <p className="mt-2 text-caption text-pump-muted">
-                  Pool{" "}
+              </div>
+
+              <div className="flex shrink-0 flex-col items-end gap-1.5">
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => toggleSave(airdropId)}
+                    className={`inline-flex h-8 w-8 items-center justify-center rounded-sm border transition ${
+                      saved
+                        ? "border-pump-accent/35 bg-pump-accent/15 text-pump-accent"
+                        : "border-pump-border/25 bg-pump-surface/65 text-pump-muted hover:text-pump-text"
+                    }`}
+                    aria-label={saved ? "Remove from saved" : "Save campaign"}
+                  >
+                    <Bookmark
+                      className={`h-4 w-4 ${saved ? "fill-current" : ""}`}
+                      strokeWidth={ICON_STROKE}
+                      aria-hidden
+                    />
+                  </button>
+                  <span className={`${airdropStatusBadgeClass(displayStatus)} h-8 items-center`}>
+                    {formatAirdropDisplayStatus(displayStatus)}
+                  </span>
+                </div>
+
+                <p className="flex max-w-full flex-wrap items-center justify-end gap-x-1.5 gap-y-0.5 text-caption text-pump-muted">
                   <Link
                     href={`/token/${detail.linkedToken}`}
-                    className="inline-flex items-center gap-1.5 font-medium text-pump-accent hover:underline"
+                    className="inline-flex min-w-0 items-center gap-1 font-medium text-pump-accent hover:underline"
                   >
-                    <TokenAvatar address={detail.linkedToken} symbol={symbol} size={14} />
-                    ${symbol}
+                    <TokenAvatar address={detail.linkedToken} symbol={symbol} size={14} className="!ring-0" />
+                    <span>{symbol}</span>
                   </Link>
-                  {" · "}
-                  Escrow on-chain
+                  <span className="shrink-0">· Escrow on-chain</span>
                 </p>
               </div>
-            </div>
-            <div className="flex shrink-0 items-center gap-2">
-              <button
-                type="button"
-                onClick={() => toggleSave(airdropId)}
-                className={`inline-flex h-8 w-8 items-center justify-center rounded-md border border-pump-border/40 transition ${
-                  saved
-                    ? "bg-pump-accent/10 text-pump-accent"
-                    : "bg-pump-surface/40 text-pump-muted hover:text-pump-text"
-                }`}
-                aria-label={saved ? "Remove from saved" : "Save campaign"}
-              >
-                <Bookmark
-                  className={`h-4 w-4 ${saved ? "fill-current" : ""}`}
-                  strokeWidth={ICON_STROKE}
-                  aria-hidden
-                />
-              </button>
-              <span className={airdropStatusBadgeClass(displayStatus)}>
-                {formatAirdropDisplayStatus(displayStatus)}
-              </span>
             </div>
           </div>
         </div>
 
-        <div className="p-4 md:p-5">
+        <div className="p-3 md:p-5">
           <AirdropMetricsStrip
+            compactMobile
+            hideStatus
+            progressInline
             reward={<AirdropRewardPoolMetric {...airdropDetailRewardProps(detail, bnbUsd)} />}
             progress={
               <AirdropProgressMetric
-                timeLabel={
-                  nowTick >= 0 ? timeLeftLabel(displayStatus, detail) : "—"
-                }
-                progressPct={
-                  displayStatus === "QUALIFYING" || displayStatus === "UPCOMING"
-                    ? qualifyProgress
-                    : undefined
-                }
-                showBar={
-                  displayStatus === "QUALIFYING" || displayStatus === "UPCOMING"
-                }
+                timeLabel={nowTick >= 0 ? timeLeftLabel(displayStatus, detail) : "—"}
+                progressPct={timelineProgress}
+                showBar={showAirdropProgressBar(displayStatus)}
               />
             }
+            participants={<AirdropParticipantsMetric count={detail.participantCount} />}
             poolToken={
               <AirdropPoolTokenMetric tokenAddress={detail.linkedToken} symbol={symbol} />
             }
             status={<AirdropStatusMetric status={displayStatus} />}
-            footer={
-              <>
-                Qualify window · {formatQualifyDate(detail.qualifyStart)} –{" "}
-                {formatQualifyDate(detail.qualifyEnd)}
-              </>
-            }
           />
         </div>
       </section>
@@ -1262,7 +1325,7 @@ export function AirdropDetailPanel({ airdropId }: { airdropId: string }) {
 
       <div className="space-y-4">
         {(hasSocialGate || hasOnchainRules || showClaimPanel) && (
-          <div className="flex flex-wrap gap-2">
+          <div className="hidden flex-wrap gap-2 md:flex">
             {hasSocialGate ? (
               <StepBadge step={1} label="Social" state={socialStepState} />
             ) : null}
@@ -1283,8 +1346,8 @@ export function AirdropDetailPanel({ airdropId }: { airdropId: string }) {
           </div>
         )}
 
-        <div className="grid gap-4 xl:grid-cols-[5fr_7fr] xl:items-stretch">
-          <div className="flex min-h-0 flex-col gap-4">
+        <div className="grid gap-3 md:gap-4 xl:grid-cols-[5fr_7fr] xl:items-start">
+          <div className="flex min-h-0 flex-col gap-3 md:gap-4">
             {hasSocialGate && !socialDone ? (
               <div className="space-y-2">
                 <SectionHeader
@@ -1292,7 +1355,7 @@ export function AirdropDetailPanel({ airdropId }: { airdropId: string }) {
                   hint="Complete each task to unlock on-chain requirements."
                 />
                 <section className="panel-surface p-4 md:p-5">
-                  <ul className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+                  <ul className="space-y-2">
                     {detail.socialTasks.map((task) => (
                       <SocialTaskRow
                         key={task.id}
@@ -1367,13 +1430,18 @@ export function AirdropDetailPanel({ airdropId }: { airdropId: string }) {
               <div className="space-y-2">
                 <SectionHeader
                   title="You qualified"
-                  hint="Claim your share before the window closes."
+                  hint={
+                    displayStatus === "CLAIMABLE" && detail.claimEnd
+                      ? `Claim before the window closes · ${nowTick >= 0 ? formatTimeRemaining(detail.claimEnd) : "—"} left`
+                      : "Claim your share before the window closes."
+                  }
+                  accent
                 />
-                <section className="panel-surface p-4 md:p-5">
+                <section className="panel-surface border border-pump-accent/25 bg-pump-accent/5 p-4 md:p-5">
                   <ClaimRewardAmount amount={claimInfo!.amount} detail={detail} />
                   <button
                     type="button"
-                    className="primary-button mt-4 flex w-full items-center justify-center gap-2 sm:w-auto"
+                    className="primary-button mt-4 flex h-11 w-full items-center justify-center gap-2 sm:w-auto sm:min-w-[10rem]"
                     disabled={isPending}
                     onClick={onClaim}
                   >
@@ -1401,12 +1469,12 @@ export function AirdropDetailPanel({ airdropId }: { airdropId: string }) {
               title={detail.merkleRoot ? "Winners" : "Live leaderboard"}
               hint={
                 detail.merkleRoot
-                  ? `Final top 100 ranked by $${symbol} balance at qualify end.`
-                  : `Projected rewards by rank · $${symbol} balances refresh every 12s during qualify.`
+                  ? `Final top 100 ranked by ${symbol} balance at qualify end.`
+                  : `Projected rewards by rank · ${symbol} balances refresh every 12s during qualify.`
               }
             />
 
-            <section className="panel-surface flex min-h-[380px] flex-1 flex-col overflow-hidden p-3 sm:p-4 md:p-5 xl:min-h-[420px]">
+            <section className="panel-surface overflow-hidden p-0 sm:p-4 md:p-5">
               {!detail.merkleRoot && address && leaderboardViewer ? (
                 <ViewerRankBanner
                   viewer={leaderboardViewer}
@@ -1415,7 +1483,7 @@ export function AirdropDetailPanel({ airdropId }: { airdropId: string }) {
                 />
               ) : null}
 
-              <div className="scrollbar-subtle min-h-0 flex-1 overflow-y-auto">
+              <div className="scrollbar-subtle max-h-[min(70vh,42rem)] overflow-y-auto overscroll-contain">
                 {detail.merkleRoot ? (
                   <WinnersTable
                     rows={winners}
@@ -1434,12 +1502,6 @@ export function AirdropDetailPanel({ airdropId }: { airdropId: string }) {
                   />
                 )}
               </div>
-
-              {!detail.merkleRoot ? (
-                <p className="mt-3 shrink-0 text-[10px] text-pump-muted">
-                  {formatQualifyDate(detail.qualifyStart)} – {formatQualifyDate(detail.qualifyEnd)}
-                </p>
-              ) : null}
             </section>
           </div>
         </div>

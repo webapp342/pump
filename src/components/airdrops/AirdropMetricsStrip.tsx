@@ -1,42 +1,49 @@
 "use client";
 
 import type { ReactNode } from "react";
-import type { LucideIcon } from "lucide-react";
-import { IconLabel } from "@/components/ui/IconLabel";
-import { MetricIcons } from "@/lib/metric-icons";
 
 type AirdropMetricsStripProps = {
   reward: ReactNode;
   progress: ReactNode;
   poolToken: ReactNode;
   status: ReactNode;
+  participants?: ReactNode;
   footer?: ReactNode;
   className?: string;
+  /** Compact row aligned to the end — featured campaign hero card */
+  variant?: "default" | "hero";
+  /** Detail page mobile: reward + participants top row, progress full width below */
+  compactMobile?: boolean;
+  /** Detail page: status shown in hero header */
+  hideStatus?: boolean;
+  /** Inline hourglass + bar + pct on one row (detail page) */
+  progressInline?: boolean;
 };
 
-function MetricColumn({
+function MetricBlock({
   label,
-  icon,
   children,
   className = "",
+  hero = false,
+  hideLabel = false,
 }: {
   label: string;
-  icon?: LucideIcon;
   children: ReactNode;
   className?: string;
+  hero?: boolean;
+  hideLabel?: boolean;
 }) {
   return (
-    <div className={`min-w-0 px-3 py-2.5 ${className}`}>
-      <dt className="text-[10px] font-semibold uppercase tracking-wider text-pump-muted">
-        {icon ? (
-          <IconLabel icon={icon} hideIconMobile iconClassName="h-3 w-3 shrink-0 opacity-70">
-            {label}
-          </IconLabel>
-        ) : (
-          label
-        )}
-      </dt>
-      <dd className="mt-1 m-0">{children}</dd>
+    <div
+      className={`min-w-0 text-left ${hero ? "airdrop-metrics-strip__block--hero" : ""} ${className}`}
+    >
+      <p
+        className={`koth-banner__tag m-0 ${hideLabel ? "invisible" : ""}`}
+        aria-hidden={hideLabel}
+      >
+        {label}
+      </p>
+      <div className="airdrop-metrics-strip__value mt-1">{children}</div>
     </div>
   );
 }
@@ -46,27 +53,68 @@ export function AirdropMetricsStrip({
   progress,
   poolToken,
   status,
+  participants,
   footer,
   className = "",
+  variant = "default",
+  compactMobile = false,
+  hideStatus = false,
+  progressInline = false,
 }: AirdropMetricsStripProps) {
+  const isHero = variant === "hero";
+  const detailGridClass = [
+    "airdrop-metrics-strip__detail-grid",
+    compactMobile ? "airdrop-metrics-strip__detail-grid--compact" : "",
+    hideStatus ? "airdrop-metrics-strip__detail-grid--no-status" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   return (
     <div
-      className={`overflow-hidden rounded-lg border border-pump-border/45 bg-pump-surface/25 ${className}`}
+      className={`airdrop-metrics-strip${isHero ? " airdrop-metrics-strip--hero" : ""}${
+        progressInline ? " airdrop-metrics-strip--progress-inline" : ""
+      } ${className}`}
     >
-      <dl className="grid grid-cols-2 divide-y divide-pump-border/20 md:grid-cols-4 md:divide-x md:divide-y-0">
-        <MetricColumn label="Reward pool" icon={MetricIcons.rewardPool}>{reward}</MetricColumn>
-        <MetricColumn label="Progress" icon={MetricIcons.progress}>{progress}</MetricColumn>
-        <MetricColumn label="Pool token" icon={MetricIcons.poolToken} className="hidden md:block">
+      <div className={isHero ? "airdrop-metrics-strip__hero-row" : detailGridClass}>
+        <MetricBlock
+          label="Reward pool"
+          hero={isHero}
+          className={
+            compactMobile
+              ? "airdrop-metrics-strip__block--reward"
+              : undefined
+          }
+        >
+          {reward}
+        </MetricBlock>
+        <MetricBlock
+          label="Progress"
+          hero={isHero}
+          className={compactMobile ? "airdrop-metrics-strip__block--progress" : undefined}
+        >
+          {progress}
+        </MetricBlock>
+        {participants ? (
+          <MetricBlock
+            label="Participants"
+            hero={isHero}
+            className={compactMobile ? "airdrop-metrics-strip__block--participants" : undefined}
+          >
+            {participants}
+          </MetricBlock>
+        ) : null}
+        <MetricBlock label="Pool token" hero={isHero} className={isHero ? "hidden" : "max-md:hidden"}>
           {poolToken}
-        </MetricColumn>
-        <MetricColumn label="Status" icon={MetricIcons.status} className="hidden md:block">
-          {status}
-        </MetricColumn>
-      </dl>
-      {footer ? (
-        <div className="border-t border-pump-border/20 px-3 py-2 text-[11px] leading-snug text-pump-muted">
-          {footer}
-        </div>
+        </MetricBlock>
+        {!hideStatus ? (
+          <MetricBlock label="Status" hero={isHero} className={isHero ? "hidden" : "max-md:hidden"}>
+            {status}
+          </MetricBlock>
+        ) : null}
+      </div>
+      {!isHero && footer ? (
+        <p className="mt-3 text-caption leading-snug text-pump-muted">{footer}</p>
       ) : null}
     </div>
   );

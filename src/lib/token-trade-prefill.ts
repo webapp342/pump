@@ -31,14 +31,15 @@ export function remainingRuleAmount(current: string, target: string): string | u
 export function buildTokenTradeUrl(
   tokenAddress: string,
   opts?: {
-    buyMode: "bnb" | "token";
+    side?: "buy" | "sell";
+    buyMode?: "bnb" | "token";
     amount?: string;
     met?: boolean;
     returnTo?: string;
   }
 ): string {
   const base = `/token/${tokenAddress.toLowerCase()}`;
-  const params = new URLSearchParams({ trade: "buy" });
+  const params = new URLSearchParams({ trade: opts?.side ?? "buy" });
 
   if (!opts?.met && opts?.buyMode) {
     params.set("mode", opts.buyMode);

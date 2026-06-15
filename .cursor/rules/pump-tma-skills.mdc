@@ -1,0 +1,24 @@
+---
+description: Points agents to pump-tma project skills for research, UI, Next.js, and Web3 work
+alwaysApply: true
+---
+
+# Pump TMA — Project Skills
+
+Before implementing or researching in this repo, read and follow the matching skill in `.cursor/skills/`:
+
+| Task | Skill |
+|------|-------|
+| Docs, APIs, versions, current web facts | `research-verified` |
+| Design system, tokens, nav, layout specs | `pump-tma-design-system` |
+| Pages, modals, forms, styling, trading UI | `pump-tma-ui-ux` |
+| App Router pages, API routes, PostgreSQL layer | `pump-tma-nextjs` |
+| wagmi, viem, RainbowKit, on-chain writes | `pump-tma-web3` |
+
+## Defaults
+
+- **UI work:** Read `pump-tma-design-system` first, then `pump-tma-ui-ux`. Top nav + mobile bottom bar — no left sidebar.
+- Verify library APIs via Context7 (`user-context7`) — do not guess versions or syntax.
+- Match existing patterns in `src/` before introducing new libraries or UI primitives.
+- No shadcn/MUI; use `globals.css` component classes and `pump-*` tokens.
+- Dev server: `npm run dev` on port **3012**.

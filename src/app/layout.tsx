@@ -10,9 +10,32 @@ import { Web3Provider } from "@/components/wallet/Web3Provider";
 import { ibmPlexMono, inter } from "@/lib/fonts";
 import "./globals.css";
 
+const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3012";
+const defaultTitle = "Pump — BSC Meme Launchpad";
+const defaultDescription =
+  "Launch, trade, and earn on BSC bonding curves. Pro trader terminal with rewards layer.";
+
 export const metadata: Metadata = {
-  title: "Pump — Meme Launchpad",
-  description: "Launch and trade memes on BSC bonding curves",
+  metadataBase: new URL(appUrl),
+  title: {
+    default: defaultTitle,
+    template: "%s | Pump",
+  },
+  description: defaultDescription,
+  openGraph: {
+    title: defaultTitle,
+    description: defaultDescription,
+    siteName: "Pump",
+    type: "website",
+    url: appUrl,
+    images: [{ url: "/opengraph-image", width: 1200, height: 630, alt: defaultTitle }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: defaultTitle,
+    description: defaultDescription,
+    images: ["/opengraph-image"],
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

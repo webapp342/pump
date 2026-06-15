@@ -90,9 +90,9 @@ function MissionRow({
   const navigable = href != null;
 
   const cardClassName = [
-    "sheet-cell block w-full p-3 text-left transition md:p-4",
-    done ? "bg-pump-border/4" : "bg-pump-card/60",
-    adminClickable || navigable ? "cursor-pointer hover:bg-pump-border/8" : "",
+    "mission-card",
+    done ? "mission-card-done" : "",
+    adminClickable || navigable ? "cursor-pointer" : "",
   ]
     .filter(Boolean)
     .join(" ");
@@ -128,9 +128,9 @@ function MissionRow({
               </span>
               <span className="financial-value font-medium">{Math.round(progressPct)}%</span>
             </div>
-            <div className="h-1.5 overflow-hidden bg-pump-border/20">
+            <div className="progress-track">
               <div
-                className="h-full bg-pump-accent transition-all duration-300"
+                className="progress-fill"
                 style={{ width: `${progressPct}%` }}
               />
             </div>
@@ -320,8 +320,8 @@ export function MissionsPanel() {
 
   if (!isConnected || !address) {
     return (
-      <div className="panel-surface p-8 text-center">
-        <p className="text-body-sm text-pump-muted">
+      <div className="panel-surface empty-state">
+        <p className="empty-state-copy">
           Connect your wallet to track Pump Points and mission progress.
         </p>
         <button
@@ -354,7 +354,7 @@ export function MissionsPanel() {
 
       {data && !error ? (
         <>
-          <section className="rounded-lg border border-pump-border/15 bg-pump-card/80 p-3 md:p-4">
+          <section className="panel-surface p-4 md:p-5">
             <div className="flex items-end justify-between gap-3">
               <div>
                 <IconLabel icon={MetricIcons.pumpPoints} hideIconMobile className="section-label leading-none">
@@ -390,7 +390,7 @@ export function MissionsPanel() {
           </section>
 
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="flex gap-1.5">
+            <div className="arena-filter-bar" role="tablist" aria-label="Mission filters">
               {(
                 [
                   ["open", "Open"],
@@ -403,10 +403,12 @@ export function MissionsPanel() {
                   <button
                     key={key}
                     type="button"
+                    role="tab"
+                    aria-selected={activeFilter === key}
                     onClick={() => setActiveFilter(key)}
-                    className={
-                      activeFilter === key ? "chip-button chip-button-active" : "chip-button"
-                    }
+                    className={`arena-filter-chip ${
+                      activeFilter === key ? "arena-filter-chip-active" : ""
+                    }`}
                   >
                     {label} ({count})
                   </button>
@@ -435,13 +437,15 @@ export function MissionsPanel() {
                 />
               ))
             ) : (
-              <p className="panel-surface p-8 text-center text-body-sm text-pump-muted">
-                {activeFilter === "done"
-                  ? "Nothing completed yet."
-                  : activeFilter === "open"
-                    ? "All caught up."
-                    : "No missions yet."}
-              </p>
+              <div className="panel-surface empty-state">
+                <p className="empty-state-copy">
+                  {activeFilter === "done"
+                    ? "Nothing completed yet."
+                    : activeFilter === "open"
+                      ? "All caught up."
+                      : "No missions yet."}
+                </p>
+              </div>
             )}
           </section>
         </>

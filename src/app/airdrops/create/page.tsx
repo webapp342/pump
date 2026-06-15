@@ -12,18 +12,12 @@ export default async function CreateAirdropPage({ searchParams }: PageProps) {
   return (
     <AppShell>
       <div className="space-y-3 md:space-y-4">
-        <div>
-          <Link
-            href="/airdrops"
-            className="text-caption font-medium text-pump-muted transition hover:text-pump-accent"
-          >
-            ← Airdrops
-          </Link>
-          <h2 className="section-heading mt-1">Create campaign</h2>
-          <p className="mt-1 text-body-sm text-pump-muted">
-            Three steps: pick token, set reward & timing, define who qualifies.
-          </p>
-        </div>
+        <Link
+          href="/airdrops"
+          className="text-caption font-medium text-pump-muted transition hover:text-pump-accent"
+        >
+          ← Airdrops
+        </Link>
         <CreateAirdropForm
           initialLinkedToken={token}
           initialLinkedTokenName={name}

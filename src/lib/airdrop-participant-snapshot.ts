@@ -81,13 +81,48 @@ export function deriveAirdropNextAction(
   opts: {
     viewerRank: number | null;
     claimedAt: string | null;
+    onchainQualified?: boolean;
   }
 ): AirdropNextAction {
   if (opts.claimedAt) return "view";
   if (displayStatus === "CLAIMABLE" && opts.viewerRank != null) return "claim";
   if (displayStatus === "FINALIZING") return "wait";
+  if (displayStatus === "QUALIFYING" && opts.onchainQualified) return "wait";
   if (displayStatus === "QUALIFYING" || displayStatus === "UPCOMING") return "continue";
   return "view";
+}
+
+export function airdropCountdownMeta(item: {
+  displayStatus: AirdropDisplayStatus;
+  qualifyStart: string;
+  qualifyEnd: string;
+  claimEnd: string | null;
+}): { label: string; time: string | null } {
+  switch (item.displayStatus) {
+    case "UPCOMING":
+      return { label: "Qualify starts in", time: item.qualifyStart };
+    case "QUALIFYING":
+      return { label: "Qualify ends in", time: item.qualifyEnd };
+    case "CLAIMABLE":
+      return {
+        label: item.claimEnd ? "Claim ends in" : "Claim open",
+        time: item.claimEnd,
+      };
+    case "FINALIZING":
+      return { label: "Allocating winners", time: null };
+    default:
+      return { label: "", time: null };
+  }
+}
+
+export function formatParticipantRankLabel(
+  viewerRank: number | null,
+  opts: { displayStatus: AirdropDisplayStatus; onchainQualified: boolean }
+): string {
+  if (viewerRank != null) return `#${viewerRank}`;
+  if (opts.displayStatus === "QUALIFYING" && opts.onchainQualified) return "100+";
+  if (opts.displayStatus === "QUALIFYING") return "—";
+  return "—";
 }
 
 export function nextActionLabel(action: AirdropNextAction): string {

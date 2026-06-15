@@ -1,38 +1,311 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { MyAirdropParticipation } from "@/lib/db/airdrops";
+import { formatAirdropDisplayStatus, type AirdropDisplayStatus } from "@/lib/airdrop-status";
 import {
-  airdropStatusBadgeClass,
-  formatAirdropDisplayStatus,
-} from "@/lib/airdrop-status";
-import { formatAirdropReward, formatTimeRemaining } from "@/lib/airdrop-board-format";
-import { nextActionLabel } from "@/lib/airdrop-participant-snapshot";
+  airdropRewardAmountUsd,
+  formatAirdropReward,
+  formatDurationUntil,
+  formatProjectedRankReward,
+  formatTimeRemaining,
+  projectedRankRewardUsd,
+} from "@/lib/airdrop-board-format";
+import {
+  airdropCountdownMeta,
+  formatParticipantRankLabel,
+  nextActionLabel,
+  type AirdropNextAction,
+} from "@/lib/airdrop-participant-snapshot";
 import { TokenAvatar } from "@/components/token/TokenAvatar";
+import { BnbLogo } from "@/components/token/BnbLogo";
+import { HourglassIcon } from "@/components/ui/HourglassIcon";
 import { MetricIcons } from "@/lib/metric-icons";
 import { ICON_STROKE } from "@/lib/icons";
+import { useBnbUsdPrice } from "@/hooks/useBnbUsdPrice";
 
 function poolSymbol(item: MyAirdropParticipation): string {
   return item.linkedSymbol ?? item.linkedToken.slice(0, 6);
 }
 
-function timeLeftLabel(item: MyAirdropParticipation): string {
-  switch (item.displayStatus) {
-    case "UPCOMING":
-      return "Soon";
-    case "QUALIFYING":
-      return formatTimeRemaining(item.qualifyEnd);
-    case "CLAIMABLE":
-      return item.claimEnd ? formatTimeRemaining(item.claimEnd) : "Open";
-    default:
-      return "—";
+function tickerLabel(item: MyAirdropParticipation): string {
+  const symbol = poolSymbol(item);
+  return symbol.startsWith("$") ? symbol : `$${symbol}`;
+}
+
+function trimTrailingZeros(formatted: string): string {
+  if (!formatted.includes(".")) return formatted;
+  return formatted.replace(/(\.\d*?)0+$/, "$1").replace(/\.$/, "");
+}
+
+/** Plain USD for est. payout — no K/M compact or subscript; up to 6 decimals when small. */
+function formatEstPayoutUsd(value: number | null | undefined): string | null {
+  if (value == null || !Number.isFinite(value) || value <= 0) return null;
+  if (value >= 1) return `$${value.toFixed(2)}`;
+  if (value >= 0.01) return `$${trimTrailingZeros(value.toFixed(4))}`;
+  return `$${trimTrailingZeros(value.toFixed(6))}`;
+}
+
+function participantRewardMeta(item: MyAirdropParticipation) {
+  return {
+    rewardToken: item.rewardToken,
+    rewardSymbol: item.rewardSymbol,
+    rewardPriceBnb: item.rewardPriceBnb,
+    totalFunded: item.totalFunded,
+  };
+}
+
+function participantRewardLabel(item: MyAirdropParticipation): string {
+  const isBnb = !item.rewardToken;
+  const opts = { isBnb, symbol: item.rewardSymbol };
+
+  if (item.claimableAmount && Number(item.claimableAmount) > 0) {
+    return formatAirdropReward(item.claimableAmount, opts);
   }
+
+  if (item.viewerRank != null && item.viewerRank >= 1 && item.viewerRank <= 100) {
+    return formatProjectedRankReward(item.totalFunded, item.viewerRank, opts);
+  }
+
+  return "—";
+}
+
+function participantRewardUsd(
+  item: MyAirdropParticipation,
+  bnbUsd: number | null | undefined
+): string | null {
+  const meta = participantRewardMeta(item);
+
+  if (item.claimableAmount && Number(item.claimableAmount) > 0) {
+    return formatEstPayoutUsd(airdropRewardAmountUsd(item.claimableAmount, meta, bnbUsd));
+  }
+
+  if (item.viewerRank != null && item.viewerRank >= 1 && item.viewerRank <= 100) {
+    return formatEstPayoutUsd(
+      projectedRankRewardUsd(item.totalFunded, item.viewerRank, meta, bnbUsd)
+    );
+  }
+
+  return null;
+}
+
+function ParticipantRewardMetric({
+  item,
+  bnbUsd,
+  iconSize = 18,
+}: {
+  item: MyAirdropParticipation;
+  bnbUsd: number | null | undefined;
+  iconSize?: number;
+}) {
+  const isBnb = !item.rewardToken;
+  const label = participantRewardLabel(item);
+  const usdLabel = participantRewardUsd(item, bnbUsd);
+
+  if (label === "—") {
+    return <span className="financial-value text-pump-text">—</span>;
+  }
+
+  return (
+    <div className="flex min-w-0 items-center gap-1.5">
+      {isBnb ? (
+        <BnbLogo size={iconSize} />
+      ) : (
+        <TokenAvatar
+          address={item.rewardToken!}
+          symbol={item.rewardSymbol ?? "?"}
+          size={iconSize}
+        />
+      )}
+      <p className="financial-value min-w-0 truncate text-pump-text">
+        {label}
+        {usdLabel != null ? (
+          <span className="text-caption font-normal text-pump-muted"> · {usdLabel}</span>
+        ) : null}
+      </p>
+    </div>
+  );
+}
+
+function MobileRewardInline({
+  item,
+  bnbUsd,
+}: {
+  item: MyAirdropParticipation;
+  bnbUsd: number | null | undefined;
+}) {
+  const isBnb = !item.rewardToken;
+  const label = participantRewardLabel(item);
+  const usdLabel = participantRewardUsd(item, bnbUsd);
+
+  if (label === "—") {
+    return <span className="text-pump-muted">—</span>;
+  }
+
+  return (
+    <span className="flex min-w-0 items-center gap-1 overflow-hidden">
+      <span className="shrink-0 text-pump-muted">Reward</span>
+      {isBnb ? (
+        <BnbLogo size={14} className="shrink-0" />
+      ) : (
+        <TokenAvatar
+          address={item.rewardToken!}
+          symbol={item.rewardSymbol ?? "?"}
+          size={14}
+          className="shrink-0"
+        />
+      )}
+      <span className="financial-value min-w-0 truncate text-pump-text">
+        {label}
+        {usdLabel != null ? (
+          <span className="font-normal text-pump-muted"> · {usdLabel}</span>
+        ) : null}
+      </span>
+    </span>
+  );
+}
+
+function countdownDisplay(item: MyAirdropParticipation): {
+  show: boolean;
+  text: string;
+  hint: string;
+} {
+  const meta = airdropCountdownMeta(item);
+  if (!meta.time) {
+    return { show: false, text: "", hint: meta.label };
+  }
+
+  const text =
+    item.displayStatus === "UPCOMING"
+      ? formatDurationUntil(meta.time)
+      : formatTimeRemaining(meta.time);
+
+  if (text === "Ended" || text === "Started") {
+    return { show: false, text: "", hint: meta.label };
+  }
+
+  return { show: true, text, hint: meta.label };
+}
+
+function portfolioStatusTone(status: AirdropDisplayStatus): string {
+  switch (status) {
+    case "QUALIFYING":
+      return "text-pump-accent";
+    case "CLAIMABLE":
+      return "text-pump-success";
+    case "FINALIZING":
+      return "text-pump-warning";
+    default:
+      return "text-pump-muted";
+  }
+}
+
+function showRank(item: MyAirdropParticipation): boolean {
+  return (
+    item.displayStatus === "QUALIFYING" ||
+    item.displayStatus === "CLAIMABLE" ||
+    item.viewerRank != null
+  );
+}
+
+function mobileActionButtonClass(action: AirdropNextAction): string {
+  const base = "relative z-10 shrink-0 rounded-md px-2.5 py-1 text-caption font-semibold";
+  if (action === "claim") {
+    return `${base} primary-button h-7 min-h-0`;
+  }
+  return `${base} border border-pump-accent/35 bg-pump-accent/10 text-pump-accent`;
+}
+
+function MobileAirdropTrailing({ item, href }: { item: MyAirdropParticipation; href: string }) {
+  const action = item.nextAction;
+
+  if (action === "claim" || action === "continue") {
+    return (
+      <Link
+        href={href}
+        className={mobileActionButtonClass(action)}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {nextActionLabel(action)}
+      </Link>
+    );
+  }
+
+  return (
+    <span className={`relative z-10 shrink-0 self-center text-caption font-medium ${portfolioStatusTone(item.displayStatus)}`}>
+      {formatAirdropDisplayStatus(item.displayStatus)}
+    </span>
+  );
+}
+
+function TimeLeftCell({ item }: { item: MyAirdropParticipation }) {
+  const countdown = countdownDisplay(item);
+
+  if (!countdown.show) {
+    return <span className="text-pump-muted">—</span>;
+  }
+
+  return (
+    <span
+      className="inline-flex items-center gap-1.5 tabular-nums"
+      title={countdown.hint}
+    >
+      <HourglassIcon size={12} className="shrink-0 text-pump-muted" />
+      {countdown.text}
+    </span>
+  );
+}
+
+function AirdropMobileRow({
+  item,
+  bnbUsd,
+}: {
+  item: MyAirdropParticipation;
+  bnbUsd: number | null | undefined;
+}) {
+  const symbol = poolSymbol(item);
+  const rank = formatParticipantRankLabel(item.viewerRank, {
+    displayStatus: item.displayStatus,
+    onchainQualified: item.onchainQualified,
+  });
+  const href = `/airdrops/${item.id}`;
+  const countdown = countdownDisplay(item);
+
+  return (
+    <article className="relative grid grid-cols-[1.75rem_1fr_auto] gap-x-2 gap-y-1.5 p-2.5 transition active:bg-pump-border/8">
+      <Link href={href} className="absolute inset-0 z-0 rounded-[inherit]" aria-label={`${tickerLabel(item)} airdrop`} />
+      <TokenAvatar address={item.linkedToken} symbol={symbol} size={28} className="relative z-10 row-span-2 self-start" />
+      <div className="relative z-10 flex min-w-0 items-center gap-1.5 overflow-hidden">
+        <p className="truncate text-body-sm font-medium text-pump-text">{tickerLabel(item)}</p>
+        {countdown.show ? (
+          <span
+            className="financial-value inline-flex shrink-0 items-center gap-0.5 tabular-nums text-caption text-pump-muted"
+            title={countdown.hint}
+          >
+            <HourglassIcon size={11} className="opacity-80" />
+            {countdown.text}
+          </span>
+        ) : null}
+      </div>
+      <MobileAirdropTrailing item={item} href={href} />
+      <div className="relative z-10 col-span-2 col-start-2 flex min-w-0 items-center gap-2 overflow-hidden text-[11px] leading-tight">
+        {showRank(item) ? (
+          <span className="financial-value shrink-0 text-pump-text">
+            <span className="text-pump-muted">Rank </span>
+            {rank}
+          </span>
+        ) : null}
+        <MobileRewardInline item={item} bnbUsd={bnbUsd} />
+      </div>
+    </article>
+  );
 }
 
 export function PortfolioAirdropsSection({ address }: { address: string }) {
   const [items, setItems] = useState<MyAirdropParticipation[]>([]);
   const [loading, setLoading] = useState(true);
+  const { bnbUsd } = useBnbUsdPrice();
 
   useEffect(() => {
     let cancelled = false;
@@ -62,6 +335,11 @@ export function PortfolioAirdropsSection({ address }: { address: string }) {
     };
   }, [address]);
 
+  const visibleItems = useMemo(
+    () => items.filter((item) => item.displayStatus !== "CLOSED"),
+    [items]
+  );
+
   if (loading) {
     return (
       <div className="space-y-2 md:space-y-3">
@@ -73,12 +351,12 @@ export function PortfolioAirdropsSection({ address }: { address: string }) {
           />
           Airdrops
         </h3>
-        <div className="panel-surface h-24 animate-pulse" />
+        <div className="h-16 animate-pulse rounded-lg border border-pump-border/15 bg-pump-border/5" />
       </div>
     );
   }
 
-  if (items.length === 0) {
+  if (visibleItems.length === 0) {
     return null;
   }
 
@@ -91,7 +369,7 @@ export function PortfolioAirdropsSection({ address }: { address: string }) {
             strokeWidth={ICON_STROKE}
             aria-hidden
           />
-          Airdrops ({items.length})
+          Airdrops ({visibleItems.length})
         </h3>
         <Link
           href="/airdrops"
@@ -101,60 +379,80 @@ export function PortfolioAirdropsSection({ address }: { address: string }) {
         </Link>
       </div>
 
-      <section className="panel-surface divide-y divide-pump-border/10 overflow-hidden">
-        {items.map((item) => {
-          const symbol = poolSymbol(item);
-          const isBnb = !item.rewardToken;
-          const action = nextActionLabel(item.nextAction);
+      <section className="rounded-lg border border-pump-border/15 bg-transparent">
+        <div className="divide-y divide-pump-border/10 lg:hidden">
+          {visibleItems.map((item) => (
+            <AirdropMobileRow key={item.id} item={item} bnbUsd={bnbUsd} />
+          ))}
+        </div>
 
-          return (
-            <Link
-              key={item.id}
-              href={`/airdrops/${item.id}`}
-              className="flex items-center gap-3 p-3 transition hover:bg-pump-border/5"
-            >
-              <TokenAvatar address={item.linkedToken} symbol={symbol} size={36} />
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="truncate text-body-sm font-semibold text-pump-text">
-                    {item.title ?? symbol}
-                  </p>
-                  <span className={airdropStatusBadgeClass(item.displayStatus)}>
-                    {formatAirdropDisplayStatus(item.displayStatus)}
-                  </span>
-                </div>
-                <div className="mt-1.5 flex items-center gap-2">
-                  <div className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-pump-surface/70">
-                    <div
-                      className="h-full rounded-full bg-pump-accent transition-all"
-                      style={{ width: `${item.progressPct}%` }}
-                    />
-                  </div>
-                  <span className="financial-value shrink-0 text-caption tabular-nums text-pump-muted">
-                    {item.progressPct}%
-                  </span>
-                </div>
-                <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-caption text-pump-muted">
-                  <span>
-                    {formatAirdropReward(item.totalFunded, {
-                      isBnb,
-                      symbol: item.rewardSymbol,
-                    })}
-                  </span>
-                  <span>·</span>
-                  <span>{timeLeftLabel(item)}</span>
-                  {item.viewerRank != null ? (
-                    <>
-                      <span>·</span>
-                      <span>Rank #{item.viewerRank}</span>
-                    </>
-                  ) : null}
-                </div>
-              </div>
-              <span className="shrink-0 text-caption font-medium text-pump-accent">{action} →</span>
-            </Link>
-          );
-        })}
+        <div className="hidden overflow-x-auto lg:block">
+          <table className="sheet-grid min-w-[780px]">
+            <thead>
+              <tr>
+                <th>Coin</th>
+                <th>Rank</th>
+                <th>Reward</th>
+                <th>Time left</th>
+                <th>Status</th>
+                <th className="w-[1%] whitespace-nowrap text-right">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {visibleItems.map((item) => {
+                const symbol = poolSymbol(item);
+                const rank = formatParticipantRankLabel(item.viewerRank, {
+                  displayStatus: item.displayStatus,
+                  onchainQualified: item.onchainQualified,
+                });
+
+                return (
+                  <tr key={item.id} className="group">
+                    <td>
+                      <Link
+                        href={`/airdrops/${item.id}`}
+                        className="flex min-w-0 items-center gap-3"
+                      >
+                        <TokenAvatar address={item.linkedToken} symbol={symbol} size={30} />
+                        <p className="truncate text-body-sm font-medium text-pump-text">
+                          {tickerLabel(item)}
+                        </p>
+                      </Link>
+                    </td>
+                    <td className="px-4 py-3 financial-value tabular-nums text-pump-text">
+                      {showRank(item) ? rank : "—"}
+                    </td>
+                    <td className="px-4 py-3">
+                      <ParticipantRewardMetric item={item} bnbUsd={bnbUsd} />
+                    </td>
+                    <td className="px-4 py-3 financial-value text-pump-text">
+                      <TimeLeftCell item={item} />
+                    </td>
+                    <td className={`px-4 py-3 text-body-sm font-medium ${portfolioStatusTone(item.displayStatus)}`}>
+                      {formatAirdropDisplayStatus(item.displayStatus)}
+                    </td>
+                    <td className="w-[1%] whitespace-nowrap px-4 py-3 text-right">
+                      {item.nextAction === "claim" || item.nextAction === "continue" ? (
+                        <Link
+                          href={`/airdrops/${item.id}`}
+                          className={
+                            item.nextAction === "claim"
+                              ? "text-caption font-medium text-pump-accent hover:underline"
+                              : "text-caption font-medium text-pump-muted transition hover:text-pump-accent"
+                          }
+                        >
+                          {nextActionLabel(item.nextAction)}
+                        </Link>
+                      ) : (
+                        <span className="text-caption text-pump-muted">—</span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       </section>
     </div>
   );

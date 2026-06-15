@@ -104,6 +104,14 @@ type VerifiedPositionView = {
   avgEntry: number | null;
 };
 
+type FlashTone = "up" | "down";
+
+function flashText(toneValue: FlashTone | undefined): string {
+  if (toneValue === "up") return "live-metric-flash-up";
+  if (toneValue === "down") return "live-metric-flash-down";
+  return "";
+}
+
 function buildVerifiedPositionView(
   position: PortfolioPosition,
   lot: DerivedLot | undefined,
@@ -135,12 +143,6 @@ function buildVerifiedPositionView(
     remainingCostBasis,
     avgEntry: displayBalance > 0 ? remainingCostBasis / displayBalance : null,
   };
-}
-
-function formatFeeBnb(value: number): string {
-  if (!Number.isFinite(value) || value <= 0) return "0";
-  if (value >= 0.0001) return value.toFixed(6);
-  return value.toFixed(8);
 }
 
 function pnlTone(value: number): string {
@@ -220,7 +222,7 @@ function HoldingQuickActions({
   onSellMax: () => void;
 }) {
   const baseClass =
-    "shrink-0 rounded px-2 py-0.5 text-caption font-semibold transition-[opacity,background-color,border-color,color] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-pump-accent/40";
+    "shrink-0 rounded px-2 py-0.5 text-caption font-semibold transition-[opacity,background-color,border-color,color] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-pump-success/40";
 
   return (
     <div className="flex items-center justify-end gap-1.5">
@@ -232,7 +234,7 @@ function HoldingQuickActions({
           event.stopPropagation();
           onBuyMax();
         }}
-        className={`${baseClass} border border-pump-accent/30 bg-pump-accent/8 text-pump-accent/85 hover:border-pump-accent/50 hover:bg-pump-accent/15 hover:text-pump-accent group-hover:border-pump-accent/45 group-hover:bg-pump-accent/12 group-hover:text-pump-accent`}
+        className={`${baseClass} border border-pump-success/30 bg-pump-success/8 text-pump-success/85 hover:border-pump-success/50 hover:bg-pump-success/15 hover:text-pump-success group-hover:border-pump-success/45 group-hover:bg-pump-success/12 group-hover:text-pump-success`}
       >
         Buy max
       </button>
@@ -521,6 +523,15 @@ export function PortfolioPanel() {
   const [onChainBalances, setOnChainBalances] = useState<Record<string, string>>({});
   const [holdingsReady, setHoldingsReady] = useState(false);
   const [quickTradeTarget, setQuickTradeTarget] = useState<PortfolioQuickTradeTarget | null>(null);
+  const [holdingFlashes, setHoldingFlashes] = useState<Record<string, FlashTone>>({});
+  const [totalValueFlash, setTotalValueFlash] = useState<FlashTone | undefined>();
+  const [totalPnlFlash, setTotalPnlFlash] = useState<FlashTone | undefined>();
+  const metricsPrevRef = useRef<{
+    values: Record<string, number>;
+    total: number;
+    pnl: number;
+  } | null>(null);
+  const holdingFlashTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const burstUntilRef = useRef(0);
   const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const loadGenerationRef = useRef(0);
@@ -687,10 +698,77 @@ export function PortfolioPanel() {
     };
   }, [address, isConnected, loadPortfolio, schedulePoll]);
 
+  useEffect(() => {
+    if (!data || !holdingsReady) return;
+
+    const views =
+      data.positions
+        .map((position) =>
+          buildVerifiedPositionView(position, derivedLots[position.tokenAddress], onChainBalances)
+        )
+        .filter((view): view is VerifiedPositionView => view != null) ?? [];
+
+    const values: Record<string, number> = {};
+    let totalValue = 0;
+    let totalPnl = 0;
+
+    for (const view of views) {
+      const key = view.position.tokenAddress.toLowerCase();
+      const val = view.balance * Number(view.position.lastPriceBnb);
+      values[key] = val;
+      totalValue += val;
+      totalPnl += val - view.remainingCostBasis;
+    }
+
+    for (const holding of walletHoldings) {
+      const key = holding.tokenAddress.toLowerCase();
+      const val = Number(holding.tokenBalance) * Number(holding.lastPriceBnb);
+      values[key] = val;
+      totalValue += val;
+    }
+
+    const prev = metricsPrevRef.current;
+    if (prev) {
+      const nextFlashes: Record<string, FlashTone> = {};
+      for (const [key, val] of Object.entries(values)) {
+        const previous = prev.values[key];
+        if (previous == null || Math.abs(val - previous) < 1e-12) continue;
+        nextFlashes[key] = val > previous ? "up" : "down";
+      }
+
+      if (Object.keys(nextFlashes).length > 0) {
+        setHoldingFlashes((current) => ({ ...current, ...nextFlashes }));
+        for (const [key, tone] of Object.entries(nextFlashes)) {
+          const existing = holdingFlashTimersRef.current[key];
+          if (existing) clearTimeout(existing);
+          holdingFlashTimersRef.current[key] = setTimeout(() => {
+            setHoldingFlashes((current) => {
+              const next = { ...current };
+              delete next[key];
+              return next;
+            });
+            delete holdingFlashTimersRef.current[key];
+          }, 700);
+        }
+      }
+
+      if (Math.abs(totalValue - prev.total) >= 1e-12) {
+        setTotalValueFlash(totalValue > prev.total ? "up" : "down");
+        window.setTimeout(() => setTotalValueFlash(undefined), 700);
+      }
+      if (Math.abs(totalPnl - prev.pnl) >= 1e-12) {
+        setTotalPnlFlash(totalPnl > prev.pnl ? "up" : "down");
+        window.setTimeout(() => setTotalPnlFlash(undefined), 700);
+      }
+    }
+
+    metricsPrevRef.current = { values, total: totalValue, pnl: totalPnl };
+  }, [data, holdingsReady, derivedLots, onChainBalances, walletHoldings]);
+
   if (!isConnected || !address) {
     return (
-      <div className="panel-surface p-8 text-center">
-        <p className="text-body-sm text-pump-muted">
+      <div className="panel-surface empty-state">
+        <p className="empty-state-copy">
           Connect your wallet to view holdings, creator fees, and launched tokens.
         </p>
         <button
@@ -800,7 +878,7 @@ export function PortfolioPanel() {
       ) : null}
 
       <div className="space-y-3 md:space-y-4">
-        <section className="rounded-lg border border-pump-accent/25 bg-gradient-to-br from-pump-accent/12 via-pump-card/70 to-pump-surface/55 p-3 md:p-4">
+        <section className="panel-surface overflow-hidden bg-gradient-to-br from-pump-accent/10 via-pump-card to-pump-surface/60 p-4 md:p-5">
           <div className="flex items-center gap-3">
             {avatarId ? (
               <button
@@ -853,7 +931,7 @@ export function PortfolioPanel() {
             </div>
           </div>
 
-          <dl className="mt-3 grid grid-cols-2 items-stretch gap-2 md:mt-4 lg:grid-cols-4">
+          <div className="portfolio-hero-metrics mt-3 grid grid-cols-2 items-stretch gap-2 md:mt-4 lg:grid-cols-4">
             <PortfolioStatBox
               label="Portfolio value"
               icon={MetricIcons.portfolioValue}
@@ -867,21 +945,23 @@ export function PortfolioPanel() {
                   </span>
                 </>
               }
-              valueClassName="inline-flex flex-wrap items-baseline gap-x-2 gap-y-0.5 financial-value text-body-sm font-semibold text-pump-text"
+              valueClassName={`inline-flex flex-wrap items-baseline gap-x-2 gap-y-0.5 financial-value text-body-sm font-semibold text-pump-text ${flashText(totalValueFlash)}`}
             />
             <PortfolioStatBox
               label="Net PnL"
               icon={MetricIcons.netPnl}
               value={formatUsdReadable(totalNetPnlUsd, { compact: true, signed: true })}
-              valueClassName={`financial-value text-body-sm font-semibold ${pnlTone(totalNetPnl)}`}
+              valueClassName={`financial-value text-body-sm font-semibold ${pnlTone(totalNetPnl)} ${flashText(totalPnlFlash)}`}
             />
             <CreatorFeesCard
+              className="col-span-2 lg:col-span-1"
               totalBnb={creatorFeesTotalBnb}
               bnbUsd={bnbUsd}
               onOpenModal={() => setClaimOpen(true)}
             />
             {address ? (
               <ReferralRewardsCard
+                className="col-span-2 lg:col-span-1"
                 address={address}
                 claimedBnb={referralStats?.claimedBnb ?? 0}
                 pendingWei={pendingReferrerWei}
@@ -889,7 +969,7 @@ export function PortfolioPanel() {
                 onOpenModal={() => setReferrerClaimOpen(true)}
               />
             ) : null}
-          </dl>
+          </div>
         </section>
 
         {error ? <div className="notice-error p-4">{error}</div> : null}
@@ -909,11 +989,11 @@ export function PortfolioPanel() {
               </h3>
               {holdingsCount > 0 ? <HoldingsSwipeHint /> : null}
               {holdingsCount === 0 ? (
-                <p className="panel-surface p-6 text-center text-body-sm text-pump-muted">
-                  No open positions. Buy from the Arena.
-                </p>
+                <div className="panel-surface empty-state">
+                  <p className="empty-state-copy">No open positions. Buy from the Arena.</p>
+                </div>
               ) : (
-                <section className="rounded-lg border border-pump-border/15 bg-transparent">
+                <section className="panel-surface portfolio-section-surface">
                   <div className="lg:hidden divide-y divide-pump-border/10">
                     {verifiedPositionViews.map((view, index) => {
                       const { position, balance, remainingCostBasis, avgEntry } = view;
@@ -954,7 +1034,13 @@ export function PortfolioPanel() {
                             <div className="col-span-2 col-start-2 flex w-full items-center justify-between gap-2 text-[11px] leading-tight">
                               <span className="financial-value min-w-0 truncate text-pump-text">
                                 <span className="text-pump-muted">VAL </span>
-                                {formatUsdReadable(positionValueUsd, { compact: true })}
+                                <span
+                                  className={flashText(
+                                    holdingFlashes[position.tokenAddress.toLowerCase()]
+                                  )}
+                                >
+                                  {formatUsdReadable(positionValueUsd, { compact: true })}
+                                </span>
                               </span>
                               <span className="financial-value min-w-0 truncate text-pump-text">
                                 <span className="text-pump-muted">BAL </span>
@@ -982,7 +1068,7 @@ export function PortfolioPanel() {
                   </div>
 
                   <div className="hidden lg:block overflow-x-auto">
-                    <table className="sheet-grid min-w-[820px]">
+                    <table className="sheet-grid portfolio-holdings-grid min-w-[820px]">
                       <thead>
                         <tr>
                           <th>Coin</th>
@@ -1030,7 +1116,7 @@ export function PortfolioPanel() {
                                   </div>
                                 </Link>
                               </td>
-                              <td className="px-4 py-3 financial-value font-semibold text-pump-text">
+                              <td className={`px-4 py-3 financial-value font-semibold text-pump-text ${flashText(holdingFlashes[position.tokenAddress.toLowerCase()])}`}>
                                 {formatUsdReadable(positionValueUsd, { compact: true })}
                               </td>
                               <td className="px-4 py-3 financial-value text-pump-text">
@@ -1074,18 +1160,25 @@ export function PortfolioPanel() {
             </div>
 
             <div className="space-y-2 md:space-y-3">
-              <h3 className="section-heading text-h3">
-                Created ({data.createdTokens.length})
+              <h3 className="section-heading text-h3 inline-flex items-center gap-2">
+                <MetricIcons.launch
+                  className="hidden h-[1.05em] w-[1.05em] shrink-0 text-pump-accent sm:block"
+                  strokeWidth={ICON_STROKE}
+                  aria-hidden
+                />
+                Launched tokens ({data.createdTokens.length})
               </h3>
               {data.createdTokens.length === 0 ? (
-                <p className="panel-surface p-6 text-center text-body-sm text-pump-muted">
-                  No launched tokens yet.{" "}
-                  <Link href="/create" className="text-pump-accent hover:underline">
-                    Create one
-                  </Link>
-                </p>
+                <div className="panel-surface empty-state">
+                  <p className="empty-state-copy">
+                    No launched tokens yet.{" "}
+                    <Link href="/create" className="text-pump-accent hover:underline">
+                      Create one
+                    </Link>
+                  </p>
+                </div>
               ) : (
-                <section className="rounded-lg border border-pump-border/15 bg-transparent">
+                <section className="panel-surface portfolio-section-surface">
                   <div className="lg:hidden divide-y divide-pump-border/10">
                     {data.createdTokens.map((token) => {
                       const mcapUsd = bnbToUsd(Number(token.marketCapBnb), bnbUsd);

@@ -488,7 +488,7 @@ export function PriceChart({
 
           <div className="flex items-end justify-between gap-2">
             <div className="flex min-w-0 items-end gap-x-1.5 gap-y-0">
-              <p className="financial-value text-[1.5rem] font-semibold leading-none text-pump-text sm:text-[1.65rem] md:text-[1.75rem]">
+              <p className="financial-value text-[1.625rem] font-semibold leading-none text-pump-text sm:text-[1.75rem] md:text-[1.875rem]">
                 {summaryValue}
               </p>
               <span

@@ -9,15 +9,13 @@ export default async function AirdropDetailPage({ params }: PageProps) {
 
   return (
     <AppShell>
-      <div className="space-y-3 md:space-y-4">
-        <div>
-          <Link
-            href="/airdrops"
-            className="text-caption font-medium text-pump-muted transition hover:text-pump-accent"
-          >
-            ← Airdrops
-          </Link>
-        </div>
+      <div className="min-w-0 space-y-3 md:space-y-4">
+        <Link
+          href="/airdrops"
+          className="inline-flex text-caption font-medium text-pump-muted transition hover:text-pump-accent"
+        >
+          ← Back to Airdrops
+        </Link>
         <AirdropDetailPanel airdropId={id} />
       </div>
     </AppShell>

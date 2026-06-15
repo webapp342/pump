@@ -8,7 +8,6 @@ import { SectionHeadingIcon } from "@/components/ui/IconLabel";
 import { MetricIcons } from "@/lib/metric-icons";
 import { DEFAULT_TOKEN_TOTAL_SUPPLY, bnbToUsd, formatUsdReadable } from "@/lib/format-usd";
 import {
-  ON_CHAIN_BALANCE_EPSILON,
   resolveVerifiedTokenBalance,
   scaleCostBasisForBalance,
 } from "@/lib/onchain-balance";
@@ -23,10 +22,12 @@ type HolderRow = {
   avgEntryBnb: number | null;
 };
 
-const HOLDER_BALANCE_EPSILON = ON_CHAIN_BALANCE_EPSILON;
-const cellClass = "px-2 py-2 lg:px-4 lg:py-3";
-const accountCellClass = `${cellClass} w-px whitespace-nowrap !pr-1 lg:!pr-4`;
-const sideCellClass = `${cellClass} w-px whitespace-nowrap !pl-1 lg:!pl-4`;
+const activityTableScrollClass =
+  "min-w-0 overflow-x-auto overscroll-x-contain [-webkit-overflow-scrolling:touch]";
+const cellClass = "px-2.5 py-2.5 sm:px-3 lg:px-4 lg:py-3";
+const accountCellClass = `${cellClass} max-w-[9.5rem] whitespace-nowrap !pr-0 lg:min-w-[9rem] lg:max-w-none lg:!pr-4`;
+const sideCellClass = `${cellClass} w-px whitespace-nowrap !px-1 !pl-0 lg:!px-3 lg:!pl-4`;
+const amountCellClass = `${cellClass} whitespace-nowrap !pl-1 financial-value text-pump-text lg:!pl-3`;
 
 function tradeNetBnb(trade: TradeItem): number {
   if (trade.netBnb != null) return Number(trade.netBnb);
@@ -122,13 +123,21 @@ function IdentityPill({
     <button
       type="button"
       onClick={() => onAddressClick(address)}
-      className="inline-flex w-max max-w-full items-center gap-1 text-left text-caption text-pump-text transition hover:text-pump-accent"
+      className="inline-flex min-w-0 max-w-full items-center gap-1 text-left text-caption text-pump-text transition hover:text-pump-accent"
       aria-label={`View profile ${label}`}
     >
-      <UserAvatarForAddress address={address} size={24} />
+      <UserAvatarForAddress address={address} size={22} className="shrink-0 sm:!h-6 sm:!w-6" />
       <span className="truncate font-medium">{label}</span>
       {showCreatorBadge ? <CreatorBadge /> : null}
     </button>
+  );
+}
+
+function TradeSideLabel({ isBuy }: { isBuy: boolean }) {
+  return (
+    <span className={`text-caption font-medium ${isBuy ? "text-pump-success" : "text-pump-danger"}`}>
+      {isBuy ? "Buy" : "Sell"}
+    </span>
   );
 }
 
@@ -157,7 +166,7 @@ export function TradeTape({
   const [holdersReady, setHoldersReady] = useState(false);
 
   const tradeIds = useMemo(() => trades.map((t) => t.id), [trades]);
-  const { rowClass: tradeRowClass, isLanding } = useLiveTradeAnimations(tradeIds);
+  const { rowClass: tradeRowClass } = useLiveTradeAnimations(tradeIds);
 
   useEffect(() => {
     let cancelled = false;
@@ -199,22 +208,28 @@ export function TradeTape({
     <section className="space-y-3">
       <SectionHeadingIcon icon={MetricIcons.activity}>Activity</SectionHeadingIcon>
 
-      <div className="rounded-lg border border-pump-border/15 bg-transparent">
-        <div className="flex flex-wrap items-center gap-2 border-b border-pump-border/15 p-3">
-          <button
-            type="button"
-            onClick={() => setTab("trades")}
-            className={tab === "trades" ? "chip-button chip-button-active" : "chip-button"}
-          >
-            Trades
-          </button>
-          <button
-            type="button"
-            onClick={() => setTab("holders")}
-            className={tab === "holders" ? "chip-button chip-button-active" : "chip-button"}
-          >
-            Holders
-          </button>
+      <div className="panel-surface overflow-hidden">
+        <div className="border-b border-pump-border/15 px-3 py-2.5">
+          <div className="segment-control w-fit" role="tablist" aria-label="Activity">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={tab === "trades"}
+              onClick={() => setTab("trades")}
+              className={tab === "trades" ? "chip-button chip-button-active" : "chip-button"}
+            >
+              Trades
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={tab === "holders"}
+              onClick={() => setTab("holders")}
+              className={tab === "holders" ? "chip-button chip-button-active" : "chip-button"}
+            >
+              Holders
+            </button>
+          </div>
         </div>
 
         {tab === "holders" ? (
@@ -223,11 +238,11 @@ export function TradeTape({
           ) : holderRows.length === 0 ? (
             <p className="px-4 py-6 text-body-sm text-pump-muted">No holders yet.</p>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="sheet-grid w-full lg:min-w-[720px]">
+            <div className={activityTableScrollClass}>
+              <table className="sheet-grid w-max min-w-[640px] lg:w-full lg:min-w-[720px]">
                 <thead>
                   <tr>
-                    <th className="w-px whitespace-nowrap">Account</th>
+                    <th className="whitespace-nowrap">Account</th>
                     <th>Balance</th>
                     <th>Supply</th>
                     <th>Entry</th>
@@ -258,7 +273,7 @@ export function TradeTape({
                           : "text-pump-danger";
 
                     return (
-                      <tr key={row.address} className="border-b border-pump-border/10 last:border-b-0">
+                      <tr key={row.address}>
                         <td className={accountCellClass}>
                           <IdentityPill
                             address={row.address}
@@ -295,13 +310,13 @@ export function TradeTape({
         ) : trades.length === 0 ? (
           <p className="px-4 py-6 text-body-sm text-pump-muted">No trades yet.</p>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="sheet-grid w-full lg:min-w-[860px]">
+          <div className={activityTableScrollClass}>
+            <table className="sheet-grid w-max min-w-[680px] lg:w-full lg:min-w-[860px]">
               <thead>
                 <tr>
-                  <th className="w-px whitespace-nowrap">Account</th>
-                  <th className="w-px whitespace-nowrap">Side</th>
-                  <th>Amount</th>
+                  <th className="whitespace-nowrap !pr-0 lg:!pr-3">Account</th>
+                  <th className={`${sideCellClass} !py-2.5 font-semibold`}>Side</th>
+                  <th className="!pl-1 lg:!pl-3">Amount</th>
                   <th>${symbol}</th>
                   <th>Price</th>
                   <th>Time</th>
@@ -318,11 +333,7 @@ export function TradeTape({
                   return (
                     <tr
                       key={trade.id}
-                      className={`border-b border-pump-border/10 last:border-b-0 ${tradeRowClass(
-                        trade.id,
-                        trade.side,
-                        isOptimistic
-                      )}`}
+                      className={tradeRowClass(trade.id, trade.side, isOptimistic)}
                     >
                       <td className={accountCellClass}>
                         <IdentityPill
@@ -332,22 +343,9 @@ export function TradeTape({
                         />
                       </td>
                       <td className={sideCellClass}>
-                        <span
-                          className={`text-caption font-medium ${isBuy ? "text-pump-success" : "text-pump-danger"}`}
-                        >
-                          {isBuy ? "Buy" : "Sell"}
-                        </span>
-                        {isOptimistic ? (
-                          <span className="ml-1 text-[10px] text-pump-accent lg:ml-2 lg:text-caption">
-                            Live
-                          </span>
-                        ) : isLanding(trade.id) ? (
-                          <span className="ml-1 text-[10px] text-pump-muted lg:ml-2 lg:text-caption">
-                            New
-                          </span>
-                        ) : null}
+                        <TradeSideLabel isBuy={isBuy} />
                       </td>
-                      <td className={`${cellClass} financial-value text-pump-text`}>
+                      <td className={amountCellClass}>
                         {formatUsdReadable(tradeNetUsd)}
                       </td>
                       <td className={`${cellClass} financial-value text-pump-text`}>
@@ -356,7 +354,7 @@ export function TradeTape({
                       <td className={`${cellClass} financial-value text-pump-text`}>
                         {formatUsdReadable(tradePriceUsd)}
                       </td>
-                      <td className={`${cellClass} text-caption text-pump-muted`}>
+                      <td className={`${cellClass} text-caption text-pump-muted whitespace-nowrap`}>
                         {formatRelativeTime(trade.blockTime)}
                       </td>
                       <td className={`${cellClass} text-right`}>

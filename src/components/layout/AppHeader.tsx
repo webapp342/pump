@@ -9,7 +9,7 @@ import { ThemePicker } from "@/components/theme/ThemePicker";
 import { ADMIN_NAV_ITEM, APP_NAV_ITEMS } from "@/lib/nav-config";
 import { ICON_STROKE } from "@/lib/icons";
 import { isAdminWallet } from "@/config/admin";
-import { shellInnerClass } from "@/components/layout/layout-shell";
+import { shellInnerClassForPath } from "@/components/layout/layout-shell";
 
 function navLinkClass(active: boolean): string {
   return `header-nav-link ${active ? "header-nav-link-active" : "header-nav-link-idle"}`;
@@ -24,7 +24,7 @@ export function AppHeader() {
 
   return (
     <header className="app-header">
-      <div className={`app-header-inner ${shellInnerClass}`}>
+      <div className={`app-header-inner ${shellInnerClassForPath(pathname)}`}>
         <div className="app-header-start">
           <Link href="/" className="app-header-brand">
             <span className="app-header-brand-mark" aria-hidden>
@@ -33,22 +33,24 @@ export function AppHeader() {
             <span className="truncate">Pump</span>
           </Link>
 
-          <nav className="app-header-nav hidden md:flex" aria-label="Main">
-            {navItems.map((link) => {
+          <nav className="app-header-nav hidden md:flex" aria-label="Primary">
+            {navItems.map((item) => {
               const active =
-                link.href === "/"
+                item.href === "/"
                   ? pathname === "/"
-                  : pathname.startsWith(link.href);
-              const Icon = link.icon;
+                  : pathname.startsWith(item.href);
+              const Icon = item.icon;
+
               return (
                 <Link
-                  key={link.href}
-                  href={link.href}
+                  key={item.href}
+                  href={item.href}
                   prefetch={true}
+                  aria-current={active ? "page" : undefined}
                   className={navLinkClass(active)}
                 >
                   <Icon className="h-4 w-4 shrink-0 opacity-80" strokeWidth={ICON_STROKE} aria-hidden />
-                  {link.label}
+                  {item.label}
                 </Link>
               );
             })}
@@ -60,7 +62,8 @@ export function AppHeader() {
           <Link
             href="/create"
             prefetch={true}
-            className={`toolbar-btn toolbar-btn-accent hidden md:inline-flex ${
+            aria-current={pathname.startsWith("/create") ? "page" : undefined}
+            className={`toolbar-btn toolbar-btn-accent hidden sm:inline-flex ${
               pathname.startsWith("/create") ? "opacity-95" : ""
             }`}
           >

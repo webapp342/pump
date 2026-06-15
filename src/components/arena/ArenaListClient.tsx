@@ -2,10 +2,14 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { Plus } from "lucide-react";
+import { ChevronRight, LayoutGrid, Table2 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { KothSummary, TokenListItem } from "@/lib/db/launchpad";
 import { ArenaSkeleton } from "@/components/arena/ArenaSkeleton";
+import { ArenaMcapTicker } from "@/components/arena/ArenaMcapTicker";
+import { ArenaShortcutsModal } from "@/components/arena/ArenaShortcutsModal";
+import { ArenaTokenCard } from "@/components/arena/ArenaTokenCard";
+import { ArenaWatchlistSheet } from "@/components/arena/ArenaWatchlistSheet";
 import { FieldSearchInput } from "@/components/ui/FieldSearchInput";
 import { IconLabel, SectionHeadingIcon, TableHeaderLabel } from "@/components/ui/IconLabel";
 import { ICON_STROKE } from "@/lib/icons";
@@ -23,43 +27,92 @@ import {
 import { useLiveChannel, resolveLivePollDelay } from "@/hooks/useLiveChannel";
 import { useLiveBoardAnimations } from "@/hooks/useLiveBoardAnimations";
 import { RECENT_STRIP_DESKTOP, RECENT_STRIP_MOBILE } from "@/lib/recent-strip-limits";
+import {
+  readArenaViewMode,
+  writeArenaViewMode,
+  type ArenaViewMode,
+} from "@/lib/arena-view";
+import {
+  ARENA_CARDS_SORT_LABELS,
+  readArenaCardsDensity,
+  readArenaCardsSort,
+  writeArenaCardsDensity,
+  writeArenaCardsSort,
+  type ArenaCardsDensity,
+  type ArenaCardsSortKey,
+} from "@/lib/arena-cards-prefs";
+import {
+  readArenaFilter,
+  writeArenaFilter,
+  type BoardFilter,
+} from "@/lib/arena-filters";
+import type { AirdropListItem } from "@/lib/db/airdrops";
 
-type FlashTone = "up" | "down";
-type BoardFilter = "all" | "new" | "highVol" | "movers" | "kothContenders" | "favorites";
-type SortKey = "mcap" | "ath" | "age" | "txns" | "vol24h" | "traders" | "h1" | "h6" | "h24";
-type SortDir = "asc" | "desc";
+const ARENA_FILTER_ITEMS = [
+  ["new", "New", "Newest"],
+  ["all", "All", "All"],
+  ["highVol", "Vol", "High Vol"],
+  ["movers", "Movers", "Movers"],
+  ["hasAirdrop", "Airdrop", "Has airdrop"],
+  ["kothContenders", "KOTH", "KOTH contenders"],
+  ["favorites", "Favorites", "Favorites"],
+] as const;
 
-function MetricValueWith24hChange({
-  value,
-  changePct,
-  compact = false,
+function ArenaFilterChips({
+  activeFilter,
+  filterCounts,
+  onSelect,
 }: {
-  value: string;
-  changePct: number | null;
-  compact?: boolean;
+  activeFilter: BoardFilter;
+  filterCounts: Record<string, number>;
+  onSelect: (filter: BoardFilter) => void;
 }) {
-  if (compact) {
-    return (
-      <div className="flex min-w-0 items-baseline gap-1.5 whitespace-nowrap">
-        <span className="financial-value text-caption font-semibold text-pump-text md:text-body-sm">
-          {value}
-        </span>
-        <span className={`financial-value text-[10px] font-medium md:text-caption ${pctTone(changePct)}`}>
-          {formatSignedPct(changePct)}
-        </span>
-      </div>
-    );
-  }
-
   return (
-    <div className="flex items-center gap-2 whitespace-nowrap">
-      <span className="financial-value text-body-sm font-semibold text-pump-text">{value}</span>
-      <span className={`financial-value text-caption font-medium ${pctTone(changePct)}`}>
-        {formatSignedPct(changePct)}
-      </span>
-    </div>
+    <>
+      {ARENA_FILTER_ITEMS.map(([key, mobileLabel, desktopLabel]) => {
+        const count = filterCounts[key] ?? 0;
+        const isFavorites = key === "favorites";
+        return (
+          <button
+            key={key}
+            type="button"
+            role="tab"
+            aria-selected={activeFilter === key}
+            onClick={() => onSelect(key)}
+            className={`arena-filter-chip ${
+              activeFilter === key ? "arena-filter-chip-active" : ""
+            }`}
+          >
+            {isFavorites ? (
+              <>
+                <span className="inline-flex items-center gap-1 md:hidden">
+                  <span className="text-lg leading-none">★</span>
+                  <span>({count})</span>
+                </span>
+                <span className="hidden md:inline">
+                  {desktopLabel} ({count})
+                </span>
+              </>
+            ) : (
+              <>
+                <span className="md:hidden">
+                  {mobileLabel} ({count})
+                </span>
+                <span className="hidden md:inline">
+                  {desktopLabel} ({count})
+                </span>
+              </>
+            )}
+          </button>
+        );
+      })}
+    </>
   );
 }
+
+type FlashTone = "up" | "down";
+type SortKey = "mcap" | "ath" | "age" | "txns" | "vol24h" | "traders" | "h1" | "h6" | "h24";
+type SortDir = "asc" | "desc";
 
 function HighlightStatCard({
   href,
@@ -75,22 +128,53 @@ function HighlightStatCard({
   return (
     <Link
       href={href}
-      className="panel-interactive flex min-w-0 flex-col gap-2 p-2.5 md:flex-row md:flex-nowrap md:items-center md:justify-between md:gap-3 md:px-3 md:py-3"
+      className="panel-interactive flex min-w-0 flex-row flex-nowrap items-center justify-between gap-3 p-2.5 md:px-3 md:py-3"
     >
       <IconLabel
         icon={icon}
-        hideIconMobile
-        className="section-label shrink-0 text-[10px] md:text-[inherit]"
+        className="section-label min-w-0 shrink text-caption md:text-[inherit]"
         iconClassName="h-3 w-3 shrink-0 opacity-75 md:h-3.5 md:w-3.5"
       >
         {label}
       </IconLabel>
-      <div className="flex min-w-0 shrink-0 items-center gap-1.5">
-        <TokenAvatar address={token.address} symbol={token.symbol} logoUrl={token.logoUrl} size={22} className="md:hidden" />
-        <TokenAvatar address={token.address} symbol={token.symbol} logoUrl={token.logoUrl} size={18} className="hidden md:block" />
-        <p className="truncate text-caption font-medium text-pump-text">${token.symbol}</p>
+      <div className="flex shrink-0 items-center gap-1.5">
+        <TokenAvatar
+          address={token.address}
+          symbol={token.symbol}
+          logoUrl={token.logoUrl}
+          size={22}
+          className="md:hidden"
+        />
+        <TokenAvatar
+          address={token.address}
+          symbol={token.symbol}
+          logoUrl={token.logoUrl}
+          size={18}
+          className="hidden md:block"
+        />
+        <p className="truncate text-caption font-medium text-pump-text">{token.symbol}</p>
+        <span
+          className={`financial-value shrink-0 text-caption font-semibold leading-none ${pctTone(token.change24hPct ?? null)}`}
+        >
+          {formatSignedPct(token.change24hPct ?? null)}
+        </span>
       </div>
     </Link>
+  );
+}
+
+function HighlightStatPlaceholder({ label, icon }: { label: string; icon: LucideIcon }) {
+  return (
+    <div className="panel-surface flex min-w-0 flex-row flex-nowrap items-center justify-between gap-3 p-2.5 md:px-3 md:py-3">
+      <IconLabel
+        icon={icon}
+        className="section-label min-w-0 shrink text-caption md:text-[inherit]"
+        iconClassName="h-3 w-3 shrink-0 opacity-75 md:h-3.5 md:w-3.5"
+      >
+        {label}
+      </IconLabel>
+      <p className="shrink-0 text-body-sm text-pump-muted">—</p>
+    </div>
   );
 }
 
@@ -100,16 +184,16 @@ function flashText(toneValue: FlashTone | undefined): string {
   return "";
 }
 
-function formatDurationSince(iso: string | null): string {
-  if (!iso) return "—";
+function formatKothDurationShort(iso: string | null): string | null {
+  if (!iso) return null;
   const elapsed = Date.now() - new Date(iso).getTime();
-  if (!Number.isFinite(elapsed) || elapsed < 0) return "—";
+  if (!Number.isFinite(elapsed) || elapsed < 0) return null;
   const min = Math.floor(elapsed / 60_000);
   if (min < 60) return `${min}m`;
   const h = Math.floor(min / 60);
-  if (h < 24) return `${h}h ${min % 60}m`;
+  if (h < 24) return `${h}h`;
   const d = Math.floor(h / 24);
-  return `${d}d ${h % 24}h`;
+  return `${d}d`;
 }
 
 function formatCount(value: number | null | undefined): string {
@@ -154,11 +238,32 @@ function TrendSparkline({
 
 const KOTH_CONTENDER_RANK = 5;
 
+function sortTokensForCards(
+  tokens: TokenListItem[],
+  sortKey: ArenaCardsSortKey
+): TokenListItem[] {
+  const sorted = [...tokens];
+  sorted.sort((a, b) => {
+    if (sortKey === "mcap") {
+      return Number(b.marketCapBnb) - Number(a.marketCapBnb);
+    }
+    if (sortKey === "vol24h") {
+      return Number(b.volume24hBnb ?? 0) - Number(a.volume24hBnb ?? 0);
+    }
+    if (sortKey === "h24") {
+      return (b.change24hPct ?? -Infinity) - (a.change24hPct ?? -Infinity);
+    }
+    return Number(b.marketCapBnb) - Number(a.marketCapBnb);
+  });
+  return sorted;
+}
+
 function matchesBoardFilter(
   token: TokenListItem,
   filter: BoardFilter,
   favorites: Set<string>,
-  kothContenderAddresses: Set<string>
+  kothContenderAddresses: Set<string>,
+  airdropTokenAddresses: Set<string>
 ): boolean {
   if (filter === "new") {
     return true;
@@ -175,12 +280,16 @@ function matchesBoardFilter(
   if (filter === "favorites") {
     return favorites.has(token.address.toLowerCase());
   }
+  if (filter === "hasAirdrop") {
+    return airdropTokenAddresses.has(token.address.toLowerCase());
+  }
   return true;
 }
 
 export function ArenaListClient() {
   const [tokens, setTokens] = useState<TokenListItem[] | null>(null);
   const [kothSummary, setKothSummary] = useState<KothSummary | null>(null);
+  const [airdropTokenAddresses, setAirdropTokenAddresses] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
   const [flashes, setFlashes] = useState<Record<string, FlashTone>>({});
   const [animatedCaps, setAnimatedCaps] = useState<Record<string, number>>({});
@@ -188,12 +297,112 @@ export function ArenaListClient() {
   const [activeFilter, setActiveFilter] = useState<BoardFilter>("new");
   const [sortKey, setSortKey] = useState<SortKey>("mcap");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const [viewMode, setViewMode] = useState<ArenaViewMode>("board");
+  const [cardsSort, setCardsSort] = useState<ArenaCardsSortKey>("mcap");
+  const [cardsDensity, setCardsDensity] = useState<ArenaCardsDensity>("comfortable");
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const { favorites, isFavorite, toggleFavorite } = useFavorites();
   const { bnbUsd } = useBnbUsdPrice();
   const flashTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const capAnimFrameRef = useRef<Record<string, number>>({});
   const animatedCapsRef = useRef<Record<string, number>>({});
   const mobileListRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const response = await fetch("/api/airdrops", { cache: "no-store" });
+        const body = (await response.json()) as { data?: AirdropListItem[] };
+        if (!response.ok || !body.data) return;
+
+        const addresses = new Set<string>();
+        for (const airdrop of body.data) {
+          if (airdrop.status !== "ACTIVE") continue;
+          addresses.add(airdrop.linkedToken.toLowerCase());
+          if (airdrop.rewardToken) {
+            addresses.add(airdrop.rewardToken.toLowerCase());
+          }
+        }
+        setAirdropTokenAddresses(addresses);
+      } catch {
+        // Keep empty set on failure.
+      }
+    })();
+  }, []);
+
+  const setArenaView = useCallback((mode: ArenaViewMode) => {
+    setViewMode(mode);
+    writeArenaViewMode(mode);
+  }, []);
+
+  const handleViewToggleClick = useCallback(
+    (mode: ArenaViewMode) => {
+      setArenaView(mode);
+      searchInputRef.current?.blur();
+    },
+    [setArenaView]
+  );
+
+  useEffect(() => {
+    setViewMode(readArenaViewMode());
+    setCardsSort(readArenaCardsSort());
+    setCardsDensity(readArenaCardsDensity());
+    setActiveFilter(readArenaFilter());
+  }, []);
+
+  const setArenaFilter = useCallback((filter: BoardFilter) => {
+    setActiveFilter(filter);
+    writeArenaFilter(filter);
+  }, []);
+
+  const setCardsSortPreference = useCallback((sort: ArenaCardsSortKey) => {
+    setCardsSort(sort);
+    writeArenaCardsSort(sort);
+  }, []);
+
+  const setCardsDensityPreference = useCallback((density: ArenaCardsDensity) => {
+    setCardsDensity(density);
+    writeArenaCardsDensity(density);
+  }, []);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!window.matchMedia("(min-width: 768px)").matches) return;
+
+      const target = event.target as HTMLElement | null;
+      const inField =
+        target?.tagName === "INPUT" ||
+        target?.tagName === "TEXTAREA" ||
+        target?.isContentEditable;
+
+      if (
+        event.key === "/" &&
+        !inField &&
+        !event.metaKey &&
+        !event.ctrlKey &&
+        !event.altKey
+      ) {
+        event.preventDefault();
+        searchInputRef.current?.focus();
+        return;
+      }
+
+      if (
+        event.key === "?" &&
+        !inField &&
+        !event.metaKey &&
+        !event.ctrlKey &&
+        !event.altKey
+      ) {
+        event.preventDefault();
+        setShortcutsOpen(true);
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
 
   const triggerFlash = useCallback((key: string, toneValue: FlashTone) => {
     setFlashes((prev) => ({ ...prev, [key]: toneValue }));
@@ -395,6 +604,10 @@ export function ArenaListClient() {
     if (activeAddress !== kothToken.address.toLowerCase()) return null;
     return kothSummary?.crownedAt ?? null;
   }, [kothSummary, kothToken]);
+  const kothReignDuration = useMemo(
+    () => formatKothDurationShort(kothCrownedAt),
+    [kothCrownedAt]
+  );
 
   const topGainer24h = useMemo(
     () =>
@@ -427,7 +640,13 @@ export function ArenaListClient() {
       ) {
         return false;
       }
-      return matchesBoardFilter(token, activeFilter, favorites, kothContenderAddresses);
+      return matchesBoardFilter(
+        token,
+        activeFilter,
+        favorites,
+        kothContenderAddresses,
+        airdropTokenAddresses
+      );
     });
 
     const withMetrics = filtered.map((token) => {
@@ -470,7 +689,13 @@ export function ArenaListClient() {
     sortDir,
     bnbUsd,
     kothContenderAddresses,
+    airdropTokenAddresses,
   ]);
+
+  const cardsTokens = useMemo(
+    () => sortTokensForCards(marketTokens, cardsSort),
+    [marketTokens, cardsSort]
+  );
 
   const boardKeys = useMemo(
     () => marketTokens.map((token) => token.address.toLowerCase()),
@@ -485,19 +710,22 @@ export function ArenaListClient() {
   const filterCounts = useMemo(() => {
     const all = resolvedTokens.length;
     const newCount = resolvedTokens.filter((token) =>
-      matchesBoardFilter(token, "new", favorites, kothContenderAddresses)
+      matchesBoardFilter(token, "new", favorites, kothContenderAddresses, airdropTokenAddresses)
     ).length;
     const highVol = resolvedTokens.filter((token) =>
-      matchesBoardFilter(token, "highVol", favorites, kothContenderAddresses)
+      matchesBoardFilter(token, "highVol", favorites, kothContenderAddresses, airdropTokenAddresses)
     ).length;
     const movers = resolvedTokens.filter((token) =>
-      matchesBoardFilter(token, "movers", favorites, kothContenderAddresses)
+      matchesBoardFilter(token, "movers", favorites, kothContenderAddresses, airdropTokenAddresses)
     ).length;
     const contenders = resolvedTokens.filter((token) =>
-      matchesBoardFilter(token, "kothContenders", favorites, kothContenderAddresses)
+      matchesBoardFilter(token, "kothContenders", favorites, kothContenderAddresses, airdropTokenAddresses)
     ).length;
     const favs = resolvedTokens.filter((token) =>
-      matchesBoardFilter(token, "favorites", favorites, kothContenderAddresses)
+      matchesBoardFilter(token, "favorites", favorites, kothContenderAddresses, airdropTokenAddresses)
+    ).length;
+    const hasAirdrop = resolvedTokens.filter((token) =>
+      matchesBoardFilter(token, "hasAirdrop", favorites, kothContenderAddresses, airdropTokenAddresses)
     ).length;
     return {
       all,
@@ -506,8 +734,9 @@ export function ArenaListClient() {
       movers,
       kothContenders: contenders,
       favorites: favs,
+      hasAirdrop,
     };
-  }, [resolvedTokens, favorites, kothContenderAddresses]);
+  }, [resolvedTokens, favorites, kothContenderAddresses, airdropTokenAddresses]);
 
   function onSort(nextKey: SortKey) {
     if (sortKey === nextKey) {
@@ -544,140 +773,167 @@ export function ArenaListClient() {
 
   if (resolvedTokens.length === 0) {
     return (
-      <div className="panel-surface p-6 text-center text-pump-muted">
-        No tokens yet. Be the first to launch a meme.
+      <div className="panel-surface empty-state">
+        <p className="empty-state-copy">No tokens yet. Be the first to launch a meme.</p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-3 md:space-y-4">
+    <div className="min-w-0 space-y-3 md:space-y-4">
+      <ArenaMcapTicker tokens={mcapRankedTokens} />
+
+      <ArenaShortcutsModal open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
+
       {kothToken ? (
-        <section className="space-y-2 md:space-y-3">
+        <section className="koth-section space-y-2 md:space-y-3">
+          <SectionHeadingIcon icon={MetricIcons.kingOfHill}>King of the Hill</SectionHeadingIcon>
+
           <Link
             href={`/token/${kothToken.address}`}
-            className="block panel-surface p-3 transition hover:bg-pump-border/6 md:p-4"
+            className="koth-banner panel-surface block"
           >
-            <div className="flex items-start justify-between gap-2 md:gap-4">
-              <div className="flex min-w-0 items-center gap-2.5 md:gap-3">
-                <TokenAvatar
-                  address={kothToken.address}
-                  symbol={kothToken.symbol}
-                  logoUrl={kothToken.logoUrl}
-                  size={38}
-                  className="md:hidden"
-                />
-                <TokenAvatar
-                  address={kothToken.address}
-                  symbol={kothToken.symbol}
-                  logoUrl={kothToken.logoUrl}
-                  size={46}
-                  className="hidden md:block"
-                />
-                <div className="min-w-0">
-                  <p className="truncate text-body-sm font-semibold text-pump-text md:card-title">
-                    {kothToken.name}
+            <div className="koth-banner__inner">
+              <TokenAvatar
+                address={kothToken.address}
+                symbol={kothToken.symbol}
+                logoUrl={kothToken.logoUrl}
+                size={48}
+                className="koth-banner__logo shrink-0 md:hidden"
+              />
+              <TokenAvatar
+                address={kothToken.address}
+                symbol={kothToken.symbol}
+                logoUrl={kothToken.logoUrl}
+                size={60}
+                className="koth-banner__logo hidden shrink-0 md:block"
+              />
+
+              <div className="koth-banner__content min-w-0 flex-1">
+                <div className="koth-banner__row koth-banner__row--top">
+                  <p className="koth-banner__headline">
+                    <span className="financial-value koth-banner__headline-symbol">
+                      {kothToken.symbol}
+                    </span>
                   </p>
-                  <p className="text-caption text-pump-muted">${kothToken.symbol}</p>
+                  <div className="koth-banner__hero" aria-label="Market cap">
+                    <span className="koth-banner__tag">MC</span>
+                    <span className="financial-value koth-banner__hero-value text-pump-text">
+                      {formatCapForBoard(bnbToUsd(Number(kothToken.marketCapBnb), bnbUsd))}
+                    </span>
+                    <span
+                      className={`financial-value koth-banner__delta ${pctTone(kothToken.change24hPct ?? null)}`}
+                    >
+                      {formatSignedPct(kothToken.change24hPct ?? null)}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="koth-banner__row koth-banner__row--bottom">
+                  {kothReignDuration ? (
+                    <p className="koth-banner__meta koth-banner__meta--lead">
+                      <span className="koth-banner__meta-item">
+                        <span className="koth-banner__tag koth-banner__tag--soft">King for</span>
+                        <span className="financial-value koth-banner__meta-value">
+                          {kothReignDuration}
+                        </span>
+                      </span>
+                    </p>
+                  ) : null}
+                  <p className="koth-banner__meta koth-banner__meta--stats">
+                    <span className="koth-banner__meta-item">
+                      <span className="koth-banner__tag">Vol</span>
+                      <span className="financial-value koth-banner__meta-value">
+                        {formatUsdReadable(
+                          bnbToUsd(Number(kothToken.volume24hBnb ?? 0), bnbUsd),
+                          { compact: true }
+                        )}
+                      </span>
+                    </span>
+                    <span className="koth-banner__meta-sep" aria-hidden>
+                      ·
+                    </span>
+                    <span className="koth-banner__meta-item max-md:hidden">
+                      <span className="koth-banner__tag">Txns</span>
+                      <span className="financial-value koth-banner__meta-value">
+                        {formatCount(kothToken.tradeCount)}
+                      </span>
+                    </span>
+                    <span className="koth-banner__meta-sep max-md:hidden" aria-hidden>
+                      ·
+                    </span>
+                    <span className="koth-banner__meta-item max-md:hidden">
+                      <span className="koth-banner__tag">Holders</span>
+                      <span className="financial-value koth-banner__meta-value">
+                        {formatCount(kothToken.holderCount)}
+                      </span>
+                    </span>
+                    <span className="koth-banner__meta-sep max-md:hidden" aria-hidden>
+                      ·
+                    </span>
+                    <span className="koth-banner__meta-item">
+                      <span className="koth-banner__tag">ATH</span>
+                      <span className="financial-value koth-banner__meta-value">
+                        {formatCapForBoard(
+                          bnbToUsd(
+                            Number(kothToken.athMarketCapBnb ?? kothToken.marketCapBnb),
+                            bnbUsd
+                          )
+                        )}
+                      </span>
+                    </span>
+                  </p>
                 </div>
               </div>
-              <span className="status-badge shrink-0 text-[10px] md:text-[inherit]">Live leader</span>
-            </div>
 
-            <dl className="mt-3 grid grid-cols-2 gap-x-2 gap-y-2 md:mt-4 md:grid-cols-3 md:gap-2">
-              <div className="flex min-w-0 flex-col gap-1">
-                <dt className="section-label whitespace-nowrap text-[10px] md:hidden">MCAP</dt>
-                <dd className="m-0 border border-pump-border/45 bg-pump-border/4 px-3 py-2 md:flex md:flex-nowrap md:items-center md:justify-between md:gap-2">
-                  <IconLabel
-                    icon={MetricIcons.mcap}
-                    hideIconMobile
-                    className="section-label hidden shrink-0 whitespace-nowrap md:inline-flex"
-                  >
-                    MCAP
-                  </IconLabel>
-                  <MetricValueWith24hChange
-                    compact
-                    value={formatCapForBoard(bnbToUsd(Number(kothToken.marketCapBnb), bnbUsd))}
-                    changePct={kothToken.change24hPct ?? null}
-                  />
-                </dd>
-              </div>
-              <div className="flex min-w-0 flex-col gap-1">
-                <dt className="section-label whitespace-nowrap text-[10px] md:hidden">24H VOL</dt>
-                <dd className="m-0 border border-pump-border/45 bg-pump-border/4 px-3 py-2 md:flex md:flex-nowrap md:items-center md:justify-between md:gap-2">
-                  <IconLabel
-                    icon={MetricIcons.vol24h}
-                    hideIconMobile
-                    className="section-label hidden shrink-0 whitespace-nowrap md:inline-flex"
-                  >
-                    24H VOL
-                  </IconLabel>
-                  <MetricValueWith24hChange
-                    compact
-                    value={formatUsdReadable(
-                      bnbToUsd(Number(kothToken.volume24hBnb ?? 0), bnbUsd),
-                      { compact: true }
-                    )}
-                    changePct={
-                      kothToken.change24hVolPct ?? kothToken.change24hPct ?? null
-                    }
-                  />
-                </dd>
-              </div>
-              <div className="hidden min-w-0 md:block">
-                <dd className="m-0 border border-pump-border/45 bg-pump-border/4 px-3 py-2 md:flex md:flex-nowrap md:items-center md:justify-between md:gap-2">
-                  <IconLabel
-                    icon={MetricIcons.timeAsKing}
-                    className="section-label shrink-0 whitespace-nowrap"
-                  >
-                    TIME AS KING
-                  </IconLabel>
-                  <span className="financial-value shrink-0 text-body-sm font-semibold text-pump-text">
-                    {formatDurationSince(kothCrownedAt)}
-                  </span>
-                </dd>
-              </div>
-            </dl>
+              <ChevronRight
+                className="koth-banner__chevron hidden shrink-0 md:block"
+                strokeWidth={ICON_STROKE}
+                aria-hidden
+              />
+            </div>
           </Link>
 
           {kothSummary?.recent?.length ? (
-            <div className="flex items-center gap-2 overflow-x-auto pb-0.5 md:flex-wrap md:overflow-visible">
+            <div className="scroll-strip-row">
               <IconLabel
                 icon={MetricIcons.recent}
                 hideIconMobile
-                className="section-label shrink-0 text-[10px] md:text-[inherit]"
+                className="section-label shrink-0 text-caption md:text-[inherit]"
               >
                 Recent
               </IconLabel>
-              {kothSummary.recent.slice(0, RECENT_STRIP_DESKTOP).map((item, index) => (
-                <Link
-                  key={`${item.tokenAddress}:${item.crownedAt}`}
-                  href={`/token/${item.tokenAddress}`}
-                  className={`inline-flex shrink-0 items-center gap-1.5 border border-pump-border/45 bg-pump-border/4 px-2 py-0.5 text-caption text-pump-muted hover:text-pump-text md:gap-2 md:px-2.5 md:py-1${index >= RECENT_STRIP_MOBILE ? " hidden md:inline-flex" : ""}`}
-                >
-                  <TokenAvatar
-                    address={item.tokenAddress}
-                    symbol={item.symbol}
-                    logoUrl={item.logoUrl}
-                    size={16}
-                    className="md:hidden"
-                  />
-                  <TokenAvatar
-                    address={item.tokenAddress}
-                    symbol={item.symbol}
-                    logoUrl={item.logoUrl}
-                    size={18}
-                    className="hidden md:block"
-                  />
-                  <span className="text-caption text-pump-text">${item.symbol}</span>
-                </Link>
-              ))}
+              <div className="scroll-strip-row__track">
+                {kothSummary.recent.slice(0, RECENT_STRIP_DESKTOP).map((item, index) => (
+                  <Link
+                    key={`${item.tokenAddress}:${item.crownedAt}`}
+                    href={`/token/${item.tokenAddress}`}
+                    className={`contender-chip${index >= RECENT_STRIP_MOBILE ? " hidden md:inline-flex" : ""}`}
+                  >
+                    <TokenAvatar
+                      address={item.tokenAddress}
+                      symbol={item.symbol}
+                      logoUrl={item.logoUrl}
+                      size={16}
+                      className="md:hidden"
+                    />
+                    <TokenAvatar
+                      address={item.tokenAddress}
+                      symbol={item.symbol}
+                      logoUrl={item.logoUrl}
+                      size={18}
+                      className="hidden md:block"
+                    />
+                    <span className="text-caption text-pump-text">{item.symbol}</span>
+                  </Link>
+                ))}
+              </div>
             </div>
           ) : null}
         </section>
       ) : null}
 
-      <section className="grid grid-cols-3 gap-2 md:gap-3">
+      <section className="grid grid-cols-1 gap-2 sm:grid-cols-3 md:gap-3">
         {topGainer24h ? (
           <HighlightStatCard
             href={`/token/${topGainer24h.address}`}
@@ -686,16 +942,7 @@ export function ArenaListClient() {
             icon={MetricIcons.topGainer}
           />
         ) : (
-          <div className="panel-surface flex flex-col gap-2 p-2.5 md:flex-row md:flex-nowrap md:items-center md:justify-between md:gap-3 md:px-3 md:py-3">
-            <IconLabel
-              icon={MetricIcons.topGainer}
-              hideIconMobile
-              className="section-label shrink-0 text-[10px] md:text-[inherit]"
-            >
-              Top gainer
-            </IconLabel>
-            <p className="shrink-0 text-body-sm text-pump-muted md:mt-0 md:text-right">—</p>
-          </div>
+          <HighlightStatPlaceholder label="Top gainer" icon={MetricIcons.topGainer} />
         )}
 
         {topVolume24h ? (
@@ -706,16 +953,7 @@ export function ArenaListClient() {
             icon={MetricIcons.topVolume}
           />
         ) : (
-          <div className="panel-surface flex flex-col gap-2 p-2.5 md:flex-row md:flex-nowrap md:items-center md:justify-between md:gap-3 md:px-3 md:py-3">
-            <IconLabel
-              icon={MetricIcons.topVolume}
-              hideIconMobile
-              className="section-label shrink-0 text-[10px] md:text-[inherit]"
-            >
-              Top volume
-            </IconLabel>
-            <p className="shrink-0 text-body-sm text-pump-muted md:mt-0 md:text-right">—</p>
-          </div>
+          <HighlightStatPlaceholder label="Top volume" icon={MetricIcons.topVolume} />
         )}
 
         {mostTrades ? (
@@ -726,86 +964,162 @@ export function ArenaListClient() {
             icon={MetricIcons.mostTrades}
           />
         ) : (
-          <div className="panel-surface flex flex-col gap-2 p-2.5 md:flex-row md:flex-nowrap md:items-center md:justify-between md:gap-3 md:px-3 md:py-3">
-            <IconLabel
-              icon={MetricIcons.mostTrades}
-              hideIconMobile
-              className="section-label shrink-0 text-[10px] md:text-[inherit]"
-            >
-              Most trades
-            </IconLabel>
-            <p className="shrink-0 text-body-sm text-pump-muted md:mt-0 md:text-right">—</p>
-          </div>
+          <HighlightStatPlaceholder label="Most trades" icon={MetricIcons.mostTrades} />
         )}
       </section>
 
       <div className="space-y-2 md:space-y-3">
-        <div className="flex items-center justify-between gap-3">
-          <SectionHeadingIcon icon={MetricIcons.exploreCoins}>Explore coins</SectionHeadingIcon>
-          <Link
-            href="/create"
-            prefetch={true}
-            className="toolbar-btn toolbar-btn-accent inline-flex shrink-0 items-center gap-1.5 md:hidden"
-          >
-            <Plus className="h-3.5 w-3.5 shrink-0" strokeWidth={ICON_STROKE} aria-hidden />
-            Create
-          </Link>
-        </div>
-        <div className="flex flex-col gap-2">
-          <FieldSearchInput
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search coin or symbol"
-            className="md:max-w-xs"
-          />
-          <div className="sheet-tabs -mx-2 overflow-x-auto px-2 md:mx-0 md:px-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {(
-            [
-              ["new", "New", "Newest"],
-              ["all", "All", "All"],
-              ["highVol", "Vol", "High Vol"],
-              ["movers", "Movers", "Movers"],
-              ["kothContenders", "KOTH", "KOTH contenders"],
-              ["favorites", "Favorites", "Favorites"],
-            ] as const
-          ).map(([key, mobileLabel, desktopLabel]) => {
-            const count = filterCounts[key] ?? 0;
-            const isFavorites = key === "favorites";
-            return (
-            <button
-              key={key}
-              type="button"
-              onClick={() => setActiveFilter(key)}
-              className={`shrink-0 max-md:px-2.5 max-md:py-1.5 ${
-                activeFilter === key ? "chip-button chip-button-active" : "chip-button"
-              }`}
-            >
-              {isFavorites ? (
-                <>
-                  <span className="inline-flex items-center gap-1 md:hidden">
-                    <span className="text-lg leading-none">★</span>
-                    <span>({count})</span>
-                  </span>
-                  <span className="hidden md:inline">
-                    {desktopLabel} ({count})
-                  </span>
-                </>
-              ) : (
-                <>
-                  <span className="md:hidden">
-                    {mobileLabel} ({count})
-                  </span>
-                  <span className="hidden md:inline">
-                    {desktopLabel} ({count})
-                  </span>
-                </>
-              )}
-            </button>
-            );
-          })}
+        <SectionHeadingIcon icon={MetricIcons.exploreCoins}>Explore coins</SectionHeadingIcon>
+
+        <div className="arena-toolbar">
+          <div className="arena-search-group">
+            <div className="arena-toolbar-search">
+              <FieldSearchInput
+                ref={searchInputRef}
+                embedded
+                fieldOnly
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search coins"
+              />
+            </div>
+            <div className="arena-search-end">
+              <div
+                className="arena-view-toggle arena-view-toggle--attached"
+                role="group"
+                aria-label="Arena view"
+              >
+                <button
+                  type="button"
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => handleViewToggleClick("board")}
+                  className={`inline-flex items-center justify-center gap-1 px-2 py-1.5 text-caption sm:px-2.5 ${
+                    viewMode === "board" ? "chip-button-active" : "chip-button"
+                  }`}
+                  aria-pressed={viewMode === "board"}
+                  aria-label="Board view"
+                >
+                  <Table2 className="h-3.5 w-3.5 shrink-0" strokeWidth={ICON_STROKE} aria-hidden />
+                  <span className="hidden sm:inline">Board</span>
+                </button>
+                <button
+                  type="button"
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => handleViewToggleClick("cards")}
+                  className={`inline-flex items-center justify-center gap-1 px-2 py-1.5 text-caption sm:px-2.5 ${
+                    viewMode === "cards" ? "chip-button-active" : "chip-button"
+                  }`}
+                  aria-pressed={viewMode === "cards"}
+                  aria-label="Cards view"
+                >
+                  <LayoutGrid className="h-3.5 w-3.5 shrink-0" strokeWidth={ICON_STROKE} aria-hidden />
+                  <span className="hidden sm:inline">Cards</span>
+                </button>
+              </div>
+            </div>
+          </div>
+          <div className="arena-toolbar-watchlist shrink-0 md:hidden">
+            <ArenaWatchlistSheet
+              tokens={resolvedTokens}
+              bnbUsd={bnbUsd}
+              flashes={flashes}
+              animatedCaps={animatedCaps}
+            />
+          </div>
+          <div className="arena-filter-bar-wrap hidden md:block">
+            <div className="arena-filter-bar" role="tablist" aria-label="Arena filters">
+              <ArenaFilterChips
+                activeFilter={activeFilter}
+                filterCounts={filterCounts}
+                onSelect={setArenaFilter}
+              />
+            </div>
           </div>
         </div>
 
+        <div className="arena-filter-bar-wrap md:hidden">
+          <div className="arena-filter-bar" role="tablist" aria-label="Arena filters">
+            <ArenaFilterChips
+              activeFilter={activeFilter}
+              filterCounts={filterCounts}
+              onSelect={setArenaFilter}
+            />
+          </div>
+        </div>
+
+        {viewMode === "cards" ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <label className="flex items-center gap-2 text-caption text-pump-muted">
+              <span className="hidden sm:inline">Sort</span>
+              <select
+                value={cardsSort}
+                onChange={(event) =>
+                  setCardsSortPreference(event.target.value as ArenaCardsSortKey)
+                }
+                className="field-input h-8 min-w-[9rem] bg-pump-surface/75 py-1 text-caption"
+                aria-label="Sort cards by"
+              >
+                {(Object.keys(ARENA_CARDS_SORT_LABELS) as ArenaCardsSortKey[]).map((key) => (
+                  <option key={key} value={key}>
+                    {ARENA_CARDS_SORT_LABELS[key]}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div className="arena-view-toggle" role="group" aria-label="Card density">
+              <button
+                type="button"
+                onClick={() => setCardsDensityPreference("comfortable")}
+                className={`px-3 py-1.5 text-caption ${
+                  cardsDensity === "comfortable" ? "chip-button-active" : "chip-button"
+                }`}
+                aria-pressed={cardsDensity === "comfortable"}
+              >
+                Comfortable
+              </button>
+              <button
+                type="button"
+                onClick={() => setCardsDensityPreference("compact")}
+                className={`px-3 py-1.5 text-caption ${
+                  cardsDensity === "compact" ? "chip-button-active" : "chip-button"
+                }`}
+                aria-pressed={cardsDensity === "compact"}
+              >
+                Compact
+              </button>
+            </div>
+          </div>
+        ) : null}
+
+        {viewMode === "cards" ? (
+          <div
+            className={`grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 ${
+              cardsDensity === "compact" ? "md:gap-2 lg:gap-2" : ""
+            }`}
+          >
+            {cardsTokens.map((token) => {
+              const addressKey = token.address.toLowerCase();
+              const mcapUsd =
+                animatedCaps[`${addressKey}:cap:mcap`] ??
+                bnbToUsd(Number(token.marketCapBnb), bnbUsd);
+              const isKoth = kothToken?.address.toLowerCase() === addressKey;
+
+              return (
+                <ArenaTokenCard
+                  key={token.address}
+                  token={token}
+                  mcapUsd={mcapUsd}
+                  isKoth={isKoth}
+                  isKothContender={kothContenderAddresses.has(addressKey)}
+                  mcapFlash={flashes[`${addressKey}:mcap`]}
+                  isFavorite={isFavorite(token.address)}
+                  onToggleFavorite={toggleFavorite}
+                  compact={cardsDensity === "compact"}
+                />
+              );
+            })}
+          </div>
+        ) : (
         <section className="panel-surface overflow-hidden">
         <div ref={mobileListRef} className="sheet-list lg:hidden">
           {marketTokens.map((token, index) => {
@@ -839,7 +1153,7 @@ export function ArenaListClient() {
                   className="flex min-w-0 items-baseline gap-2 self-center"
                 >
                   <p className="truncate text-body-sm font-medium text-pump-text">{token.name}</p>
-                  <p className="shrink-0 text-caption text-pump-muted">${token.symbol}</p>
+                  <p className="shrink-0 text-caption text-pump-muted">{token.symbol}</p>
                 </Link>
                 <button
                   type="button"
@@ -853,7 +1167,8 @@ export function ArenaListClient() {
                 >
                   {isFavorite(token.address) ? "★" : "☆"}
                 </button>
-                <div className="col-span-3 col-start-2 flex w-full items-center justify-between gap-1 text-[11px] leading-tight">
+                <div className="col-span-3 col-start-2">
+                  <div className="flex w-full items-center justify-between gap-1 text-[11px] leading-tight">
                   <span className={`financial-value min-w-0 truncate ${flashText(flashes[`${addressKey}:mcap`])}`}>
                     <span className="text-pump-muted">MCAP </span>
                     {formatCapForBoard(mcapUsd)}
@@ -862,7 +1177,9 @@ export function ArenaListClient() {
                     <span className="text-pump-muted">VOL </span>
                     {formatUsdReadable(vol24hUsd, { compact: true })}
                   </span>
-                  <span className={`financial-value min-w-0 truncate ${flashText(flashes[`${addressKey}:txns`])}`}>
+                  <span
+                    className={`financial-value min-w-0 truncate max-md:hidden ${flashText(flashes[`${addressKey}:txns`])}`}
+                  >
                     <span className="text-pump-muted">TXN </span>
                     {token.tradeCount ?? 0}
                   </span>
@@ -872,6 +1189,7 @@ export function ArenaListClient() {
                       {formatSignedPct(token.change24hPct ?? null)}
                     </span>
                   </span>
+                  </div>
                 </div>
               </article>
             );
@@ -879,7 +1197,7 @@ export function ArenaListClient() {
         </div>
 
         <div className="hidden lg:block overflow-x-auto">
-          <table className="sheet-grid min-w-[1180px]">
+          <table className="sheet-grid min-w-[1280px]">
           <thead>
             <tr>
               <th />
@@ -946,7 +1264,7 @@ export function ArenaListClient() {
                       />
                       <div className="flex min-w-0 items-baseline gap-2">
                         <p className="truncate text-body-sm font-medium text-pump-text">{token.name}</p>
-                        <p className="shrink-0 text-caption text-pump-muted">${token.symbol}</p>
+                        <p className="shrink-0 text-caption text-pump-muted">{token.symbol}</p>
                       </div>
                     </Link>
                   </td>
@@ -1007,6 +1325,7 @@ export function ArenaListClient() {
         </table>
         </div>
         </section>
+        )}
       </div>
     </div>
   );

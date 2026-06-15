@@ -31,6 +31,7 @@ export const MetricIcons = {
   age: Clock,
   txns: ArrowLeftRight,
   traders: Users,
+  participants: Users,
   change1h: Zap,
   change6h: BarChart3,
   change24h: Percent,

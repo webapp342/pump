@@ -123,7 +123,7 @@ export function HoldingSwipeRow({
                 dismissHoldingsSwipeHint();
                 onBuyMax();
               }}
-              className="flex flex-1 items-center justify-center bg-pump-accent px-2 text-center text-caption font-semibold leading-tight text-pump-accent-foreground"
+              className="flex flex-1 items-center justify-center bg-pump-success px-2 text-center text-caption font-semibold leading-tight text-pump-accent-foreground"
             >
               Buy max
             </button>

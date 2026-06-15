@@ -69,7 +69,7 @@ export function TokenLaunchSuccessModal({
             </button>
           </div>
 
-          <div className="mt-4 flex items-center gap-3 rounded-lg border border-pump-border/45 bg-pump-surface/40 px-3 py-3">
+          <div className="mt-4 flex items-center gap-3 rounded-lg border border-pump-border/30 bg-pump-card-soft/40 px-3 py-3">
             <TokenAvatar
               address={tokenAddress}
               symbol={tokenSymbol}
@@ -86,8 +86,8 @@ export function TokenLaunchSuccessModal({
             </div>
           </div>
 
-          <div className="mt-4 rounded-lg border border-pump-accent/25 bg-pump-accent/8 px-3.5 py-3">
-            <p className="text-body-sm font-medium text-pump-text">Next step: boost visibility</p>
+          <div className="mt-4 rounded-lg border border-pump-accent/30 bg-pump-accent/8 px-4 py-3">
+            <p className="text-body-sm font-semibold text-pump-text">Next step: boost visibility</p>
             <p className="mt-1.5 text-caption leading-relaxed text-pump-muted">
               Tokens with an active airdrop campaign reach more traders, build a holder base faster, and
               rank higher across Explore and Airdrops. Most successful launches run one within the first

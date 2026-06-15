@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { normalizeAddressParam } from "@/lib/address";
-import { listMyAirdropParticipations } from "@/lib/db/airdrops";
+import { listMyAirdropIds, listMyAirdropParticipations, refreshParticipantSnapshot } from "@/lib/db/airdrops";
 
 export async function GET(request: NextRequest) {
   const address = normalizeAddressParam(request.nextUrl.searchParams.get("address"));
@@ -13,6 +13,12 @@ export async function GET(request: NextRequest) {
   const limit = limitRaw ? Math.min(50, Math.max(1, Number(limitRaw) || 20)) : 20;
 
   try {
+    const ids = await listMyAirdropIds(address);
+    await Promise.all(
+      ids.slice(0, limit).map((id) =>
+        refreshParticipantSnapshot(id, address).catch(() => undefined)
+      )
+    );
     const data = await listMyAirdropParticipations(address, limit);
     return NextResponse.json({ data });
   } catch (error) {

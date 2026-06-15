@@ -12,13 +12,13 @@ import {
 } from "@/lib/airdrop-status";
 import {
   airdropRewardUsd,
+  airdropTimelineProgress,
   formatAirdropReward,
   formatDurationUntil,
-  formatQualifyDate,
   formatQualifyDateTime,
   formatTimeRemaining,
   isEndingSoon,
-  qualifyWindowProgress,
+  showAirdropProgressBar,
 } from "@/lib/airdrop-board-format";
 import { Plus, Bookmark } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -66,6 +66,70 @@ type EnrichedAirdrop = AirdropListItem & {
 
 const HIGH_VALUE_THRESHOLD = 10_000;
 const ENDING_SOON_HOURS = 48;
+
+const AIRDROP_FILTER_ITEMS = [
+  ["all", "All", "All"],
+  ["qualifying", "Qualifying", "Qualifying"],
+  ["claimable", "Claimable", "Claimable"],
+  ["upcoming", "Upcoming", "Upcoming"],
+  ["endingSoon", "Ending", "Ending soon"],
+  ["ended", "Ended", "Ended"],
+  ["highValue", "High", "High value"],
+  ["saved", "Saved", "Saved"],
+  ["mine", "Joined", "Joined airdrops"],
+] as const;
+
+function AirdropFilterChips({
+  activeFilter,
+  filterCounts,
+  onSelect,
+}: {
+  activeFilter: AirdropFilter;
+  filterCounts: Record<string, number>;
+  onSelect: (filter: AirdropFilter) => void;
+}) {
+  return (
+    <>
+      {AIRDROP_FILTER_ITEMS.map(([key, mobileLabel, desktopLabel]) => {
+        const count = filterCounts[key] ?? 0;
+        const isSavedTab = key === "saved";
+        return (
+          <button
+            key={key}
+            type="button"
+            role="tab"
+            aria-selected={activeFilter === key}
+            onClick={() => onSelect(key)}
+            className={`arena-filter-chip ${
+              activeFilter === key ? "arena-filter-chip-active" : ""
+            }`}
+          >
+            {isSavedTab ? (
+              <>
+                <span className="inline-flex items-center gap-1 md:hidden">
+                  <Bookmark className="h-3.5 w-3.5" strokeWidth={ICON_STROKE} aria-hidden />
+                  <span>({count})</span>
+                </span>
+                <span className="hidden md:inline">
+                  {desktopLabel} ({count})
+                </span>
+              </>
+            ) : (
+              <>
+                <span className="md:hidden">
+                  {mobileLabel} ({count})
+                </span>
+                <span className="hidden md:inline">
+                  {desktopLabel} ({count})
+                </span>
+              </>
+            )}
+          </button>
+        );
+      })}
+    </>
+  );
+}
 
 function rewardUsdValue(
   item: Pick<AirdropListItem, "totalFunded" | "rewardToken" | "rewardPriceBnb">,
@@ -197,48 +261,23 @@ function statusSortWeight(status: AirdropDisplayStatus): number {
   }
 }
 
-function timelineLabel(item: EnrichedAirdrop): string {
-  switch (item.displayStatus) {
-    case "UPCOMING":
-      return `Starts ${formatQualifyDateTime(item.qualifyStart)}`;
-    case "QUALIFYING":
-      return `Ends ${formatQualifyDateTime(item.qualifyEnd)}`;
-    case "FINALIZING":
-      return "Allocating winners";
-    case "CLAIMABLE":
-      return item.claimEnd
-        ? `Claim by ${formatQualifyDateTime(item.claimEnd)}`
-        : "Claims open";
-    default:
-      return "Campaign closed";
-  }
+function airdropShowsCountdown(status: AirdropDisplayStatus): boolean {
+  return status === "UPCOMING" || status === "QUALIFYING" || status === "CLAIMABLE";
 }
 
-function timeLeftLabel(item: EnrichedAirdrop): string {
+/** Active countdown / phase caption; null when nothing meaningful to show (e.g. closed). */
+function airdropTimeCaption(item: EnrichedAirdrop): string | null {
   switch (item.displayStatus) {
     case "UPCOMING":
       return formatDurationUntil(item.qualifyStart);
     case "QUALIFYING":
       return formatTimeRemaining(item.qualifyEnd);
     case "CLAIMABLE":
-      return item.claimEnd ? formatTimeRemaining(item.claimEnd) : "Open";
-    default:
-      return "—";
-  }
-}
-
-function mobileStatusLabel(status: AirdropDisplayStatus): string {
-  switch (status) {
-    case "QUALIFYING":
-      return "Live";
-    case "CLAIMABLE":
-      return "Claim";
-    case "UPCOMING":
-      return "Soon";
+      return item.claimEnd ? formatTimeRemaining(item.claimEnd) : "Window open";
     case "FINALIZING":
-      return "Finalizing";
-    default:
-      return "Ended";
+      return "Finalizing winners";
+    case "CLOSED":
+      return null;
   }
 }
 
@@ -288,58 +327,56 @@ function MobileAirdropBoardRow({
     isBnb,
     symbol: item.rewardSymbol,
   });
+  const timeCaption = airdropTimeCaption(item);
+  const href = `/airdrops/${item.id}`;
 
   return (
-    <article className="grid grid-cols-[1fr_auto] items-start gap-2 p-2.5 transition active:bg-pump-border/8">
-      <Link href={`/airdrops/${item.id}`} className="flex min-w-0 items-start gap-2.5">
-        <TokenAvatar
-          address={item.linkedToken}
-          symbol={symbol}
-          size={32}
-          className="shrink-0"
-        />
-        <div className="flex min-w-0 flex-1 flex-col gap-1">
-          <div className="flex items-center justify-between gap-2">
-            <p className="truncate text-body-sm font-semibold text-pump-text">{symbol}</p>
-            <span
-              className={`shrink-0 text-[10px] leading-none ${airdropStatusBadgeClass(item.displayStatus)}`}
-            >
-              {mobileStatusLabel(item.displayStatus)}
+    <article className="mobile-airdrop-row relative grid grid-cols-[1.75rem_minmax(0,1fr)_auto] grid-rows-[auto_auto] items-start gap-x-2 gap-y-1 p-2.5 transition active:bg-pump-border/8">
+      <Link
+        href={href}
+        className="absolute inset-0 z-0 rounded-[inherit]"
+        aria-label={`${symbol} airdrop`}
+      />
+
+      <TokenAvatar
+        address={item.linkedToken}
+        symbol={symbol}
+        size={28}
+        className="relative z-10 row-span-2 self-start !ring-0"
+      />
+
+      <div className="relative z-10 col-start-2 row-start-1 flex min-w-0 items-center gap-x-1.5">
+        <span className="truncate text-body-sm font-semibold text-pump-text">{symbol}</span>
+        <span className={`shrink-0 ${airdropStatusBadgeClass(item.displayStatus)}`}>
+          {formatAirdropDisplayStatus(item.displayStatus)}
+        </span>
+      </div>
+
+      <div className="relative z-10 col-start-3 row-start-1 row-span-2 flex flex-col items-end self-stretch">
+        <AirdropSaveButton airdropId={item.id} className="h-8 w-8 shrink-0" />
+        {timeCaption ? (
+          <span className="mt-auto flex shrink-0 items-center gap-1 pt-1 text-[11px] font-medium tabular-nums text-pump-muted">
+            {airdropShowsCountdown(item.displayStatus) ? (
+              <HourglassIcon size={12} aria-hidden />
+            ) : null}
+            <span className="financial-value">{timeCaption}</span>
+          </span>
+        ) : null}
+      </div>
+
+      <div className="relative z-10 col-start-2 row-start-2 min-w-0 pr-1 text-[11px] leading-tight">
+        <span className="financial-value block min-w-0 truncate font-semibold tabular-nums text-pump-text">
+          <span className="font-normal text-pump-muted">Reward </span>
+          {poolLabel}
+          {usd != null ? (
+            <span className="ml-1 font-medium text-pump-muted">
+              · {formatUsdReadable(usd, { compact: true })}
             </span>
-          </div>
-          <div className="flex items-center justify-between gap-2">
-            <p className="financial-value min-w-0 truncate text-caption font-semibold tabular-nums text-pump-text">
-              <span className="font-normal text-pump-muted">Reward </span>
-              {poolLabel}
-              {usd != null ? (
-                <span className="ml-1.5 font-medium text-pump-muted">
-                  · {formatUsdReadable(usd, { compact: true })}
-                </span>
-              ) : null}
-            </p>
-            <span className="financial-value flex shrink-0 items-center gap-1 text-caption font-medium tabular-nums text-pump-muted">
-              <HourglassIcon size={12} />
-              {timeLeftLabel(item)}
-            </span>
-          </div>
-        </div>
-      </Link>
-      <AirdropSaveButton airdropId={item.id} className="mt-0.5 h-8 w-8" />
+          ) : null}
+        </span>
+      </div>
     </article>
   );
-}
-
-function featuredBadge(status: AirdropDisplayStatus): string {
-  switch (status) {
-    case "QUALIFYING":
-      return "Live campaign";
-    case "CLAIMABLE":
-      return "Claims open";
-    case "UPCOMING":
-      return "Starting soon";
-    default:
-      return "Featured";
-  }
 }
 
 function HighlightAirdropCard({
@@ -356,49 +393,37 @@ function HighlightAirdropCard({
   const symbol = poolSymbol(item);
 
   return (
-    <div className="flex h-full min-w-0 flex-col gap-1">
-      <IconLabel icon={icon} hideIconMobile className="section-label md:hidden" iconClassName="h-3 w-3">
+    <Link
+      href={href}
+      className="panel-interactive flex min-w-0 flex-row flex-nowrap items-center justify-between gap-3 p-2.5 md:px-3 md:py-3"
+    >
+      <IconLabel
+        icon={icon}
+        className="section-label min-w-0 shrink text-caption md:text-[inherit]"
+        iconClassName="h-3 w-3 shrink-0 opacity-75 md:h-3.5 md:w-3.5"
+      >
         {label}
       </IconLabel>
-      <Link
-        href={href}
-        className="panel-interactive flex min-h-[2.625rem] flex-1 min-w-0 flex-nowrap items-center gap-2 px-2.5 py-2.5 md:min-h-[3rem] md:justify-between md:gap-3 md:px-3 md:py-3"
-      >
-        <IconLabel
-          icon={icon}
-          hideIconMobile
-          className="section-label hidden shrink-0 md:inline-flex"
-        >
-          {label}
-        </IconLabel>
-        <div className="flex min-w-0 shrink-0 items-center gap-1.5">
-          <TokenAvatar address={item.linkedToken} symbol={symbol} size={18} />
-          <p className="truncate text-caption font-medium text-pump-text">${symbol}</p>
-        </div>
-      </Link>
-    </div>
+      <div className="flex min-w-0 shrink-0 items-center gap-1.5">
+        <TokenAvatar address={item.linkedToken} symbol={symbol} size={22} className="md:hidden" />
+        <TokenAvatar address={item.linkedToken} symbol={symbol} size={18} className="hidden md:block" />
+        <p className="truncate text-caption font-medium text-pump-text">{symbol}</p>
+      </div>
+    </Link>
   );
 }
 
 function HighlightAirdropPlaceholder({ label, icon }: { label: string; icon: LucideIcon }) {
   return (
-    <div className="flex h-full min-w-0 flex-col gap-1">
-      <IconLabel icon={icon} hideIconMobile className="section-label md:hidden" iconClassName="h-3 w-3">
+    <div className="panel-surface flex min-w-0 flex-row flex-nowrap items-center justify-between gap-3 p-2.5 md:px-3 md:py-3">
+      <IconLabel
+        icon={icon}
+        className="section-label min-w-0 shrink text-caption md:text-[inherit]"
+        iconClassName="h-3 w-3 shrink-0 opacity-75 md:h-3.5 md:w-3.5"
+      >
         {label}
       </IconLabel>
-      <div className="panel-surface flex min-h-[2.625rem] flex-1 min-w-0 flex-nowrap items-center gap-2 px-2.5 py-2.5 md:min-h-[3rem] md:justify-between md:gap-3 md:px-3 md:py-3">
-        <IconLabel
-          icon={icon}
-          hideIconMobile
-          className="section-label hidden shrink-0 md:inline-flex"
-        >
-          {label}
-        </IconLabel>
-        <div className="flex min-w-0 shrink-0 items-center gap-1.5">
-          <span className="inline-block h-[18px] w-[18px] shrink-0" aria-hidden />
-          <p className="text-caption font-medium text-pump-muted">—</p>
-        </div>
-      </div>
+      <p className="shrink-0 text-body-sm text-pump-muted">—</p>
     </div>
   );
 }
@@ -540,10 +565,6 @@ export function AirdropsListClient() {
     };
   }, [resolvedItems, saves, mineIds]);
 
-  const myCampaignItems = useMemo(() => {
-    return resolvedItems.filter((item) => mineIds.has(item.id)).slice(0, 3);
-  }, [resolvedItems, mineIds]);
-
   const boardItems = useMemo(() => {
     const term = search.trim().toLowerCase();
     const filtered = resolvedItems.filter((item) => {
@@ -613,8 +634,8 @@ export function AirdropsListClient() {
 
   if (resolvedItems.length === 0) {
     return (
-      <div className="panel-surface p-8 text-center">
-        <p className="text-body-sm text-pump-muted">No active airdrop campaigns yet.</p>
+      <div className="panel-surface empty-state">
+        <p className="empty-state-copy">No active airdrop campaigns yet.</p>
         <CreateCampaignLink className="mt-4 h-10 px-5 text-body-sm" />
       </div>
     );
@@ -623,128 +644,130 @@ export function AirdropsListClient() {
   return (
     <div className="space-y-3 md:space-y-4">
       {featured ? (
-        <>
-          <SectionHeadingIcon icon={MetricIcons.featured}>Featured campaign</SectionHeadingIcon>
         <section className="space-y-2 md:space-y-3">
+          <SectionHeadingIcon icon={MetricIcons.featured}>Featured campaign</SectionHeadingIcon>
+
           <Link
             href={`/airdrops/${featured.id}`}
-            className="panel-interactive block p-3 md:p-4"
+            className="koth-banner panel-surface block"
           >
-            <div className="flex items-start justify-between gap-2 md:gap-4">
-              <div className="flex min-w-0 items-center gap-2.5 md:gap-3">
+            <div className="koth-banner__inner featured-airdrop-banner__inner">
+              <div className="featured-airdrop-banner__identity min-w-0">
                 <TokenAvatar
                   address={featured.linkedToken}
                   symbol={poolSymbol(featured)}
-                  size={38}
-                  className="md:hidden"
+                  size={48}
+                  className="koth-banner__logo shrink-0 md:hidden"
                 />
                 <TokenAvatar
                   address={featured.linkedToken}
                   symbol={poolSymbol(featured)}
-                  size={46}
-                  className="hidden md:block"
+                  size={60}
+                  className="koth-banner__logo hidden shrink-0 md:block"
                 />
-                <div className="min-w-0">
-                  <p className="truncate text-body-sm font-semibold text-pump-text md:card-title">
-                    {campaignTitle(featured)}
-                  </p>
-                  <p className="text-caption text-pump-muted">
-                    <span className="md:hidden">${poolSymbol(featured)}</span>
-                    <span className="hidden md:inline">
-                      Pool ${poolSymbol(featured)} · Escrow on-chain
-                    </span>
-                  </p>
+
+                <div className="featured-airdrop-banner__lead min-w-0 flex-1">
+                  <div className="featured-airdrop-banner__headline-row">
+                    <p className="featured-airdrop-banner__title truncate">
+                      {campaignTitle(featured)}
+                    </p>
+                    <AirdropStatusMetric status={featured.displayStatus} />
+                  </div>
+                  <p className="mt-1 text-caption text-pump-muted">Escrow on-chain</p>
                 </div>
               </div>
-              <span className="status-badge shrink-0 text-[10px] md:text-[inherit]">
-                {featuredBadge(featured.displayStatus)}
-              </span>
-            </div>
 
-            <AirdropMetricsStrip
-              className="mt-3 md:mt-4"
-              reward={
-                <AirdropRewardPoolMetric {...airdropListRewardProps(featured, bnbUsd)} />
-              }
-              progress={
-                <AirdropProgressMetric
-                  timeLabel={nowTick >= 0 ? timeLeftLabel(featured) : "—"}
-                  progressPct={qualifyWindowProgress(featured.qualifyStart, featured.qualifyEnd)}
-                />
-              }
-              poolToken={
-                <AirdropPoolTokenMetric
-                  tokenAddress={featured.linkedToken}
-                  symbol={poolSymbol(featured)}
-                />
-              }
-              status={<AirdropStatusMetric status={featured.displayStatus} />}
-              footer={
-                featured.displayStatus === "UPCOMING" ||
-                featured.displayStatus === "QUALIFYING" ? (
-                  <>
-                    Qualify window · {formatQualifyDate(featured.qualifyStart)} –{" "}
-                    {formatQualifyDate(featured.qualifyEnd)}
-                  </>
-                ) : (
-                  timelineLabel(featured)
-                )
-              }
-            />
+              <AirdropMetricsStrip
+                variant="hero"
+                className="featured-airdrop-banner__metrics min-w-0"
+                reward={
+                  <AirdropRewardPoolMetric {...airdropListRewardProps(featured, bnbUsd)} />
+                }
+                progress={
+                  <AirdropProgressMetric
+                    timeLabel={
+                      nowTick >= 0 ? (airdropTimeCaption(featured) ?? "Ended") : "—"
+                    }
+                    progressPct={airdropTimelineProgress(
+                      featured.displayStatus,
+                      featured.qualifyStart,
+                      featured.qualifyEnd,
+                      featured.claimEnd
+                    )}
+                    showBar={showAirdropProgressBar(featured.displayStatus)}
+                    showIcon={airdropShowsCountdown(featured.displayStatus)}
+                  />
+                }
+                poolToken={
+                  <AirdropPoolTokenMetric
+                    tokenAddress={featured.linkedToken}
+                    symbol={poolSymbol(featured)}
+                  />
+                }
+                status={<AirdropStatusMetric status={featured.displayStatus} />}
+              />
+            </div>
           </Link>
 
           {resolvedItems.length > 1 ? (
-            <div className="flex items-center gap-2 overflow-x-auto pb-0.5 md:flex-wrap md:overflow-visible">
+            <div className="scroll-strip-row">
               <IconLabel
                 icon={MetricIcons.recent}
                 hideIconMobile
-                className="section-label shrink-0 text-[10px] md:text-[inherit]"
+                className="section-label shrink-0 text-caption md:text-[inherit]"
               >
                 More
               </IconLabel>
-              {resolvedItems
-                .filter((item) => item.id !== featured.id)
-                .slice(0, RECENT_STRIP_DESKTOP)
-                .map((item, index) => (
-                  <Link
-                    key={item.id}
-                    href={`/airdrops/${item.id}`}
-                    className={`inline-flex shrink-0 items-center gap-1.5 border border-pump-border/45 bg-pump-border/4 px-2 py-0.5 text-caption text-pump-muted hover:text-pump-text md:gap-2 md:px-2.5 md:py-1${index >= RECENT_STRIP_MOBILE ? " hidden md:inline-flex" : ""}`}
-                  >
-                    <TokenAvatar address={item.linkedToken} symbol={poolSymbol(item)} size={16} className="md:hidden" />
-                    <TokenAvatar address={item.linkedToken} symbol={poolSymbol(item)} size={18} className="hidden md:block" />
-                    <span className="text-caption font-medium text-pump-text">{poolSymbol(item)}</span>
-                  </Link>
-                ))}
+              <div className="scroll-strip-row__track">
+                {resolvedItems
+                  .filter((item) => item.id !== featured.id)
+                  .slice(0, RECENT_STRIP_DESKTOP)
+                  .map((item, index) => (
+                    <Link
+                      key={item.id}
+                      href={`/airdrops/${item.id}`}
+                      className={`contender-chip${index >= RECENT_STRIP_MOBILE ? " hidden md:inline-flex" : ""}`}
+                    >
+                      <TokenAvatar
+                        address={item.linkedToken}
+                        symbol={poolSymbol(item)}
+                        size={16}
+                        className="md:hidden"
+                      />
+                      <TokenAvatar
+                        address={item.linkedToken}
+                        symbol={poolSymbol(item)}
+                        size={18}
+                        className="hidden md:block"
+                      />
+                      <span className="text-caption text-pump-text">{poolSymbol(item)}</span>
+                    </Link>
+                  ))}
+              </div>
             </div>
           ) : null}
         </section>
-        </>
       ) : null}
 
-      <section className="grid grid-cols-2 items-stretch gap-2 md:grid-cols-3 md:gap-3">
-        <div className="col-span-2 flex min-w-0 flex-col gap-1 md:col-span-1">
+      <section className="grid grid-cols-1 gap-2 sm:grid-cols-3 md:gap-3">
+        <div className="panel-surface flex min-w-0 flex-row flex-nowrap items-center justify-between gap-3 p-2.5 md:px-3 md:py-3">
           <IconLabel
             icon={MetricIcons.totalRewards}
-            hideIconMobile
-            className="section-label md:hidden"
+            className="section-label min-w-0 shrink text-caption md:text-[inherit]"
+            iconClassName="h-3 w-3 shrink-0 opacity-75 md:h-3.5 md:w-3.5"
           >
             Total rewards
           </IconLabel>
-          <div className="panel-surface flex flex-nowrap items-center justify-between gap-2 px-2.5 py-2.5 md:gap-3 md:px-3 md:py-3">
-            <IconLabel
-              icon={MetricIcons.totalRewards}
-              hideIconMobile
-              className="section-label hidden shrink-0 md:inline-flex"
-            >
-              Total rewards
-            </IconLabel>
+          <div className="flex min-w-0 shrink items-baseline justify-end gap-1.5 text-right">
             <p className="financial-value shrink-0 text-body-sm font-semibold text-pump-text">
               {stats.totalUsd != null ? formatUsdReadable(stats.totalUsd, { compact: true }) : "—"}
             </p>
-            <p className="min-w-0 truncate text-right text-caption text-pump-muted">
-              {resolvedItems.length} campaigns · USD est.
-            </p>
+            <span className="truncate text-caption text-pump-muted">
+              <span className="md:hidden">USD est.</span>
+              <span className="hidden md:inline">
+                {resolvedItems.length} campaigns · USD est.
+              </span>
+            </span>
           </div>
         </div>
 
@@ -771,109 +794,43 @@ export function AirdropsListClient() {
         )}
       </section>
 
-      {isConnected && myCampaignItems.length > 0 ? (
-        <section className="space-y-2 md:space-y-3">
-          <div className="flex items-center justify-between gap-3">
-            <SectionHeadingIcon icon={MetricIcons.missions}>My campaigns</SectionHeadingIcon>
-            {mineIds.size > 3 ? (
-              <button
-                type="button"
-                onClick={() => setActiveFilter("mine")}
-                className="text-caption font-medium text-pump-accent hover:underline"
-              >
-                View all ({mineIds.size})
-              </button>
-            ) : null}
-          </div>
-          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-            {myCampaignItems.map((item) => (
-              <Link
-                key={item.id}
-                href={`/airdrops/${item.id}`}
-                className="panel-interactive flex items-center justify-between gap-3 p-3"
-              >
-                <div className="flex min-w-0 items-center gap-2.5">
-                  <TokenAvatar address={item.linkedToken} symbol={poolSymbol(item)} size={32} />
-                  <div className="min-w-0">
-                    <p className="truncate text-body-sm font-semibold text-pump-text">
-                      {poolSymbol(item)}
-                    </p>
-                    <p className="truncate text-caption text-pump-muted">
-                      {formatAirdropDisplayStatus(item.displayStatus)}
-                    </p>
-                  </div>
-                </div>
-                <span className="shrink-0 text-caption font-medium text-pump-accent">Continue →</span>
-              </Link>
-            ))}
-          </div>
-        </section>
-      ) : null}
-
       <div className="space-y-2 md:space-y-3">
-        <div>
-          <div className="flex items-center justify-between gap-3">
-            <SectionHeadingIcon icon={MetricIcons.exploreAirdrops}>Explore airdrops</SectionHeadingIcon>
-            <CreateCampaignLink className="h-8 px-2.5 text-caption md:hidden" />
-            <CreateCampaignLink className="hidden h-9 whitespace-nowrap px-4 text-body-sm md:inline-flex" />
+        <div className="flex items-center justify-between gap-3">
+          <SectionHeadingIcon icon={MetricIcons.exploreAirdrops}>Explore airdrops</SectionHeadingIcon>
+          <CreateCampaignLink className="h-8 px-2.5 text-caption md:hidden" />
+          <CreateCampaignLink className="hidden h-9 whitespace-nowrap px-4 text-body-sm md:inline-flex" />
+        </div>
+
+        <div className="arena-toolbar">
+          <div className="arena-search-group">
+            <div className="arena-toolbar-search">
+              <FieldSearchInput
+                embedded
+                fieldOnly
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search campaigns"
+              />
+            </div>
+          </div>
+          <div className="arena-filter-bar-wrap hidden md:block">
+            <div className="arena-filter-bar" role="tablist" aria-label="Airdrop filters">
+              <AirdropFilterChips
+                activeFilter={activeFilter}
+                filterCounts={filterCounts}
+                onSelect={setActiveFilter}
+              />
+            </div>
           </div>
         </div>
 
-        <div className="flex flex-col gap-2">
-          <FieldSearchInput
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search campaign or token"
-            className="md:max-w-xs"
-          />
-          <div className="sheet-tabs -mx-2 overflow-x-auto px-2 md:mx-0 md:px-0">
-            {(
-              [
-                ["all", "All", "All"],
-                ["qualifying", "Live", "Qualifying"],
-                ["claimable", "Claim", "Claimable"],
-                ["upcoming", "Soon", "Upcoming"],
-                ["endingSoon", "Ending", "Ending soon"],
-                ["ended", "Ended", "Ended"],
-                ["highValue", "High", "High value"],
-                ["saved", "Saved", "Saved"],
-                ["mine", "Mine", "My campaigns"],
-              ] as const
-            ).map(([key, mobileLabel, desktopLabel]) => {
-              const count = filterCounts[key] ?? 0;
-              const isSavedTab = key === "saved";
-              return (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => setActiveFilter(key)}
-                  className={`shrink-0 max-md:px-2.5 max-md:py-1.5 ${
-                    activeFilter === key ? "chip-button chip-button-active" : "chip-button"
-                  }`}
-                >
-                  {isSavedTab ? (
-                    <>
-                      <span className="inline-flex items-center gap-1 md:hidden">
-                        <Bookmark className="h-3.5 w-3.5" strokeWidth={ICON_STROKE} aria-hidden />
-                        <span>({count})</span>
-                      </span>
-                      <span className="hidden md:inline">
-                        {desktopLabel} ({count})
-                      </span>
-                    </>
-                  ) : (
-                    <>
-                      <span className="md:hidden">
-                        {mobileLabel} ({count})
-                      </span>
-                      <span className="hidden md:inline">
-                        {desktopLabel} ({count})
-                      </span>
-                    </>
-                  )}
-                </button>
-              );
-            })}
+        <div className="arena-filter-bar-wrap md:hidden">
+          <div className="arena-filter-bar" role="tablist" aria-label="Airdrop filters">
+            <AirdropFilterChips
+              activeFilter={activeFilter}
+              filterCounts={filterCounts}
+              onSelect={setActiveFilter}
+            />
           </div>
         </div>
 
@@ -882,7 +839,7 @@ export function AirdropsListClient() {
             <div className="p-8 text-center">
               <p className="text-body-sm text-pump-muted">
                 Connect your wallet to view{" "}
-                {activeFilter === "saved" ? "saved campaigns" : "your campaigns"}.
+                {activeFilter === "saved" ? "saved campaigns" : "joined airdrops"}.
               </p>
               <button
                 type="button"
@@ -897,8 +854,12 @@ export function AirdropsListClient() {
               {activeFilter === "saved"
                 ? "No saved campaigns yet. Tap the bookmark on any campaign to save it."
                 : activeFilter === "mine"
-                  ? "No joined campaigns yet. Complete on-chain requirements during qualify to track progress here."
-                  : "No campaigns match your filters."}
+                  ? "No joined airdrops yet. Complete on-chain requirements during qualify to track progress here."
+                  : activeFilter === "claimable"
+                    ? "No campaigns in the claimable phase. Winners can claim after qualify ends and results are finalized."
+                    : activeFilter === "qualifying"
+                      ? "No campaigns open for qualify right now."
+                      : "No campaigns match your filters."}
             </div>
           ) : (
             <>
@@ -951,13 +912,8 @@ export function AirdropsListClient() {
                                 symbol={poolSymbol(item)}
                                 size={30}
                               />
-                              <div className="flex min-w-0 items-baseline gap-2">
-                                <p className="truncate font-medium text-pump-text">
-                                  {campaignTitle(item)}
-                                </p>
-                                <p className="shrink-0 text-caption text-pump-muted">
-                                  {poolSymbol(item)}
-                                </p>
+                              <div className="min-w-0">
+                                <p className="truncate font-medium text-pump-text">{poolSymbol(item)}</p>
                               </div>
                             </Link>
                           </td>
@@ -989,7 +945,7 @@ export function AirdropsListClient() {
                               : formatQualifyDateTime(item.qualifyEnd)}
                           </td>
                           <td className="px-4 py-3 financial-value text-pump-text">
-                            {timeLeftLabel(item)}
+                            {airdropTimeCaption(item) ?? "Ended"}
                           </td>
                         </tr>
                     ))}

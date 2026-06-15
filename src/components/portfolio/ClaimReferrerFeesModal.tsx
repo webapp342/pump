@@ -1,7 +1,8 @@
 "use client";
 
+import { Share2 } from "lucide-react";
 import { formatEther } from "viem";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   useAccount,
   useReadContract,
@@ -12,7 +13,10 @@ import { contracts, pumpChain, shortAddress } from "@/config/chain";
 import { useBnbUsdPrice } from "@/hooks/useBnbUsdPrice";
 import { bondingCurveManagerAbi } from "@/lib/bonding-curve";
 import { buildReferralInviteUrl, truncateReferralInviteUrl } from "@/lib/referral-link";
+import { ShareSheetModal } from "@/components/ui/ShareSheetModal";
 import { ModalPortal } from "@/components/ui/ModalPortal";
+import { ICON_STROKE } from "@/lib/icons";
+import { referralSharePayload } from "@/lib/share-links";
 import { bnbToUsd, formatUsdReadable } from "@/lib/format-usd";
 
 type ClaimReferrerFeesModalProps = {
@@ -59,7 +63,7 @@ export function ClaimReferrerFeesModal({
 }: ClaimReferrerFeesModalProps) {
   const { bnbUsd } = useBnbUsdPrice();
   const { address, chain } = useAccount();
-  const [copied, setCopied] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
 
   const { data: pendingWei, refetch: refetchPending } = useReadContract({
     address: contracts.bondingCurveManager,
@@ -77,17 +81,7 @@ export function ClaimReferrerFeesModal({
   const handledTxRef = useRef<string | null>(null);
 
   const inviteUrl = address ? buildReferralInviteUrl(address) : "";
-
-  const copyLink = useCallback(async () => {
-    if (!inviteUrl) return;
-    try {
-      await navigator.clipboard.writeText(inviteUrl);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      setCopied(false);
-    }
-  }, [inviteUrl]);
+  const sharePayload = address ? referralSharePayload(address) : null;
 
   const pendingBnb = pendingWei != null ? Number(formatEther(pendingWei)) : 0;
   const totalBnb = claimedBnb + pendingBnb;
@@ -127,6 +121,7 @@ export function ClaimReferrerFeesModal({
   }
 
   return (
+    <>
     <ModalPortal open={open}>
       <div
         className="modal-backdrop modal-backdrop-shell z-50"
@@ -216,10 +211,11 @@ export function ClaimReferrerFeesModal({
             </p>
             <button
               type="button"
-              onClick={() => void copyLink()}
-              className="secondary-button mt-2"
+              onClick={() => setShareOpen(true)}
+              className="secondary-button mt-2 inline-flex items-center justify-center gap-1.5"
             >
-              {copied ? "Copied" : "Copy link"}
+              <Share2 className="h-4 w-4 shrink-0" strokeWidth={ICON_STROKE} aria-hidden />
+              Share
             </button>
           </div>
         ) : null}
@@ -254,5 +250,16 @@ export function ClaimReferrerFeesModal({
       </div>
     </div>
     </ModalPortal>
+
+      {sharePayload ? (
+        <ShareSheetModal
+          open={shareOpen}
+          onClose={() => setShareOpen(false)}
+          payload={sharePayload}
+          title="Share invite"
+          description="Friends must open your link before their first trade."
+        />
+      ) : null}
+    </>
   );
 }

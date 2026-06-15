@@ -67,7 +67,7 @@ export function AirdropPoolTokenMetric({
     <div className="flex min-w-0 items-center gap-1.5">
       <TokenAvatar address={tokenAddress} symbol={symbol} size={18} />
       <span className="financial-value truncate text-caption font-semibold text-pump-text">
-        ${symbol}
+        {symbol}
       </span>
     </div>
   );
@@ -77,34 +77,46 @@ export function AirdropProgressMetric({
   timeLabel,
   progressPct,
   showBar = true,
+  showIcon = true,
 }: {
   timeLabel: string;
   progressPct?: number;
   showBar?: boolean;
+  showIcon?: boolean;
 }) {
   const pct =
     progressPct != null ? Math.max(0, Math.min(100, Math.round(progressPct))) : null;
 
   return (
-    <div className={showBar && pct != null ? "space-y-1" : undefined}>
-      <div className="flex items-center justify-between gap-2">
-        <span className="flex min-w-0 items-center gap-1 financial-value text-caption font-semibold tabular-nums text-pump-text">
-          <HourglassIcon size={13} />
-          <span className="truncate">{timeLabel}</span>
-        </span>
-        {pct != null ? (
-          <span className="shrink-0 text-[11px] tabular-nums text-pump-muted">{pct}%</span>
-        ) : null}
+    <div
+      className={`airdrop-progress-metric${showBar && pct != null ? " airdrop-progress-metric--with-bar" : ""}`}
+    >
+      <div className="airdrop-progress-metric__head flex min-w-0 items-center gap-1 financial-value text-caption font-semibold tabular-nums text-pump-text">
+        {showIcon ? <HourglassIcon size={13} className="shrink-0" /> : null}
+        <span className="truncate">{timeLabel}</span>
       </div>
       {showBar && pct != null ? (
-        <div className="h-1 overflow-hidden rounded-full bg-pump-border/20">
-          <div
-            className="h-full rounded-full bg-pump-accent transition-[width] duration-500"
-            style={{ width: `${pct}%` }}
-          />
-        </div>
+        <>
+          <div className="airdrop-progress-metric__bar h-1 overflow-hidden rounded-full bg-pump-border/20">
+            <div
+              className="h-full rounded-full bg-pump-accent transition-[width] duration-500"
+              style={{ width: `${pct}%` }}
+            />
+          </div>
+          <span className="airdrop-progress-metric__pct financial-value shrink-0 text-caption tabular-nums text-pump-muted">
+            {pct}%
+          </span>
+        </>
       ) : null}
     </div>
+  );
+}
+
+export function AirdropParticipantsMetric({ count }: { count: number }) {
+  return (
+    <p className="financial-value text-caption font-semibold tabular-nums text-pump-text">
+      {count.toLocaleString()}
+    </p>
   );
 }
 

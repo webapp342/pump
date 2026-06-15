@@ -66,17 +66,17 @@ export function TradeSheet({
     <>
       <button
         type="button"
-        className={`modal-backdrop modal-backdrop-dismiss z-[100] cursor-default transition-opacity ${isModal ? "" : "xl:hidden"}`}
+        className={`modal-backdrop modal-backdrop-dismiss z-[100] cursor-default transition-opacity ${isModal ? "" : "lg:hidden"}`}
         aria-label="Close trade panel"
         onClick={onClose}
       />
       <div
         className={`fixed inset-0 z-[101] flex pointer-events-none ${
-          isModal ? "items-center justify-center p-4" : "items-end justify-center xl:hidden"
+          isModal ? "items-center justify-center p-4" : "items-end justify-center lg:hidden"
         }`}
         role="dialog"
         aria-modal="true"
-        aria-label={`Trade ${symbol}`}
+        aria-label={isModal ? tradeTitle : `Trade ${symbol}`}
       >
         <div
           className={`modal-panel pointer-events-auto flex flex-col overflow-hidden ${
@@ -85,26 +85,28 @@ export function TradeSheet({
               : "w-full max-h-[min(85dvh,720px)] border-x-0 border-b-0"
           }`}
         >
-          <div className={`shrink-0 border-b border-pump-border/45 px-4 pb-3 ${isModal ? "pt-4" : "pt-2"}`}>
-            {!isModal ? (
-              <div className="mb-2 flex justify-center" aria-hidden>
-                <div className="h-1 w-9 bg-pump-border/45" />
+          {isModal ? (
+            <div className="shrink-0 border-b border-pump-border/45 px-4 pb-3 pt-4">
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="text-h3 font-semibold text-pump-text">{tradeTitle}</h2>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="inline-flex h-8 w-8 shrink-0 items-center justify-center text-pump-muted transition hover:bg-pump-border/10 hover:text-pump-text"
+                  aria-label="Close"
+                >
+                  <span className="text-xl leading-none">×</span>
+                </button>
               </div>
-            ) : null}
-            <div className="flex items-center justify-between gap-3">
-              <h2 className="text-h3 font-semibold text-pump-text">{tradeTitle}</h2>
-              <button
-                type="button"
-                onClick={onClose}
-                className="inline-flex h-8 w-8 shrink-0 items-center justify-center text-pump-muted transition hover:bg-pump-border/10 hover:text-pump-text"
-                aria-label="Close"
-              >
-                <span className="text-xl leading-none">×</span>
-              </button>
             </div>
-          </div>
+          ) : (
+            <div className="shrink-0 pt-2" aria-hidden>
+              <div className="mx-auto h-1 w-9 bg-pump-border/45" />
+            </div>
+          )}
           <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pb-[max(1rem,env(safe-area-inset-bottom))]">
             <TradePanel
+              key={`${tokenAddress}-${tradeSide}`}
               embedded
               tokenAddress={tokenAddress}
               symbol={symbol}

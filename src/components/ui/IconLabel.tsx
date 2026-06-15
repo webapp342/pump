@@ -42,7 +42,7 @@ export function SectionHeadingIcon({
   return (
     <h2 className={`section-heading inline-flex items-center gap-2 ${className}`}>
       <Icon
-        className="hidden h-[1.05em] w-[1.05em] shrink-0 text-pump-accent sm:block"
+        className="h-[1.05em] w-[1.05em] shrink-0 text-pump-accent"
         strokeWidth={ICON_STROKE}
         aria-hidden
       />

@@ -1115,10 +1115,8 @@ export function TradePanel({
   const submitDisabled =
     isConnected &&
     (wrongChain || isBusy || paused || insufficientBalance || balancePending);
-  const submitTone =
-    side === "sell"
-      ? "bg-pump-danger text-white"
-      : "bg-pump-accent text-pump-accent-foreground";
+  const submitButtonClass =
+    side === "sell" ? "trade-submit-button--sell" : "trade-submit-button--buy";
 
   const canUseMaxBuy =
     side === "buy" &&
@@ -1238,7 +1236,7 @@ export function TradePanel({
               />
               <div
                 className={`pointer-events-none absolute top-1/2 h-1 -translate-y-1/2 rounded-full transition-[width] duration-75 ${
-                  side === "buy" ? "bg-pump-accent/70" : "bg-pump-danger/70"
+                  side === "buy" ? "bg-pump-success/70" : "bg-pump-danger/70"
                 }`}
                 style={{ width: `${sliderFillPct}%` }}
                 aria-hidden
@@ -1268,7 +1266,7 @@ export function TradePanel({
               onClick={() => applySliderPercent(100)}
               disabled={!canUseSlider}
               className={`shrink-0 text-caption font-semibold text-pump-muted transition disabled:opacity-40 ${
-                side === "buy" ? "hover:text-pump-accent" : "hover:text-pump-danger"
+                side === "buy" ? "hover:text-pump-success" : "hover:text-pump-danger"
               }`}
             >
               Max
@@ -1321,7 +1319,7 @@ export function TradePanel({
           <button
             type="submit"
             disabled={submitDisabled}
-            className={`primary-button w-full py-3 text-body-sm disabled:cursor-not-allowed disabled:opacity-50 ${submitTone}`}
+            className={`trade-submit-button ${submitButtonClass}`}
           >
             {submitLabel}
           </button>

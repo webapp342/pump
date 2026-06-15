@@ -1,5 +1,6 @@
 import { parseEther, formatEther } from "viem";
 import { rewardAmountForRank } from "@/lib/airdrop-distribution";
+import type { AirdropDisplayStatus } from "@/lib/airdrop-status";
 import { bnbToUsd } from "@/lib/format-usd";
 
 type AirdropRewardMeta = {
@@ -138,6 +139,48 @@ export function qualifyWindowProgress(startIso: string, endIso: string): number 
   if (now <= start) return 0;
   if (now >= end) return 100;
   return Math.min(100, ((now - start) / (end - start)) * 100);
+}
+
+const DEFAULT_CLAIM_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+/** Elapsed % through the claim window (starts when qualify ends). */
+export function claimWindowProgress(
+  qualifyEndIso: string,
+  claimEndIso: string | null | undefined
+): number {
+  const start = new Date(qualifyEndIso).getTime();
+  const end = claimEndIso
+    ? new Date(claimEndIso).getTime()
+    : start + DEFAULT_CLAIM_WINDOW_MS;
+  const now = Date.now();
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return 0;
+  if (now <= start) return 0;
+  if (now >= end) return 100;
+  return Math.min(100, ((now - start) / (end - start)) * 100);
+}
+
+/** Progress bar fill for the active campaign phase (qualify vs claim). */
+export function airdropTimelineProgress(
+  displayStatus: AirdropDisplayStatus,
+  qualifyStart: string,
+  qualifyEnd: string,
+  claimEnd?: string | null
+): number | undefined {
+  if (displayStatus === "UPCOMING" || displayStatus === "QUALIFYING") {
+    return qualifyWindowProgress(qualifyStart, qualifyEnd);
+  }
+  if (displayStatus === "CLAIMABLE") {
+    return claimWindowProgress(qualifyEnd, claimEnd);
+  }
+  return undefined;
+}
+
+export function showAirdropProgressBar(displayStatus: AirdropDisplayStatus): boolean {
+  return (
+    displayStatus === "UPCOMING" ||
+    displayStatus === "QUALIFYING" ||
+    displayStatus === "CLAIMABLE"
+  );
 }
 
 export function formatQualifyDate(iso: string): string {

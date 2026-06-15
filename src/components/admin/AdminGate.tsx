@@ -10,7 +10,9 @@ export function AdminGate({ children }: { children: React.ReactNode }) {
   if (isConnecting) {
     return (
       <div className="admin-page">
-        <p className="admin-empty">Verifying access…</p>
+        <div className="empty-state admin-empty">
+          <p className="empty-state-copy">Verifying access…</p>
+        </div>
       </div>
     );
   }
@@ -18,11 +20,13 @@ export function AdminGate({ children }: { children: React.ReactNode }) {
   if (!isConnected || !isAdminWallet(address)) {
     return (
       <div className="admin-page py-16 text-center">
-        <p className="admin-title">404</p>
-        <p className="admin-meta mt-2">Page not found.</p>
-        <Link href="/" className="admin-link mt-4 inline-block">
-          Back to Arena
-        </Link>
+        <div className="empty-state mx-auto max-w-sm">
+          <p className="page-title">404</p>
+          <p className="empty-state-copy mt-2">Page not found.</p>
+          <Link href="/" className="admin-link mt-4 inline-block">
+            Back to Arena
+          </Link>
+        </div>
       </div>
     );
   }
