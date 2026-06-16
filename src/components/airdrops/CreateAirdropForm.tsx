@@ -30,6 +30,7 @@ import {
   type SocialTaskDraft,
 } from "@/lib/airdrop-social";
 import { useOpenConnectModal } from "@/hooks/useOpenConnectModal";
+import { useWalletFunding } from "@/components/wallet/WalletFundingProvider";
 import {
   useAccount,
   useBalance,
@@ -89,7 +90,7 @@ function rewardPoolValidationMessage(opts: {
   if (!opts.isConnected) return "Connect wallet to set pool size.";
   if (opts.maxRewardWei === 0n) {
     return opts.isBnbReward
-      ? "Insufficient BNB for reward pool (need balance after create fee and gas)."
+      ? "Need more BNB for reward pool (balance must cover create fee and gas)."
       : `Insufficient ${opts.rewardSymbol} balance for reward pool.`;
   }
   if (!opts.rewardAmountInput.trim()) return "Enter a pool size.";
@@ -131,6 +132,7 @@ export function CreateAirdropForm({
   const rulesRef = useRef<AirdropRules>({});
 
   const { openConnectModal } = useOpenConnectModal();
+  const { openFundChoice } = useWalletFunding();
   const { address, isConnected } = useAccount();
   const [tokens, setTokens] = useState<TokenListItem[]>([]);
   const [createdTokens, setCreatedTokens] = useState<TokenListItem[]>([]);
@@ -509,6 +511,10 @@ export function CreateAirdropForm({
 
     const amount = parsedRewardAmount;
     if (!amount || amount <= 0n) {
+      if (formValidation.needsBnbFunding) {
+        openAirdropFundingModal();
+        return;
+      }
       setError(
         rewardPoolValidationMessage({
           isConnected: Boolean(address),
@@ -519,6 +525,11 @@ export function CreateAirdropForm({
           rewardSymbol: selectedRewardSymbol,
         })
       );
+      return;
+    }
+
+    if (formValidation.needsBnbFunding) {
+      openAirdropFundingModal();
       return;
     }
 
@@ -750,7 +761,38 @@ export function CreateAirdropForm({
       canSubmit = false;
     }
 
+    let canSubmitExceptBnb = canSubmit;
+    let needsBnbFunding = false;
+    let bnbShortfallWei = 0n;
+    let fundMessage = "";
+
     const fee = createFee ?? 0n;
+
+    if (isConnected && bnbBalance !== undefined) {
+      const bnbAvail = bnbBalance.value;
+      const minBnbNeeded = fee + GAS_BUFFER_BNB;
+
+      if (isBnbReward) {
+        const targetReward = parsedRewardAmount ?? 0n;
+        const neededBnb =
+          targetReward > 0n ? targetReward + minBnbNeeded : minBnbNeeded;
+
+        if (bnbAvail < neededBnb) {
+          bnbShortfallWei = neededBnb - bnbAvail;
+          needsBnbFunding = true;
+          fundMessage =
+            targetReward > 0n
+              ? `You need ${formatCampaignAmount(bnbShortfallWei)} more BNB for the reward pool, create fee, and gas.`
+              : `You need ${formatCampaignAmount(bnbShortfallWei)} more BNB for the create fee and gas.`;
+        }
+      } else if (rewardToken) {
+        if (bnbAvail < minBnbNeeded) {
+          bnbShortfallWei = minBnbNeeded - bnbAvail;
+          needsBnbFunding = true;
+          fundMessage = `You need ${formatCampaignAmount(bnbShortfallWei)} more BNB for the create fee and gas.`;
+        }
+      }
+    }
 
     if (isConnected && parsedRewardAmount) {
       const bnbAvail = bnbBalance?.value ?? 0n;
@@ -759,7 +801,7 @@ export function CreateAirdropForm({
         const neededBnb = parsedRewardAmount + fee + GAS_BUFFER_BNB;
         if (bnbAvail < neededBnb) {
           warnings.push(
-            `Insufficient BNB: need ${formatEther(neededBnb)} (reward + ${formatEther(fee)} fee + gas), wallet has ${formatEther(bnbAvail)}.`
+            `Need ${formatCampaignAmount(neededBnb - bnbAvail)} more BNB for reward pool, create fee, and gas.`
           );
           canSubmit = false;
         }
@@ -767,7 +809,7 @@ export function CreateAirdropForm({
         const neededBnb = fee + GAS_BUFFER_BNB;
         if (bnbAvail < neededBnb) {
           warnings.push(
-            `Insufficient BNB for create fee: need ${formatEther(neededBnb)} (${formatEther(fee)} fee + gas), wallet has ${formatEther(bnbAvail)}.`
+            `Need ${formatCampaignAmount(neededBnb - bnbAvail)} more BNB for create fee and gas.`
           );
           canSubmit = false;
         }
@@ -780,9 +822,17 @@ export function CreateAirdropForm({
           canSubmit = false;
         }
       }
+    } else if (isConnected && isBnbReward && maxRewardWei === 0n && bnbBalance !== undefined) {
+      const minBnbNeeded = fee + GAS_BUFFER_BNB;
+      if (bnbBalance.value < minBnbNeeded) {
+        warnings.push(
+          `Need ${formatCampaignAmount(minBnbNeeded - bnbBalance.value)} more BNB for create fee and gas.`
+        );
+        canSubmit = false;
+      }
     }
 
-    return { warnings, canSubmit };
+    return { warnings, canSubmit, canSubmitExceptBnb, needsBnbFunding, bnbShortfallWei, fundMessage };
   }, [
     linkedToken,
     rules.onchain?.minHoldWei,
@@ -812,18 +862,30 @@ export function CreateAirdropForm({
     );
   }
 
+  function openAirdropFundingModal() {
+    openFundChoice({
+      title: "Add BNB to create campaign",
+      message:
+        formValidation.fundMessage ||
+        `You need ${formatCampaignAmount(formValidation.bnbShortfallWei)} more BNB to create this campaign.`,
+    });
+  }
+
   const busy = isPending || Boolean(txHash && !error);
-  const submitDisabled = busy || !formValidation.canSubmit;
+  const canUseFundingCta = formValidation.needsBnbFunding && isConnected;
+  const submitDisabled = busy || (!formValidation.canSubmit && !canUseFundingCta);
   const displayTitle = title.trim() || "Your campaign";
   const displayPoolSymbol = selectedLinkedToken?.symbol ?? "TOKEN";
 
   const submitLabel = !isConnected
     ? "Connect wallet"
-    : pendingAction === "approve"
-      ? "Approving token…"
-      : busy
-        ? "Creating…"
-        : "Create campaign";
+    : canUseFundingCta
+      ? "Add BNB to create"
+      : pendingAction === "approve"
+        ? "Approving token…"
+        : busy
+          ? "Creating…"
+          : "Create campaign";
 
   const rewardAssetLabel = isBnbReward ? "BNB" : selectedRewardSymbol;
   const rewardAmountValue =
@@ -990,6 +1052,21 @@ export function CreateAirdropForm({
                   <span className="financial-value text-pump-text">{maxRewardLabel}</span>
                   {isBnbReward ? " BNB" : ` ${selectedRewardSymbol}`}.
                 </p>
+              ) : null}
+
+              {canUseFundingCta ? (
+                <div className="mt-2 rounded-md border border-pump-warning/30 bg-pump-warning/10 px-2.5 py-2">
+                  <p className="text-caption leading-snug text-pump-warning">
+                    {formValidation.fundMessage}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={openAirdropFundingModal}
+                    className="secondary-button mt-2 w-full py-2 text-caption"
+                  >
+                    Add funds
+                  </button>
+                </div>
               ) : null}
 
               <div className="mt-3 max-w-sm">
@@ -1258,6 +1335,17 @@ export function CreateAirdropForm({
                   {warning}
                 </li>
               ))}
+              {canUseFundingCta ? (
+                <li className="pt-1">
+                  <button
+                    type="button"
+                    onClick={openAirdropFundingModal}
+                    className="secondary-button w-full py-2 text-caption"
+                  >
+                    Add funds
+                  </button>
+                </li>
+              ) : null}
             </ul>
           ) : null}
 

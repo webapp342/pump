@@ -7,6 +7,7 @@ import { cookieToInitialState, WagmiProvider, type Config } from "wagmi";
 import { useTheme } from "@/components/theme/ThemeProvider";
 import { getAppKitThemeOptions } from "@/lib/appkit-theme";
 import type { ThemeId } from "@/lib/theme";
+import { WalletFundingProvider } from "@/components/wallet/WalletFundingProvider";
 import { wagmiAdapter } from "@/lib/appkit";
 
 function AppKitThemeSync() {
@@ -53,7 +54,7 @@ export function Web3Provider({
     <WagmiProvider config={wagmiAdapter.wagmiConfig as Config} initialState={initialState}>
       <QueryClientProvider client={queryClient}>
         <AppKitThemeSync />
-        {children}
+        <WalletFundingProvider>{children}</WalletFundingProvider>
       </QueryClientProvider>
     </WagmiProvider>
   );

@@ -12,6 +12,7 @@ import { useUserAvatar } from "@/components/user/UserAvatarProvider";
 import { useBnbUsdPrice } from "@/hooks/useBnbUsdPrice";
 import { bnbToUsd } from "@/lib/format-usd";
 import { copyToClipboard } from "@/lib/copy-to-clipboard";
+import { useWalletFunding } from "@/components/wallet/WalletFundingProvider";
 
 function formatHeaderBalanceUsd(usd: number | null): string {
   if (usd == null || !Number.isFinite(usd)) return "$0.00";
@@ -93,6 +94,7 @@ function WalletMenu({
   onClose,
 }: WalletMenuProps) {
   const { disconnect } = useDisconnect();
+  const { openDeposit, openOnRamp } = useWalletFunding();
   const [copied, setCopied] = useState(false);
 
   async function onCopyAddress(event: MouseEvent<HTMLButtonElement>) {
@@ -142,6 +144,29 @@ function WalletMenu({
       </button>
 
       <div className="mt-3 grid grid-cols-2 gap-2">
+        <button
+          type="button"
+          onClick={() => {
+            onClose();
+            openDeposit();
+          }}
+          className="primary-button py-2.5 text-body-sm"
+        >
+          Deposit
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            onClose();
+            openOnRamp();
+          }}
+          className="secondary-button py-2.5 text-body-sm"
+        >
+          Buy
+        </button>
+      </div>
+
+      <div className="mt-2 grid grid-cols-2 gap-2">
         <Link
           href="/portfolio"
           onClick={onClose}

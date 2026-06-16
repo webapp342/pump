@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { formatEther, formatUnits, parseEther, parseUnits } from "viem";
 import type { TransactionReceipt } from "viem";
 import { useOpenConnectModal } from "@/hooks/useOpenConnectModal";
+import { useWalletFunding } from "@/components/wallet/WalletFundingProvider";
 import {
   useAccount,
   useBalance,
@@ -172,6 +173,7 @@ export function TradePanel({
   const { address, isConnected, chain } = useAccount();
   const { data: gasPrice } = useGasPrice({ chainId: pumpChain.id });
   const { openConnectModal } = useOpenConnectModal();
+  const { openFundChoice } = useWalletFunding();
   const { bnbUsd } = useBnbUsdPrice();
   const [side, setSide] = useState<Side>("buy");
   const [buyInputMode, setBuyInputMode] = useState<TradeInputMode>("usd");
@@ -559,6 +561,14 @@ export function TradePanel({
 
   const insufficientBalance =
     side === "buy" ? insufficientBuyBalance : insufficientSellBalance;
+
+  const insufficientTokenOnly =
+    side === "sell" && insufficientSellTokenBalance && !insufficientSellGas;
+
+  const needsBnbFunding =
+    isConnected &&
+    !wrongChain &&
+    (insufficientBuyBalance || (side === "sell" && insufficientSellGas && !insufficientSellTokenBalance));
 
   const balancePending =
     side === "buy"
@@ -1070,6 +1080,16 @@ export function TradePanel({
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (needsBnbFunding) {
+      openFundChoice({
+        title: "Add BNB to trade",
+        message:
+          side === "buy"
+            ? "You need more BNB on BSC to complete this buy, including network fees."
+            : "You need a small BNB balance to pay network fees for this sell.",
+      });
+      return;
+    }
     await submitTrade();
   }
 
@@ -1094,10 +1114,14 @@ export function TradePanel({
     ? "Connect wallet to trade"
     : wrongChain
       ? "Switch to BSC Testnet"
-      : insufficientBalance
-        ? insufficientSellGas && !insufficientSellTokenBalance
-          ? "Insufficient BNB for gas"
-          : "Insufficient balance"
+      : needsBnbFunding
+        ? side === "buy"
+          ? "Add BNB to buy"
+          : "Add BNB for gas"
+        : insufficientBalance
+          ? insufficientTokenOnly
+            ? "Insufficient token balance"
+            : "Insufficient balance"
         : side === "buy"
           ? isBusy
             ? "Buying…"
@@ -1114,7 +1138,11 @@ export function TradePanel({
 
   const submitDisabled =
     isConnected &&
-    (wrongChain || isBusy || paused || insufficientBalance || balancePending);
+    (wrongChain ||
+      isBusy ||
+      paused ||
+      balancePending ||
+      (insufficientBalance && !needsBnbFunding));
   const submitButtonClass =
     side === "sell" ? "trade-submit-button--sell" : "trade-submit-button--buy";
 

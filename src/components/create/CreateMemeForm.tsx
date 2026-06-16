@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { parseEther, parseEventLogs } from "viem";
 import { useOpenConnectModal } from "@/hooks/useOpenConnectModal";
+import { useWalletFunding } from "@/components/wallet/WalletFundingProvider";
 import {
   useAccount,
   useBalance,
@@ -167,6 +168,7 @@ export function CreateMemeForm() {
   const descriptionRef = useRef("");
   const socialLinksRef = useRef({ twitter: "", website: "", telegram: "", discord: "" });
   const { openConnectModal } = useOpenConnectModal();
+  const { openFundChoice } = useWalletFunding();
   const { address, isConnected, chain } = useAccount();
   const [name, setName] = useState("");
   const [symbol, setSymbol] = useState("");
@@ -410,6 +412,16 @@ export function CreateMemeForm() {
     return launchRequiredWei - bnbBalance.value;
   }, [isConnected, bnbBalanceLoading, bnbBalance, launchRequiredWei]);
 
+  const needsBnbFunding =
+    isConnected && !bnbBalanceLoading && bnbShortfallWei > 0n;
+
+  function openLaunchFundingModal() {
+    openFundChoice({
+      title: "Add BNB to launch",
+      message: `You need ${formatCampaignAmount(bnbShortfallWei)} more BNB for the create fee, initial buy, and gas.`,
+    });
+  }
+
   const showInitialBuySlider = canUseInitialBuySlider;
 
   const initialBuySliderPct = useMemo(() => {
@@ -498,10 +510,8 @@ export function CreateMemeForm() {
       setError("Initial buy is too small for the bonding curve.");
       return;
     }
-    if (bnbBalance !== undefined && launchRequiredWei > bnbBalance.value) {
-      setError(
-        `Need ${formatCampaignAmount(launchRequiredWei - bnbBalance.value)} more BNB for create fee, initial buy, and gas.`
-      );
+    if (needsBnbFunding) {
+      openLaunchFundingModal();
       return;
     }
 
@@ -540,9 +550,11 @@ export function CreateMemeForm() {
     ? "Connect wallet"
     : wrongChain
       ? "Switch to BSC Testnet"
-      : isBusy
-        ? "Creating…"
-        : "Create + Launch";
+      : needsBnbFunding
+        ? "Add BNB to launch"
+        : isBusy
+          ? "Creating…"
+          : "Create + Launch";
 
   const submitDisabled = isConnected && (wrongChain || isBusy || !contractsReady);
 
@@ -724,16 +736,25 @@ export function CreateMemeForm() {
               ) : null}
             </p>
             {bnbShortfallWei > 0n && isConnected && !bnbBalanceLoading ? (
-              <p className="mt-2 rounded-md border border-pump-warning/30 bg-pump-warning/10 px-2.5 py-2 text-caption leading-snug text-pump-warning">
-                Need{" "}
-                <BnbAmountDisplay
-                  amount={formatCampaignAmount(bnbShortfallWei)}
-                  logoSize={14}
-                  amountClassName="financial-value font-semibold tabular-nums text-pump-warning"
-                  symbolClassName="text-caption font-medium text-pump-warning/90"
-                />{" "}
-                more for create fee, initial buy, and gas.
-              </p>
+              <div className="mt-2 rounded-md border border-pump-warning/30 bg-pump-warning/10 px-2.5 py-2">
+                <p className="text-caption leading-snug text-pump-warning">
+                  Need{" "}
+                  <BnbAmountDisplay
+                    amount={formatCampaignAmount(bnbShortfallWei)}
+                    logoSize={14}
+                    amountClassName="financial-value font-semibold tabular-nums text-pump-warning"
+                    symbolClassName="text-caption font-medium text-pump-warning/90"
+                  />{" "}
+                  more for create fee, initial buy, and gas.
+                </p>
+                <button
+                  type="button"
+                  onClick={openLaunchFundingModal}
+                  className="secondary-button mt-2 w-full py-2 text-caption"
+                >
+                  Add funds
+                </button>
+              </div>
             ) : null}
           </div>
         </section>
@@ -934,7 +955,15 @@ export function CreateMemeForm() {
             disabled={submitDisabled}
             className="primary-button min-h-11 shrink-0 px-4 text-caption"
           >
-            {isBusy ? "Creating…" : !isConnected ? "Connect" : wrongChain ? "Switch net" : "Launch"}
+            {isBusy
+              ? "Creating…"
+              : !isConnected
+                ? "Connect"
+                : wrongChain
+                  ? "Switch net"
+                  : needsBnbFunding
+                    ? "Add BNB"
+                    : "Launch"}
           </button>
         </div>
       </div>
