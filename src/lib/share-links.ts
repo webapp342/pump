@@ -75,3 +75,20 @@ export function referralSharePayload(address: string, origin?: string): SharePay
     text: "Trade memes on BSC with my referral link — connect before your first trade.",
   };
 }
+
+export function tokenSharePayload(
+  token: { name: string; symbol: string; address: string },
+  pageUrl?: string
+): SharePayload {
+  const url =
+    pageUrl ??
+    (typeof window !== "undefined"
+      ? window.location.href
+      : `/token/${token.address}`);
+
+  return {
+    url,
+    title: `${token.name} ($${token.symbol})`,
+    text: `Trade $${token.symbol} on Pump — BSC meme launchpad.`,
+  };
+}

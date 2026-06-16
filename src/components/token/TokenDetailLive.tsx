@@ -38,10 +38,12 @@ import { useFavorites } from "@/components/favorites/FavoritesProvider";
 import { TokenAvatar } from "@/components/token/TokenAvatar";
 import { CreatorProfileModal } from "@/components/creators/CreatorProfileModal";
 import { CreatorRewardsCard } from "@/components/creators/CreatorRewardsCard";
+import { ShareSheetModal } from "@/components/ui/ShareSheetModal";
 import { TokenSocialLinksBar } from "@/components/token/TokenSocialLinksBar";
 import { UserAvatarForAddress } from "@/components/user/UserAvatarForAddress";
 import { hasSocialLinks } from "@/lib/token-social";
 import { copyToClipboard } from "@/lib/copy-to-clipboard";
+import { tokenSharePayload } from "@/lib/share-links";
 import { shellPaddingXClass } from "@/components/layout/layout-shell";
 import { useLiveChannel, resolveLivePollDelay } from "@/hooks/useLiveChannel";
 
@@ -200,6 +202,7 @@ export function TokenDetailLive({
   const [profileAddress, setProfileAddress] = useState<string | null>(null);
   const [tradePrefill, setTradePrefill] = useState<TradePrefillConfig | null>(null);
   const [tradeSheetOpen, setTradeSheetOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const tradePrefillCapturedRef = useRef(false);
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -432,25 +435,19 @@ export function TokenDetailLive({
     [trades, displayPrice, bnbUsd]
   );
 
+  const sharePayload = useMemo(
+    () => tokenSharePayload(liveToken),
+    [liveToken]
+  );
+
   async function onCopyAddress() {
     const ok = await copyToClipboard(liveToken.address);
     setCopiedAddress(ok);
     if (ok) setTimeout(() => setCopiedAddress(false), 2000);
   }
 
-  async function onShare() {
-    const url = typeof window !== "undefined" ? window.location.href : "";
-    const shareData = { title: `${liveToken.name} (${liveToken.symbol})`, text: liveToken.name, url };
-
-    try {
-      if (navigator.share) {
-        await navigator.share(shareData);
-        return;
-      }
-      await copyToClipboard(url || liveToken.address);
-    } catch {
-      // ignore cancelled share
-    }
+  function onShare() {
+    setShareOpen(true);
   }
 
   const elapsed = formatElapsedSince(liveToken.createdAt);
@@ -473,7 +470,7 @@ export function TokenDetailLive({
     <div className="segment-control">
       <button
         type="button"
-        onClick={() => void onShare()}
+        onClick={onShare}
         className="inline-flex h-8 w-8 items-center justify-center text-pump-muted transition hover:bg-pump-border/10 hover:text-pump-text"
         aria-label="Share"
       >
@@ -569,7 +566,7 @@ export function TokenDetailLive({
         <div className="flex shrink-0 items-center gap-2">
           <button
             type="button"
-            onClick={() => void onShare()}
+            onClick={onShare}
             className="secondary-button inline-flex h-8 items-center gap-2 px-3 text-body-sm"
             aria-label="Share"
           >
@@ -700,6 +697,14 @@ export function TokenDetailLive({
         open={profileAddress != null}
         onClose={() => setProfileAddress(null)}
         creatorAddress={profileAddress ?? ""}
+      />
+
+      <ShareSheetModal
+        open={shareOpen}
+        onClose={() => setShareOpen(false)}
+        payload={sharePayload}
+        title="Share token"
+        description={`Spread the word about $${liveToken.symbol}.`}
       />
     </div>
   );
