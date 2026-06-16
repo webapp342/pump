@@ -1,9 +1,9 @@
 "use client";
 
-import Link from "next/link";
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import type { TokenDetail, TradeItem } from "@/lib/db/launchpad";
 import { AppShell } from "@/components/layout/AppShell";
+import { PageBackLink } from "@/components/ui/PageBackLink";
 import { TokenDetailLive } from "@/components/token/TokenDetailLive";
 import { TokenDetailBackLink } from "@/components/token/TokenDetailBackLink";
 import { TokenDetailBodySkeleton } from "@/components/token/TokenDetailBodySkeleton";
@@ -30,16 +30,7 @@ function TokenDetailView({
 }) {
   return (
     <>
-      <Suspense
-        fallback={
-          <Link
-            href="/"
-            className="inline-flex items-center text-body-sm text-pump-muted transition hover:text-pump-accent"
-          >
-            ← Arena
-          </Link>
-        }
-      >
+      <Suspense fallback={<PageBackLink href="/" />}>
         <TokenDetailBackLink />
       </Suspense>
 
@@ -149,12 +140,7 @@ export function TokenDetailShell({ address }: TokenDetailShellProps) {
   if (initialLoading && !optimisticToken) {
     return (
       <AppShell wide>
-        <Link
-          href="/"
-          className="inline-flex items-center text-body-sm text-pump-muted transition hover:text-pump-accent"
-        >
-          ← Arena
-        </Link>
+        <PageBackLink href="/" />
         <TokenDetailBodySkeleton />
       </AppShell>
     );
@@ -163,12 +149,7 @@ export function TokenDetailShell({ address }: TokenDetailShellProps) {
   if (fatalError && !data && !optimisticToken) {
     return (
       <AppShell wide>
-        <Link
-          href="/"
-          className="inline-flex items-center text-body-sm text-pump-muted transition hover:text-pump-accent"
-        >
-          ← Arena
-        </Link>
+        <PageBackLink href="/" />
         <div className="notice-error mt-6 p-4">
           {fatalError}
         </div>

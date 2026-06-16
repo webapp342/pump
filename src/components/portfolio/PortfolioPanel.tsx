@@ -23,6 +23,7 @@ import { useUserAvatar } from "@/components/user/UserAvatarProvider";
 import { shortAddress } from "@/config/chain";
 import { TokenBoardTable } from "@/components/arena/TokenBoardTable";
 import { PortfolioAirdropsSection } from "@/components/portfolio/PortfolioAirdropsSection";
+import { SellAllHoldingsModal } from "@/components/portfolio/SellAllHoldingsModal";
 import { PortfolioPanelSkeleton } from "@/components/portfolio/PortfolioPanelSkeleton";
 import { HoldingSwipeRow } from "@/components/portfolio/HoldingSwipeRow";
 import { HoldingsSwipeHint } from "@/components/portfolio/HoldingsSwipeHint";
@@ -32,6 +33,16 @@ import type { TokenListItem } from "@/lib/db/launchpad";
 import { useBnbUsdPrice } from "@/hooks/useBnbUsdPrice";
 import { bnbToUsd, formatUsdReadable } from "@/lib/format-usd";
 import { formatCapForBoard, formatSignedPct, pctTone } from "@/lib/arena-board-format";
+import {
+  PORTFOLIO_CREATOR_WALLET_SCAN_MAX,
+  PORTFOLIO_DERIVED_LOTS_MAX,
+  PORTFOLIO_HOLDINGS_INCREMENT,
+  PORTFOLIO_HOLDINGS_INITIAL,
+  PORTFOLIO_LAUNCHED_INCREMENT,
+  PORTFOLIO_LAUNCHED_INITIAL,
+  PORTFOLIO_ONCHAIN_BALANCE_CHUNK,
+  PORTFOLIO_ONCHAIN_VERIFY_INITIAL,
+} from "@/lib/portfolio-limits";
 import {
   resolveVerifiedTokenBalance,
   scaleCostBasisForBalance,
@@ -61,6 +72,7 @@ type PortfolioData = {
   followerCount: number;
   positions: PortfolioPosition[];
   createdTokens: TokenListItem[];
+  createdTokensTotal: number;
 };
 
 type WalletLaunchpadHolding = {
@@ -122,11 +134,11 @@ function buildVerifiedPositionView(
   const indexedBalance = lot?.netTokens ?? Number(position.tokenBalance);
   const fullCostBasis = lot?.remainingCostBnb ?? Math.max(0, totalBought - totalSold);
   const onChainStr = onChainBalances[position.tokenAddress.toLowerCase()];
-  if (onChainStr == null) return null;
+  const onChainBalance = onChainStr != null ? Number(onChainStr) : null;
 
   const { displayBalance, hidden } = resolveVerifiedTokenBalance(
     indexedBalance,
-    Number(onChainStr)
+    onChainBalance
   );
 
   if (hidden) return null;
@@ -352,6 +364,30 @@ function WalletHoldingDesktopRow({
   );
 }
 
+type PortfolioHoldingRow =
+  | { kind: "position"; view: VerifiedPositionView; estimatedValueBnb: number }
+  | { kind: "wallet"; holding: WalletLaunchpadHolding; estimatedValueBnb: number };
+
+function buildPortfolioHoldingRows(
+  verifiedPositionViews: VerifiedPositionView[],
+  walletHoldings: WalletLaunchpadHolding[]
+): PortfolioHoldingRow[] {
+  const rows: PortfolioHoldingRow[] = [
+    ...verifiedPositionViews.map((view) => ({
+      kind: "position" as const,
+      view,
+      estimatedValueBnb: view.balance * Number(view.position.lastPriceBnb),
+    })),
+    ...walletHoldings.map((holding) => ({
+      kind: "wallet" as const,
+      holding,
+      estimatedValueBnb: Number(holding.tokenBalance) * Number(holding.lastPriceBnb),
+    })),
+  ];
+
+  return rows.sort((a, b) => b.estimatedValueBnb - a.estimatedValueBnb);
+}
+
 const BURST_POLL_MS = 1_500;
 const BURST_DURATION_MS = 60_000;
 const NORMAL_POLL_MS = 15_000;
@@ -393,37 +429,75 @@ function computeOpenLotForAddress(trades: TradeRow[], walletAddress: string): De
   return { netTokens, remainingCostBnb };
 }
 
-async function fetchPortfolioData(walletAddress: string): Promise<PortfolioData | null> {
-  const response = await fetch(`/api/portfolio?address=${walletAddress}`, { cache: "no-store" });
+async function fetchPortfolioData(
+  walletAddress: string,
+  createdLimit = PORTFOLIO_LAUNCHED_INITIAL
+): Promise<PortfolioData | null> {
+  const response = await fetch(
+    `/api/portfolio?address=${encodeURIComponent(walletAddress)}&createdLimit=${createdLimit}`,
+    { cache: "no-store" }
+  );
   const body = (await response.json()) as { data?: PortfolioData; error?: string };
   if (!response.ok) throw new Error(body.error ?? "Failed to load portfolio");
   return body.data ?? null;
 }
 
+async function fetchCreatedTokensPage(
+  walletAddress: string,
+  limit: number,
+  offset: number
+): Promise<{ tokens: TokenListItem[]; total: number; hasMore: boolean }> {
+  const response = await fetch(
+    `/api/portfolio/created-tokens?address=${encodeURIComponent(walletAddress)}&limit=${limit}&offset=${offset}`,
+    { cache: "no-store" }
+  );
+  const body = (await response.json()) as {
+    data?: { tokens: TokenListItem[]; total: number; hasMore: boolean };
+    error?: string;
+  };
+  if (!response.ok) throw new Error(body.error ?? "Failed to load launched tokens");
+  return body.data ?? { tokens: [], total: 0, hasMore: false };
+}
+
 async function fetchOnChainBalancesForTokens(
   walletAddress: string,
   tokenAddresses: string[]
-): Promise<Record<string, string> | null> {
+): Promise<Record<string, string>> {
   if (tokenAddresses.length === 0) return {};
 
-  const response = await fetch(
-    `/api/portfolio/onchain-balances?address=${walletAddress}&tokens=${tokenAddresses.join(",")}`,
-    { cache: "no-store" }
-  );
-  if (!response.ok) return null;
+  const merged: Record<string, string> = {};
 
-  const body = (await response.json()) as { data?: Record<string, string> };
-  return body.data ?? {};
+  for (let i = 0; i < tokenAddresses.length; i += PORTFOLIO_ONCHAIN_BALANCE_CHUNK) {
+    const chunk = tokenAddresses.slice(i, i + PORTFOLIO_ONCHAIN_BALANCE_CHUNK);
+    try {
+      const response = await fetch("/api/portfolio/onchain-balances", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ address: walletAddress, tokens: chunk }),
+        cache: "no-store",
+      });
+      if (!response.ok) continue;
+      const body = (await response.json()) as { data?: Record<string, string> };
+      Object.assign(merged, body.data ?? {});
+    } catch {
+      // Keep partial results when a batch fails.
+    }
+  }
+
+  return merged;
 }
 
 async function fetchExtraWalletHoldings(
   walletAddress: string,
-  excludeTokenAddresses: string[]
+  excludeTokenAddresses: string[],
+  scanLimit?: number
 ): Promise<WalletLaunchpadHolding[]> {
   const excludeQuery =
     excludeTokenAddresses.length > 0 ? `&exclude=${excludeTokenAddresses.join(",")}` : "";
+  const scanQuery =
+    scanLimit != null && scanLimit > 0 ? `&scanLimit=${scanLimit}` : "";
   const response = await fetch(
-    `/api/portfolio/wallet-holdings?address=${walletAddress}${excludeQuery}`,
+    `/api/portfolio/wallet-holdings?address=${encodeURIComponent(walletAddress)}&scope=creator${excludeQuery}${scanQuery}`,
     { cache: "no-store" }
   );
   if (!response.ok) return [];
@@ -436,6 +510,10 @@ async function fetchDerivedLotsForWallet(
   walletAddress: string,
   positions: PortfolioPosition[]
 ): Promise<Record<string, DerivedLot>> {
+  if (positions.length > PORTFOLIO_DERIVED_LOTS_MAX) {
+    return {};
+  }
+
   const entries = await Promise.all(
     positions.map(async (position) => {
       try {
@@ -480,6 +558,12 @@ async function fetchReferralStats(walletAddress: string): Promise<ReferralStats 
   }
 }
 
+type HoldingsEnrichmentOptions = {
+  onChainPositionLimit?: number;
+  walletScanLimit?: number;
+  includeDerivedLots?: boolean;
+};
+
 type VerifiedHoldingsSnapshot = {
   onChainBalances: Record<string, string>;
   walletHoldings: WalletLaunchpadHolding[];
@@ -488,18 +572,30 @@ type VerifiedHoldingsSnapshot = {
 
 async function fetchVerifiedHoldingsSnapshot(
   walletAddress: string,
-  portfolio: PortfolioData
-): Promise<VerifiedHoldingsSnapshot | null> {
-  const tokenAddresses = portfolio.positions.map((position) => position.tokenAddress);
+  portfolio: PortfolioData,
+  options?: HoldingsEnrichmentOptions
+): Promise<VerifiedHoldingsSnapshot> {
+  const onChainLimit = options?.onChainPositionLimit;
+  const positionsForOnChain =
+    onChainLimit != null && onChainLimit > 0
+      ? portfolio.positions.slice(0, onChainLimit)
+      : portfolio.positions;
+  const excludeAddresses = portfolio.positions.map((position) => position.tokenAddress);
 
   const [onChainBalances, walletHoldings] = await Promise.all([
-    fetchOnChainBalancesForTokens(walletAddress, tokenAddresses),
-    fetchExtraWalletHoldings(walletAddress, tokenAddresses),
+    fetchOnChainBalancesForTokens(
+      walletAddress,
+      positionsForOnChain.map((position) => position.tokenAddress)
+    ),
+    fetchExtraWalletHoldings(walletAddress, excludeAddresses, options?.walletScanLimit),
   ]);
 
-  if (onChainBalances === null) return null;
-
-  const derivedLots = await fetchDerivedLotsForWallet(walletAddress, portfolio.positions);
+  const derivedLots =
+    options?.includeDerivedLots &&
+    portfolio.positions.length > 0 &&
+    portfolio.positions.length <= PORTFOLIO_DERIVED_LOTS_MAX
+      ? await fetchDerivedLotsForWallet(walletAddress, portfolio.positions)
+      : {};
 
   return { onChainBalances, walletHoldings, derivedLots };
 }
@@ -522,6 +618,12 @@ export function PortfolioPanel() {
   const [walletHoldings, setWalletHoldings] = useState<WalletLaunchpadHolding[]>([]);
   const [onChainBalances, setOnChainBalances] = useState<Record<string, string>>({});
   const [holdingsReady, setHoldingsReady] = useState(false);
+  const [holdingsEnriching, setHoldingsEnriching] = useState(false);
+  const [createdLimit, setCreatedLimit] = useState(PORTFOLIO_LAUNCHED_INITIAL);
+  const createdLimitRef = useRef(PORTFOLIO_LAUNCHED_INITIAL);
+  const [holdingsVisibleLimit, setHoldingsVisibleLimit] = useState(PORTFOLIO_HOLDINGS_INITIAL);
+  const [sellAllOpen, setSellAllOpen] = useState(false);
+  const [loadingMoreCreated, setLoadingMoreCreated] = useState(false);
   const [quickTradeTarget, setQuickTradeTarget] = useState<PortfolioQuickTradeTarget | null>(null);
   const [holdingFlashes, setHoldingFlashes] = useState<Record<string, FlashTone>>({});
   const [totalValueFlash, setTotalValueFlash] = useState<FlashTone | undefined>();
@@ -535,7 +637,37 @@ export function PortfolioPanel() {
   const burstUntilRef = useRef(0);
   const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const loadGenerationRef = useRef(0);
+  const enrichGenerationRef = useRef(0);
   const holdingsReadyRef = useRef(false);
+  const isInitialPortfolioLoadRef = useRef(true);
+
+  const enrichHoldings = useCallback(async (walletAddress: string, portfolio: PortfolioData) => {
+    const generation = ++enrichGenerationRef.current;
+    setHoldingsEnriching(true);
+
+    try {
+      const snapshot = await fetchVerifiedHoldingsSnapshot(walletAddress, portfolio, {
+        onChainPositionLimit: PORTFOLIO_ONCHAIN_VERIFY_INITIAL,
+        walletScanLimit: PORTFOLIO_CREATOR_WALLET_SCAN_MAX,
+        includeDerivedLots: false,
+      });
+      if (generation !== enrichGenerationRef.current) return;
+
+      setOnChainBalances(snapshot.onChainBalances);
+      setWalletHoldings(snapshot.walletHoldings);
+      setDerivedLots(snapshot.derivedLots);
+      holdingsReadyRef.current = true;
+      setHoldingsReady(true);
+    } catch {
+      if (generation !== enrichGenerationRef.current) return;
+      holdingsReadyRef.current = true;
+      setHoldingsReady(true);
+    } finally {
+      if (generation === enrichGenerationRef.current) {
+        setHoldingsEnriching(false);
+      }
+    }
+  }, []);
 
   const { data: pendingWei, refetch: refetchPending } = useReadContract({
     address: contracts.bondingCurveManager,
@@ -555,68 +687,90 @@ export function PortfolioPanel() {
     query: { enabled: Boolean(address), refetchInterval: 15_000 },
   });
 
-  const loadPortfolio = useCallback(async (walletAddress: string) => {
-    const generation = ++loadGenerationRef.current;
-    const isInitial = !holdingsReadyRef.current;
+  const loadPortfolio = useCallback(
+    async (walletAddress: string, launchedLimit?: number) => {
+      const limit = launchedLimit ?? createdLimitRef.current;
+      const generation = ++loadGenerationRef.current;
+      const isInitial = isInitialPortfolioLoadRef.current;
 
-    if (isInitial) {
-      setLoading(true);
-    }
-    setError(null);
-
-    try {
-      const portfolio = await fetchPortfolioData(walletAddress);
-      if (generation !== loadGenerationRef.current) return;
-
-      if (!portfolio) {
-        setData(null);
-        setOnChainBalances({});
-        setWalletHoldings([]);
-        setDerivedLots({});
-        holdingsReadyRef.current = true;
-        setHoldingsReady(true);
-        return;
+      if (isInitial) {
+        setLoading(true);
       }
+      setError(null);
 
-      const snapshot = await fetchVerifiedHoldingsSnapshot(walletAddress, portfolio);
-      if (generation !== loadGenerationRef.current) return;
+      try {
+        const portfolio = await fetchPortfolioData(walletAddress, limit);
+        if (generation !== loadGenerationRef.current) return;
 
-      if (snapshot === null) {
-        if (isInitial) {
-          setData(portfolio);
+        if (!portfolio) {
+          enrichGenerationRef.current += 1;
+          setData(null);
           setOnChainBalances({});
           setWalletHoldings([]);
           setDerivedLots({});
           holdingsReadyRef.current = true;
           setHoldingsReady(true);
+          setHoldingsEnriching(false);
+          isInitialPortfolioLoadRef.current = true;
+          return;
         }
-        return;
-      }
 
-      setData(portfolio);
-      setOnChainBalances(snapshot.onChainBalances);
-      setWalletHoldings(snapshot.walletHoldings);
-      setDerivedLots(snapshot.derivedLots);
-      holdingsReadyRef.current = true;
-      setHoldingsReady(true);
+        setData(portfolio);
+        isInitialPortfolioLoadRef.current = false;
+        void enrichHoldings(walletAddress, portfolio);
+      } catch (err) {
+        if (generation !== loadGenerationRef.current) return;
+
+        if (isInitial) {
+          setData(null);
+          setWalletHoldings([]);
+          setOnChainBalances({});
+          setDerivedLots({});
+          holdingsReadyRef.current = false;
+          setHoldingsReady(false);
+          setHoldingsEnriching(false);
+          isInitialPortfolioLoadRef.current = true;
+          setError(err instanceof Error ? err.message : "Failed to load portfolio");
+        }
+      } finally {
+        if (generation === loadGenerationRef.current) {
+          setLoading(false);
+        }
+      }
+    },
+    [enrichHoldings]
+  );
+
+  const loadMoreCreatedTokens = useCallback(async () => {
+    if (!address || loadingMoreCreated || !data) return;
+    const offset = data.createdTokens.length;
+    if (offset >= data.createdTokensTotal) return;
+
+    setLoadingMoreCreated(true);
+    try {
+      const page = await fetchCreatedTokensPage(
+        address,
+        PORTFOLIO_LAUNCHED_INCREMENT,
+        offset
+      );
+      setData((current) => {
+        if (!current) return current;
+        const merged = [...current.createdTokens, ...page.tokens];
+        return {
+          ...current,
+          createdTokens: merged,
+          createdTokensTotal: page.total,
+        };
+      });
+      const nextCount = offset + page.tokens.length;
+      createdLimitRef.current = nextCount;
+      setCreatedLimit(nextCount);
     } catch (err) {
-      if (generation !== loadGenerationRef.current) return;
-
-      if (isInitial) {
-        setData(null);
-        setWalletHoldings([]);
-        setOnChainBalances({});
-        setDerivedLots({});
-        holdingsReadyRef.current = false;
-        setHoldingsReady(false);
-        setError(err instanceof Error ? err.message : "Failed to load portfolio");
-      }
+      setError(err instanceof Error ? err.message : "Failed to load more launched tokens");
     } finally {
-      if (generation === loadGenerationRef.current) {
-        setLoading(false);
-      }
+      setLoadingMoreCreated(false);
     }
-  }, []);
+  }, [address, data, loadingMoreCreated]);
 
   const openQuickTrade = useCallback(
     (tokenAddress: string, symbol: string, side: "buy" | "sell") => {
@@ -647,26 +801,38 @@ export function PortfolioPanel() {
   useEffect(() => {
     if (!isConnected || !address) {
       loadGenerationRef.current += 1;
+      enrichGenerationRef.current += 1;
+      isInitialPortfolioLoadRef.current = true;
       holdingsReadyRef.current = false;
       setData(null);
       setWalletHoldings([]);
       setOnChainBalances({});
       setDerivedLots({});
       setHoldingsReady(false);
+      setHoldingsEnriching(false);
       setError(null);
       setLoading(false);
+      createdLimitRef.current = PORTFOLIO_LAUNCHED_INITIAL;
+      setCreatedLimit(PORTFOLIO_LAUNCHED_INITIAL);
+      setHoldingsVisibleLimit(PORTFOLIO_HOLDINGS_INITIAL);
       return;
     }
 
     loadGenerationRef.current += 1;
+    enrichGenerationRef.current += 1;
+    isInitialPortfolioLoadRef.current = true;
     holdingsReadyRef.current = false;
     setData(null);
     setWalletHoldings([]);
     setOnChainBalances({});
     setDerivedLots({});
     setHoldingsReady(false);
+    setHoldingsEnriching(false);
     setLoading(true);
-    void loadPortfolio(address);
+    createdLimitRef.current = PORTFOLIO_LAUNCHED_INITIAL;
+    setCreatedLimit(PORTFOLIO_LAUNCHED_INITIAL);
+    setHoldingsVisibleLimit(PORTFOLIO_HOLDINGS_INITIAL);
+    void loadPortfolio(address, PORTFOLIO_LAUNCHED_INITIAL);
   }, [address, isConnected, loadPortfolio]);
 
   const schedulePoll = useCallback(() => {
@@ -699,14 +865,14 @@ export function PortfolioPanel() {
   }, [address, isConnected, loadPortfolio, schedulePoll]);
 
   useEffect(() => {
-    if (!data || !holdingsReady) return;
+    if (!data) return;
 
     const views =
       data.positions
         .map((position) =>
           buildVerifiedPositionView(position, derivedLots[position.tokenAddress], onChainBalances)
         )
-        .filter((view): view is VerifiedPositionView => view != null) ?? [];
+        .filter((view): view is VerifiedPositionView => view != null);
 
     const values: Record<string, number> = {};
     let totalValue = 0;
@@ -763,7 +929,7 @@ export function PortfolioPanel() {
     }
 
     metricsPrevRef.current = { values, total: totalValue, pnl: totalPnl };
-  }, [data, holdingsReady, derivedLots, onChainBalances, walletHoldings]);
+  }, [data, derivedLots, onChainBalances, walletHoldings]);
 
   if (!isConnected || !address) {
     return (
@@ -782,12 +948,22 @@ export function PortfolioPanel() {
     );
   }
 
-  if (loading || !holdingsReady) {
+  if (loading && !data) {
     return <PortfolioPanelSkeleton />;
   }
 
+  if (!data) {
+    return (
+      <div className="panel-surface empty-state">
+        <p className="empty-state-copy">
+          {error ?? "Failed to load portfolio."}
+        </p>
+      </div>
+    );
+  }
+
   const verifiedPositionViews =
-    data?.positions
+    data.positions
       .map((position) =>
         buildVerifiedPositionView(
           position,
@@ -795,7 +971,7 @@ export function PortfolioPanel() {
           onChainBalances
         )
       )
-      .filter((view): view is VerifiedPositionView => view != null) ?? [];
+      .filter((view): view is VerifiedPositionView => view != null);
 
   const totalEstimated = verifiedPositionViews.reduce(
     (sum, view) => sum + view.balance * Number(view.position.lastPriceBnb),
@@ -814,10 +990,27 @@ export function PortfolioPanel() {
   );
   const portfolioValuePct =
     totalCostBasis > 0 ? (totalNetPnl / totalCostBasis) * 100 : null;
-  const claimedBnb = data?.creatorFeesClaimedBnb ?? 0;
+  const claimedBnb = data.creatorFeesClaimedBnb ?? 0;
   const pendingBnb = pendingWei != null ? Number(formatEther(pendingWei)) : 0;
   const creatorFeesTotalBnb = claimedBnb + pendingBnb;
   const holdingsCount = verifiedPositionViews.length + walletHoldings.length;
+  const allHoldingsRows = buildPortfolioHoldingRows(verifiedPositionViews, walletHoldings);
+  const visibleHoldingsRows = allHoldingsRows.slice(0, holdingsVisibleLimit);
+  const hasMoreHoldings = visibleHoldingsRows.length < holdingsCount;
+  const sellAllHoldingsInput = [
+    ...verifiedPositionViews.map((view) => ({
+      tokenAddress: view.position.tokenAddress,
+      symbol: view.position.symbol,
+      name: view.position.name,
+      logoUrl: view.position.logoUrl,
+    })),
+    ...walletHoldings.map((holding) => ({
+      tokenAddress: holding.tokenAddress,
+      symbol: holding.symbol,
+      name: holding.name,
+      logoUrl: holding.logoUrl,
+    })),
+  ];
 
   return (
     <>
@@ -853,6 +1046,17 @@ export function PortfolioPanel() {
       />
 
       <AvatarPickerModal open={avatarPickerOpen} onClose={() => setAvatarPickerOpen(false)} />
+
+      <SellAllHoldingsModal
+        open={sellAllOpen}
+        onClose={() => setSellAllOpen(false)}
+        holdings={sellAllHoldingsInput}
+        address={address}
+        onSold={() => {
+          if (address) void loadPortfolio(address);
+          window.dispatchEvent(new Event("pump:activity"));
+        }}
+      />
 
       {quickTradeTarget ? (
         <TradeSheet
@@ -914,7 +1118,7 @@ export function PortfolioPanel() {
                   }}
                   className="financial-value font-semibold text-pump-text transition hover:text-pump-accent"
                 >
-                  {data?.followingCount ?? 0} following
+                  {data.followingCount ?? 0} following
                 </button>
                 <span className="text-pump-muted">·</span>
                 <button
@@ -925,7 +1129,7 @@ export function PortfolioPanel() {
                   }}
                   className="financial-value font-semibold text-pump-text transition hover:text-pump-accent"
                 >
-                  {data?.followerCount ?? 0} followers
+                  {data.followerCount ?? 0} followers
                 </button>
               </div>
             </div>
@@ -979,24 +1183,56 @@ export function PortfolioPanel() {
         {data && !error ? (
           <>
             <div className="space-y-2 md:space-y-3">
-              <h3 className="section-heading text-h3 inline-flex items-center gap-2">
-                <MetricIcons.holdings
-                  className="hidden h-[1.05em] w-[1.05em] shrink-0 text-pump-accent sm:block"
-                  strokeWidth={ICON_STROKE}
-                  aria-hidden
-                />
-                Holdings ({holdingsCount})
-              </h3>
+              <div className="flex items-center justify-between gap-3">
+                <h3 className="section-heading text-h3 inline-flex items-center gap-2">
+                  <MetricIcons.holdings
+                    className="hidden h-[1.05em] w-[1.05em] shrink-0 text-pump-accent sm:block"
+                    strokeWidth={ICON_STROKE}
+                    aria-hidden
+                  />
+                  Holdings ({holdingsEnriching ? "…" : holdingsCount})
+                </h3>
+                {holdingsCount > 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => setSellAllOpen(true)}
+                    className="secondary-button shrink-0 border-pump-danger/35 px-3 py-1.5 text-caption text-pump-danger hover:bg-pump-danger/10"
+                  >
+                    Sell all ({holdingsCount})
+                  </button>
+                ) : null}
+              </div>
               {holdingsCount > 0 ? <HoldingsSwipeHint /> : null}
-              {holdingsCount === 0 ? (
+              {holdingsEnriching && holdingsCount === 0 ? (
+                <section className="panel-surface portfolio-section-surface p-4" aria-busy="true">
+                  <p className="text-body-sm text-pump-muted">Loading holdings…</p>
+                </section>
+              ) : holdingsCount === 0 ? (
                 <div className="panel-surface empty-state">
                   <p className="empty-state-copy">No open positions. Buy from the Arena.</p>
                 </div>
               ) : (
                 <section className="panel-surface portfolio-section-surface">
                   <div className="lg:hidden divide-y divide-pump-border/10">
-                    {verifiedPositionViews.map((view, index) => {
-                      const { position, balance, remainingCostBasis, avgEntry } = view;
+                    {visibleHoldingsRows.map((row, index) => {
+                      if (row.kind === "wallet") {
+                        return (
+                          <WalletHoldingMobileRow
+                            key={row.holding.tokenAddress}
+                            holding={row.holding}
+                            bnbUsd={bnbUsd}
+                            peekOnMount={index === 0}
+                            onBuyMax={() =>
+                              openQuickTrade(row.holding.tokenAddress, row.holding.symbol, "buy")
+                            }
+                            onSellMax={() =>
+                              openQuickTrade(row.holding.tokenAddress, row.holding.symbol, "sell")
+                            }
+                          />
+                        );
+                      }
+
+                      const { position, balance, remainingCostBasis, avgEntry } = row.view;
                       const avgEntryUsd = avgEntry != null ? bnbToUsd(avgEntry, bnbUsd) : null;
                       const positionValueUsd = bnbToUsd(
                         balance * Number(position.lastPriceBnb),
@@ -1012,7 +1248,9 @@ export function PortfolioPanel() {
                           key={position.tokenAddress}
                           peekOnMount={index === 0}
                           onBuyMax={() => openQuickTrade(position.tokenAddress, position.symbol, "buy")}
-                          onSellMax={() => openQuickTrade(position.tokenAddress, position.symbol, "sell")}
+                          onSellMax={() =>
+                            openQuickTrade(position.tokenAddress, position.symbol, "sell")
+                          }
                         >
                           <article className="grid grid-cols-[1.75rem_1fr_auto] gap-x-2 gap-y-2 p-2.5">
                             <TokenAvatar
@@ -1055,16 +1293,6 @@ export function PortfolioPanel() {
                         </HoldingSwipeRow>
                       );
                     })}
-                    {walletHoldings.map((holding, index) => (
-                      <WalletHoldingMobileRow
-                        key={holding.tokenAddress}
-                        holding={holding}
-                        bnbUsd={bnbUsd}
-                        peekOnMount={verifiedPositionViews.length === 0 && index === 0}
-                        onBuyMax={() => openQuickTrade(holding.tokenAddress, holding.symbol, "buy")}
-                        onSellMax={() => openQuickTrade(holding.tokenAddress, holding.symbol, "sell")}
-                      />
-                    ))}
                   </div>
 
                   <div className="hidden lg:block overflow-x-auto">
@@ -1080,8 +1308,24 @@ export function PortfolioPanel() {
                         </tr>
                       </thead>
                       <tbody>
-                        {verifiedPositionViews.map((view) => {
-                          const { position, balance, remainingCostBasis, avgEntry } = view;
+                        {visibleHoldingsRows.map((row) => {
+                          if (row.kind === "wallet") {
+                            return (
+                              <WalletHoldingDesktopRow
+                                key={row.holding.tokenAddress}
+                                holding={row.holding}
+                                bnbUsd={bnbUsd}
+                                onBuyMax={() =>
+                                  openQuickTrade(row.holding.tokenAddress, row.holding.symbol, "buy")
+                                }
+                                onSellMax={() =>
+                                  openQuickTrade(row.holding.tokenAddress, row.holding.symbol, "sell")
+                                }
+                              />
+                            );
+                          }
+
+                          const { position, balance, remainingCostBasis, avgEntry } = row.view;
                           const avgEntryUsd = avgEntry != null ? bnbToUsd(avgEntry, bnbUsd) : null;
                           const positionValueUsd = bnbToUsd(
                             balance * Number(position.lastPriceBnb),
@@ -1141,20 +1385,24 @@ export function PortfolioPanel() {
                             </tr>
                           );
                         })}
-                        {walletHoldings.map((holding) => (
-                          <WalletHoldingDesktopRow
-                            key={holding.tokenAddress}
-                            holding={holding}
-                            bnbUsd={bnbUsd}
-                            onBuyMax={() => openQuickTrade(holding.tokenAddress, holding.symbol, "buy")}
-                            onSellMax={() =>
-                              openQuickTrade(holding.tokenAddress, holding.symbol, "sell")
-                            }
-                          />
-                        ))}
                       </tbody>
                     </table>
                   </div>
+                  {hasMoreHoldings ? (
+                    <div className="flex justify-center border-t border-pump-border/10 px-3 py-3">
+                      <button
+                        type="button"
+                        className="text-body-sm font-medium text-pump-accent hover:underline"
+                        onClick={() =>
+                          setHoldingsVisibleLimit((prev) =>
+                            Math.min(prev + PORTFOLIO_HOLDINGS_INCREMENT, holdingsCount)
+                          )
+                        }
+                      >
+                        {`Load more (${visibleHoldingsRows.length} of ${holdingsCount})`}
+                      </button>
+                    </div>
+                  ) : null}
                 </section>
               )}
             </div>
@@ -1166,7 +1414,7 @@ export function PortfolioPanel() {
                   strokeWidth={ICON_STROKE}
                   aria-hidden
                 />
-                Launched tokens ({data.createdTokens.length})
+                Launched tokens ({data.createdTokensTotal})
               </h3>
               {data.createdTokens.length === 0 ? (
                 <div className="panel-surface empty-state">
@@ -1228,6 +1476,20 @@ export function PortfolioPanel() {
                   <div className="hidden lg:block">
                     <TokenBoardTable tokens={data.createdTokens} bnbUsd={bnbUsd} variant="created" />
                   </div>
+                  {data.createdTokens.length < data.createdTokensTotal ? (
+                    <div className="flex justify-center border-t border-pump-border/10 px-3 py-3">
+                      <button
+                        type="button"
+                        className="text-body-sm font-medium text-pump-accent hover:underline disabled:opacity-50"
+                        onClick={() => void loadMoreCreatedTokens()}
+                        disabled={loadingMoreCreated}
+                      >
+                        {loadingMoreCreated
+                          ? "Loading…"
+                          : `Load more (${data.createdTokens.length} of ${data.createdTokensTotal})`}
+                      </button>
+                    </div>
+                  ) : null}
                 </section>
               )}
             </div>

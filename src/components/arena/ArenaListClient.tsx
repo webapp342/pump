@@ -318,7 +318,8 @@ export function ArenaListClient() {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const loadMoreRef = useRef<HTMLDivElement>(null);
   const listLimitRef = useRef(ARENA_PAGE_INITIAL);
-  const activeListSort: ArenaListSort = activeFilter === "new" ? "age" : "mcap";
+  const boardSortKey: SortKey = activeFilter === "new" ? "age" : sortKey;
+  const activeListSort: ArenaListSort = boardSortKey === "age" ? "age" : "mcap";
 
   useEffect(() => {
     void (async () => {
@@ -681,7 +682,16 @@ export function ArenaListClient() {
           ),
     [topByMcap, resolvedTokens]
   );
-  const kothToken = mcapRankedTokens[0] ?? null;
+  const kothToken = useMemo(() => {
+    const active = kothSummary?.activeTokenAddress?.toLowerCase();
+    if (active) {
+      const fromList =
+        topByMcap.find((token) => token.address.toLowerCase() === active) ??
+        resolvedTokens.find((token) => token.address.toLowerCase() === active);
+      if (fromList) return fromList;
+    }
+    return mcapRankedTokens[0] ?? null;
+  }, [kothSummary?.activeTokenAddress, mcapRankedTokens, resolvedTokens, topByMcap]);
   const kothContenderAddresses = useMemo(
     () =>
       new Set(
@@ -692,10 +702,16 @@ export function ArenaListClient() {
     [mcapRankedTokens]
   );
   const kothCrownedAt = useMemo(() => {
-    const activeAddress = kothSummary?.activeTokenAddress?.toLowerCase();
-    if (!kothToken || !activeAddress) return null;
-    if (activeAddress !== kothToken.address.toLowerCase()) return null;
-    return kothSummary?.crownedAt ?? null;
+    if (!kothToken) return null;
+    const addr = kothToken.address.toLowerCase();
+    const active = kothSummary?.activeTokenAddress?.toLowerCase();
+    if (active === addr && kothSummary?.crownedAt) {
+      return kothSummary.crownedAt;
+    }
+    const openReign = kothSummary?.recent?.find(
+      (item) => item.tokenAddress.toLowerCase() === addr && !item.dethronedAt
+    );
+    return openReign?.crownedAt ?? null;
   }, [kothSummary, kothToken]);
   const kothReignDuration = useMemo(
     () => formatKothDurationShort(kothCrownedAt),
@@ -773,7 +789,6 @@ export function ArenaListClient() {
       };
     });
 
-    const boardSortKey: SortKey = activeFilter === "new" ? "age" : sortKey;
     const boardSortDir: SortDir = activeFilter === "new" ? "desc" : sortDir;
 
     withMetrics.sort((a, b) => {
@@ -791,6 +806,7 @@ export function ArenaListClient() {
     favorites,
     sortKey,
     sortDir,
+    boardSortKey,
     effectiveBnbUsd,
     kothContenderAddresses,
     airdropTokenAddresses,
@@ -835,7 +851,6 @@ export function ArenaListClient() {
     setSortDir("desc");
   }
 
-  const boardSortKey: SortKey = activeFilter === "new" ? "age" : sortKey;
   const boardSortDir: SortDir = activeFilter === "new" ? "desc" : sortDir;
 
   const sortLabel = (key: SortKey) =>
@@ -901,80 +916,76 @@ export function ArenaListClient() {
               />
 
               <div className="koth-banner__content min-w-0 flex-1">
-                <div className="koth-banner__row koth-banner__row--top">
-                  <p className="koth-banner__headline">
-                    <span className="financial-value koth-banner__headline-symbol">
-                      {kothToken.symbol}
-                    </span>
-                  </p>
-                  <div className="koth-banner__hero" aria-label="Market cap">
-                    <span className="koth-banner__tag">MC</span>
-                    <span className="financial-value koth-banner__hero-value text-pump-text">
-                      {formatCapForBoard(bnbToUsd(Number(kothToken.marketCapBnb), effectiveBnbUsd))}
-                    </span>
-                    <span
-                      className={`financial-value koth-banner__delta ${pctTone(kothToken.change24hPct ?? null)}`}
-                    >
-                      {formatSignedPct(kothToken.change24hPct ?? null)}
-                    </span>
-                  </div>
+                <p className="koth-banner__headline">
+                  <span className="financial-value koth-banner__headline-symbol">
+                    {kothToken.symbol}
+                  </span>
+                </p>
+                <div className="koth-banner__hero" aria-label="Market cap">
+                  <span className="koth-banner__tag">MC</span>
+                  <span className="financial-value koth-banner__hero-value text-pump-text">
+                    {formatCapForBoard(bnbToUsd(Number(kothToken.marketCapBnb), effectiveBnbUsd))}
+                  </span>
+                  <span
+                    className={`financial-value koth-banner__delta ${pctTone(kothToken.change24hPct ?? null)}`}
+                  >
+                    {formatSignedPct(kothToken.change24hPct ?? null)}
+                  </span>
                 </div>
 
-                <div className="koth-banner__row koth-banner__row--bottom">
-                  {kothReignDuration ? (
-                    <p className="koth-banner__meta koth-banner__meta--lead">
-                      <span className="koth-banner__meta-item">
-                        <span className="koth-banner__tag koth-banner__tag--soft">King for</span>
-                        <span className="financial-value koth-banner__meta-value">
-                          {kothReignDuration}
-                        </span>
-                      </span>
-                    </p>
-                  ) : null}
-                  <p className="koth-banner__meta koth-banner__meta--stats">
+                {kothReignDuration ? (
+                  <p className="koth-banner__meta koth-banner__meta--lead">
                     <span className="koth-banner__meta-item">
-                      <span className="koth-banner__tag">Vol</span>
+                      <span className="koth-banner__tag koth-banner__tag--soft">King for</span>
                       <span className="financial-value koth-banner__meta-value">
-                        {formatUsdReadable(
-                          bnbToUsd(Number(kothToken.volume24hBnb ?? 0), effectiveBnbUsd),
-                          { compact: true }
-                        )}
-                      </span>
-                    </span>
-                    <span className="koth-banner__meta-sep" aria-hidden>
-                      ·
-                    </span>
-                    <span className="koth-banner__meta-item max-md:hidden">
-                      <span className="koth-banner__tag">Txns</span>
-                      <span className="financial-value koth-banner__meta-value">
-                        {formatCount(kothToken.tradeCount)}
-                      </span>
-                    </span>
-                    <span className="koth-banner__meta-sep max-md:hidden" aria-hidden>
-                      ·
-                    </span>
-                    <span className="koth-banner__meta-item max-md:hidden">
-                      <span className="koth-banner__tag">Holders</span>
-                      <span className="financial-value koth-banner__meta-value">
-                        {formatCount(kothToken.holderCount)}
-                      </span>
-                    </span>
-                    <span className="koth-banner__meta-sep max-md:hidden" aria-hidden>
-                      ·
-                    </span>
-                    <span className="koth-banner__meta-item">
-                      <span className="koth-banner__tag">ATH</span>
-                      <span className="financial-value koth-banner__meta-value">
-                        {formatCapForBoard(
-                          bnbToUsd(
-                            Number(kothToken.athMarketCapBnb ?? kothToken.marketCapBnb),
-                            effectiveBnbUsd
-                          )
-                        )}
+                        {kothReignDuration}
                       </span>
                     </span>
                   </p>
-                </div>
+                ) : null}
+                <p className="koth-banner__meta koth-banner__meta--stats">
+                  <span className="koth-banner__meta-item">
+                    <span className="koth-banner__tag">Vol</span>
+                    <span className="financial-value koth-banner__meta-value">
+                      {formatUsdReadable(
+                        bnbToUsd(Number(kothToken.volume24hBnb ?? 0), effectiveBnbUsd),
+                        { compact: true }
+                      )}
+                    </span>
+                  </span>
+                  <span className="koth-banner__meta-sep" aria-hidden>
+                    ·
+                  </span>
+                  <span className="koth-banner__meta-item max-md:hidden">
+                    <span className="koth-banner__tag">Txns</span>
+                    <span className="financial-value koth-banner__meta-value">
+                      {formatCount(kothToken.tradeCount)}
+                    </span>
+                  </span>
+                  <span className="koth-banner__meta-sep max-md:hidden" aria-hidden>
+                    ·
+                  </span>
+                  <span className="koth-banner__meta-item max-md:hidden">
+                    <span className="koth-banner__tag">Holders</span>
+                    <span className="financial-value koth-banner__meta-value">
+                      {formatCount(kothToken.holderCount)}
+                    </span>
+                  </span>
+                  <span className="koth-banner__meta-sep max-md:hidden" aria-hidden>
+                    ·
+                  </span>
+                  <span className="koth-banner__meta-item">
+                    <span className="koth-banner__tag">ATH</span>
+                    <span className="financial-value koth-banner__meta-value">
+                      {formatCapForBoard(
+                        bnbToUsd(
+                          Number(kothToken.athMarketCapBnb ?? kothToken.marketCapBnb),
+                          effectiveBnbUsd
+                        )
+                      )}
+                    </span>
+                  </span>
+                </p>
               </div>
 
               <ChevronRight

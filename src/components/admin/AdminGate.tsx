@@ -1,7 +1,7 @@
 "use client";
 
-import Link from "next/link";
 import { useAccount } from "wagmi";
+import { PageBackLink } from "@/components/ui/PageBackLink";
 import { isAdminWallet } from "@/config/admin";
 
 export function AdminGate({ children }: { children: React.ReactNode }) {
@@ -23,9 +23,7 @@ export function AdminGate({ children }: { children: React.ReactNode }) {
         <div className="empty-state mx-auto max-w-sm">
           <p className="page-title">404</p>
           <p className="empty-state-copy mt-2">Page not found.</p>
-          <Link href="/" className="admin-link mt-4 inline-block">
-            Back to Arena
-          </Link>
+          <PageBackLink href="/" className="mt-4" />
         </div>
       </div>
     );

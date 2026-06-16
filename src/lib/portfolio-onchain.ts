@@ -1,7 +1,10 @@
 import { createPublicClient, formatUnits, http, type Address } from "viem";
 import { erc20Abi } from "@/lib/abis/erc20";
 import { pumpChain, rpcUrl } from "@/config/chain";
-import { listLaunchpadTokensForWalletBalance } from "@/lib/db/launchpad";
+import {
+  listLaunchpadTokensByCreatorForWalletBalance,
+  listLaunchpadTokensForWalletBalance,
+} from "@/lib/db/launchpad";
 
 const publicClient = createPublicClient({
   chain: pumpChain,
@@ -138,15 +141,28 @@ export async function fetchOnChainTokenBalancesForHolders(
   return balances;
 }
 
+type WalletHoldingsScanOptions = {
+  /** Scan only tokens created by this wallet instead of the full launchpad catalog. */
+  creatorAddress?: string;
+  /** Cap how many launchpad tokens to balanceOf per request. */
+  scanLimit?: number;
+};
+
 /** On-chain ERC20 balances for launchpad tokens not already covered by indexer positions. */
 export async function fetchWalletLaunchpadHoldings(
   walletAddress: string,
-  excludeTokenAddresses: Iterable<string>
+  excludeTokenAddresses: Iterable<string>,
+  options?: WalletHoldingsScanOptions
 ): Promise<WalletLaunchpadHolding[]> {
   const exclude = new Set(
     [...excludeTokenAddresses].map((address) => address.toLowerCase())
   );
-  const catalog = await listLaunchpadTokensForWalletBalance();
+  const catalog = options?.creatorAddress
+    ? await listLaunchpadTokensByCreatorForWalletBalance(
+        options.creatorAddress,
+        options.scanLimit
+      )
+    : await listLaunchpadTokensForWalletBalance();
   const candidates = catalog.filter((token) => !exclude.has(token.address.toLowerCase()));
   if (candidates.length === 0) return [];
 

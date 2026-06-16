@@ -1,5 +1,5 @@
-import Link from "next/link";
 import { AppShell } from "@/components/layout/AppShell";
+import { PageBackLink } from "@/components/ui/PageBackLink";
 import { CreateAirdropForm } from "@/components/airdrops/CreateAirdropForm";
 
 type PageProps = {
@@ -12,12 +12,7 @@ export default async function CreateAirdropPage({ searchParams }: PageProps) {
   return (
     <AppShell>
       <div className="space-y-3 md:space-y-4">
-        <Link
-          href="/airdrops"
-          className="text-caption font-medium text-pump-muted transition hover:text-pump-accent"
-        >
-          ← Airdrops
-        </Link>
+        <PageBackLink href="/airdrops" />
         <CreateAirdropForm
           initialLinkedToken={token}
           initialLinkedTokenName={name}

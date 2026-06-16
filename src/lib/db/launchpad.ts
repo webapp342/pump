@@ -586,9 +586,23 @@ export async function getArenaFilterCounts(
   };
 }
 
-export async function listTokensByCreator(creatorAddress: string): Promise<TokenListItem[]> {
+export async function listTokensByCreator(
+  creatorAddress: string,
+  limit?: number,
+  offset = 0
+): Promise<TokenListItem[]> {
   const db = getLaunchpadPool();
   const normalized = creatorAddress.toLowerCase();
+  let orderBy = limit ? "ORDER BY bt.created_at DESC LIMIT $2" : "ORDER BY bt.created_at DESC";
+  const params: (string | number)[] = [normalized];
+
+  if (limit) {
+    params.push(limit);
+    if (offset > 0) {
+      orderBy += " OFFSET $3";
+      params.push(offset);
+    }
+  }
 
   const sql = buildTokenListSql(
     `
@@ -606,11 +620,26 @@ export async function listTokensByCreator(creatorAddress: string): Promise<Token
         AND t.is_hidden = false
       ORDER BY t.created_at DESC
     `,
-    "ORDER BY bt.created_at DESC"
+    orderBy
   );
-  const result = await db.query<TokenListQueryRow>(sql, [normalized]);
+  const result = await db.query<TokenListQueryRow>(sql, params);
 
   return result.rows.map(mapTokenListRow);
+}
+
+export async function countTokensByCreator(creatorAddress: string): Promise<number> {
+  const db = getLaunchpadPool();
+  const normalized = creatorAddress.toLowerCase();
+  const result = await db.query<{ count: number }>(
+    `
+      SELECT COUNT(*)::int AS count
+      FROM tokens
+      WHERE creator_address = $1
+        AND is_hidden = false
+    `,
+    [normalized]
+  );
+  return result.rows[0]?.count ?? 0;
 }
 
 export async function getKothSummary(limit = 5): Promise<KothSummary | null> {
@@ -1123,6 +1152,7 @@ export type PortfolioSnapshot = {
   followerCount: number;
   positions: PortfolioPosition[];
   createdTokens: TokenListItem[];
+  createdTokensTotal: number;
 };
 
 export type CreatorFollowListEntry = {
@@ -1346,11 +1376,78 @@ export async function listLaunchpadTokensForWalletBalance(): Promise<
   }));
 }
 
-export async function getPortfolioForAddress(address: string): Promise<PortfolioSnapshot> {
+export async function listLaunchpadTokensByCreatorForWalletBalance(
+  creatorAddress: string,
+  limit?: number
+): Promise<LaunchpadTokenWalletCatalogEntry[]> {
+  const db = getLaunchpadPool();
+  const normalized = creatorAddress.toLowerCase();
+  const cappedLimit =
+    limit != null && Number.isFinite(limit) && limit > 0 ? Math.floor(limit) : null;
+
+  const result = await db.query<{
+    address: string;
+    symbol: string;
+    name: string;
+    logo_url: string | null;
+    last_price_zug: string;
+  }>(
+    cappedLimit
+      ? `
+      SELECT
+        t.address,
+        t.symbol,
+        t.name,
+        t.logo_url,
+        COALESCE(b.last_price_zug, 0)::text AS last_price_zug
+      FROM tokens t
+      LEFT JOIN bonding_states b ON b.token_address = t.address
+      WHERE t.creator_address = $1
+        AND t.is_hidden = false
+      ORDER BY
+        EXISTS (
+          SELECT 1
+          FROM trades tr
+          WHERE tr.token_address = t.address
+            AND tr.trader_address = $1
+        ) DESC,
+        t.created_at DESC
+      LIMIT $2
+    `
+      : `
+      SELECT
+        t.address,
+        t.symbol,
+        t.name,
+        t.logo_url,
+        COALESCE(b.last_price_zug, 0)::text AS last_price_zug
+      FROM tokens t
+      LEFT JOIN bonding_states b ON b.token_address = t.address
+      WHERE t.creator_address = $1
+        AND t.is_hidden = false
+      ORDER BY t.created_at DESC
+    `,
+    cappedLimit ? [normalized, cappedLimit] : [normalized]
+  );
+
+  return result.rows.map((row) => ({
+    address: row.address,
+    symbol: row.symbol,
+    name: row.name,
+    logoUrl: row.logo_url,
+    lastPriceBnb: row.last_price_zug,
+  }));
+}
+
+export async function getPortfolioForAddress(
+  address: string,
+  options?: { createdLimit?: number }
+): Promise<PortfolioSnapshot> {
   const db = getLaunchpadPool();
   const normalized = address.toLowerCase();
+  const createdLimit = options?.createdLimit;
 
-  const [volumeResult, positionsResult, createdTokens, creatorFeesClaimedBnb, followCountsResult] =
+  const [volumeResult, positionsResult, createdTokens, createdTokensTotal, creatorFeesClaimedBnb, followCountsResult] =
     await Promise.all([
     db.query<{
       total_volume_zug: string | null;
@@ -1405,7 +1502,8 @@ export async function getPortfolioForAddress(address: string): Promise<Portfolio
       `,
       [normalized]
     ),
-    listTokensByCreator(normalized),
+    listTokensByCreator(normalized, createdLimit),
+    countTokensByCreator(normalized),
     getCreatorFeesClaimedBnb(normalized),
     db.query<{ following_count: number; follower_count: number }>(
       `
@@ -1459,6 +1557,7 @@ export async function getPortfolioForAddress(address: string): Promise<Portfolio
     followerCount: followCounts?.follower_count ?? 0,
     positions,
     createdTokens,
+    createdTokensTotal,
   };
 }
 

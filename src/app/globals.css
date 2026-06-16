@@ -306,6 +306,48 @@ code,
     border-bottom: 1px solid rgb(var(--pump-border) / 0.28);
   }
 
+  .page-back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    min-height: 44px;
+    margin: -6px 0 -6px -6px;
+    padding: 6px 12px 6px 6px;
+    border-radius: var(--radius-md);
+    font-size: var(--text-body-sm);
+    font-weight: 500;
+    line-height: 1.2;
+    color: rgb(var(--pump-muted));
+    transition:
+      color 0.15s ease,
+      background-color 0.15s ease;
+  }
+
+  .page-back-link:hover {
+    color: rgb(var(--pump-text));
+    background: rgb(var(--pump-border) / 0.1);
+  }
+
+  .page-back-link:focus-visible {
+    outline: 2px solid rgb(var(--pump-accent) / 0.65);
+    outline-offset: 2px;
+  }
+
+  .page-back-link__icon {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+    margin-left: -1px;
+  }
+
+  @media (min-width: 768px) {
+    .page-back-link {
+      min-height: 36px;
+      margin-block: -4px;
+      padding-block: 4px;
+    }
+  }
+
   .skeleton-shimmer {
     background: linear-gradient(
       110deg,
@@ -1730,24 +1772,19 @@ code,
   }
 
   .koth-banner__content {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-  }
-
-  .koth-banner__row {
-    display: flex;
-    width: 100%;
-    min-width: 0;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-rows: auto auto;
     align-items: baseline;
-    justify-content: space-between;
-    gap: 12px;
+    column-gap: 12px;
+    row-gap: 6px;
   }
 
   .koth-banner__headline {
+    grid-column: 1;
+    grid-row: 1;
     display: flex;
     min-width: 0;
-    flex: 0 1 auto;
     align-items: baseline;
     margin: 0;
     line-height: 1;
@@ -1788,6 +1825,9 @@ code,
   }
 
   .koth-banner__meta--stats {
+    grid-column: 2;
+    grid-row: 2;
+    justify-self: end;
     display: flex;
     flex-wrap: wrap;
     align-items: center;
@@ -1796,8 +1836,9 @@ code,
   }
 
   .koth-banner__meta--lead {
+    grid-column: 1;
+    grid-row: 2;
     display: flex;
-    flex: 0 1 auto;
     justify-content: flex-start;
     margin: 0;
   }
@@ -1822,6 +1863,9 @@ code,
   }
 
   .koth-banner__hero {
+    grid-column: 2;
+    grid-row: 1;
+    justify-self: end;
     display: inline-flex;
     flex: 0 1 auto;
     flex-wrap: nowrap;

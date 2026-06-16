@@ -18,8 +18,20 @@ export async function GET(request: NextRequest) {
         .filter(Boolean)
     : [];
 
+  const scope = request.nextUrl.searchParams.get("scope");
+  const creatorAddress = scope === "creator" ? address : undefined;
+  const scanLimitParam = request.nextUrl.searchParams.get("scanLimit");
+  const parsedScanLimit = scanLimitParam ? Number.parseInt(scanLimitParam, 10) : undefined;
+  const scanLimit =
+    parsedScanLimit != null && Number.isFinite(parsedScanLimit) && parsedScanLimit > 0
+      ? parsedScanLimit
+      : undefined;
+
   try {
-    const data = await fetchWalletLaunchpadHoldings(address, exclude);
+    const data = await fetchWalletLaunchpadHoldings(address, exclude, {
+      creatorAddress,
+      scanLimit,
+    });
     return NextResponse.json({ data });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";

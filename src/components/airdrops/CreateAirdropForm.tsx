@@ -248,7 +248,7 @@ export function CreateAirdropForm({
 
     (async () => {
       try {
-        const res = await fetch(`/api/portfolio?address=${address}`, { cache: "no-store" });
+        const res = await fetch(`/api/portfolio?address=${address}&createdLimit=all`, { cache: "no-store" });
         const json = (await res.json()) as { data?: { createdTokens?: TokenListItem[] } };
         if (!cancelled && res.ok) {
           setCreatedTokens(json.data?.createdTokens ?? []);
