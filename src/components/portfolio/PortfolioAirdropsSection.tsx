@@ -79,7 +79,7 @@ export function PortfolioAirdropsSection({ address }: { address: string }) {
           />
           Joined airdrops
         </h3>
-        <div className="h-16 animate-pulse rounded-lg border border-pump-border/15 bg-pump-border/5" />
+        <div className="skeleton-shimmer h-16 rounded-lg" />
       </div>
     );
   }

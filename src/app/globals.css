@@ -306,6 +306,38 @@ code,
     border-bottom: 1px solid rgb(var(--pump-border) / 0.28);
   }
 
+  .skeleton-shimmer {
+    background: linear-gradient(
+      110deg,
+      rgb(var(--pump-card-soft) / 0.42) 8%,
+      rgb(var(--pump-card-soft) / 0.88) 18%,
+      rgb(var(--pump-border) / 0.26) 28%,
+      rgb(var(--pump-card-soft) / 0.88) 38%,
+      rgb(var(--pump-card-soft) / 0.42) 48%
+    );
+    background-size: 220% 100%;
+    background-position: 100% 50%;
+    animation: skeleton-shimmer 1.35s ease-in-out infinite;
+    box-shadow: inset 0 0 0 1px rgb(var(--pump-border) / 0.14);
+  }
+
+  @keyframes skeleton-shimmer {
+    0% {
+      background-position: 100% 50%;
+    }
+    100% {
+      background-position: -100% 50%;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .skeleton-shimmer {
+      animation: none;
+      background: rgb(var(--pump-card-soft) / 0.72);
+      background-size: auto;
+    }
+  }
+
   .page-kicker {
     font-size: var(--text-label);
     line-height: var(--leading-label);

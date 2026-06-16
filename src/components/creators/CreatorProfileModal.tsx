@@ -298,18 +298,18 @@ export function CreatorProfileModal({ open, onClose, creatorAddress }: CreatorPr
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 {Array.from({ length: 2 }).map((_, i) => (
-                  <div key={i} className="h-20 animate-pulse rounded-md bg-pump-surface/60" />
+                  <div key={i} className="skeleton-shimmer h-20 rounded-md" />
                 ))}
               </div>
               <div className="space-y-2">
-                <div className="h-5 w-24 animate-pulse rounded-md bg-pump-surface/60" />
+                <div className="skeleton-shimmer h-5 w-24 rounded-md" />
                 <div className="grid grid-cols-2 gap-3">
                   {Array.from({ length: 2 }).map((_, i) => (
-                    <div key={i} className="h-20 animate-pulse rounded-md bg-pump-surface/60" />
+                    <div key={i} className="skeleton-shimmer h-20 rounded-md" />
                   ))}
                 </div>
               </div>
-              <div className="h-32 animate-pulse rounded-md bg-pump-surface/60" />
+              <div className="skeleton-shimmer h-32 rounded-md" />
             </div>
           ) : error ? (
             <p className="notice-error p-4 text-body-sm">{error}</p>

@@ -890,7 +890,7 @@ export function PortfolioPanel() {
                 <UserAvatar address={address} avatarId={avatarId} size={48} />
               </button>
             ) : (
-              <div className="h-12 w-12 shrink-0 animate-pulse rounded-full bg-pump-surface/60 md:h-14 md:w-14" />
+              <div className="skeleton-shimmer h-12 w-12 shrink-0 rounded-full md:h-14 md:w-14" />
             )}
             <div className="min-w-0 flex-1">
               <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">

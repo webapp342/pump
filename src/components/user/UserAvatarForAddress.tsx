@@ -54,7 +54,7 @@ export function UserAvatarForAddress({
   if (!avatarId) {
     return (
       <span
-        className={`inline-block shrink-0 animate-pulse rounded-full bg-pump-surface/60 ${className}`}
+        className={`skeleton-shimmer inline-block shrink-0 rounded-full ${className}`}
         style={{ width: size, height: size }}
       />
     );

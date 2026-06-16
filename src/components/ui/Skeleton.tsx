@@ -1,12 +1,12 @@
 type SkeletonProps = {
   className?: string;
+  /** block = panels/chips, circle = avatars, line = labels */
+  variant?: "block" | "circle" | "line";
 };
 
-export function Skeleton({ className = "" }: SkeletonProps) {
-  return (
-    <div
-      className={`animate-pulse rounded-md bg-pump-surface/80 ring-1 ring-inset ring-pump-border/12 ${className}`}
-      aria-hidden
-    />
-  );
+export function Skeleton({ className = "", variant = "block" }: SkeletonProps) {
+  const radius =
+    variant === "circle" ? "rounded-full" : variant === "line" ? "rounded-sm" : "rounded-md";
+
+  return <div className={`skeleton-shimmer ${radius} ${className}`} aria-hidden />;
 }
