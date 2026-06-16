@@ -1334,16 +1334,13 @@ code,
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 220px;
-    height: 220px;
-    border: 1px solid rgb(var(--pump-border) / 0.45);
-    border-radius: var(--radius-md);
-    background: #fff;
-    padding: 12px;
+    width: 196px;
+    height: 196px;
+    padding: 0;
   }
 
   .wallet-fund-qr--loading {
-    background: rgb(var(--pump-border) / 0.06);
+    color: rgb(var(--pump-muted));
   }
 
   .wallet-fund-qr img {
@@ -1357,26 +1354,23 @@ code,
     width: 100%;
     align-items: flex-start;
     gap: 12px;
-    border: 1px solid rgb(var(--pump-border) / 0.45);
-    background: rgb(var(--pump-border) / 0.04);
-    padding: 14px;
+    padding: 12px 0;
     text-align: left;
-    transition: background 0.15s ease;
+    transition: color 0.15s ease;
   }
 
-  .wallet-fund-option:hover {
-    background: rgb(var(--pump-border) / 0.08);
+  .wallet-fund-option:hover .wallet-fund-option-icon {
+    color: rgb(var(--pump-accent-strong));
   }
 
   .wallet-fund-option-icon {
     display: flex;
-    height: 40px;
-    width: 40px;
+    height: 1.25rem;
+    width: 1.25rem;
     shrink: 0;
     align-items: center;
     justify-content: center;
-    border: 1px solid rgb(var(--pump-border) / 0.35);
-    background: rgb(var(--pump-border) / 0.06);
+    margin-top: 0.125rem;
     color: rgb(var(--pump-accent));
   }
 

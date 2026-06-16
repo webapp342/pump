@@ -148,7 +148,7 @@ export function WalletFundingModal({
             </div>
 
             {view === "choice" ? (
-              <div className="mt-4 space-y-2.5">
+              <div className="mt-4 divide-y divide-pump-border/10">
                 <button type="button" onClick={openDepositView} className="wallet-fund-option">
                   <span className="wallet-fund-option-icon">
                     <QrCode className="h-5 w-5" strokeWidth={ICON_STROKE} aria-hidden />
@@ -179,7 +179,7 @@ export function WalletFundingModal({
                   </span>
                 </button>
 
-                <p className="pt-1 text-caption text-pump-muted">
+                <p className="pt-3 text-caption text-pump-muted">
                   On-ramp availability and payment methods depend on your region and connected
                   wallet type.
                 </p>
