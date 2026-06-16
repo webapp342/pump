@@ -106,143 +106,156 @@ export function WalletFundingModal({
 
   return (
     <ModalPortal open={open}>
-      <div
-        className="modal-backdrop modal-backdrop-shell z-[70]"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="wallet-funding-title"
-      >
-        <button type="button" className="absolute inset-0 cursor-default" aria-label="Close" onClick={onClose} />
-        <div className="modal-panel relative w-full max-w-md p-4 sm:p-5">
-          <div className="flex items-start justify-between gap-3 border-b border-pump-border/45 pb-3">
-            <div className="min-w-0">
-              {view === "deposit" && canReturnToChoice ? (
-                <button
-                  type="button"
-                  onClick={() => onViewChange("choice")}
-                  className="mb-2 inline-flex items-center gap-1 text-caption text-pump-muted transition hover:text-pump-text"
-                >
-                  <ArrowLeft className="h-3.5 w-3.5" strokeWidth={ICON_STROKE} aria-hidden />
-                  Back
-                </button>
-              ) : null}
-              <h2 id="wallet-funding-title" className="text-h3 font-semibold text-pump-text">
-                {title}
-              </h2>
-              <p className="mt-0.5 text-caption text-pump-muted">{description}</p>
-            </div>
-            <button
-              type="button"
-              onClick={onClose}
-              className="inline-flex h-8 w-8 shrink-0 items-center justify-center text-pump-muted transition hover:bg-pump-border/10 hover:text-pump-text"
-              aria-label="Close"
-            >
-              ×
-            </button>
-          </div>
-
-          {view === "choice" ? (
-            <div className="mt-4 space-y-2.5">
-              <button type="button" onClick={openDepositView} className="wallet-fund-option">
-                <span className="wallet-fund-option-icon">
-                  <QrCode className="h-5 w-5" strokeWidth={ICON_STROKE} aria-hidden />
-                </span>
-                <span className="min-w-0">
-                  <span className="block text-body-sm font-semibold text-pump-text">
-                    Deposit on-chain
-                  </span>
-                  <span className="mt-0.5 block text-caption leading-snug text-pump-muted">
-                    Transfer {pumpChain.nativeCurrency.symbol} from another wallet or exchange to
-                    your address on {pumpChain.name}.
-                  </span>
-                </span>
-              </button>
-
-              <button type="button" onClick={onOpenOnRamp} className="wallet-fund-option">
-                <span className="wallet-fund-option-icon">
-                  <CreditCard className="h-5 w-5" strokeWidth={ICON_STROKE} aria-hidden />
-                </span>
-                <span className="min-w-0">
-                  <span className="block text-body-sm font-semibold text-pump-text">
-                    Buy with card
-                  </span>
-                  <span className="mt-0.5 block text-caption leading-snug text-pump-muted">
-                    Purchase {pumpChain.nativeCurrency.symbol} via card, Apple Pay, or bank transfer
-                    through our on-ramp partners.
-                  </span>
-                </span>
-              </button>
-
-              <p className="pt-1 text-caption text-pump-muted">
-                On-ramp availability and payment methods depend on your region and connected wallet
-                type.
-              </p>
-            </div>
-          ) : address ? (
-            <div className="mt-4">
-              <div className="flex flex-col items-center">
-                <DepositQrCode address={address} />
-                <p className="mt-3 text-caption text-pump-muted">Scan to copy wallet address</p>
-              </div>
-
-              <div className="mt-4">
-                <p className="section-label">Your wallet address</p>
-                <div className="share-sheet-copy-row mt-1.5">
-                  <p className="share-sheet-copy-url font-mono text-body-sm" title={address}>
-                    {address}
-                  </p>
-                  <button type="button" onClick={() => void onCopyAddress()} className="share-sheet-copy-button">
-                    {copied ? (
-                      <Check className="h-4 w-4 text-pump-success" strokeWidth={2.25} aria-hidden />
-                    ) : (
-                      <Copy className="h-4 w-4" strokeWidth={ICON_STROKE} aria-hidden />
-                    )}
-                    <span>{copied ? "Copied" : "Copy"}</span>
+      <>
+        <button
+          type="button"
+          className="modal-backdrop modal-backdrop-dismiss z-[110] cursor-default transition-opacity"
+          aria-label="Close"
+          onClick={onClose}
+        />
+        <div
+          className="modal-sheet-host z-[111]"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="wallet-funding-title"
+        >
+          <div className="modal-panel modal-sheet-panel max-w-md rounded-t-2xl border-x-0 border-b-0 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:rounded-xl sm:border-x sm:border-b sm:p-5">
+            <div className="flex items-start justify-between gap-3 border-b border-pump-border/45 pb-3">
+              <div className="min-w-0">
+                {view === "deposit" && canReturnToChoice ? (
+                  <button
+                    type="button"
+                    onClick={() => onViewChange("choice")}
+                    className="mb-2 inline-flex items-center gap-1 text-caption text-pump-muted transition hover:text-pump-text"
+                  >
+                    <ArrowLeft className="h-3.5 w-3.5" strokeWidth={ICON_STROKE} aria-hidden />
+                    Back
                   </button>
-                </div>
+                ) : null}
+                <h2 id="wallet-funding-title" className="text-h3 font-semibold text-pump-text">
+                  {title}
+                </h2>
+                <p className="mt-0.5 text-caption text-pump-muted">{description}</p>
               </div>
-
-              <div className="mt-4 flex items-center justify-between gap-3 border border-pump-border/45 bg-pump-border/4 px-3 py-2.5">
-                <span className="flex items-center gap-2 text-caption text-pump-muted">
-                  <Wallet className="h-4 w-4 shrink-0" strokeWidth={ICON_STROKE} aria-hidden />
-                  Network
-                </span>
-                <span className="text-body-sm font-semibold text-pump-text">{FUNDING_CHAIN_LABEL}</span>
-              </div>
-
-              <ul className="mt-4 space-y-2">
-                {DEPOSIT_WARNINGS.map((warning) => (
-                  <li key={warning} className="notice-warning leading-snug">
-                    {warning}
-                  </li>
-                ))}
-              </ul>
-
-              <a
-                href={explorerAddressUrl(address)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-4 inline-flex text-caption text-pump-accent transition hover:underline"
+              <button
+                type="button"
+                onClick={onClose}
+                className="inline-flex h-8 w-8 shrink-0 items-center justify-center text-pump-muted transition hover:bg-pump-border/10 hover:text-pump-text"
+                aria-label="Close"
               >
-                View address on {pumpChain.blockExplorers.default.name}
-              </a>
+                ×
+              </button>
             </div>
-          ) : (
-            <p className="notice-warning mt-4">Connect a wallet to see your deposit address.</p>
-          )}
 
-          {view === "deposit" ? (
-            <div className="mt-5 grid grid-cols-2 gap-2">
-              <button type="button" onClick={onOpenOnRamp} className="secondary-button w-full">
-                Buy with card
-              </button>
-              <button type="button" onClick={onClose} className="primary-button w-full">
-                Done
-              </button>
-            </div>
-          ) : null}
+            {view === "choice" ? (
+              <div className="mt-4 space-y-2.5">
+                <button type="button" onClick={openDepositView} className="wallet-fund-option">
+                  <span className="wallet-fund-option-icon">
+                    <QrCode className="h-5 w-5" strokeWidth={ICON_STROKE} aria-hidden />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block text-body-sm font-semibold text-pump-text">
+                      Deposit on-chain
+                    </span>
+                    <span className="mt-0.5 block text-caption leading-snug text-pump-muted">
+                      Transfer {pumpChain.nativeCurrency.symbol} from another wallet or exchange to
+                      your address on {pumpChain.name}.
+                    </span>
+                  </span>
+                </button>
+
+                <button type="button" onClick={onOpenOnRamp} className="wallet-fund-option">
+                  <span className="wallet-fund-option-icon">
+                    <CreditCard className="h-5 w-5" strokeWidth={ICON_STROKE} aria-hidden />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block text-body-sm font-semibold text-pump-text">
+                      Buy with card
+                    </span>
+                    <span className="mt-0.5 block text-caption leading-snug text-pump-muted">
+                      Purchase {pumpChain.nativeCurrency.symbol} via card, Apple Pay, or bank
+                      transfer through our on-ramp partners.
+                    </span>
+                  </span>
+                </button>
+
+                <p className="pt-1 text-caption text-pump-muted">
+                  On-ramp availability and payment methods depend on your region and connected
+                  wallet type.
+                </p>
+              </div>
+            ) : address ? (
+              <div className="mt-4">
+                <div className="flex flex-col items-center">
+                  <DepositQrCode address={address} />
+                  <p className="mt-3 text-caption text-pump-muted">Scan to copy wallet address</p>
+                </div>
+
+                <div className="mt-4">
+                  <p className="section-label">Your wallet address</p>
+                  <div className="share-sheet-copy-row mt-1.5">
+                    <p className="share-sheet-copy-url font-mono text-body-sm" title={address}>
+                      {address}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => void onCopyAddress()}
+                      className="share-sheet-copy-button"
+                    >
+                      {copied ? (
+                        <Check className="h-4 w-4 text-pump-success" strokeWidth={2.25} aria-hidden />
+                      ) : (
+                        <Copy className="h-4 w-4" strokeWidth={ICON_STROKE} aria-hidden />
+                      )}
+                      <span>{copied ? "Copied" : "Copy"}</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="mt-4 flex items-center justify-between gap-3 border border-pump-border/45 bg-pump-border/4 px-3 py-2.5">
+                  <span className="flex items-center gap-2 text-caption text-pump-muted">
+                    <Wallet className="h-4 w-4 shrink-0" strokeWidth={ICON_STROKE} aria-hidden />
+                    Network
+                  </span>
+                  <span className="text-body-sm font-semibold text-pump-text">
+                    {FUNDING_CHAIN_LABEL}
+                  </span>
+                </div>
+
+                <ul className="mt-4 space-y-2">
+                  {DEPOSIT_WARNINGS.map((warning) => (
+                    <li key={warning} className="notice-warning leading-snug">
+                      {warning}
+                    </li>
+                  ))}
+                </ul>
+
+                <a
+                  href={explorerAddressUrl(address)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-4 inline-flex text-caption text-pump-accent transition hover:underline"
+                >
+                  View address on {pumpChain.blockExplorers.default.name}
+                </a>
+              </div>
+            ) : (
+              <p className="notice-warning mt-4">Connect a wallet to see your deposit address.</p>
+            )}
+
+            {view === "deposit" ? (
+              <div className="mt-5 grid grid-cols-2 gap-2">
+                <button type="button" onClick={onOpenOnRamp} className="secondary-button w-full">
+                  Buy with card
+                </button>
+                <button type="button" onClick={onClose} className="primary-button w-full">
+                  Done
+                </button>
+              </div>
+            ) : null}
+          </div>
         </div>
-      </div>
+      </>
     </ModalPortal>
   );
 }

@@ -242,12 +242,12 @@ export function CreatorProfileModal({ open, onClose, creatorAddress }: CreatorPr
         onClick={onClose}
       />
       <div
-        className="fixed inset-0 z-[101] flex items-end justify-center p-0 sm:items-center sm:p-4 pointer-events-none"
+        className="modal-sheet-host z-[101] sm:items-center sm:p-4"
         role="dialog"
         aria-modal="true"
         aria-labelledby="creator-profile-title"
       >
-        <div className="panel-surface pointer-events-auto relative flex w-full max-w-2xl max-h-[min(78dvh,680px)] flex-col overflow-hidden rounded-t-2xl shadow-panel sm:max-h-[min(72vh,640px)] sm:rounded-xl">
+        <div className="panel-surface pointer-events-auto relative flex w-full max-w-2xl max-h-[min(90dvh,680px)] flex-col overflow-hidden rounded-t-2xl shadow-panel sm:max-h-[min(72vh,640px)] sm:rounded-xl">
           <div className="shrink-0 border-b border-pump-border/10 px-4 pb-3 pt-3 sm:px-5 sm:pb-4 sm:pt-4">
             <div className="mb-2 flex justify-center sm:hidden">
               <div className="h-1 w-10 rounded-full bg-pump-border/50" aria-hidden />

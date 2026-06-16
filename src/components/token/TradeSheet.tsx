@@ -71,18 +71,16 @@ export function TradeSheet({
         onClick={onClose}
       />
       <div
-        className={`fixed inset-0 z-[101] flex pointer-events-none ${
-          isModal ? "items-center justify-center p-4" : "items-end justify-center lg:hidden"
-        }`}
+        className={`modal-sheet-host z-[101] ${isModal ? "items-center p-4" : "lg:hidden"}`}
         role="dialog"
         aria-modal="true"
         aria-label={isModal ? tradeTitle : `Trade ${symbol}`}
       >
         <div
-          className={`modal-panel pointer-events-auto flex flex-col overflow-hidden ${
+          className={`modal-panel modal-sheet-panel pointer-events-auto flex flex-col overflow-hidden ${
             isModal
-              ? "w-full max-w-md max-h-[min(85dvh,640px)]"
-              : "w-full max-h-[min(85dvh,720px)] border-x-0 border-b-0"
+              ? "max-w-md max-h-[min(85dvh,640px)]"
+              : "max-h-[min(85dvh,720px)] border-x-0 border-b-0 rounded-t-2xl"
           }`}
         >
           {isModal ? (

@@ -26,9 +26,10 @@ html[data-theme="light"] {
   --mobile-trade-dock-height: calc(3.75rem + env(safe-area-inset-bottom, 0px));
   --mobile-token-footer-height: var(--mobile-trade-dock-height);
 
-  --modal-overlay-opacity: 0.92;
-  --modal-overlay-blur: 32px;
-  --modal-overlay-saturate: 160%;
+  --modal-overlay-color: 0 0 0;
+  --modal-overlay-opacity: 0.48;
+  --modal-overlay-blur: 16px;
+  --modal-overlay-saturate: 125%;
 
   --radius-sm: 4px;
   --radius-md: 6px;
@@ -163,11 +164,48 @@ code,
   .modal-backdrop {
     position: fixed;
     inset: 0;
+    height: 100dvh;
+    max-height: 100dvh;
     isolation: isolate;
     border: none;
-    background: rgb(var(--pump-bg) / var(--modal-overlay-opacity));
+    background: rgb(var(--modal-overlay-color) / var(--modal-overlay-opacity));
     backdrop-filter: blur(var(--modal-overlay-blur)) saturate(var(--modal-overlay-saturate));
     -webkit-backdrop-filter: blur(var(--modal-overlay-blur)) saturate(var(--modal-overlay-saturate));
+  }
+
+  @media (max-width: 639px) {
+    .modal-backdrop {
+      --modal-overlay-opacity: 0.36;
+      --modal-overlay-blur: 10px;
+      --modal-overlay-saturate: 110%;
+    }
+  }
+
+  .modal-sheet-host {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    height: 100dvh;
+    max-height: 100dvh;
+    align-items: flex-end;
+    justify-content: center;
+    pointer-events: none;
+  }
+
+  @media (min-width: 640px) {
+    .modal-sheet-host {
+      align-items: center;
+      padding: 1rem;
+    }
+  }
+
+  .modal-sheet-panel {
+    pointer-events: auto;
+    width: 100%;
+    max-height: min(90dvh, 720px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
   }
 
   .modal-backdrop-shell {
