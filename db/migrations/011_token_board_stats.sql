@@ -1,6 +1,7 @@
 -- Phase 3: indexer-maintained per-token board stats (incremental on trade)
 -- Run: sudo -u postgres psql -d pump_db -f db/migrations/011_token_board_stats.sql
--- Backfill: cd indexer && npm run backfill-board-stats
+-- Backfill: sudo -u postgres psql -d pump_db -f db/refresh/backfill_token_board_stats.sql
+-- Or (indexer): npm run backfill-board-stats
 
 CREATE TABLE IF NOT EXISTS token_board_stats (
   token_address text PRIMARY KEY REFERENCES tokens(address) ON DELETE CASCADE,
