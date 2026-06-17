@@ -1275,10 +1275,10 @@ export function PortfolioPanel() {
                         balance * Number(position.lastPriceBnb),
                         bnbUsd
                       );
-                      const netPnlBnb = holdingNetPnlBnb(row.view);
-                      const netPnlUsd = bnbUsd != null ? netPnlBnb * bnbUsd : null;
-                      const netPnlPct =
-                        remainingCostBasis > 0 ? (netPnlBnb / remainingCostBasis) * 100 : null;
+                      const openPnlBnb = holdingOpenPnlBnb(row.view);
+                      const openPnlUsd = bnbUsd != null ? openPnlBnb * bnbUsd : null;
+                      const openPnlPct =
+                        remainingCostBasis > 0 ? (openPnlBnb / remainingCostBasis) * 100 : null;
 
                       return (
                         <HoldingSwipeRow
@@ -1304,7 +1304,7 @@ export function PortfolioPanel() {
                               ${position.symbol}
                             </Link>
                             <div className="self-center">
-                              <PnlCell usd={netPnlUsd} pct={netPnlPct} />
+                              <PnlCell usd={openPnlUsd} pct={openPnlPct} />
                             </div>
                             <div className="col-span-2 col-start-2 flex w-full items-center justify-between gap-2 text-[11px] leading-tight">
                               <span className="financial-value min-w-0 truncate text-pump-text">
@@ -1340,7 +1340,7 @@ export function PortfolioPanel() {
                           <th>Value</th>
                           <th>Balance</th>
                           <th>Entry</th>
-                          <th className="w-[1%] whitespace-nowrap">Net PnL</th>
+                          <th className="w-[1%] whitespace-nowrap">P/L</th>
                           <th className="w-[1%] whitespace-nowrap text-right">Trade</th>
                         </tr>
                       </thead>
@@ -1368,11 +1368,11 @@ export function PortfolioPanel() {
                             balance * Number(position.lastPriceBnb),
                             bnbUsd
                           );
-                          const netPnlBnb = holdingNetPnlBnb(row.view);
-                          const netPnlUsd = bnbUsd != null ? netPnlBnb * bnbUsd : null;
-                          const netPnlPct =
+                          const openPnlBnb = holdingOpenPnlBnb(row.view);
+                          const openPnlUsd = bnbUsd != null ? openPnlBnb * bnbUsd : null;
+                          const openPnlPct =
                             remainingCostBasis > 0
-                              ? (netPnlBnb / remainingCostBasis) * 100
+                              ? (openPnlBnb / remainingCostBasis) * 100
                               : null;
 
                           return (
@@ -1408,7 +1408,7 @@ export function PortfolioPanel() {
                                 {formatUsdReadable(avgEntryUsd, { compact: true })}
                               </td>
                               <td className="w-[1%] whitespace-nowrap px-4 py-3">
-                                <PnlCell usd={netPnlUsd} pct={netPnlPct} align="start" />
+                                <PnlCell usd={openPnlUsd} pct={openPnlPct} align="start" />
                               </td>
                               <td className="w-[1%] whitespace-nowrap px-4 py-3">
                                 <HoldingQuickActions

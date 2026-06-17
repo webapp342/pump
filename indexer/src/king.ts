@@ -16,6 +16,16 @@ type TopToken = {
   tradeCount: number;
 };
 
+/** Bonding mark price from DB reserves (human units) — matches Arena / portfolio. */
+const SQL_BONDING_MARK_PRICE = `
+  CASE
+    WHEN (${KOTH_TOKEN_SUPPLY}::numeric - COALESCE(b.token_sold, 0)) > 0
+    THEN (5::numeric + COALESCE(b.reserve_zug, 0))
+         / (${KOTH_TOKEN_SUPPLY}::numeric - COALESCE(b.token_sold, 0))
+    ELSE COALESCE(b.last_price_zug, 0)
+  END
+`;
+
 /** #1 FDV among bonding tokens — same ordering as Arena table (MCAP desc). */
 export async function getTopMcapToken(pool: pg.Pool): Promise<TopToken | null> {
   const result = await pool.query<{
@@ -29,7 +39,7 @@ export async function getTopMcapToken(pool: pg.Pool): Promise<TopToken | null> {
       SELECT
         t.address AS token_address,
         t.creator_address,
-        (COALESCE(b.last_price_zug, 0) * ${KOTH_TOKEN_SUPPLY})::text AS market_cap_zug,
+        ((${SQL_BONDING_MARK_PRICE}) * ${KOTH_TOKEN_SUPPLY})::text AS market_cap_zug,
         COALESCE(b.holder_count, 0) AS holder_count,
         COALESCE(b.trade_count, 0) AS trade_count
       FROM tokens t
@@ -37,7 +47,7 @@ export async function getTopMcapToken(pool: pg.Pool): Promise<TopToken | null> {
       WHERE t.is_hidden = false
         AND t.status = 'BONDING'
         AND COALESCE(b.trade_count, 0) > 0
-      ORDER BY (COALESCE(b.last_price_zug, 0) * ${KOTH_TOKEN_SUPPLY}) DESC,
+      ORDER BY ((${SQL_BONDING_MARK_PRICE}) * ${KOTH_TOKEN_SUPPLY}) DESC,
                COALESCE(b.trade_count, 0) DESC,
                t.created_at ASC
       LIMIT 1

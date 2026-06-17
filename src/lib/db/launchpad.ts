@@ -19,6 +19,9 @@ const SQL_BONDING_MARK_PRICE_ZUG = `
   END
 `;
 
+/** SQL: FDV / market cap from bonding mark price × 1B supply. */
+const SQL_BONDING_MARK_CAP_ZUG = `((${SQL_BONDING_MARK_PRICE_ZUG}) * ${BONDING_TOKEN_SUPPLY_HUMAN})`;
+
 function resolvePositionMarkPriceBnb(
   reserveZug: string | null | undefined,
   tokenSold: string | null | undefined,
@@ -203,10 +206,10 @@ const TOKEN_LIST_SELECT = `
       bt.logo_url,
       COALESCE(b.progress_bps, 0) AS progress_bps,
       COALESCE(b.reserve_zug, 0)::text AS reserve_zug,
-      (COALESCE(b.last_price_zug, 0) * 1000000000)::text AS market_cap_zug,
+      (${SQL_BONDING_MARK_CAP_ZUG})::text AS market_cap_zug,
       COALESCE(
         ts.ath_price_zug * 1000000000,
-        COALESCE(b.last_price_zug, 0) * 1000000000,
+        (${SQL_BONDING_MARK_CAP_ZUG}),
         0
       )::text AS ath_market_cap_zug,
       COALESCE(ts.trade_count, COALESCE(b.trade_count, 0)) AS trade_count,
@@ -216,12 +219,12 @@ const TOKEN_LIST_SELECT = `
       COALESCE(ts.traders_24h, 0) AS traders_24h,
       CASE
         WHEN p1h.price_zug IS NOT NULL AND p1h.price_zug > 0
-          THEN (((COALESCE(b.last_price_zug, 0) - p1h.price_zug) / p1h.price_zug) * 100)::text
+          THEN ((((${SQL_BONDING_MARK_PRICE_ZUG}) - p1h.price_zug) / p1h.price_zug) * 100)::text
         ELSE NULL
       END AS change_1h_pct,
       CASE
         WHEN p6h.price_zug IS NOT NULL AND p6h.price_zug > 0
-          THEN (((COALESCE(b.last_price_zug, 0) - p6h.price_zug) / p6h.price_zug) * 100)::text
+          THEN ((((${SQL_BONDING_MARK_PRICE_ZUG}) - p6h.price_zug) / p6h.price_zug) * 100)::text
         ELSE NULL
       END AS change_6h_pct,
       CASE
@@ -229,7 +232,7 @@ const TOKEN_LIST_SELECT = `
              AND COALESCE(p24h_prev.price_zug, p_first.price_zug) > 0
           THEN (
             (
-              COALESCE(b.last_price_zug, 0) - COALESCE(p24h_prev.price_zug, p_first.price_zug)
+              (${SQL_BONDING_MARK_PRICE_ZUG}) - COALESCE(p24h_prev.price_zug, p_first.price_zug)
             ) / COALESCE(p24h_prev.price_zug, p_first.price_zug) * 100
           )::text
         ELSE NULL
@@ -283,10 +286,10 @@ const TOKEN_LIST_SELECT_BONDING = `
       bt.logo_url,
       COALESCE(b.progress_bps, 0) AS progress_bps,
       COALESCE(b.reserve_zug, 0)::text AS reserve_zug,
-      COALESCE(b.market_cap_zug, 0)::text AS market_cap_zug,
+      (${SQL_BONDING_MARK_CAP_ZUG})::text AS market_cap_zug,
       COALESCE(
         ts.ath_price_zug * 1000000000,
-        COALESCE(b.market_cap_zug, 0),
+        (${SQL_BONDING_MARK_CAP_ZUG}),
         0
       )::text AS ath_market_cap_zug,
       COALESCE(b.trade_count, 0) AS trade_count,
@@ -296,12 +299,12 @@ const TOKEN_LIST_SELECT_BONDING = `
       COALESCE(ts.traders_24h, 0) AS traders_24h,
       CASE
         WHEN p1h.price_zug IS NOT NULL AND p1h.price_zug > 0
-          THEN (((COALESCE(b.last_price_zug, 0) - p1h.price_zug) / p1h.price_zug) * 100)::text
+          THEN ((((${SQL_BONDING_MARK_PRICE_ZUG}) - p1h.price_zug) / p1h.price_zug) * 100)::text
         ELSE NULL
       END AS change_1h_pct,
       CASE
         WHEN p6h.price_zug IS NOT NULL AND p6h.price_zug > 0
-          THEN (((COALESCE(b.last_price_zug, 0) - p6h.price_zug) / p6h.price_zug) * 100)::text
+          THEN ((((${SQL_BONDING_MARK_PRICE_ZUG}) - p6h.price_zug) / p6h.price_zug) * 100)::text
         ELSE NULL
       END AS change_6h_pct,
       CASE
@@ -309,7 +312,7 @@ const TOKEN_LIST_SELECT_BONDING = `
              AND COALESCE(p24h_prev.price_zug, p_first.price_zug) > 0
           THEN (
             (
-              COALESCE(b.last_price_zug, 0) - COALESCE(p24h_prev.price_zug, p_first.price_zug)
+              (${SQL_BONDING_MARK_PRICE_ZUG}) - COALESCE(p24h_prev.price_zug, p_first.price_zug)
             ) / COALESCE(p24h_prev.price_zug, p_first.price_zug) * 100
           )::text
         ELSE NULL
@@ -363,10 +366,10 @@ const TOKEN_LIST_SELECT_MV = `
       bt.logo_url,
       COALESCE(b.progress_bps, 0) AS progress_bps,
       COALESCE(b.reserve_zug, 0)::text AS reserve_zug,
-      COALESCE(b.market_cap_zug, 0)::text AS market_cap_zug,
+      (${SQL_BONDING_MARK_CAP_ZUG})::text AS market_cap_zug,
       COALESCE(
         mts.ath_price_zug * 1000000000,
-        COALESCE(b.market_cap_zug, 0),
+        (${SQL_BONDING_MARK_CAP_ZUG}),
         0
       )::text AS ath_market_cap_zug,
       COALESCE(mts.trade_count, COALESCE(b.trade_count, 0)) AS trade_count,
@@ -376,12 +379,12 @@ const TOKEN_LIST_SELECT_MV = `
       COALESCE(mts.traders_24h, 0) AS traders_24h,
       CASE
         WHEN mpa.price_1h_ago IS NOT NULL AND mpa.price_1h_ago > 0
-          THEN (((COALESCE(b.last_price_zug, 0) - mpa.price_1h_ago) / mpa.price_1h_ago) * 100)::text
+          THEN ((((${SQL_BONDING_MARK_PRICE_ZUG}) - mpa.price_1h_ago) / mpa.price_1h_ago) * 100)::text
         ELSE NULL
       END AS change_1h_pct,
       CASE
         WHEN mpa.price_6h_ago IS NOT NULL AND mpa.price_6h_ago > 0
-          THEN (((COALESCE(b.last_price_zug, 0) - mpa.price_6h_ago) / mpa.price_6h_ago) * 100)::text
+          THEN ((((${SQL_BONDING_MARK_PRICE_ZUG}) - mpa.price_6h_ago) / mpa.price_6h_ago) * 100)::text
         ELSE NULL
       END AS change_6h_pct,
       CASE
@@ -389,7 +392,7 @@ const TOKEN_LIST_SELECT_MV = `
              AND COALESCE(mpa.price_24h_ago, mpa.price_first) > 0
           THEN (
             (
-              COALESCE(b.last_price_zug, 0) - COALESCE(mpa.price_24h_ago, mpa.price_first)
+              (${SQL_BONDING_MARK_PRICE_ZUG}) - COALESCE(mpa.price_24h_ago, mpa.price_first)
             ) / COALESCE(mpa.price_24h_ago, mpa.price_first) * 100
           )::text
         ELSE NULL
@@ -420,15 +423,8 @@ function buildTokenListSelectSql(baseTokensInner: string): string {
 }
 
 function buildTokenListSql(baseTokensInner: string, orderBy: string): string {
-  const order =
-    useBondingStateCounts() && !useMvTokenStats()
-      ? orderBy.replace(
-          "(COALESCE(b.last_price_zug, 0) * 1000000000)",
-          "COALESCE(b.market_cap_zug, 0)"
-        )
-      : orderBy;
   return `${buildTokenListSelectSql(baseTokensInner)}
-    ${order}`;
+    ${orderBy}`;
 }
 
 function arenaBoardOrderClause(
@@ -480,11 +476,7 @@ function arenaBoardFilterClause(
         FROM tokens t
         LEFT JOIN bonding_states b ON b.token_address = t.address
         WHERE t.is_hidden = false
-        ORDER BY COALESCE(
-          b.market_cap_zug,
-          COALESCE(b.last_price_zug, 0) * 1000000000,
-          0
-        ) DESC
+        ORDER BY (${SQL_BONDING_MARK_CAP_ZUG}) DESC
         LIMIT 5
       )`,
       params: [],
@@ -567,11 +559,7 @@ async function countKothContenders(): Promise<number> {
         FROM tokens t
         LEFT JOIN bonding_states b ON b.token_address = t.address
         WHERE t.is_hidden = false
-        ORDER BY COALESCE(
-          b.market_cap_zug,
-          COALESCE(b.last_price_zug, 0) * 1000000000,
-          0
-        ) DESC
+        ORDER BY (${SQL_BONDING_MARK_CAP_ZUG}) DESC
         LIMIT 5
       ) koth
     `
@@ -623,7 +611,7 @@ function arenaListOrderBy(sort: ArenaListSort): string {
   if (sort === "age") {
     return "ORDER BY bt.created_at DESC";
   }
-  return "ORDER BY COALESCE(b.market_cap_zug, COALESCE(b.last_price_zug, 0) * 1000000000, 0) DESC, bt.created_at DESC";
+  return `ORDER BY (${SQL_BONDING_MARK_CAP_ZUG}) DESC, bt.created_at DESC`;
 }
 
 export async function listTokensPaginated(
@@ -680,7 +668,7 @@ export async function getArenaFilterCounts(
                  AND COALESCE(mpa.price_24h_ago, mpa.price_first) > 0
               THEN (
                 (
-                  COALESCE(b.last_price_zug, 0) - COALESCE(mpa.price_24h_ago, mpa.price_first)
+                  (${SQL_BONDING_MARK_PRICE_ZUG}) - COALESCE(mpa.price_24h_ago, mpa.price_first)
                 ) / COALESCE(mpa.price_24h_ago, mpa.price_first) * 100
               )
             ELSE NULL
@@ -724,7 +712,7 @@ export async function getArenaFilterCounts(
                AND COALESCE(p24h_prev.price_zug, p_first.price_zug) > 0
             THEN (
               (
-                COALESCE(b.last_price_zug, 0) - COALESCE(p24h_prev.price_zug, p_first.price_zug)
+                (${SQL_BONDING_MARK_PRICE_ZUG}) - COALESCE(p24h_prev.price_zug, p_first.price_zug)
               ) / COALESCE(p24h_prev.price_zug, p_first.price_zug) * 100
             )
           ELSE NULL
