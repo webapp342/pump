@@ -182,7 +182,7 @@ async function finalizeOne(
 
   if (qualified.length === 0) {
     console.warn(
-      `airdrop ${airdrop.id}: no qualified winners, marking CLOSED in DB (on-chain finalize requires winners; sweep after claim window)`
+      `airdrop ${airdrop.id}: no qualified winners, marking CLOSED in DB (sweep full reward via admin after claim window)`
     );
     await pools.launchpad.query(
       `

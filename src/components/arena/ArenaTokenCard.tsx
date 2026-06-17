@@ -102,7 +102,25 @@ export function ArenaTokenCard({
       role="link"
       aria-label={`View ${token.symbol}`}
     >
-      <div className="flex items-start justify-between gap-2">
+      <button
+        type="button"
+        onClick={(event) => {
+          event.stopPropagation();
+          onToggleFavorite(token.address);
+        }}
+        className={`arena-token-card__favorite absolute z-[2] text-lg leading-none transition ${
+          compact ? "right-2.5 top-2.5" : "right-3 top-3 md:right-4 md:top-4"
+        } ${isFavorite ? "text-pump-accent" : "text-pump-muted hover:text-pump-text"}`}
+        aria-label={isFavorite ? "Remove from favorites" : "Add to favorites"}
+      >
+        {isFavorite ? "★" : "☆"}
+      </button>
+
+      <div
+        className={`flex items-start justify-between gap-2 ${
+          compact ? "pr-6" : "pr-7 md:pr-8"
+        }`}
+      >
         <div className="flex min-w-0 items-center gap-3">
           <TokenAvatar
             address={token.address}
@@ -115,28 +133,13 @@ export function ArenaTokenCard({
             <p className="text-caption text-pump-muted">${token.symbol}</p>
           </div>
         </div>
-        <div className="flex shrink-0 flex-col items-end gap-1.5">
-          {isKoth ? (
-            <span className="status-badge border-pump-accent/40 bg-pump-accent/12 text-[10px] text-pump-accent">
-              KOTH
-            </span>
-          ) : isKothContender ? (
-            <span className="status-badge text-[10px] text-pump-muted">Contender</span>
-          ) : null}
-          <button
-            type="button"
-            onClick={(event) => {
-              event.stopPropagation();
-              onToggleFavorite(token.address);
-            }}
-            className={`text-lg leading-none transition ${
-              isFavorite ? "text-pump-accent" : "text-pump-muted hover:text-pump-text"
-            }`}
-            aria-label={isFavorite ? "Remove from favorites" : "Add to favorites"}
-          >
-            {isFavorite ? "★" : "☆"}
-          </button>
-        </div>
+        {isKoth ? (
+          <span className="status-badge shrink-0 border-pump-accent/40 bg-pump-accent/12 text-[10px] text-pump-accent">
+            KOTH
+          </span>
+        ) : isKothContender ? (
+          <span className="status-badge shrink-0 text-[10px] text-pump-muted">Contender</span>
+        ) : null}
       </div>
 
       <div className="grid grid-cols-[1fr_auto] items-end gap-3">

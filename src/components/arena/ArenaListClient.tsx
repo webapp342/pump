@@ -61,12 +61,63 @@ import type { AirdropListItem } from "@/lib/db/airdrops";
 const ARENA_FILTER_ITEMS = [
   ["new", "New", "Newest"],
   ["all", "All", "All"],
-  ["highVol", "Vol", "High Vol"],
   ["movers", "Movers", "Movers"],
   ["hasAirdrop", "Airdrop", "Has airdrop"],
   ["kothContenders", "KOTH", "KOTH contenders"],
   ["favorites", "Favorites", "Favorites"],
 ] as const;
+
+const SERVER_BOARD_FILTERS = new Set<BoardFilter>([
+  "movers",
+  "kothContenders",
+  "hasAirdrop",
+]);
+
+function applyBoardFilterDefaults(filter: BoardFilter): {
+  sortKey?: SortKey;
+  sortDir?: SortDir;
+  cardsSort?: ArenaCardsSortKey;
+} {
+  if (filter === "new") {
+    return { sortKey: "age", sortDir: "desc" };
+  }
+  if (filter === "movers") {
+    return { sortKey: "h24", sortDir: "desc", cardsSort: "h24" };
+  }
+  return {};
+}
+
+function emptyExploreFilterCopy(
+  filter: BoardFilter,
+  options: {
+    search: string;
+    isConnected: boolean;
+    favoritesCount: number;
+    favoriteListLoaded: boolean;
+  }
+): string {
+  if (options.search.trim()) {
+    return "No coins match your search.";
+  }
+
+  switch (filter) {
+    case "favorites":
+      if (!options.isConnected) return "Connect wallet to sync starred tokens.";
+      if (options.favoritesCount === 0) {
+        return "Star tokens in Explore coins to add them here.";
+      }
+      if (!options.favoriteListLoaded) return "Loading favorites…";
+      return "No favorites to show.";
+    case "movers":
+      return "No movers with 1%+ 24h change right now.";
+    case "kothContenders":
+      return "No KOTH contenders yet.";
+    case "hasAirdrop":
+      return "No coins with an active airdrop right now.";
+    default:
+      return "No coins match this filter.";
+  }
+}
 
 function ArenaFilterChips({
   activeFilter,
@@ -247,9 +298,6 @@ function matchesBoardFilter(
   if (filter === "new") {
     return true;
   }
-  if (filter === "highVol") {
-    return Number(token.volume24hBnb ?? 0) >= 0.5;
-  }
   if (filter === "movers") {
     return Math.abs(token.change24hPct ?? 0) >= 1;
   }
@@ -286,13 +334,14 @@ export function ArenaListClient() {
   const [animatedCaps, setAnimatedCaps] = useState<Record<string, number>>({});
   const [search, setSearch] = useState("");
   const [activeFilter, setActiveFilter] = useState<BoardFilter>("new");
-  const [sortKey, setSortKey] = useState<SortKey>("mcap");
+  const [sortKey, setSortKey] = useState<SortKey>("age");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [viewMode, setViewMode] = useState<ArenaViewMode>("board");
   const [cardsSort, setCardsSort] = useState<ArenaCardsSortKey>("mcap");
   const [cardsDensity, setCardsDensity] = useState<ArenaCardsDensity>("comfortable");
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [quickTradeTarget, setQuickTradeTarget] = useState<ArenaQuickTradeTarget | null>(null);
+  const [favoriteListTokens, setFavoriteListTokens] = useState<TokenListItem[]>([]);
   const { address, isConnected } = useAccount();
   const router = useRouter();
   const { openConnectModal } = useOpenConnectModal();
@@ -305,9 +354,45 @@ export function ArenaListClient() {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const loadMoreRef = useRef<HTMLDivElement>(null);
   const listLimitRef = useRef(ARENA_PAGE_INITIAL);
-  const boardSortKey: SortKey = activeFilter === "new" ? "age" : sortKey;
-  const boardSortDir: SortDir = activeFilter === "new" ? "desc" : sortDir;
+  const apiSortKey: SortKey =
+    activeFilter === "movers" ? "h24" : viewMode === "cards" ? cardsSort : sortKey;
+  const apiSortDir: SortDir =
+    activeFilter === "movers"
+      ? sortDir
+      : viewMode === "cards"
+        ? "desc"
+        : sortDir;
+  const headerSortKey: SortKey = activeFilter === "movers" ? "h24" : sortKey;
   const useServerBoardOrder = activeFilter !== "favorites";
+  const favoriteAddressKey = useMemo(() => [...favorites].sort().join("|"), [favorites]);
+
+  const loadFavoriteTokens = useCallback(async () => {
+    if (!address || favorites.size === 0) {
+      setFavoriteListTokens([]);
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `/api/favorites?address=${encodeURIComponent(address)}&include=tokens`,
+        { cache: "no-store" }
+      );
+      const body = (await response.json()) as {
+        tokens?: TokenListItem[];
+        error?: string;
+      };
+      if (!response.ok) {
+        throw new Error(body.error ?? "Failed to load favorites");
+      }
+      setFavoriteListTokens(body.tokens ?? []);
+    } catch {
+      setFavoriteListTokens([]);
+    }
+  }, [address, favorites.size, favoriteAddressKey]);
+
+  useEffect(() => {
+    void loadFavoriteTokens();
+  }, [loadFavoriteTokens]);
 
   const openQuickTrade = useCallback(
     (tokenAddress: string, symbol: string, status: string, side: "buy" | "sell") => {
@@ -368,15 +453,30 @@ export function ArenaListClient() {
   );
 
   useEffect(() => {
+    const filter = readArenaFilter();
     setViewMode(readArenaViewMode());
-    setCardsSort(readArenaCardsSort());
     setCardsDensity(readArenaCardsDensity());
-    setActiveFilter(readArenaFilter());
+    setActiveFilter(filter);
+    const defaults = applyBoardFilterDefaults(filter);
+    if (defaults.sortKey) setSortKey(defaults.sortKey);
+    if (defaults.sortDir) setSortDir(defaults.sortDir);
+    if (defaults.cardsSort) {
+      setCardsSort(defaults.cardsSort);
+    } else {
+      setCardsSort(readArenaCardsSort());
+    }
   }, []);
 
   const setArenaFilter = useCallback((filter: BoardFilter) => {
     setActiveFilter(filter);
     writeArenaFilter(filter);
+    const defaults = applyBoardFilterDefaults(filter);
+    if (defaults.sortKey) setSortKey(defaults.sortKey);
+    if (defaults.sortDir) setSortDir(defaults.sortDir);
+    if (defaults.cardsSort) {
+      setCardsSort(defaults.cardsSort);
+      writeArenaCardsSort(defaults.cardsSort);
+    }
   }, []);
 
   const setCardsSortPreference = useCallback((sort: ArenaCardsSortKey) => {
@@ -492,8 +592,8 @@ export function ArenaListClient() {
     (limit: number) => {
       const params = new URLSearchParams({
         limit: String(limit),
-        sortKey: boardSortKey,
-        sortDir: boardSortDir,
+        sortKey: apiSortKey,
+        sortDir: apiSortDir,
         filter: activeFilter === "favorites" ? "all" : activeFilter,
       });
       if (airdropTokenAddresses.size > 0) {
@@ -501,7 +601,7 @@ export function ArenaListClient() {
       }
       return `/api/tokens?${params.toString()}`;
     },
-    [boardSortKey, boardSortDir, activeFilter, airdropTokenAddresses]
+    [apiSortKey, apiSortDir, activeFilter, airdropTokenAddresses]
   );
 
   const load = useCallback(
@@ -587,6 +687,9 @@ export function ArenaListClient() {
   const loadMoreRefFn = useRef(loadMore);
   loadMoreRefFn.current = loadMore;
 
+  const loadFavoriteTokensRef = useRef(loadFavoriteTokens);
+  loadFavoriteTokensRef.current = loadFavoriteTokens;
+
   const { connected: wsConnected } = useLiveChannel({
     room: "arena",
     onMessage: (message) => {
@@ -597,20 +700,27 @@ export function ArenaListClient() {
         payload.type === "koth"
       ) {
         void loadRef.current(listLimitRef.current);
+        void loadFavoriteTokensRef.current();
       }
     },
   });
 
   useEffect(() => {
+    if (activeFilter === "favorites") {
+      setHasMore(false);
+      setLoadingMore(false);
+      return;
+    }
+
     listLimitRef.current = ARENA_PAGE_INITIAL;
     setHasMore(false);
     setLoadingMore(false);
     setTokens(null);
     void loadRef.current(ARENA_PAGE_INITIAL);
-  }, [boardSortKey, boardSortDir, activeFilter, airdropTokenAddresses]);
+  }, [apiSortKey, apiSortDir, activeFilter, airdropTokenAddresses, viewMode]);
 
   useEffect(() => {
-    if (!hasMore || loadingMore) return;
+    if (activeFilter === "favorites" || !hasMore || loadingMore) return;
 
     const sentinel = loadMoreRef.current;
     if (!sentinel) return;
@@ -626,7 +736,7 @@ export function ArenaListClient() {
 
     observer.observe(sentinel);
     return () => observer.disconnect();
-  }, [hasMore, loadingMore, tokens?.length, viewMode]);
+  }, [activeFilter, hasMore, loadingMore, tokens?.length, viewMode]);
 
   useEffect(() => {
     if (tokens === null) return;
@@ -686,6 +796,19 @@ export function ArenaListClient() {
   }, [tokens, effectiveBnbUsd, animateCap, setAnimatedCap]);
 
   const resolvedTokens = tokens ?? [];
+  const arenaTokenPool = useMemo(() => {
+    const byAddress = new Map<string, TokenListItem>();
+    for (const token of topByMcap) {
+      byAddress.set(token.address.toLowerCase(), token);
+    }
+    for (const token of resolvedTokens) {
+      byAddress.set(token.address.toLowerCase(), token);
+    }
+    for (const token of favoriteListTokens) {
+      byAddress.set(token.address.toLowerCase(), token);
+    }
+    return [...byAddress.values()];
+  }, [topByMcap, resolvedTokens, favoriteListTokens]);
   const mcapRankedTokens = useMemo(
     () =>
       topByMcap.length > 0
@@ -764,14 +887,21 @@ export function ArenaListClient() {
 
   const marketTokens = useMemo(() => {
     const searchTerm = search.trim().toLowerCase();
+    const sourceTokens = activeFilter === "favorites" ? favoriteListTokens : resolvedTokens;
 
-    const filtered = resolvedTokens.filter((token) => {
+    const filtered = sourceTokens.filter((token) => {
       if (
         searchTerm &&
         !token.name.toLowerCase().includes(searchTerm) &&
         !token.symbol.toLowerCase().includes(searchTerm)
       ) {
         return false;
+      }
+      if (activeFilter === "favorites") {
+        return favorites.has(token.address.toLowerCase());
+      }
+      if (SERVER_BOARD_FILTERS.has(activeFilter)) {
+        return true;
       }
       return matchesBoardFilter(
         token,
@@ -807,30 +937,35 @@ export function ArenaListClient() {
     });
 
     withMetrics.sort((a, b) => {
-      const av = a.metric[boardSortKey];
-      const bv = b.metric[boardSortKey];
+      const av = a.metric[sortKey];
+      const bv = b.metric[sortKey];
       const delta = av - bv;
-      return boardSortDir === "asc" ? delta : -delta;
+      return sortDir === "asc" ? delta : -delta;
     });
 
     return withMetrics.map((entry) => entry.token);
   }, [
     resolvedTokens,
+    favoriteListTokens,
     search,
     activeFilter,
     favorites,
-    boardSortKey,
-    boardSortDir,
+    sortKey,
+    sortDir,
     useServerBoardOrder,
     effectiveBnbUsd,
     kothContenderAddresses,
     airdropTokenAddresses,
   ]);
 
-  const cardsTokens = useMemo(
-    () => sortTokensForCards(marketTokens, cardsSort),
-    [marketTokens, cardsSort]
-  );
+  const showLoadMore = activeFilter !== "favorites" && (hasMore || loadingMore);
+
+  const cardsTokens = useMemo(() => {
+    if (activeFilter === "favorites") {
+      return sortTokensForCards(marketTokens, cardsSort);
+    }
+    return marketTokens;
+  }, [marketTokens, cardsSort, activeFilter]);
 
   const boardKeys = useMemo(
     () => marketTokens.map((token) => token.address.toLowerCase()),
@@ -846,7 +981,6 @@ export function ArenaListClient() {
     const server = serverFilterCounts ?? {
       all: resolvedTokens.length,
       new: resolvedTokens.length,
-      highVol: 0,
       movers: 0,
       kothContenders: 0,
       hasAirdrop: 0,
@@ -867,12 +1001,10 @@ export function ArenaListClient() {
   }
 
   const sortLabel = (key: SortKey) =>
-    boardSortKey === key ? `${boardSortDir === "asc" ? "↑" : "↓"}` : "";
+    headerSortKey === key ? `${sortDir === "asc" ? "↑" : "↓"}` : "";
   const sortHeadClass = (key: SortKey) =>
     `inline-flex items-center gap-1 rounded-sm px-1 py-0.5 transition ${
-      boardSortKey === key
-        ? "text-pump-accent"
-        : "text-pump-muted hover:text-pump-text"
+      headerSortKey === key ? "text-pump-accent" : "text-pump-muted hover:text-pump-text"
     }`;
 
   const awaitingPrices =
@@ -890,7 +1022,11 @@ export function ArenaListClient() {
     );
   }
 
-  if (resolvedTokens.length === 0) {
+  if (
+    resolvedTokens.length === 0 &&
+    activeFilter !== "favorites" &&
+    (activeFilter === "all" || activeFilter === "new")
+  ) {
     return (
       <div className="panel-surface empty-state">
         <p className="empty-state-copy">No tokens yet. Be the first to launch a meme.</p>
@@ -1154,7 +1290,7 @@ export function ArenaListClient() {
           </div>
           <div className="arena-toolbar-watchlist shrink-0 md:hidden">
             <ArenaWatchlistSheet
-              tokens={resolvedTokens}
+              tokens={arenaTokenPool}
               bnbUsd={effectiveBnbUsd}
               flashes={flashes}
               animatedCaps={animatedCaps}
@@ -1225,7 +1361,18 @@ export function ArenaListClient() {
           </div>
         ) : null}
 
-        {viewMode === "cards" ? (
+        {marketTokens.length === 0 ? (
+          <div className="panel-surface empty-state py-8">
+            <p className="empty-state-copy text-caption">
+              {emptyExploreFilterCopy(activeFilter, {
+                search,
+                isConnected,
+                favoritesCount: favorites.size,
+                favoriteListLoaded: favoriteListTokens.length > 0 || favorites.size === 0,
+              })}
+            </p>
+          </div>
+        ) : viewMode === "cards" ? (
           <div
             className={`grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 ${
               cardsDensity === "compact" ? "md:gap-2 lg:gap-2" : ""
@@ -1440,7 +1587,7 @@ export function ArenaListClient() {
         </section>
         )}
 
-        {hasMore || loadingMore ? (
+        {showLoadMore ? (
           <div ref={loadMoreRef} className="flex justify-center py-3 md:py-4">
             {loadingMore ? (
               <p className="text-caption text-pump-muted">Loading more coins…</p>

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Star } from "lucide-react";
+import { useAccount } from "wagmi";
 import type { TokenListItem } from "@/lib/db/launchpad";
 import { ToolbarSheet } from "@/components/ui/ToolbarSheet";
 import { ICON_STROKE } from "@/lib/icons";
@@ -24,8 +25,10 @@ export function ArenaWatchlistSheet({
   animatedCaps,
 }: ArenaWatchlistSheetProps) {
   const [open, setOpen] = useState(false);
+  const { isConnected } = useAccount();
   const { favorites } = useFavorites();
   const watchlistTokens = useWatchlistTokens(tokens);
+  const watchlistCount = isConnected ? favorites.size : watchlistTokens.length;
 
   const close = useCallback(() => setOpen(false), []);
 
@@ -38,7 +41,7 @@ export function ArenaWatchlistSheet({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [open, close]);
 
-  const ariaLabel = `Open watchlist${favorites.size > 0 ? `, ${favorites.size} tokens` : ""}`;
+  const ariaLabel = `Open watchlist${watchlistCount > 0 ? `, ${watchlistCount} tokens` : ""}`;
 
   return (
     <>
@@ -50,9 +53,9 @@ export function ArenaWatchlistSheet({
       >
         <Star className="h-3.5 w-3.5 shrink-0 text-pump-accent" strokeWidth={ICON_STROKE} aria-hidden />
         <span className="arena-watchlist-btn__label text-caption">Watchlist</span>
-        {watchlistTokens.length > 0 ? (
+        {watchlistCount > 0 ? (
           <span className="arena-watchlist-btn__count financial-value text-caption text-pump-muted">
-            ({watchlistTokens.length})
+            ({watchlistCount})
           </span>
         ) : null}
       </button>
@@ -62,7 +65,7 @@ export function ArenaWatchlistSheet({
         onClose={close}
         ariaLabel="Watchlist"
         title="Watchlist"
-        count={watchlistTokens.length}
+        count={watchlistCount}
         icon={<Star className="h-4 w-4 text-pump-accent" strokeWidth={ICON_STROKE} />}
       >
         <WatchlistContent

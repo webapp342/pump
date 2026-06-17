@@ -24,18 +24,17 @@ export async function GET(request: NextRequest) {
           onChain !== null &&
           !onChain.remainderSwept &&
           onChain.remainingWei > 0n &&
-          nowSec > claimEndSec &&
-          Boolean(row.merkleRoot);
+          nowSec > claimEndSec;
 
-        const sweepStatus = !row.merkleRoot
-          ? "not_finalized"
-          : onChain?.remainderSwept
-            ? "swept"
-            : nowSec <= claimEndSec
+        const sweepStatus = onChain?.remainderSwept
+          ? "swept"
+          : nowSec <= claimEndSec
+            ? row.merkleRoot
               ? "claim_window_open"
-              : onChain && onChain.remainingWei > 0n
-                ? "ready"
-                : "nothing_to_sweep";
+              : "claim_window_open_no_winners"
+            : onChain && onChain.remainingWei > 0n
+              ? "ready"
+              : "nothing_to_sweep";
 
         return {
           ...row,

@@ -1,7 +1,6 @@
 export type BoardFilter =
   | "all"
   | "new"
-  | "highVol"
   | "movers"
   | "kothContenders"
   | "favorites"
@@ -12,7 +11,6 @@ export const ARENA_FILTER_STORAGE_KEY = "pump-arena-filters";
 const FILTER_VALUES: BoardFilter[] = [
   "all",
   "new",
-  "highVol",
   "movers",
   "kothContenders",
   "favorites",
@@ -23,6 +21,7 @@ export function readArenaFilter(): BoardFilter {
   if (typeof window === "undefined") return "new";
   try {
     const stored = localStorage.getItem(ARENA_FILTER_STORAGE_KEY);
+    if (stored === "highVol") return "new";
     if (stored && FILTER_VALUES.includes(stored as BoardFilter)) {
       return stored as BoardFilter;
     }

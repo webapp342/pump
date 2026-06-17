@@ -19,6 +19,7 @@ import { bondingCurveManagerAbi } from "@/lib/bonding-curve";
 import {
   airdropRewardAmountUsd,
   formatAirdropReward,
+  formatCountdownMs,
   formatQualifyDateTime,
 } from "@/lib/airdrop-board-format";
 import { AdminAirdropCreateFeeModal } from "@/components/admin/AdminAirdropCreateFeeModal";
@@ -98,6 +99,7 @@ type SweepRow = {
   totalClaimedBnb: string;
   remainingBnb: string;
   claimEnd: string;
+  claimEndUnix: number;
   canSweep: boolean;
   sweepStatus: string;
   sweepRecipient: string | null;
@@ -151,6 +153,8 @@ function sweepStatusLabel(status: string): string {
       return "Ready to sweep";
     case "claim_window_open":
       return "Claim window open";
+    case "claim_window_open_no_winners":
+      return "No winners";
     case "swept":
       return "Already swept";
     case "not_finalized":
@@ -241,12 +245,60 @@ function sweepStatusClass(status: string): string {
     case "ready":
       return "admin-status-ok";
     case "claim_window_open":
+    case "claim_window_open_no_winners":
       return "admin-status-warn";
     case "down":
       return "admin-status-bad";
     default:
       return "";
   }
+}
+
+function AdminSweepCountdown({
+  claimEndUnix,
+  canSweep,
+  sweepStatus,
+}: {
+  claimEndUnix: number;
+  canSweep: boolean;
+  sweepStatus: string;
+}) {
+  const [nowMs, setNowMs] = useState(() => Date.now());
+
+  useEffect(() => {
+    if (canSweep || sweepStatus === "swept" || sweepStatus === "nothing_to_sweep") return;
+    const id = window.setInterval(() => setNowMs(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, [canSweep, sweepStatus]);
+
+  if (sweepStatus === "swept" || sweepStatus === "nothing_to_sweep") {
+    return <span className="admin-meta">—</span>;
+  }
+
+  if (canSweep || !claimEndUnix) {
+    const ready = canSweep || (claimEndUnix > 0 && claimEndUnix * 1000 <= nowMs);
+    if (ready) {
+      return <span className="admin-status-ok text-caption font-semibold">Ready now</span>;
+    }
+  }
+
+  if (!claimEndUnix) {
+    return <span className="admin-meta">Unknown</span>;
+  }
+
+  const ms = claimEndUnix * 1000 - nowMs;
+  if (ms <= 0) {
+    return <span className="admin-status-ok text-caption font-semibold">Ready now</span>;
+  }
+
+  return (
+    <div className="space-y-0.5">
+      <p className="financial-value text-caption font-semibold text-pump-warning">
+        in {formatCountdownMs(ms)}
+      </p>
+      <p className="text-[10px] leading-tight text-pump-muted">on-chain claimEnd</p>
+    </div>
+  );
 }
 
 export function AdminPanel() {
@@ -605,6 +657,17 @@ export function AdminPanel() {
   }
 
   const readySweeps = airdrops.filter((r) => r.canSweep);
+  const pendingSweeps = useMemo(
+    () =>
+      airdrops.filter(
+        (row) =>
+          !row.canSweep &&
+          row.sweepStatus !== "swept" &&
+          row.sweepStatus !== "nothing_to_sweep" &&
+          Number(row.remainingBnb) > 0
+      ),
+    [airdrops]
+  );
   const treasuryBnb = treasuryLiveBalance
     ? formatEther(treasuryLiveBalance.value)
     : (protocol?.treasury.balanceBnb ?? "0");
@@ -1153,12 +1216,22 @@ export function AdminPanel() {
             <AdminEmptyState title="No airdrops" />
           ) : (
             <>
+              <p className="admin-note">
+                Sweep unlocks when on-chain <span className="admin-num">claimEnd</span> passes
+                (qualify end + 24h). Finalize is not required if there are no winners.
+              </p>
               {readySweeps.length > 0 ? (
                 <p className="admin-note">
                   {readySweeps.length} ready to sweep
                   {sweepStats.remainingUsd != null
                     ? ` · ${formatUsdReadable(sweepStats.remainingUsd, { compact: true })}`
                     : ""}
+                </p>
+              ) : null}
+              {pendingSweeps.length > 0 ? (
+                <p className="admin-note admin-status-warn">
+                  {pendingSweeps.length} campaign{pendingSweeps.length === 1 ? "" : "s"} locked
+                  until claim window ends — see countdown below.
                 </p>
               ) : null}
               <AdminGridTable>
@@ -1171,6 +1244,7 @@ export function AdminPanel() {
                     <th>Claimed</th>
                     <th>Remaining</th>
                     <th>Claim until</th>
+                    <th>Sweep in</th>
                     <th>Status</th>
                     <th>Action</th>
                   </tr>
@@ -1213,7 +1287,27 @@ export function AdminPanel() {
                         />
                       </td>
                       <td className="admin-num">
-                        {row.claimEnd ? formatQualifyDateTime(row.claimEnd) : "—"}
+                        <div className="space-y-0.5">
+                          <p>
+                            {row.claimEndUnix
+                              ? formatQualifyDateTime(new Date(row.claimEndUnix * 1000).toISOString())
+                              : row.claimEnd
+                                ? formatQualifyDateTime(row.claimEnd)
+                                : "—"}
+                          </p>
+                          {row.sweepStatus === "claim_window_open_no_winners" ? (
+                            <p className="text-[10px] leading-tight text-pump-muted">
+                              No claims possible
+                            </p>
+                          ) : null}
+                        </div>
+                      </td>
+                      <td>
+                        <AdminSweepCountdown
+                          claimEndUnix={row.claimEndUnix}
+                          canSweep={row.canSweep}
+                          sweepStatus={row.sweepStatus}
+                        />
                       </td>
                       <td className={sweepStatusClass(row.sweepStatus)}>
                         {sweepStatusLabel(row.sweepStatus)}
@@ -1226,8 +1320,12 @@ export function AdminPanel() {
                           >
                             {adminTxPending && sweepingId === row.onChainId ? "…" : "Sweep"}
                           </AdminBtn>
-                        ) : (
+                        ) : row.sweepStatus === "swept" ? (
+                          "Swept"
+                        ) : row.sweepStatus === "nothing_to_sweep" ? (
                           "—"
+                        ) : (
+                          <span className="admin-meta text-caption">Locked</span>
                         )}
                       </td>
                     </tr>

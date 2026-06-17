@@ -35,7 +35,6 @@ const BOARD_SORT_KEYS: ArenaBoardSortKey[] = [
 const BOARD_FILTERS: ArenaBoardFilter[] = [
   "all",
   "new",
-  "highVol",
   "movers",
   "kothContenders",
   "hasAirdrop",
@@ -83,7 +82,6 @@ function parseAirdropAddresses(value: string | null): string[] {
 }
 
 function filterCountKey(filter: ArenaBoardFilter): keyof ArenaListMeta["filterCounts"] {
-  if (filter === "highVol") return "highVol";
   if (filter === "movers") return "movers";
   if (filter === "kothContenders") return "kothContenders";
   if (filter === "hasAirdrop") return "hasAirdrop";

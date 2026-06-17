@@ -78,7 +78,6 @@ export type ArenaBoardSortDir = "asc" | "desc";
 export type ArenaBoardFilter =
   | "all"
   | "new"
-  | "highVol"
   | "movers"
   | "kothContenders"
   | "hasAirdrop";
@@ -95,7 +94,6 @@ export type ArenaBoardListOptions = {
 export type ArenaFilterCounts = {
   all: number;
   new: number;
-  highVol: number;
   movers: number;
   kothContenders: number;
   hasAirdrop: number;
@@ -434,9 +432,6 @@ function arenaBoardFilterClause(
   filter: ArenaBoardFilter,
   airdropAddresses: string[]
 ): { clause: string; params: string[] } {
-  if (filter === "highVol") {
-    return { clause: "WHERE volume_24h_zug::numeric >= 0.5", params: [] };
-  }
   if (filter === "movers") {
     return {
       clause:
@@ -444,7 +439,10 @@ function arenaBoardFilterClause(
       params: [],
     };
   }
-  if (filter === "hasAirdrop" && airdropAddresses.length > 0) {
+  if (filter === "hasAirdrop") {
+    if (airdropAddresses.length === 0) {
+      return { clause: "WHERE false", params: [] };
+    }
     return {
       clause: "WHERE LOWER(address) = ANY($3::text[])",
       params: airdropAddresses.map((address) => address.toLowerCase()),
@@ -499,6 +497,61 @@ export async function listArenaBoardTokens(
     filterParams.length > 0 ? [limit, offset, filterParams] : [limit, offset];
   const result = await db.query<TokenListQueryRow>(sql, queryParams);
   return result.rows.map(mapTokenListRow);
+}
+
+export async function listTokenListItemsByAddresses(
+  addresses: string[]
+): Promise<TokenListItem[]> {
+  const normalized = [
+    ...new Set(
+      addresses
+        .map((address) => address.toLowerCase())
+        .filter((address) => /^0x[a-f0-9]{40}$/.test(address))
+    ),
+  ];
+  if (normalized.length === 0) return [];
+
+  const baseInner = `
+      SELECT
+        t.address,
+        t.symbol,
+        t.name,
+        t.creator_address,
+        t.status,
+        t.created_at,
+        t.launch_block_number::text,
+        t.logo_url
+      FROM tokens t
+      WHERE t.is_hidden = false
+        AND LOWER(t.address) = ANY($1::text[])
+    `;
+
+  const db = getLaunchpadPool();
+  const sql = `${buildTokenListSelectSql(baseInner)} ORDER BY bt.created_at DESC`;
+  const result = await db.query<TokenListQueryRow>(sql, [normalized]);
+  return result.rows.map(mapTokenListRow);
+}
+
+async function countKothContenders(): Promise<number> {
+  const db = getLaunchpadPool();
+  const result = await db.query<{ count: string }>(
+    `
+      SELECT COUNT(*)::text AS count
+      FROM (
+        SELECT t.address
+        FROM tokens t
+        LEFT JOIN bonding_states b ON b.token_address = t.address
+        WHERE t.is_hidden = false
+        ORDER BY COALESCE(
+          b.market_cap_zug,
+          COALESCE(b.last_price_zug, 0) * 1000000000,
+          0
+        ) DESC
+        LIMIT 5
+      ) koth
+    `
+  );
+  return Number(result.rows[0]?.count ?? 0);
 }
 
 const TOKEN_TRADE_STATS_CTE = `
@@ -586,11 +639,10 @@ export async function getArenaFilterCounts(
   const db = getLaunchpadPool();
   const normalizedAirdrops = airdropAddresses.map((address) => address.toLowerCase());
   const total = await countVisibleTokens();
-  const kothContenders = Math.min(5, total);
+  const kothContenders = await countKothContenders();
 
   if (useMvTokenStats()) {
     const result = await db.query<{
-      high_vol: number;
       movers: number;
       has_airdrop: number;
     }>(
@@ -598,7 +650,6 @@ export async function getArenaFilterCounts(
       WITH enriched AS (
         SELECT
           t.address,
-          COALESCE(mts.volume_24h_zug, '0')::numeric AS volume_24h,
           CASE
             WHEN COALESCE(mpa.price_24h_ago, mpa.price_first) IS NOT NULL
                  AND COALESCE(mpa.price_24h_ago, mpa.price_first) > 0
@@ -611,12 +662,10 @@ export async function getArenaFilterCounts(
           END AS change_24h_pct
         FROM tokens t
         LEFT JOIN bonding_states b ON b.token_address = t.address
-        LEFT JOIN mv_token_trade_stats mts ON mts.token_address = t.address
         LEFT JOIN mv_token_price_anchors mpa ON mpa.token_address = t.address
         WHERE t.is_hidden = false
       )
       SELECT
-        COUNT(*) FILTER (WHERE volume_24h >= 0.5)::int AS high_vol,
         COUNT(*) FILTER (
           WHERE change_24h_pct IS NOT NULL AND ABS(change_24h_pct) >= 1
         )::int AS movers,
@@ -631,7 +680,6 @@ export async function getArenaFilterCounts(
     return {
       all: total,
       new: total,
-      highVol: row?.high_vol ?? 0,
       movers: row?.movers ?? 0,
       kothContenders,
       hasAirdrop: row?.has_airdrop ?? 0,
@@ -639,7 +687,6 @@ export async function getArenaFilterCounts(
   }
 
   const result = await db.query<{
-    high_vol: number;
     movers: number;
     has_airdrop: number;
   }>(
@@ -647,7 +694,6 @@ export async function getArenaFilterCounts(
     WITH enriched AS (
       SELECT
         t.address,
-        COALESCE(ts.volume_24h_zug, '0')::numeric AS volume_24h,
         CASE
           WHEN COALESCE(p24h_prev.price_zug, p_first.price_zug) IS NOT NULL
                AND COALESCE(p24h_prev.price_zug, p_first.price_zug) > 0
@@ -660,16 +706,6 @@ export async function getArenaFilterCounts(
         END AS change_24h_pct
       FROM tokens t
       LEFT JOIN bonding_states b ON b.token_address = t.address
-      LEFT JOIN LATERAL (
-        SELECT
-          COALESCE(
-            SUM(GREATEST(tr.zug_amount - COALESCE(tr.fee_zug, 0), 0))
-              FILTER (WHERE tr.block_time >= now() - interval '24 hours'),
-            0
-          )::text AS volume_24h_zug
-        FROM trades tr
-        WHERE tr.token_address = t.address
-      ) ts ON true
       LEFT JOIN LATERAL (
         SELECT tr.price_zug
         FROM trades tr
@@ -688,7 +724,6 @@ export async function getArenaFilterCounts(
       WHERE t.is_hidden = false
     )
     SELECT
-      COUNT(*) FILTER (WHERE volume_24h >= 0.5)::int AS high_vol,
       COUNT(*) FILTER (
         WHERE change_24h_pct IS NOT NULL AND ABS(change_24h_pct) >= 1
       )::int AS movers,
@@ -703,7 +738,6 @@ export async function getArenaFilterCounts(
   return {
     all: total,
     new: total,
-    highVol: row?.high_vol ?? 0,
     movers: row?.movers ?? 0,
     kothContenders,
     hasAirdrop: row?.has_airdrop ?? 0,
