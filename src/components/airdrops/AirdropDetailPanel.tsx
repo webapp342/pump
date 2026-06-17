@@ -964,10 +964,38 @@ export function AirdropDetailPanel({ airdropId }: { airdropId: string }) {
     const socialDone =
       requiredSocial.length === 0 || requiredSocial.every((t) => t.completed);
 
-    if (address && airdrop && socialDone && !airdrop.merkleRoot) {
-      const progRes = await fetch(`/api/airdrops/${airdropId}/progress?address=${address}`, {
-        cache: "no-store",
-      });
+    const progressPromise =
+      address && airdrop && socialDone && !airdrop.merkleRoot
+        ? fetch(`/api/airdrops/${airdropId}/progress?address=${address}`, {
+            cache: "no-store",
+          })
+        : Promise.resolve(null);
+
+    const winnersPromise = airdrop?.merkleRoot
+      ? fetch(`/api/airdrops/${airdropId}/winners`)
+      : Promise.resolve(null);
+
+    const leaderboardPromise =
+      airdrop && !airdrop.merkleRoot
+        ? fetch(
+            `/api/airdrops/${airdropId}/leaderboard${address ? `?address=${address}` : ""}`,
+            { cache: "no-store" }
+          )
+        : Promise.resolve(null);
+
+    const proofPromise =
+      address && airdrop?.merkleRoot
+        ? fetch(`/api/airdrops/${airdropId}/proof/${address}`)
+        : Promise.resolve(null);
+
+    const [progRes, winnersRes, leaderboardRes, proofRes] = await Promise.all([
+      progressPromise,
+      winnersPromise,
+      leaderboardPromise,
+      proofPromise,
+    ]);
+
+    if (progRes) {
       if (progRes.ok) {
         const progJson = (await progRes.json()) as { data?: AirdropProgress };
         setProgress(progJson.data ?? null);
@@ -982,37 +1010,27 @@ export function AirdropDetailPanel({ airdropId }: { airdropId: string }) {
       setProgressError(null);
     }
 
-    if (airdrop?.merkleRoot) {
-      const w = await fetch(`/api/airdrops/${airdropId}/winners`);
-      const wj = (await w.json()) as { data?: WinnerRow[] };
+    if (winnersRes?.ok) {
+      const wj = (await winnersRes.json()) as { data?: WinnerRow[] };
       setWinners(wj.data ?? []);
       setLeaderboard([]);
       setLeaderboardViewer(null);
+    } else if (leaderboardRes?.ok) {
+      const lbj = (await leaderboardRes.json()) as {
+        data?: { rows?: LeaderboardRow[]; viewer?: LeaderboardViewer | null };
+      };
+      setLeaderboard(lbj.data?.rows ?? []);
+      setLeaderboardViewer(lbj.data?.viewer ?? null);
+      setWinners([]);
     } else {
-      const lbQs = address ? `?address=${address}` : "";
-      const lb = await fetch(`/api/airdrops/${airdropId}/leaderboard${lbQs}`, {
-        cache: "no-store",
-      });
-      if (lb.ok) {
-        const lbj = (await lb.json()) as {
-          data?: { rows?: LeaderboardRow[]; viewer?: LeaderboardViewer | null };
-        };
-        setLeaderboard(lbj.data?.rows ?? []);
-        setLeaderboardViewer(lbj.data?.viewer ?? null);
-      } else {
-        setLeaderboard([]);
-        setLeaderboardViewer(null);
-      }
+      setWinners([]);
+      setLeaderboard([]);
+      setLeaderboardViewer(null);
     }
 
-    if (address && airdrop?.merkleRoot) {
-      const p = await fetch(`/api/airdrops/${airdropId}/proof/${address}`);
-      if (p.ok) {
-        const pj = (await p.json()) as { data?: { amount: string; proof: string[] } };
-        setClaimInfo(pj.data ?? null);
-      } else {
-        setClaimInfo(null);
-      }
+    if (proofRes?.ok) {
+      const pj = (await proofRes.json()) as { data?: { amount: string; proof: string[] } };
+      setClaimInfo(pj.data ?? null);
     } else {
       setClaimInfo(null);
     }

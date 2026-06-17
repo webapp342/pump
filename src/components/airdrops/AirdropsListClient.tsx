@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { shortAddress } from "@/config/chain";
 import type { AirdropListItem } from "@/lib/db/airdrops";
+import type { AirdropsHomePayload } from "@/lib/airdrops-server";
 import {
   airdropStatusBadgeClass,
   formatAirdropDisplayStatus,
@@ -448,11 +449,15 @@ function pickFeatured(items: EnrichedAirdrop[]): EnrichedAirdrop | null {
   return byPriority(items);
 }
 
-export function AirdropsListClient() {
+export function AirdropsListClient({
+  initialPayload = null,
+}: {
+  initialPayload?: AirdropsHomePayload | null;
+}) {
   const { address, isConnected } = useAccount();
   const { openConnectModal } = useOpenConnectModal();
   const { saves } = useAirdropSaves();
-  const [items, setItems] = useState<AirdropListItem[] | null>(null);
+  const [items, setItems] = useState<AirdropListItem[] | null>(initialPayload?.data ?? null);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [activeFilter, setActiveFilter] = useState<AirdropFilter>("all");
@@ -480,7 +485,16 @@ export function AirdropsListClient() {
     }
   }, []);
 
+  const initialPayloadRef = useRef(initialPayload);
+
   useEffect(() => {
+    if (initialPayloadRef.current) {
+      initialPayloadRef.current = null;
+      void load();
+      const timer = window.setInterval(() => void load(), 30_000);
+      return () => window.clearInterval(timer);
+    }
+
     void load();
     const timer = window.setInterval(() => void load(), 30_000);
     return () => window.clearInterval(timer);

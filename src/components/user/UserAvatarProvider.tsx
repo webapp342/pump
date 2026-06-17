@@ -9,6 +9,7 @@ import {
   useState,
 } from "react";
 import { useAccount } from "wagmi";
+import { subscribeUserBootstrap } from "@/lib/user-bootstrap";
 import type { UserAvatarId } from "@/lib/user-avatars";
 
 type UserAvatarContextValue = {
@@ -49,8 +50,32 @@ export function UserAvatarProvider({ children }: { children: React.ReactNode }) 
   }, [address]);
 
   useEffect(() => {
-    void refresh();
-  }, [refresh]);
+    if (!address) {
+      setAvatarId(null);
+      return;
+    }
+
+    let cancelled = false;
+    let bootstrapped = false;
+
+    const unsub = subscribeUserBootstrap(address, (data) => {
+      if (cancelled) return;
+      bootstrapped = true;
+      if (data.avatarId) setAvatarId(data.avatarId);
+      setLoading(false);
+    });
+
+    const fallback = window.setTimeout(() => {
+      if (cancelled || bootstrapped) return;
+      void refresh();
+    }, 2_000);
+
+    return () => {
+      cancelled = true;
+      unsub();
+      window.clearTimeout(fallback);
+    };
+  }, [address, refresh]);
 
   const updateAvatar = useCallback(
     async (nextId: UserAvatarId) => {

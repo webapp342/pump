@@ -2,6 +2,7 @@
 
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import type { TokenDetail, TradeItem } from "@/lib/db/launchpad";
+import type { TokenDetailPayload } from "@/lib/token-server";
 import { AppShell } from "@/components/layout/AppShell";
 import { PageBackLink } from "@/components/ui/PageBackLink";
 import { TokenDetailLive } from "@/components/token/TokenDetailLive";
@@ -17,6 +18,7 @@ const POLL_MAX_MS = 90_000;
 
 type TokenDetailShellProps = {
   address: string;
+  initialPayload?: TokenDetailPayload | null;
 };
 
 function TokenDetailView({
@@ -53,9 +55,14 @@ function TokenDetailView({
   );
 }
 
-export function TokenDetailShell({ address }: TokenDetailShellProps) {
+export function TokenDetailShell({
+  address,
+  initialPayload = null,
+}: TokenDetailShellProps) {
   const normalized = address.toLowerCase();
-  const [data, setData] = useState<{ token: TokenDetail; trades: TradeItem[] } | null>(null);
+  const [data, setData] = useState<{ token: TokenDetail; trades: TradeItem[] } | null>(
+    initialPayload
+  );
   const [optimisticToken, setOptimisticToken] = useState<TokenDetail | null>(() => {
     const pending = getPendingCreateForToken(normalized);
     return pending ? buildOptimisticTokenDetail(normalized, pending) : null;
@@ -64,8 +71,8 @@ export function TokenDetailShell({ address }: TokenDetailShellProps) {
     Boolean(getPendingCreateForToken(normalized))
   );
   const [fatalError, setFatalError] = useState<string | null>(null);
-  const [initialLoading, setInitialLoading] = useState(true);
-  const pollUntilRef = useRef(0);
+  const [initialLoading, setInitialLoading] = useState(!initialPayload);
+  const initialPayloadRef = useRef(initialPayload);
 
   const load = useCallback(async (): Promise<boolean> => {
     try {
@@ -89,7 +96,16 @@ export function TokenDetailShell({ address }: TokenDetailShellProps) {
     }
   }, [normalized]);
 
+  const pollUntilRef = useRef(0);
+
   useEffect(() => {
+    if (initialPayloadRef.current) {
+      initialPayloadRef.current = null;
+      pollUntilRef.current = Date.now() + POLL_MAX_MS;
+      void load();
+      return;
+    }
+
     setData(null);
     setFatalError(null);
     setInitialLoading(true);

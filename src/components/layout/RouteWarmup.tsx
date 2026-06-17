@@ -6,7 +6,8 @@ import { useEffect } from "react";
 const ROUTES = ["/", "/create", "/missions", "/portfolio"] as const;
 
 /**
- * Prefetch tab routes and warm the arena API so navigation feels instant after first paint.
+ * Prefetch tab routes so client navigation feels instant.
+ * Arena data is SSR'd on `/` — no global /api/tokens warmup (saves a heavy DB hit every session).
  */
 export function RouteWarmup() {
   const router = useRouter();
@@ -15,8 +16,6 @@ export function RouteWarmup() {
     for (const href of ROUTES) {
       router.prefetch(href);
     }
-
-    void fetch("/api/tokens", { cache: "no-store" }).catch(() => undefined);
   }, [router]);
 
   return null;

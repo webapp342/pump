@@ -4,6 +4,7 @@ import { CreatorFollowsProvider } from "@/components/creators/CreatorFollowsProv
 import { FavoritesProvider } from "@/components/favorites/FavoritesProvider";
 import { AirdropSavesProvider } from "@/components/airdrops/AirdropSavesProvider";
 import { UserAvatarProvider } from "@/components/user/UserAvatarProvider";
+import { UserBootstrapProvider } from "@/components/user/UserBootstrapProvider";
 import { ReferralCaptureProvider } from "@/components/referrals/ReferralCaptureProvider";
 import { RouteWarmup } from "@/components/layout/RouteWarmup";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
@@ -66,6 +67,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         />
         <ThemeProvider>
           <Web3Provider cookies={cookies}>
+            <UserBootstrapProvider>
             <FavoritesProvider>
               <AirdropSavesProvider>
               <CreatorFollowsProvider>
@@ -78,6 +80,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               </CreatorFollowsProvider>
               </AirdropSavesProvider>
             </FavoritesProvider>
+            </UserBootstrapProvider>
           </Web3Provider>
         </ThemeProvider>
       </body>

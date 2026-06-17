@@ -9,6 +9,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { subscribeUserBootstrap } from "@/lib/user-bootstrap";
 import { useOpenConnectModal } from "@/hooks/useOpenConnectModal";
 import { useAccount } from "wagmi";
 
@@ -35,26 +36,39 @@ export function FavoritesProvider({ children }: { children: React.ReactNode }) {
     }
 
     let cancelled = false;
+    let bootstrapped = false;
     setLoading(true);
 
-    void (async () => {
-      try {
-        const response = await fetch(`/api/favorites?address=${encodeURIComponent(address)}`, {
-          cache: "no-store",
-        });
-        const body = (await response.json()) as { data?: string[]; error?: string };
-        if (!cancelled && response.ok && Array.isArray(body.data)) {
-          setFavorites(new Set(body.data.map((item) => item.toLowerCase())));
+    const unsub = subscribeUserBootstrap(address, (data) => {
+      if (cancelled) return;
+      bootstrapped = true;
+      setFavorites(new Set(data.favorites.map((item) => item.toLowerCase())));
+      setLoading(false);
+    });
+
+    const fallback = window.setTimeout(() => {
+      if (cancelled || bootstrapped) return;
+      void (async () => {
+        try {
+          const response = await fetch(`/api/favorites?address=${encodeURIComponent(address)}`, {
+            cache: "no-store",
+          });
+          const body = (await response.json()) as { data?: string[]; error?: string };
+          if (!cancelled && response.ok && Array.isArray(body.data)) {
+            setFavorites(new Set(body.data.map((item) => item.toLowerCase())));
+          }
+        } catch {
+          // ignore fetch errors
+        } finally {
+          if (!cancelled) setLoading(false);
         }
-      } catch {
-        // ignore fetch errors
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
+      })();
+    }, 2_000);
 
     return () => {
       cancelled = true;
+      unsub();
+      window.clearTimeout(fallback);
     };
   }, [address]);
 

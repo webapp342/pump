@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { TokenDetailShell } from "@/components/token/TokenDetailShell";
 import { normalizeAddressParam } from "@/lib/address";
 import { getTokenByAddress } from "@/lib/db/launchpad";
+import { fetchTokenDetailPayload } from "@/lib/token-server";
 
 type PageProps = { params: Promise<{ address: string }> };
 
@@ -51,5 +52,12 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 export default async function TokenDetailPage({ params }: PageProps) {
   const { address } = await params;
-  return <TokenDetailShell address={address} />;
+  let initialPayload = null;
+  try {
+    initialPayload = await fetchTokenDetailPayload(address);
+  } catch {
+    // Client retries on hydration.
+  }
+
+  return <TokenDetailShell address={address} initialPayload={initialPayload} />;
 }

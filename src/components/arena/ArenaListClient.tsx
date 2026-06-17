@@ -57,6 +57,8 @@ import {
   writeArenaFilter,
   type BoardFilter,
 } from "@/lib/arena-filters";
+import type { ArenaTradeWsPayload } from "@/lib/arena-live-delta";
+import { patchArenaTokenList } from "@/lib/arena-live-delta";
 import type { AirdropListItem } from "@/lib/db/airdrops";
 import type { ArenaHomePayload } from "@/lib/arena-server";
 
@@ -720,12 +722,39 @@ export function ArenaListClient({
   const { connected: wsConnected } = useLiveChannel({
     room: "arena",
     onMessage: (message) => {
-      const payload = message as { type?: string };
-      if (
-        payload.type === "trade" ||
-        payload.type === "board_delta" ||
-        payload.type === "koth"
-      ) {
+      const payload = message as ArenaTradeWsPayload & { type?: string };
+
+      if (payload.type === "trade" && payload.tokenAddress && tokensRef.current) {
+        const { next, changed } = patchArenaTokenList(tokensRef.current, payload);
+        if (changed) {
+          const addr = payload.tokenAddress.toLowerCase();
+          const oldToken = tokensRef.current.find((t) => t.address.toLowerCase() === addr);
+          const newToken = next.find((t) => t.address.toLowerCase() === addr);
+          if (oldToken && newToken) {
+            const prevMcap = Number(oldToken.marketCapBnb);
+            const nextMcap = Number(newToken.marketCapBnb);
+            if (Number.isFinite(prevMcap) && Number.isFinite(nextMcap) && prevMcap !== nextMcap) {
+              triggerFlash(
+                `${addr}:mcap`,
+                nextMcap > prevMcap ? "up" : "down"
+              );
+            }
+          }
+          setTokens(next);
+          setTopByMcap((prev) => {
+            const { next: patchedTop, changed: topChanged } = patchArenaTokenList(prev, payload);
+            return topChanged ? patchedTop : prev;
+          });
+          return;
+        }
+      }
+
+      if (payload.type === "koth") {
+        void loadRef.current(listLimitRef.current, { silent: true });
+        return;
+      }
+
+      if (payload.type === "board_delta") {
         void loadRef.current(listLimitRef.current, { silent: true });
         void loadFavoriteTokensRef.current();
       }
