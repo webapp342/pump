@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { isPromotableAirdropStatus } from "@/lib/airdrop-status";
 import type { TokenAirdropPromo } from "@/lib/db/airdrops";
-import { AirdropGiftIcon } from "@/components/ui/AirdropGiftIcon";
+import { AirdropPromoIcon } from "@/components/ui/AirdropGiftIcon";
 
 type TokenAirdropLinkChipProps = {
   tokenAddress: string;
@@ -49,7 +49,7 @@ export function TokenAirdropLinkChip({ tokenAddress, className = "" }: TokenAird
       className={`inline-flex shrink-0 items-center gap-1 rounded-sm border border-pump-border/35 bg-pump-surface/55 px-1.5 py-0.5 text-label font-medium text-pump-accent transition-colors hover:border-pump-accent/30 hover:bg-pump-accent/8 ${className}`}
       aria-label="View airdrop campaign"
     >
-      <AirdropGiftIcon size={10} />
+      <AirdropPromoIcon size={10} />
       <span>Airdrop</span>
     </Link>
   );

@@ -8,7 +8,6 @@ import {
   Coins,
   Crown,
   Gem,
-  Gift,
   History,
   LayoutGrid,
   Percent,
@@ -22,6 +21,7 @@ import {
   Wallet,
   Zap,
 } from "lucide-react";
+import { AirdropParachute } from "@/components/icons/AirdropParachute";
 
 /** Lucide icons for metrics, sections, and table headers. */
 export const MetricIcons = {
@@ -43,8 +43,8 @@ export const MetricIcons = {
   liveLeader: Crown,
   recent: History,
   exploreCoins: LayoutGrid,
-  exploreAirdrops: Gift,
-  airdrops: Gift,
+  exploreAirdrops: AirdropParachute,
+  airdrops: AirdropParachute,
   totalRewards: Coins,
   largestPool: Trophy,
   endingSoon: Timer,

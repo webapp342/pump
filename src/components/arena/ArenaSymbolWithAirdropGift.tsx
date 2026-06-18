@@ -1,4 +1,4 @@
-import { AirdropGiftIcon } from "@/components/ui/AirdropGiftIcon";
+import { AirdropPromoIcon } from "@/components/ui/AirdropGiftIcon";
 
 type ArenaSymbolWithAirdropGiftProps = {
   symbol: string;
@@ -20,7 +20,7 @@ export function ArenaSymbolWithAirdropGift({
   return (
     <span className={`inline-flex min-w-0 max-w-full items-center gap-1 ${className}`}>
       <span className={`truncate ${symbolClassName}`}>{symbol}</span>
-      {hasOpenAirdrop ? <AirdropGiftIcon /> : null}
+      {hasOpenAirdrop ? <AirdropPromoIcon /> : null}
     </span>
   );
 }

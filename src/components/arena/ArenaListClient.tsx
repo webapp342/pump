@@ -23,6 +23,7 @@ import { TradeSheet } from "@/components/token/TradeSheet";
 import { ArenaBoardRowQuickActions } from "@/components/arena/ArenaBoardRowQuickActions";
 import { ArenaExploreCoinRow } from "@/components/arena/ArenaExploreCoinRow";
 import { ArenaSymbolWithAirdropGift } from "@/components/arena/ArenaSymbolWithAirdropGift";
+import { AirdropPromoIcon } from "@/components/ui/AirdropGiftIcon";
 import { ArenaSwipeTradeBar } from "@/components/arena/ArenaSwipeTradeBar";
 import { HoldingSwipeRow } from "@/components/portfolio/HoldingSwipeRow";
 import { buildArenaQuickTradePrefill } from "@/lib/arena-quick-trade";
@@ -1312,6 +1313,9 @@ export function ArenaListClient({
                   <span className="financial-value koth-banner__headline-symbol">
                     {kothToken.symbol}
                   </span>
+                  {airdropTokenAddresses.has(kothToken.address.toLowerCase()) ? (
+                    <AirdropPromoIcon size={14} className="ml-1" />
+                  ) : null}
                 </p>
                 <div className="koth-banner__hero" aria-label="Market cap">
                   <span className="koth-banner__tag">MC</span>

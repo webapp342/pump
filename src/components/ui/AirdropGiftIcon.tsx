@@ -1,21 +1,18 @@
-import { Gift } from "lucide-react";
-import { ICON_STROKE } from "@/lib/icons";
+import { AirdropParachute } from "@/components/icons/AirdropParachute";
 
-type AirdropGiftIconProps = {
+type AirdropPromoIconProps = {
   className?: string;
   size?: number;
 };
 
-/** Animated gift marker for tokens with an open airdrop campaign. */
-export function AirdropGiftIcon({ className = "", size = 13 }: AirdropGiftIconProps) {
+/** Animated parachute marker for tokens with an open airdrop campaign. */
+export function AirdropPromoIcon({ className = "", size = 13 }: AirdropPromoIconProps) {
   return (
-    <span className={`airdrop-gift-icon inline-flex shrink-0 ${className}`} aria-hidden>
-      <Gift
-        className="airdrop-gift-icon__glyph"
-        width={size}
-        height={size}
-        strokeWidth={ICON_STROKE}
-      />
+    <span className={`airdrop-promo-icon inline-flex shrink-0 ${className}`} aria-hidden>
+      <AirdropParachute className="airdrop-promo-icon__glyph" size={size} />
     </span>
   );
 }
+
+/** @deprecated Use AirdropPromoIcon */
+export const AirdropGiftIcon = AirdropPromoIcon;

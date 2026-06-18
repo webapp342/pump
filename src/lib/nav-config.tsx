@@ -1,5 +1,6 @@
 import type { LucideIcon } from "lucide-react";
-import { Gift, LayoutGrid, Shield, Target, Wallet } from "lucide-react";
+import { LayoutGrid, Shield, Target, Wallet } from "lucide-react";
+import { AirdropParachute } from "@/components/icons/AirdropParachute";
 
 export type AppNavItem = {
   href: string;
@@ -9,7 +10,7 @@ export type AppNavItem = {
 
 export const APP_NAV_ITEMS: AppNavItem[] = [
   { href: "/", label: "Arena", icon: LayoutGrid },
-  { href: "/airdrops", label: "Airdrops", icon: Gift },
+  { href: "/airdrops", label: "Airdrops", icon: AirdropParachute },
   { href: "/missions", label: "Missions", icon: Target },
   { href: "/portfolio", label: "Portfolio", icon: Wallet },
 ];
