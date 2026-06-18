@@ -44,13 +44,13 @@ Redis Pub/Sub → pump-realtime → Browser WS rooms → delta patches
 - Arena chip filter cache + skeleton (flash fix)
 - User bootstrap (4→1 API)
 
-### Kritik eksikler (Tier 4+)
+### Kritik eksikler (post-Tier 4)
 
 | Eksik | Etki |
 |-------|------|
-| Horizontal multi-VM split | >2000 WS / >200 trade/s |
-| Rocicorp Zero | Favorites/portfolio 0ms reads |
-| Client bonding curve state machine | Offline quote preview |
+| Full Rocicorp Zero sync | Cross-device favorites instant |
+| Edge WS terminator | Global < 50ms WS |
+| pg_trickle on PG 18 | MV CPU −80% |
 
 ### Tier 3 tamamlananlar ✅
 
@@ -175,14 +175,23 @@ Redis Pub/Sub → pump-realtime → Browser WS rooms → delta patches
 | 15 | Read replica (arena read-only) | ✅ `LAUNCHPAD_DATABASE_READ_URL` |
 | 16 | Indexer: `watchBlocks` (eth_subscribe heads) | ✅ `INDEXER_USE_WS_BLOCKS` |
 
-### Tier 4 — Cesur yenilikler
+### Tier 4 — Cesur yenilikler ✅ (kod — infra kısmi)
 
-| # | İş |
-|---|-----|
-| 17 | Rocicorp Zero (favorites/portfolio reads) |
-| 18 | Edge WS (Durable Objects / coğrafi terminator) |
-| 19 | Client bonding curve state machine |
-| 20 | PostgreSQL 18 + pg_trickle IVM |
+| # | İş | Durum |
+|---|-----|-------|
+| 17 | Rocicorp Zero (favorites/portfolio reads) | ⏳ local-first store (Zero path doc) |
+| 18 | Edge WS (Durable Objects) | ⏳ eval doc — tek VM yeterli |
+| 19 | Client bonding curve state machine | ✅ `bonding-curve-state` + hook |
+| 20 | PostgreSQL 18 + pg_trickle IVM | ⏳ eval doc — PG 16 VM |
+
+### Tier 4 tamamlananlar ✅
+
+| Yetenek | Durum |
+|---------|-------|
+| Local-first favorites hydrate | ✅ `user-local-store` |
+| Local-first portfolio hydrate | ✅ `PortfolioPanel` |
+| WS-driven curve quotes (0ms Est.) | ✅ `useBondingCurveMachine` |
+| Zero / Edge / pg_trickle yol haritası | ✅ `.cursor/docs/tier4-*.md` |
 
 ---
 
@@ -232,6 +241,9 @@ Next.js (Tier 1+):
 
 | Doküman | İçerik |
 |---------|--------|
+| `tier4-local-first-zero-path.md` | Local-first + Zero migration |
+| `tier4-edge-ws-evaluation.md` | Edge WS when to split |
+| `tier4-pg-trickle-evaluation.md` | PG 18 IVM plan |
 | `ultra-fast-architecture-phases-2-6.md` | Detaylı faz planı |
 | `price-accuracy-contract.md` | Spot / Quote / Fill sözleşmesi |
 | Bu dosya | Strateji + sektör karşılaştırma + tier öncelik |

@@ -52,6 +52,7 @@ import { tokenSharePayload } from "@/lib/share-links";
 import { shellPaddingXClass } from "@/components/layout/layout-shell";
 import { useLiveChannel, resolveLivePollDelay } from "@/hooks/useLiveChannel";
 import { useRafMessageQueue } from "@/hooks/useRafMessageQueue";
+import { useBondingCurveMachine } from "@/hooks/useBondingCurveMachine";
 import {
   mergeChartTradePatch,
   patchTokenDetailFromWsTrade,
@@ -209,6 +210,9 @@ export function TokenDetailLive({
   const [holdersRefreshKey, setHoldersRefreshKey] = useState(0);
   const [optimisticTrades, setOptimisticTrades] = useState<TradeItem[]>([]);
   const [indexerSyncing, setIndexerSyncing] = useState(false);
+  const [latestWsBonding, setLatestWsBonding] = useState<
+    TokenTradeWsPayload["bonding"] | null
+  >(null);
   const [copiedAddress, setCopiedAddress] = useState(false);
   const [profileAddress, setProfileAddress] = useState<string | null>(null);
   const [tradePrefill, setTradePrefill] = useState<TradePrefillConfig | null>(null);
@@ -270,6 +274,16 @@ export function TokenDetailLive({
     [chainCurve]
   );
 
+  const liveCurveSnapshot = useBondingCurveMachine({
+    reserveBnb: token.reserveBnb,
+    tokenSold: token.tokenSold ?? "0",
+    paused: token.status === "PAUSED",
+    chainCurve: chainCurve as CurveTuple | undefined,
+    wsBonding: latestWsBonding,
+  });
+
+  const tradeCurveSnapshot = liveCurveSnapshot ?? chainCurveSnapshot;
+
   const fetchLive = useCallback(async () => {
     try {
       const response = await fetch(`/api/tokens/${tokenAddress}`, { cache: "no-store" });
@@ -328,6 +342,9 @@ export function TokenDetailLive({
       if (payload.type === "trade") {
         const tradeItem = wsPayloadToTradeItem(payload);
         if (tradeItem) {
+          if (payload.bonding) {
+            setLatestWsBonding(payload.bonding);
+          }
           setDbTrades((prev) => prependTradeIfNew(prev, tradeItem));
           setChartTradePatches((prev) => mergeChartTradePatch(prev, tradeItem));
           setToken((prev) => patchTokenDetailFromWsTrade(prev, payload) ?? prev);
@@ -689,7 +706,7 @@ export function TokenDetailLive({
               reserveBnb={liveToken.reserveBnb}
               prefill={tradePrefill}
               onTradeConfirmed={handleTradeConfirmed}
-              chainCurveSnapshot={chainCurveSnapshot}
+              chainCurveSnapshot={tradeCurveSnapshot}
             />
           </div>
           <CreatorRewardsCard
@@ -739,7 +756,7 @@ export function TokenDetailLive({
         reserveBnb={liveToken.reserveBnb}
         prefill={tradePrefill}
         onTradeConfirmed={handleTradeConfirmed}
-        chainCurveSnapshot={chainCurveSnapshot}
+        chainCurveSnapshot={tradeCurveSnapshot}
       />
 
       <CreatorProfileModal

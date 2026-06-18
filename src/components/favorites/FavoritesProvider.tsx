@@ -10,6 +10,8 @@ import {
   useState,
 } from "react";
 import { subscribeUserBootstrap } from "@/lib/user-bootstrap";
+import { useLocalFirstReads } from "@/lib/local-first/flags";
+import { getLocalFavorites, setLocalFavorites } from "@/lib/local-first/user-local-store";
 import { useOpenConnectModal } from "@/hooks/useOpenConnectModal";
 import { useAccount } from "wagmi";
 
@@ -37,12 +39,24 @@ export function FavoritesProvider({ children }: { children: React.ReactNode }) {
 
     let cancelled = false;
     let bootstrapped = false;
+
+    if (useLocalFirstReads()) {
+      const local = getLocalFavorites(address);
+      if (local?.length) {
+        setFavorites(new Set(local));
+      }
+    }
+
     setLoading(true);
 
     const unsub = subscribeUserBootstrap(address, (data) => {
       if (cancelled) return;
       bootstrapped = true;
-      setFavorites(new Set(data.favorites.map((item) => item.toLowerCase())));
+      const next = new Set(data.favorites.map((item) => item.toLowerCase()));
+      setFavorites(next);
+      if (useLocalFirstReads()) {
+        setLocalFavorites(address, [...next]);
+      }
       setLoading(false);
     });
 
@@ -55,7 +69,11 @@ export function FavoritesProvider({ children }: { children: React.ReactNode }) {
           });
           const body = (await response.json()) as { data?: string[]; error?: string };
           if (!cancelled && response.ok && Array.isArray(body.data)) {
-            setFavorites(new Set(body.data.map((item) => item.toLowerCase())));
+            const next = new Set(body.data.map((item) => item.toLowerCase()));
+            setFavorites(next);
+            if (useLocalFirstReads()) {
+              setLocalFavorites(address, [...next]);
+            }
           }
         } catch {
           // ignore fetch errors
@@ -114,6 +132,9 @@ export function FavoritesProvider({ children }: { children: React.ReactNode }) {
             const next = new Set(prev);
             if (favorited) next.add(key);
             else next.delete(key);
+            if (useLocalFirstReads() && address) {
+              setLocalFavorites(address, [...next]);
+            }
             return next;
           });
         } catch {

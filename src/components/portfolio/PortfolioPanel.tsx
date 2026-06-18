@@ -55,6 +55,11 @@ import {
   scaleCostBasisForBalance,
 } from "@/lib/onchain-balance";
 import { useLiveChannel, resolveLivePollDelay } from "@/hooks/useLiveChannel";
+import { useLocalFirstReads } from "@/lib/local-first/flags";
+import {
+  getLocalPortfolioSnapshot,
+  setLocalPortfolioSnapshot,
+} from "@/lib/local-first/user-local-store";
 import { walletRoom } from "@/lib/db/perf-flags";
 import {
   patchPortfolioFromWalletTrade,
@@ -607,6 +612,21 @@ export function PortfolioPanel({
     hasSsrPortfolio ? initialPortfolio : null
   );
 
+  useEffect(() => {
+    const wallet = address ?? ssrWalletAddress;
+    if (!wallet || !useLocalFirstReads() || portfolioDataRef.current) return;
+
+    const local = getLocalPortfolioSnapshot(wallet) as PortfolioData | null;
+    if (!local?.address || !portfolioMatchesWallet(local as PortfolioSnapshot, wallet)) return;
+
+    setData(local);
+    portfolioDataRef.current = local;
+    setLoading(false);
+    holdingsReadyRef.current = true;
+    setHoldingsReady(true);
+    isInitialPortfolioLoadRef.current = false;
+  }, [address, ssrWalletAddress]);
+
   const { connected: wsConnected } = useLiveChannel({
     room: address ? walletRoom(address) : "wallet:disconnected",
     enabled: Boolean(isConnected && address),
@@ -738,6 +758,9 @@ export function PortfolioPanel({
         }
 
         setData(portfolio);
+        if (useLocalFirstReads()) {
+          setLocalPortfolioSnapshot(walletAddress, portfolio);
+        }
         isInitialPortfolioLoadRef.current = false;
 
         const fingerprint = portfolioFingerprint(portfolio);
