@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { ChevronRight, LayoutGrid, Table2 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useAccount } from "wagmi";
@@ -394,6 +394,7 @@ export function ArenaListClient({
   const [favoriteListTokens, setFavoriteListTokens] = useState<TokenListItem[]>([]);
   const { address, isConnected } = useAccount();
   const router = useRouter();
+  const pathname = usePathname();
   const [navigatingTo, setNavigatingTo] = useState<string | null>(null);
   const [, startTokenNavigation] = useTransition();
   const { openConnectModal } = useOpenConnectModal();
@@ -483,6 +484,16 @@ export function ArenaListClient({
     },
     [router]
   );
+
+  useEffect(() => {
+    setNavigatingTo(null);
+  }, [pathname]);
+
+  useEffect(() => {
+    if (!navigatingTo) return;
+    const id = window.setTimeout(() => setNavigatingTo(null), 2500);
+    return () => window.clearTimeout(id);
+  }, [navigatingTo]);
 
   useEffect(() => {
     void (async () => {
@@ -1202,11 +1213,13 @@ export function ArenaListClient({
       kothContenders: 0,
       hasAirdrop: 0,
     };
+    const clientAirdropCount = airdropTokenAddresses.size;
     return {
       ...server,
+      hasAirdrop: Math.max(server.hasAirdrop, clientAirdropCount),
       favorites: favorites.size,
     };
-  }, [serverFilterCounts, favorites.size, resolvedTokens.length]);
+  }, [serverFilterCounts, favorites.size, resolvedTokens.length, airdropTokenAddresses]);
 
   function onSort(nextKey: SortKey) {
     if (sortKey === nextKey) {

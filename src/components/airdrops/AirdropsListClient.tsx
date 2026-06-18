@@ -42,6 +42,7 @@ import {
   AirdropStatusMetric,
   airdropListRewardProps,
 } from "@/components/airdrops/AirdropMetricCells";
+import { AirdropGuaranteedBadge } from "@/components/airdrops/AirdropGuaranteedBadge";
 import { AirdropMetricsStrip } from "@/components/airdrops/AirdropMetricsStrip";
 import { TokenAvatar } from "@/components/token/TokenAvatar";
 import { BnbLogo } from "@/components/token/BnbLogo";
@@ -670,32 +671,29 @@ export function AirdropsListClient({
           >
             <div className="koth-banner__inner featured-airdrop-banner__inner">
               <div className="featured-airdrop-banner__identity min-w-0">
-                <div className="relative shrink-0">
-                  <TokenAvatar
-                    address={featured.linkedToken}
-                    symbol={poolSymbol(featured)}
-                    size={48}
-                    className="koth-banner__logo shrink-0 md:hidden"
-                  />
-                  <TokenAvatar
-                    address={featured.linkedToken}
-                    symbol={poolSymbol(featured)}
-                    size={60}
-                    className="koth-banner__logo hidden shrink-0 md:block"
-                  />
-                  <span className="status-badge absolute -bottom-1 left-1/2 z-[1] -translate-x-1/2 whitespace-nowrap border-pump-success/40 bg-pump-card px-1.5 py-0 text-[9px] text-pump-success md:text-[10px]">
-                    100% guaranteed
-                  </span>
-                </div>
+                <TokenAvatar
+                  address={featured.linkedToken}
+                  symbol={poolSymbol(featured)}
+                  size={48}
+                  className="koth-banner__logo shrink-0 md:hidden"
+                />
+                <TokenAvatar
+                  address={featured.linkedToken}
+                  symbol={poolSymbol(featured)}
+                  size={60}
+                  className="koth-banner__logo hidden shrink-0 md:block"
+                />
 
                 <div className="featured-airdrop-banner__lead min-w-0 flex-1">
                   <div className="featured-airdrop-banner__headline-row">
                     <p className="featured-airdrop-banner__title truncate">
                       {campaignTitle(featured)}
                     </p>
-                    <AirdropStatusMetric status={featured.displayStatus} />
+                    <div className="featured-airdrop-banner__badges flex shrink-0 items-center gap-1.5">
+                      <AirdropGuaranteedBadge />
+                      <AirdropStatusMetric status={featured.displayStatus} />
+                    </div>
                   </div>
-                  <p className="mt-1 text-caption text-pump-muted">Escrow on-chain</p>
                 </div>
               </div>
 

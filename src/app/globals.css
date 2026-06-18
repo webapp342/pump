@@ -1440,7 +1440,9 @@ code,
     transition: opacity 0.12s ease;
   }
 
-  .sheet-grid tbody tr:hover .arena-board-quick-actions,
+  .sheet-grid tbody tr.arena-board-row--clickable:hover .arena-board-quick-actions,
+  .sheet-grid tbody tr.arena-board-row--clickable:focus-within .arena-board-quick-actions,
+  .arena-board-quick-cell:hover .arena-board-quick-actions,
   .arena-board-quick-actions:focus-within {
     opacity: 1;
     pointer-events: auto;
@@ -1486,7 +1488,6 @@ code,
 
   .arena-board-row--navigating {
     opacity: 0.72;
-    pointer-events: none;
   }
 
   .arena-token-card:active {
@@ -1742,7 +1743,22 @@ code,
     min-width: 0;
     align-items: center;
     justify-content: space-between;
-    gap: 8px;
+    gap: 8px 12px;
+  }
+
+  .featured-airdrop-banner__badges {
+    flex-wrap: nowrap;
+  }
+
+  @media (max-width: 479px) {
+    .featured-airdrop-banner__headline-row {
+      flex-wrap: wrap;
+      align-items: flex-start;
+    }
+
+    .featured-airdrop-banner__badges {
+      flex-wrap: wrap;
+    }
   }
 
   .featured-airdrop-banner__headline-row .featured-airdrop-banner__title {
@@ -2940,18 +2956,24 @@ code,
     70%,
     100% {
       opacity: 0.78;
-      filter: drop-shadow(0 0 0 transparent);
+      box-shadow: none;
     }
     82% {
       opacity: 1;
-      filter: drop-shadow(0 0 5px rgb(var(--pump-accent) / 0.55));
+      box-shadow: 0 0 6px rgb(var(--pump-accent) / 0.5);
     }
+  }
+
+  .airdrop-gift-icon {
+    pointer-events: none;
+    border-radius: 999px;
+    animation: airdrop-gift-glow 3.2s ease-in-out infinite;
   }
 
   .airdrop-gift-icon__glyph {
     color: rgb(var(--pump-accent));
-    animation: airdrop-gift-wiggle 3.2s ease-in-out infinite,
-      airdrop-gift-glow 3.2s ease-in-out infinite;
+    pointer-events: none;
+    animation: airdrop-gift-wiggle 3.2s ease-in-out infinite;
   }
 
   @keyframes hourglass-flip {
@@ -3072,6 +3094,7 @@ code,
     .hourglass-sand-top,
     .hourglass-sand-stream,
     .hourglass-sand-bottom,
+    .airdrop-gift-icon,
     .airdrop-gift-icon__glyph,
     .progress-fill,
     .koth-banner,

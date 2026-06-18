@@ -1,4 +1,5 @@
 import { Pool } from "pg";
+import { SQL_PROMOTABLE_AIRDROP_LINKED_TOKEN_ADDRESSES } from "@/lib/airdrop-promotable-sql";
 import { getLaunchpadReadPool, getLaunchpadWritePool } from "@/lib/db/pool";
 import { parseSocialLinksFromDb, type TokenSocialLinks } from "@/lib/token-social";
 import { useBondingStateCounts, useMvTokenStats, useTokenBoardStats } from "@/lib/db/perf-flags";
@@ -510,12 +511,15 @@ function arenaBoardFilterClause(
     };
   }
   if (filter === "hasAirdrop") {
-    if (airdropAddresses.length === 0) {
-      return { clause: "WHERE false", params: [] };
+    if (airdropAddresses.length > 0) {
+      return {
+        clause: "WHERE LOWER(address) = ANY($3::text[])",
+        params: airdropAddresses.map((address) => address.toLowerCase()),
+      };
     }
     return {
-      clause: "WHERE LOWER(address) = ANY($3::text[])",
-      params: airdropAddresses.map((address) => address.toLowerCase()),
+      clause: `WHERE LOWER(address) IN (${SQL_PROMOTABLE_AIRDROP_LINKED_TOKEN_ADDRESSES})`,
+      params: [],
     };
   }
   if (filter === "kothContenders") {
@@ -696,10 +700,9 @@ export async function countVisibleTokens(): Promise<number> {
 }
 
 export async function getArenaFilterCounts(
-  airdropAddresses: string[] = []
+  _airdropAddresses: string[] = []
 ): Promise<ArenaFilterCounts> {
   const db = getLaunchpadReadPool();
-  const normalizedAirdrops = airdropAddresses.map((address) => address.toLowerCase());
   const total = await countVisibleTokens();
   const kothContenders = await countKothContenders();
 
@@ -726,17 +729,17 @@ export async function getArenaFilterCounts(
         LEFT JOIN bonding_states b ON b.token_address = t.address
         LEFT JOIN mv_token_price_anchors mpa ON mpa.token_address = t.address
         WHERE t.is_hidden = false
+      ),
+      promotable AS (
+        ${SQL_PROMOTABLE_AIRDROP_LINKED_TOKEN_ADDRESSES}
       )
       SELECT
         COUNT(*) FILTER (
           WHERE change_24h_pct IS NOT NULL AND ABS(change_24h_pct) >= 1
         )::int AS movers,
-        COUNT(*) FILTER (
-          WHERE LOWER(address) = ANY($1::text[])
-        )::int AS has_airdrop
+        (SELECT COUNT(*)::int FROM promotable) AS has_airdrop
       FROM enriched
-      `,
-      [normalizedAirdrops]
+      `
     );
     const row = result.rows[0];
     return {
@@ -784,17 +787,17 @@ export async function getArenaFilterCounts(
         LIMIT 1
       ) p_first ON true
       WHERE t.is_hidden = false
+    ),
+    promotable AS (
+      ${SQL_PROMOTABLE_AIRDROP_LINKED_TOKEN_ADDRESSES}
     )
     SELECT
       COUNT(*) FILTER (
         WHERE change_24h_pct IS NOT NULL AND ABS(change_24h_pct) >= 1
       )::int AS movers,
-      COUNT(*) FILTER (
-        WHERE LOWER(address) = ANY($1::text[])
-      )::int AS has_airdrop
+      (SELECT COUNT(*)::int FROM promotable) AS has_airdrop
     FROM enriched
-    `,
-    [normalizedAirdrops]
+    `
   );
   const row = result.rows[0];
   return {
