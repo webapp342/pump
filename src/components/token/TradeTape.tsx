@@ -139,6 +139,7 @@ export function TradeTape({
   trades,
   wsConnected = false,
   holdersRefreshKey = 0,
+  initialHolders,
   currentPriceBnb,
   bnbUsd,
   onAddressClick,
@@ -149,22 +150,32 @@ export function TradeTape({
   trades: TradeItem[];
   wsConnected?: boolean;
   holdersRefreshKey?: number;
+  initialHolders?: TokenHolderSnapshot[];
   currentPriceBnb: number;
   bnbUsd: number | null;
   onAddressClick: (address: string) => void;
 }) {
   const creatorKey = creatorAddress.toLowerCase();
   const [tab, setTab] = useState<ActivityTab>("trades");
-  const [holderRows, setHolderRows] = useState<HolderRow[]>([]);
-  const [holdersReady, setHoldersReady] = useState(false);
+  const [holderRows, setHolderRows] = useState<HolderRow[]>(() =>
+    initialHolders?.length ? mapApiHoldersToRows(initialHolders) : []
+  );
+  const [holdersReady, setHoldersReady] = useState(
+    Boolean(initialHolders && initialHolders.length > 0)
+  );
 
   const tradeIds = useMemo(() => trades.map((t) => t.id), [trades]);
   const { rowClass: tradeRowClass } = useLiveTradeAnimations(tradeIds);
 
   useEffect(() => {
+    if (initialHolders?.length) {
+      setHolderRows(mapApiHoldersToRows(initialHolders));
+      setHoldersReady(true);
+    }
+  }, [initialHolders]);
+
+  useEffect(() => {
     let cancelled = false;
-    setHoldersReady(false);
-    setHolderRows([]);
 
     async function loadHolders(isInitial: boolean) {
       try {
@@ -184,7 +195,7 @@ export function TradeTape({
       }
     }
 
-    void loadHolders(true);
+    void loadHolders(!initialHolders?.length);
     if (wsConnected) {
       return () => {
         cancelled = true;
@@ -195,7 +206,7 @@ export function TradeTape({
       cancelled = true;
       window.clearInterval(timer);
     };
-  }, [tokenAddress, wsConnected]);
+  }, [tokenAddress, wsConnected, initialHolders?.length]);
 
   useEffect(() => {
     if (holdersRefreshKey <= 0) return;

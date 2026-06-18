@@ -37,7 +37,9 @@ import {
   resolveTradeReferrer,
 } from "@/lib/referral-storage";
 import { bnbToUsd, formatUsdReadable } from "@/lib/format-usd";
-import { formatEstimatedPriceUsd, quoteFillPriceBnb } from "@/lib/price-semantics";
+import { formatEstimatedPriceUsd, quoteFillPriceBnb, quoteFillDeviationBps, isPriceAccuracyViolation, logPriceAccuracyViolation } from "@/lib/price-semantics";
+import { tradeFillPriceBnb } from "@/lib/format-usd";
+import { parseTradesFromReceipt } from "@/lib/launchpad-events";
 import { useBnbUsdPrice } from "@/hooks/useBnbUsdPrice";
 import {
   useTradeGasEstimate,
@@ -195,6 +197,7 @@ export function TradePanel({
   const [pendingAction, setPendingAction] = useState<"buy" | "sell" | "approve" | null>(null);
   const pendingSellRef = useRef<{ amountWei: bigint; minBnbOut: bigint } | null>(null);
   const pendingTradeReferrerRef = useRef<`0x${string}` | null>(null);
+  const quoteUsdAtSubmitRef = useRef<number | null>(null);
   /** Set when buy amount comes from slider/max — keeps token mode aligned with BNB/USD spend. */
   const [linkedBuySpendWei, setLinkedBuySpendWei] = useState<bigint | null>(null);
   /** Set when sell amount comes from slider/max — keeps USD/BNB modes aligned with token balance. */
@@ -806,6 +809,7 @@ export function TradePanel({
       if (pendingSell) {
         const tradeReferrer = resolvePendingTradeReferrer();
         pendingTradeReferrerRef.current = tradeReferrer;
+        quoteUsdAtSubmitRef.current = estimatedQuotePriceUsd;
         setPendingAction("sell");
         writeContract({
           address: contracts.bondingCurveManager,
@@ -836,17 +840,49 @@ export function TradePanel({
     const confirmedSide = pendingAction;
     setPendingAction(null);
     pendingSellRef.current = null;
-    void refetchBnbBalance();
-    refetchBalance();
-    refetchAllowance();
-    reset();
+
     if (receipt.transactionHash && (confirmedSide === "buy" || confirmedSide === "sell")) {
+      const quoteUsd = quoteUsdAtSubmitRef.current;
+      quoteUsdAtSubmitRef.current = null;
+      if (quoteUsd != null && quoteUsd > 0 && bnbUsd != null && bnbUsd > 0) {
+        const parsed = parseTradesFromReceipt(receipt, tokenAddress);
+        const trade = parsed[0];
+        if (trade) {
+          const native = formatEther(trade.nativeAmount);
+          const fee = formatEther(trade.feeBnb);
+          const net = formatEther(trade.nativeAmount - trade.feeBnb);
+          const tokens = formatUnits(trade.tokenAmount, 18);
+          const fillBnb = tradeFillPriceBnb(native, tokens, fee, net);
+          const fillUsd = fillBnb != null ? bnbToUsd(fillBnb, bnbUsd) : null;
+          if (fillUsd != null) {
+            const deviationBps = quoteFillDeviationBps(quoteUsd, fillUsd);
+            if (deviationBps != null && isPriceAccuracyViolation(deviationBps)) {
+              logPriceAccuracyViolation({
+                tokenAddress,
+                side: confirmedSide,
+                quoteUsd,
+                fillUsd,
+                deviationBps,
+                txHash: receipt.transactionHash,
+              });
+            }
+          }
+        }
+      }
+
       onTradeConfirmed?.({
         txHash: receipt.transactionHash,
         side: confirmedSide,
         receipt,
       });
+    } else {
+      quoteUsdAtSubmitRef.current = null;
     }
+
+    void refetchBnbBalance();
+    refetchBalance();
+    refetchAllowance();
+    reset();
   }, [
     receipt,
     pendingAction,
@@ -857,6 +893,8 @@ export function TradePanel({
     onTradeConfirmed,
     tokenAddress,
     writeContract,
+    bnbUsd,
+    estimatedQuotePriceUsd,
   ]);
 
   function onDisplayInputChange(raw: string) {
@@ -1064,6 +1102,7 @@ export function TradePanel({
 
         const tradeReferrer = resolvePendingTradeReferrer();
         pendingTradeReferrerRef.current = tradeReferrer;
+        quoteUsdAtSubmitRef.current = estimatedQuotePriceUsd;
         setPendingAction("buy");
         writeContract({
           address: contracts.bondingCurveManager,
@@ -1124,6 +1163,7 @@ export function TradePanel({
         const parsed = parseSignature(signature);
         const permitV =
           parsed.yParity !== undefined ? parsed.yParity + 27 : Number(parsed.v ?? 27);
+        quoteUsdAtSubmitRef.current = estimatedQuotePriceUsd;
         setPendingAction("sell");
         writeContract({
           address: contracts.bondingCurveManager,
@@ -1156,6 +1196,7 @@ export function TradePanel({
       pendingSellRef.current = null;
       const tradeReferrer = resolvePendingTradeReferrer();
       pendingTradeReferrerRef.current = tradeReferrer;
+      quoteUsdAtSubmitRef.current = estimatedQuotePriceUsd;
       setPendingAction("sell");
       writeContract({
         address: contracts.bondingCurveManager,

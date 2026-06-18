@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createPublicClient, http } from "viem";
 import { useReadContract } from "wagmi";
-import type { TokenDetail, TradeItem } from "@/lib/db/launchpad";
+import type { TokenHolderSnapshot, TokenDetail, TradeItem } from "@/lib/db/launchpad";
 import {
   bondingCurveManagerAbi,
   bondingCurveSnapshotFromTuple,
@@ -51,6 +51,7 @@ import { copyToClipboard } from "@/lib/copy-to-clipboard";
 import { tokenSharePayload } from "@/lib/share-links";
 import { shellPaddingXClass } from "@/components/layout/layout-shell";
 import { useLiveChannel, resolveLivePollDelay } from "@/hooks/useLiveChannel";
+import { useRafMessageQueue } from "@/hooks/useRafMessageQueue";
 import {
   mergeChartTradePatch,
   patchTokenDetailFromWsTrade,
@@ -110,6 +111,7 @@ type TokenDetailLiveProps = {
   status: string;
   initialToken: TokenDetail;
   initialTrades: TradeItem[];
+  initialHolders?: TokenHolderSnapshot[];
 };
 
 type PriceChange24h = {
@@ -199,6 +201,7 @@ export function TokenDetailLive({
   status,
   initialToken,
   initialTrades,
+  initialHolders = [],
 }: TokenDetailLiveProps) {
   const [token, setToken] = useState(initialToken);
   const [dbTrades, setDbTrades] = useState(initialTrades);
@@ -314,10 +317,13 @@ export function TokenDetailLive({
   const fetchLiveRef = useRef(fetchLive);
   fetchLiveRef.current = fetchLive;
 
-  const { connected: wsConnected } = useLiveChannel({
-    room: `token:${tokenAddress.toLowerCase()}`,
-    onMessage: (message) => {
-      const payload = message as TokenTradeWsPayload;
+  const lastWsSeqRef = useRef(0);
+
+  const applyWsMessages = useCallback((messages: unknown[]) => {
+    for (const message of messages) {
+      const payload = message as TokenTradeWsPayload & { seq?: number };
+      if (payload.seq != null && payload.seq <= lastWsSeqRef.current) continue;
+      if (payload.seq != null) lastWsSeqRef.current = payload.seq;
 
       if (payload.type === "trade") {
         const tradeItem = wsPayloadToTradeItem(payload);
@@ -331,12 +337,21 @@ export function TokenDetailLive({
           setIndexerSyncing(false);
           setHoldersRefreshKey((k) => k + 1);
         }
-        return;
+        continue;
       }
 
       if (payload.type === "board_delta") {
         void fetchLiveRef.current();
       }
+    }
+  }, []);
+
+  const queueWsMessage = useRafMessageQueue(applyWsMessages);
+
+  const { connected: wsConnected } = useLiveChannel({
+    room: `token:${tokenAddress.toLowerCase()}`,
+    onMessage: (message) => {
+      queueWsMessage(message);
     },
   });
 
@@ -657,6 +672,7 @@ export function TokenDetailLive({
               trades={trades}
               wsConnected={wsConnected}
               holdersRefreshKey={holdersRefreshKey}
+              initialHolders={initialHolders}
               currentPriceBnb={displayPrice}
               bnbUsd={bnbUsd}
               onAddressClick={setProfileAddress}

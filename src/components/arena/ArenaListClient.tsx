@@ -37,6 +37,7 @@ import {
 } from "@/lib/arena-board-format";
 import { ScrollStripTrack } from "@/components/ui/ScrollStripTrack";
 import { useLiveChannel, resolveLivePollDelay } from "@/hooks/useLiveChannel";
+import { useRafMessageQueue } from "@/hooks/useRafMessageQueue";
 import { useLiveBoardAnimations } from "@/hooks/useLiveBoardAnimations";
 import { RECENT_STRIP_DESKTOP, RECENT_STRIP_MOBILE } from "@/lib/recent-strip-limits";
 import {
@@ -811,46 +812,58 @@ export function ArenaListClient({
   const loadFavoriteTokensRef = useRef(loadFavoriteTokens);
   loadFavoriteTokensRef.current = loadFavoriteTokens;
 
+  const lastArenaWsSeqRef = useRef(0);
+
+  const applyArenaWsMessages = useCallback(
+    (messages: unknown[]) => {
+      for (const message of messages) {
+        const payload = message as ArenaTradeWsPayload & { type?: string; seq?: number };
+        if (payload.seq != null && payload.seq <= lastArenaWsSeqRef.current) continue;
+        if (payload.seq != null) lastArenaWsSeqRef.current = payload.seq;
+
+        if (payload.type === "trade" && payload.tokenAddress && tokensRef.current) {
+          const { next, changed } = patchArenaTokenList(tokensRef.current, payload);
+          if (changed) {
+            const addr = payload.tokenAddress.toLowerCase();
+            const oldToken = tokensRef.current.find((t) => t.address.toLowerCase() === addr);
+            const newToken = next.find((t) => t.address.toLowerCase() === addr);
+            if (oldToken && newToken) {
+              const prevMcap = Number(oldToken.marketCapBnb);
+              const nextMcap = Number(newToken.marketCapBnb);
+              if (Number.isFinite(prevMcap) && Number.isFinite(nextMcap) && prevMcap !== nextMcap) {
+                triggerFlash(`${addr}:mcap`, nextMcap > prevMcap ? "up" : "down");
+              }
+              snapAnimatedCapsForToken(newToken);
+            }
+            setTokens(next);
+            setTopByMcap((prev) => {
+              const { next: patchedTop, changed: topChanged } = patchArenaTokenList(prev, payload);
+              return topChanged ? patchedTop : prev;
+            });
+          }
+          continue;
+        }
+
+        if (payload.type === "koth") {
+          void loadRef.current(listLimitRef.current, { silent: true });
+          continue;
+        }
+
+        if (payload.type === "board_delta") {
+          void loadRef.current(listLimitRef.current, { silent: true });
+          void loadFavoriteTokensRef.current();
+        }
+      }
+    },
+    [triggerFlash, snapAnimatedCapsForToken]
+  );
+
+  const queueArenaWsMessage = useRafMessageQueue(applyArenaWsMessages);
+
   const { connected: wsConnected } = useLiveChannel({
     room: "arena",
     onMessage: (message) => {
-      const payload = message as ArenaTradeWsPayload & { type?: string };
-
-      if (payload.type === "trade" && payload.tokenAddress && tokensRef.current) {
-        const { next, changed } = patchArenaTokenList(tokensRef.current, payload);
-        if (changed) {
-          const addr = payload.tokenAddress.toLowerCase();
-          const oldToken = tokensRef.current.find((t) => t.address.toLowerCase() === addr);
-          const newToken = next.find((t) => t.address.toLowerCase() === addr);
-          if (oldToken && newToken) {
-            const prevMcap = Number(oldToken.marketCapBnb);
-            const nextMcap = Number(newToken.marketCapBnb);
-            if (Number.isFinite(prevMcap) && Number.isFinite(nextMcap) && prevMcap !== nextMcap) {
-              triggerFlash(
-                `${addr}:mcap`,
-                nextMcap > prevMcap ? "up" : "down"
-              );
-            }
-            snapAnimatedCapsForToken(newToken);
-          }
-          setTokens(next);
-          setTopByMcap((prev) => {
-            const { next: patchedTop, changed: topChanged } = patchArenaTokenList(prev, payload);
-            return topChanged ? patchedTop : prev;
-          });
-          return;
-        }
-      }
-
-      if (payload.type === "koth") {
-        void loadRef.current(listLimitRef.current, { silent: true });
-        return;
-      }
-
-      if (payload.type === "board_delta") {
-        void loadRef.current(listLimitRef.current, { silent: true });
-        void loadFavoriteTokensRef.current();
-      }
+      queueArenaWsMessage(message);
     },
   });
 

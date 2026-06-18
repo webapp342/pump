@@ -9,6 +9,18 @@ export type LiveChannelOptions = {
   enabled?: boolean;
 };
 
+type ReplayMessage = {
+  type: "replay";
+  room: string;
+  events: unknown[];
+};
+
+function isReplayMessage(data: unknown): data is ReplayMessage {
+  if (!data || typeof data !== "object") return false;
+  const msg = data as ReplayMessage;
+  return msg.type === "replay" && Array.isArray(msg.events);
+}
+
 export function useLiveChannel({ room, onMessage, enabled = true }: LiveChannelOptions) {
   const [connected, setConnected] = useState(false);
   const onMessageRef = useRef(onMessage);
@@ -42,7 +54,14 @@ export function useLiveChannel({ room, onMessage, enabled = true }: LiveChannelO
 
       ws.onmessage = (event) => {
         try {
-          onMessageRef.current(JSON.parse(String(event.data)));
+          const data = JSON.parse(String(event.data)) as unknown;
+          if (isReplayMessage(data)) {
+            for (const item of data.events) {
+              onMessageRef.current(item);
+            }
+            return;
+          }
+          onMessageRef.current(data);
         } catch {
           // Ignore malformed payloads.
         }

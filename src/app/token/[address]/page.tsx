@@ -1,8 +1,11 @@
+import { Suspense } from "react";
 import type { Metadata } from "next";
-import { TokenDetailShell } from "@/components/token/TokenDetailShell";
+import { AppShell } from "@/components/layout/AppShell";
+import { TokenDetailPageLoader } from "@/components/token/TokenDetailPageLoader";
+import { TokenDetailBodySkeleton } from "@/components/token/TokenDetailBodySkeleton";
+import { PageBackLink } from "@/components/ui/PageBackLink";
 import { normalizeAddressParam } from "@/lib/address";
 import { getTokenByAddress } from "@/lib/db/launchpad";
-import { fetchTokenDetailPayload } from "@/lib/token-server";
 
 type PageProps = { params: Promise<{ address: string }> };
 
@@ -52,12 +55,17 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 export default async function TokenDetailPage({ params }: PageProps) {
   const { address } = await params;
-  let initialPayload = null;
-  try {
-    initialPayload = await fetchTokenDetailPayload(address);
-  } catch {
-    // Client retries on hydration.
-  }
 
-  return <TokenDetailShell address={address} initialPayload={initialPayload} />;
+  return (
+    <Suspense
+      fallback={
+        <AppShell wide>
+          <PageBackLink href="/" />
+          <TokenDetailBodySkeleton />
+        </AppShell>
+      }
+    >
+      <TokenDetailPageLoader address={address} />
+    </Suspense>
+  );
 }

@@ -2,7 +2,7 @@
 
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import type { TokenDetail, TradeItem } from "@/lib/db/launchpad";
-import type { TokenDetailPayload } from "@/lib/token-server";
+import type { TokenDetailBundle } from "@/lib/token-server";
 import { AppShell } from "@/components/layout/AppShell";
 import { PageBackLink } from "@/components/ui/PageBackLink";
 import { TokenDetailLive } from "@/components/token/TokenDetailLive";
@@ -18,16 +18,18 @@ const POLL_MAX_MS = 90_000;
 
 type TokenDetailShellProps = {
   address: string;
-  initialPayload?: TokenDetailPayload | null;
+  initialBundle?: TokenDetailBundle | null;
 };
 
 function TokenDetailView({
   token,
   trades,
+  initialHolders,
   indexerSyncing,
 }: {
   token: TokenDetail;
   trades: TradeItem[];
+  initialHolders?: TokenDetailBundle["holders"];
   indexerSyncing: boolean;
 }) {
   return (
@@ -49,6 +51,7 @@ function TokenDetailView({
           status={token.status}
           initialToken={token}
           initialTrades={trades}
+          initialHolders={initialHolders}
         />
       </Suspense>
     </>
@@ -57,11 +60,17 @@ function TokenDetailView({
 
 export function TokenDetailShell({
   address,
-  initialPayload = null,
+  initialBundle = null,
 }: TokenDetailShellProps) {
   const normalized = address.toLowerCase();
-  const [data, setData] = useState<{ token: TokenDetail; trades: TradeItem[] } | null>(
-    initialPayload
+  const [data, setData] = useState<{ token: TokenDetail; trades: TradeItem[]; holders: TokenDetailBundle["holders"] } | null>(
+    initialBundle
+      ? {
+          token: initialBundle.token,
+          trades: initialBundle.trades,
+          holders: initialBundle.holders,
+        }
+      : null
   );
   const [optimisticToken, setOptimisticToken] = useState<TokenDetail | null>(() => {
     const pending = getPendingCreateForToken(normalized);
@@ -71,14 +80,14 @@ export function TokenDetailShell({
     Boolean(getPendingCreateForToken(normalized))
   );
   const [fatalError, setFatalError] = useState<string | null>(null);
-  const [initialLoading, setInitialLoading] = useState(!initialPayload);
-  const initialPayloadRef = useRef(initialPayload);
+  const [initialLoading, setInitialLoading] = useState(!initialBundle);
+  const initialBundleRef = useRef(initialBundle);
 
   const load = useCallback(async (): Promise<boolean> => {
     try {
       const response = await fetch(`/api/tokens/${normalized}`, { cache: "no-store" });
       const body = (await response.json()) as {
-        data?: { token: TokenDetail; trades: TradeItem[] };
+        data?: TokenDetailBundle;
         error?: string;
       };
 
@@ -86,7 +95,11 @@ export function TokenDetailShell({
         return false;
       }
 
-      setData(body.data);
+      setData({
+        token: body.data.token,
+        trades: body.data.trades,
+        holders: body.data.holders ?? [],
+      });
       setOptimisticToken(null);
       setIndexerSyncing(false);
       setFatalError(null);
@@ -99,8 +112,8 @@ export function TokenDetailShell({
   const pollUntilRef = useRef(0);
 
   useEffect(() => {
-    if (initialPayloadRef.current) {
-      initialPayloadRef.current = null;
+    if (initialBundleRef.current) {
+      initialBundleRef.current = null;
       pollUntilRef.current = Date.now() + POLL_MAX_MS;
       void load();
       return;
@@ -199,6 +212,7 @@ export function TokenDetailShell({
       <TokenDetailView
         token={token}
         trades={data?.trades ?? []}
+        initialHolders={data?.holders}
         indexerSyncing={indexerSyncing && !data}
       />
     </AppShell>

@@ -5,6 +5,7 @@ export type ClientMessage =
 
 export type ServerMessage =
   | { type: "subscribed"; room: string }
+  | { type: "replay"; room: string; events: unknown[] }
   | { type: "pong" }
   | { type: "trade"; tokenAddress: string; trade: unknown; bonding: unknown }
   | { type: "wallet_trade"; walletAddress: string; tokenAddress: string; trade: unknown; position: unknown; bonding: unknown }

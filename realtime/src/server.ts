@@ -49,6 +49,32 @@ function subscribe(ws: WebSocket, room: string): void {
   clients.add(ws);
 
   send(ws, { type: "subscribed", room: normalized });
+  void sendReplay(ws, normalized);
+}
+
+async function sendReplay(ws: WebSocket, room: string): Promise<void> {
+  try {
+    const entries = await redisCmd.xrevrange(`pump:stream:${room}`, "+", "-", "COUNT", 40);
+    if (!entries.length) return;
+
+    const events: unknown[] = [];
+    for (const entry of entries.reverse()) {
+      const fields = entry[1];
+      const payloadIndex = fields.indexOf("p");
+      if (payloadIndex === -1 || payloadIndex + 1 >= fields.length) continue;
+      try {
+        events.push(JSON.parse(fields[payloadIndex + 1]!));
+      } catch {
+        // Skip malformed stream entries.
+      }
+    }
+
+    if (events.length > 0) {
+      send(ws, { type: "replay", room, events });
+    }
+  } catch (error) {
+    console.warn("replay failed:", error instanceof Error ? error.message : error);
+  }
 }
 
 function unsubscribe(ws: WebSocket, room: string): void {
@@ -131,8 +157,12 @@ wss.on("connection", (ws, req) => {
 });
 
 const redisSub = new Redis(REDIS_URL);
+const redisCmd = new Redis(REDIS_URL);
 redisSub.on("error", (error: Error) => {
   console.warn("redis sub error:", error.message);
+});
+redisCmd.on("error", (error: Error) => {
+  console.warn("redis cmd error:", error.message);
 });
 
 server.listen(PORT, "127.0.0.1", () => {
@@ -159,10 +189,12 @@ process.on("SIGINT", () => {
   wss.close();
   server.close();
   void redisSub.quit();
+  void redisCmd.quit();
 });
 
 process.on("SIGTERM", () => {
   wss.close();
   server.close();
   void redisSub.quit();
+  void redisCmd.quit();
 });

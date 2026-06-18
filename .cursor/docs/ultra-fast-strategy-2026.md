@@ -44,15 +44,24 @@ Redis Pub/Sub → pump-realtime → Browser WS rooms → delta patches
 - Arena chip filter cache + skeleton (flash fix)
 - User bootstrap (4→1 API)
 
-### Kritik eksikler (Tier 2+)
+### Kritik eksikler (Tier 3+)
 
 | Eksik | Etki |
 |-------|------|
-| WS reconnect replay | Kopunca poll gap |
-| rAF patch coalescing | Yüksek trade/s jank |
-| Token bundle SSR | +2 RTT token sayfası |
-| `price_accuracy_violation` telemetry | %99.9 ölçülemez |
-| Per-token Redis snapshot | Token API PG yükü |
+| TanStack Query standard | Liste geçişlerinde stale flash |
+| Enriched WS trade payload | Client-side recompute |
+| Horizontal WS scale | Tek VM fan-out limiti |
+
+### Tier 2 tamamlananlar ✅
+
+| Yetenek | Durum |
+|---------|-------|
+| Token bundle SSR (chart + holders) | ✅ PPR island |
+| WS seq + Redis Streams replay | ✅ indexer XADD + realtime XREVRANGE |
+| rAF patch coalescing | ✅ arena + token |
+| Per-token Redis snapshot | ✅ 5s TTL |
+| `price_accuracy_violation` telemetry | ✅ TradePanel receipt hook |
+| Token Suspense fallback | ✅ AppShell + skeleton |
 
 ---
 
@@ -112,9 +121,9 @@ Redis Pub/Sub → pump-realtime → Browser WS rooms → delta patches
 |---------|-------------|-------------|------------------|-------|
 | Ingestion | Custom indexer | L1 native | RPC poll | eth_subscribe |
 | Read path | Redis + replica | Local node | PG + Redis 2s | + per-token snapshot |
-| WS model | Push | Snapshot+delta | Pub/Sub | + seq + replay |
-| UI update | Throttled | Projection | Direct setState | rAF batch |
-| İlk paint | Cached shell | App | SSR kısmi | PPR + cache |
+| WS model | Push | Snapshot+delta | Pub/Sub + replay | + enriched payload |
+| UI update | Throttled | Projection | rAF batch | view model |
+| İlk paint | Cached shell | App | PPR + cache ✅ | — |
 | Fiyat | Pair price | Mark/Last | Spot/Quote/Fill ✅ | + violation metrics |
 
 ---
@@ -132,17 +141,17 @@ Redis Pub/Sub → pump-realtime → Browser WS rooms → delta patches
 | 5 | PPR Suspense islands | `ArenaHomeServer.tsx`, `RootProviders.tsx`, `layout.tsx` | ✅ |
 | 6 | `connection()` dynamic markers | `ArenaHomeServer`, `PortfolioPageLoader` | ✅ |
 
-### Tier 2 — Orta vade (1–2 ay)
+### Tier 2 — Orta vade (1–2 ay) ✅ tamamlandı
 
-| # | İş |
-|---|-----|
-| 5 | Token bundle SSR (chart + holders) |
-| 6 | WS seq + Redis Streams replay |
-| 7 | rAF patch coalescing (arena/token) |
-| 8 | Per-token Redis snapshot |
-| 9 | Enriched WS trade payload |
-| 10 | `price_accuracy_violation` metrics |
-| 11 | TanStack Query standard (keepPreviousData) |
+| # | İş | Durum |
+|---|-----|-------|
+| 5 | Token bundle SSR (chart + holders) | ✅ |
+| 6 | WS seq + Redis Streams replay | ✅ |
+| 7 | rAF patch coalescing (arena/token) | ✅ |
+| 8 | Per-token Redis snapshot | ✅ |
+| 9 | Enriched WS trade payload | ⏳ spotPriceZug alias only |
+| 10 | `price_accuracy_violation` metrics | ✅ |
+| 11 | TanStack Query standard (keepPreviousData) | ⏳ Tier 3 |
 
 ### Tier 3 — Ölçek (2–4 ay)
 
