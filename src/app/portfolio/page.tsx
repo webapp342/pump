@@ -1,10 +1,18 @@
+import { Suspense } from "react";
 import { AppShell } from "@/components/layout/AppShell";
-import { PortfolioPanel } from "@/components/portfolio/PortfolioPanel";
+import { PortfolioPageLoader } from "@/components/portfolio/PortfolioPageLoader";
+import { PortfolioPanelSkeleton } from "@/components/portfolio/PortfolioPanelSkeleton";
 
-export default function PortfolioPage() {
+type PortfolioPageProps = {
+  searchParams: Promise<{ address?: string }>;
+};
+
+export default function PortfolioPage({ searchParams }: PortfolioPageProps) {
   return (
     <AppShell>
-      <PortfolioPanel />
+      <Suspense fallback={<PortfolioPanelSkeleton />}>
+        <PortfolioPageLoader searchParams={searchParams} />
+      </Suspense>
     </AppShell>
   );
 }

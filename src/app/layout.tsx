@@ -1,14 +1,6 @@
 import type { Metadata } from "next";
-import { headers } from "next/headers";
-import { CreatorFollowsProvider } from "@/components/creators/CreatorFollowsProvider";
-import { FavoritesProvider } from "@/components/favorites/FavoritesProvider";
-import { AirdropSavesProvider } from "@/components/airdrops/AirdropSavesProvider";
-import { UserAvatarProvider } from "@/components/user/UserAvatarProvider";
-import { UserBootstrapProvider } from "@/components/user/UserBootstrapProvider";
-import { ReferralCaptureProvider } from "@/components/referrals/ReferralCaptureProvider";
-import { RouteWarmup } from "@/components/layout/RouteWarmup";
-import { ThemeProvider } from "@/components/theme/ThemeProvider";
-import { Web3Provider } from "@/components/wallet/Web3Provider";
+import { Suspense } from "react";
+import { RootProviders } from "@/components/layout/RootProviders";
 import { ibmPlexMono, inter } from "@/lib/fonts";
 import "./globals.css";
 
@@ -40,10 +32,7 @@ export const metadata: Metadata = {
   },
 };
 
-export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  const headersList = await headers();
-  const cookies = headersList.get("cookie");
-
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html
       lang="en"
@@ -65,24 +54,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             `,
           }}
         />
-        <ThemeProvider>
-          <Web3Provider cookies={cookies}>
-            <UserBootstrapProvider>
-            <FavoritesProvider>
-              <AirdropSavesProvider>
-              <CreatorFollowsProvider>
-                <UserAvatarProvider>
-                  <ReferralCaptureProvider>
-                    <RouteWarmup />
-                    {children}
-                  </ReferralCaptureProvider>
-                </UserAvatarProvider>
-              </CreatorFollowsProvider>
-              </AirdropSavesProvider>
-            </FavoritesProvider>
-            </UserBootstrapProvider>
-          </Web3Provider>
-        </ThemeProvider>
+        <Suspense>
+          <RootProviders>{children}</RootProviders>
+        </Suspense>
       </body>
     </html>
   );

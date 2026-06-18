@@ -4,6 +4,7 @@ import path from "node:path";
 const projectRoot = path.join(__dirname);
 
 const nextConfig: NextConfig = {
+  cacheComponents: true,
   output: "standalone",
   outputFileTracingRoot: projectRoot,
   turbopack: {

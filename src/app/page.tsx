@@ -1,22 +1,14 @@
+import { Suspense } from "react";
 import { AppShell } from "@/components/layout/AppShell";
-import { ArenaListClient } from "@/components/arena/ArenaListClient";
-import { fetchArenaHomePayload } from "@/lib/arena-server";
+import { ArenaHomeServer } from "@/components/arena/ArenaHomeServer";
+import { ArenaSkeleton } from "@/components/arena/ArenaSkeleton";
 
-export default async function HomePage() {
-  let initialPayload = null;
-  try {
-    initialPayload = await fetchArenaHomePayload({
-      filter: "new",
-      sortKey: "age",
-      sortDir: "desc",
-    });
-  } catch {
-    // Client retries on hydration if SSR fetch fails.
-  }
-
+export default function HomePage() {
   return (
     <AppShell>
-      <ArenaListClient initialPayload={initialPayload} />
+      <Suspense fallback={<ArenaSkeleton />}>
+        <ArenaHomeServer />
+      </Suspense>
     </AppShell>
   );
 }

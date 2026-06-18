@@ -1,3 +1,4 @@
+import { cacheLife, cacheTag } from "next/cache";
 import { fetchBnbUsdPrice } from "@/lib/bnb-price-server";
 import { useRedisArenaCache } from "@/lib/db/perf-flags";
 import {
@@ -50,10 +51,26 @@ export type ArenaHomeFetchOptions = {
   airdropAddresses?: string[];
 };
 
+function arenaCacheTag(options: ArenaHomeFetchOptions): string {
+  const filter = options.filter ?? "new";
+  const sortKey = options.sortKey ?? "age";
+  const sortDir = options.sortDir ?? "desc";
+  const airdropKey =
+    options.airdropAddresses && options.airdropAddresses.length > 0
+      ? [...options.airdropAddresses].sort().join(",")
+      : "";
+  return `arena:${filter}:${sortKey}:${sortDir}:${options.limit ?? ARENA_HOME_LIMIT}:${airdropKey}`;
+}
+
 /** Server-side arena board payload — SSR home page + shared with /api/tokens. */
 export async function fetchArenaHomePayload(
   options: ArenaHomeFetchOptions = {}
 ): Promise<ArenaHomePayload> {
+  "use cache";
+  cacheTag("arena");
+  cacheTag(arenaCacheTag(options));
+  cacheLife({ stale: 2, revalidate: 2, expire: 10 });
+
   const limit = options.limit ?? ARENA_HOME_LIMIT;
   const sortKey = options.sortKey ?? "age";
   const sortDir = options.sortDir ?? "desc";

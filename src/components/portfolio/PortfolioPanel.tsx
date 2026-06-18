@@ -29,7 +29,7 @@ import { HoldingSwipeRow } from "@/components/portfolio/HoldingSwipeRow";
 import { HoldingsSwipeHint } from "@/components/portfolio/HoldingsSwipeHint";
 import { TokenAvatar } from "@/components/token/TokenAvatar";
 import { TradeSheet } from "@/components/token/TradeSheet";
-import type { TokenListItem } from "@/lib/db/launchpad";
+import type { PortfolioSnapshot, TokenListItem } from "@/lib/db/launchpad";
 import { useBnbUsdPrice } from "@/hooks/useBnbUsdPrice";
 import { bnbToUsd, formatPortfolioHoldingValueUsd, formatUsdReadable } from "@/lib/format-usd";
 import { PctChange } from "@/components/ui/PctChange";
@@ -60,6 +60,7 @@ import {
   patchPortfolioFromWalletTrade,
   type WalletTradeWsPayload,
 } from "@/lib/portfolio-live-delta";
+import { writePortfolioWalletCookie } from "@/lib/portfolio-wallet-cookie";
 
 type PortfolioPosition = {
   tokenAddress: string;
@@ -528,14 +529,39 @@ async function fetchReferralStats(walletAddress: string): Promise<ReferralStats 
   }
 }
 
-export function PortfolioPanel() {
-  const { address, isConnected } = useAccount();
+function portfolioFingerprint(portfolio: PortfolioData): string {
+  return portfolio.positions
+    .map(
+      (position) =>
+        `${position.tokenAddress}:${position.tokenBalance}:${position.lastPriceBnb}`
+    )
+    .join("|");
+}
+
+function portfolioMatchesWallet(
+  portfolio: PortfolioSnapshot | null | undefined,
+  walletAddress: string | null | undefined
+): boolean {
+  if (!portfolio || !walletAddress) return false;
+  return portfolio.address.toLowerCase() === walletAddress.toLowerCase();
+}
+
+export function PortfolioPanel({
+  initialPortfolio = null,
+  ssrWalletAddress = null,
+}: {
+  initialPortfolio?: PortfolioSnapshot | null;
+  ssrWalletAddress?: string | null;
+}) {
+  const hasSsrPortfolio = portfolioMatchesWallet(initialPortfolio, ssrWalletAddress);
+  const { address, isConnected, isConnecting, isReconnecting } = useAccount();
   const { openConnectModal } = useOpenConnectModal();
   const { bnbUsd } = useBnbUsdPrice();
-  const [data, setData] = useState<PortfolioData | null>(null);
+  const [data, setData] = useState<PortfolioData | null>(
+    hasSsrPortfolio ? initialPortfolio : null
+  );
   const [error, setError] = useState<string | null>(null);
-  // Start in loading mode to avoid a brief error placeholder flash on hard refresh.
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!hasSsrPortfolio);
   const [claimOpen, setClaimOpen] = useState(false);
   const [referrerClaimOpen, setReferrerClaimOpen] = useState(false);
   const [referralStats, setReferralStats] = useState<ReferralStats | null>(null);
@@ -545,7 +571,7 @@ export function PortfolioPanel() {
   const { avatarId } = useUserAvatar();
   const [walletHoldings, setWalletHoldings] = useState<WalletLaunchpadHolding[]>([]);
   const [onChainBalances, setOnChainBalances] = useState<Record<string, string>>({});
-  const [holdingsReady, setHoldingsReady] = useState(false);
+  const [holdingsReady, setHoldingsReady] = useState(hasSsrPortfolio);
   const [holdingsEnriching, setHoldingsEnriching] = useState(false);
   const [createdLimit, setCreatedLimit] = useState(PORTFOLIO_LAUNCHED_INITIAL);
   const createdLimitRef = useRef(PORTFOLIO_LAUNCHED_INITIAL);
@@ -567,12 +593,19 @@ export function PortfolioPanel() {
   const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const loadGenerationRef = useRef(0);
   const enrichGenerationRef = useRef(0);
-  const holdingsReadyRef = useRef(false);
-  const isInitialPortfolioLoadRef = useRef(true);
-  const lastEnrichFingerprintRef = useRef("");
+  const holdingsReadyRef = useRef(hasSsrPortfolio);
+  const isInitialPortfolioLoadRef = useRef(!hasSsrPortfolio);
+  const ssrHydratedRef = useRef(hasSsrPortfolio);
+  const lastEnrichFingerprintRef = useRef(
+    hasSsrPortfolio && initialPortfolio ? portfolioFingerprint(initialPortfolio) : ""
+  );
   const bnbUsdForDustRef = useRef<number | null>(null);
-  const loadPortfolioRef = useRef<(wallet: string, limit?: number) => Promise<void>>(async () => {});
-  const portfolioDataRef = useRef<PortfolioData | null>(null);
+  const loadPortfolioRef = useRef<
+    (wallet: string, limit?: number, options?: { silent?: boolean }) => Promise<void>
+  >(async () => {});
+  const portfolioDataRef = useRef<PortfolioData | null>(
+    hasSsrPortfolio ? initialPortfolio : null
+  );
 
   const { connected: wsConnected } = useLiveChannel({
     room: address ? walletRoom(address) : "wallet:disconnected",
@@ -674,12 +707,16 @@ export function PortfolioPanel() {
   });
 
   const loadPortfolio = useCallback(
-    async (walletAddress: string, launchedLimit?: number) => {
+    async (
+      walletAddress: string,
+      launchedLimit?: number,
+      options?: { silent?: boolean }
+    ) => {
       const limit = launchedLimit ?? createdLimitRef.current;
       const generation = ++loadGenerationRef.current;
       const isInitial = isInitialPortfolioLoadRef.current;
 
-      if (isInitial) {
+      if (isInitial && !options?.silent) {
         setLoading(true);
       }
       setError(null);
@@ -703,15 +740,9 @@ export function PortfolioPanel() {
         setData(portfolio);
         isInitialPortfolioLoadRef.current = false;
 
-        const fingerprint = portfolio.positions
-          .map(
-            (position) =>
-              `${position.tokenAddress}:${position.tokenBalance}:${position.lastPriceBnb}`
-          )
-          .join("|");
+        const fingerprint = portfolioFingerprint(portfolio);
         const needsEnrich =
           !holdingsReadyRef.current || fingerprint !== lastEnrichFingerprintRef.current;
-        // First paint should be instant from indexed snapshot; verify on-chain in background.
         if (!holdingsReadyRef.current) {
           holdingsReadyRef.current = true;
           setHoldingsReady(true);
@@ -723,7 +754,7 @@ export function PortfolioPanel() {
       } catch (err) {
         if (generation !== loadGenerationRef.current) return;
 
-        if (isInitial) {
+        if (isInitial && !options?.silent) {
           setData(null);
           setWalletHoldings([]);
           setOnChainBalances({});
@@ -734,7 +765,7 @@ export function PortfolioPanel() {
           setError(err instanceof Error ? err.message : "Failed to load portfolio");
         }
       } finally {
-        if (generation === loadGenerationRef.current) {
+        if (generation === loadGenerationRef.current && !options?.silent) {
           setLoading(false);
         }
       }
@@ -806,10 +837,21 @@ export function PortfolioPanel() {
   }, [address, isConnected]);
 
   useEffect(() => {
+    if (address && isConnected) {
+      writePortfolioWalletCookie(address);
+    }
+  }, [address, isConnected]);
+
+  useEffect(() => {
     if (!isConnected || !address) {
+      if ((isConnecting || isReconnecting) && hasSsrPortfolio) {
+        return;
+      }
+
       loadGenerationRef.current += 1;
       enrichGenerationRef.current += 1;
       isInitialPortfolioLoadRef.current = true;
+      ssrHydratedRef.current = false;
       holdingsReadyRef.current = false;
       lastEnrichFingerprintRef.current = "";
       setData(null);
@@ -825,9 +867,31 @@ export function PortfolioPanel() {
       return;
     }
 
+    const ssrMatch =
+      portfolioMatchesWallet(initialPortfolio, ssrWalletAddress) &&
+      portfolioMatchesWallet(initialPortfolio, address);
+
+    if (ssrMatch && !ssrHydratedRef.current) {
+      ssrHydratedRef.current = true;
+      setData(initialPortfolio);
+      isInitialPortfolioLoadRef.current = false;
+      holdingsReadyRef.current = true;
+      setHoldingsReady(true);
+      setLoading(false);
+      setError(null);
+      void enrichHoldings(address, initialPortfolio!, { silent: true });
+      void loadPortfolio(address, PORTFOLIO_LAUNCHED_INITIAL, { silent: true });
+      return;
+    }
+
+    if (ssrMatch && ssrHydratedRef.current) {
+      return;
+    }
+
     loadGenerationRef.current += 1;
     enrichGenerationRef.current += 1;
     isInitialPortfolioLoadRef.current = true;
+    ssrHydratedRef.current = false;
     holdingsReadyRef.current = false;
     lastEnrichFingerprintRef.current = "";
     setData(null);
@@ -840,7 +904,7 @@ export function PortfolioPanel() {
     setCreatedLimit(PORTFOLIO_LAUNCHED_INITIAL);
     setHoldingsVisibleLimit(PORTFOLIO_HOLDINGS_INITIAL);
     void loadPortfolio(address, PORTFOLIO_LAUNCHED_INITIAL);
-  }, [address, isConnected, loadPortfolio]);
+  }, [address, isConnected, isConnecting, isReconnecting, hasSsrPortfolio, initialPortfolio, ssrWalletAddress, loadPortfolio, enrichHoldings]);
 
   const schedulePoll = useCallback(() => {
     if (!address) return;
@@ -938,7 +1002,15 @@ export function PortfolioPanel() {
     metricsPrevRef.current = { values, total: totalValue, pnl: totalPnl };
   }, [data, onChainBalances, walletHoldings]);
 
-  if (!isConnected || !address) {
+  const walletReconnecting = isConnecting || isReconnecting;
+  const ssrPreview =
+    hasSsrPortfolio && walletReconnecting && !isConnected && Boolean(data);
+
+  if (!isConnected && !ssrPreview) {
+    if (walletReconnecting && hasSsrPortfolio) {
+      return <PortfolioPanelSkeleton />;
+    }
+
     return (
       <div className="panel-surface empty-state">
         <p className="empty-state-copy">
@@ -968,6 +1040,8 @@ export function PortfolioPanel() {
       </div>
     );
   }
+
+  const walletAddress = address ?? ssrWalletAddress ?? data.address;
 
   const verifiedPositionViews =
     data.positions
@@ -1079,7 +1153,7 @@ export function PortfolioPanel() {
       <FollowNetworkModal
         open={followModalOpen}
         onClose={() => setFollowModalOpen(false)}
-        address={address}
+        address={walletAddress}
         initialTab={followModalTab}
       />
 
@@ -1089,9 +1163,9 @@ export function PortfolioPanel() {
         open={sellAllOpen}
         onClose={() => setSellAllOpen(false)}
         holdings={sellAllHoldingsInput}
-        address={address}
+        address={walletAddress}
         onSold={() => {
-          if (address) void loadPortfolio(address);
+          void loadPortfolio(walletAddress);
           window.dispatchEvent(new Event("pump:activity"));
         }}
       />
@@ -1113,7 +1187,7 @@ export function PortfolioPanel() {
           }}
           onTradeConfirmed={() => {
             setQuickTradeTarget(null);
-            if (address) void loadPortfolio(address);
+            if (address) void loadPortfolio(walletAddress);
             window.dispatchEvent(new Event("pump:activity"));
           }}
         />
@@ -1129,7 +1203,7 @@ export function PortfolioPanel() {
                 className="shrink-0 rounded-full transition hover:opacity-90"
                 aria-label="Change avatar"
               >
-                <UserAvatar address={address} avatarId={avatarId} size={48} />
+                <UserAvatar address={walletAddress} avatarId={avatarId} size={48} />
               </button>
             ) : (
               <div className="skeleton-shimmer h-12 w-12 shrink-0 rounded-full md:h-14 md:w-14" />
@@ -1137,7 +1211,7 @@ export function PortfolioPanel() {
             <div className="min-w-0 flex-1">
               <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
                 <p className="financial-value text-body-sm font-semibold text-pump-text md:text-body">
-                  {shortAddress(address)}
+                  {shortAddress(walletAddress)}
                 </p>
                 <button
                   type="button"
@@ -1201,10 +1275,10 @@ export function PortfolioPanel() {
               bnbUsd={bnbUsd}
               onOpenModal={() => setClaimOpen(true)}
             />
-            {address ? (
+            {walletAddress ? (
               <ReferralRewardsCard
                 className="col-span-2 lg:col-span-1"
-                address={address}
+                address={walletAddress}
                 claimedBnb={referralStats?.claimedBnb ?? 0}
                 pendingWei={pendingReferrerWei}
                 bnbUsd={bnbUsd}
@@ -1216,7 +1290,7 @@ export function PortfolioPanel() {
 
         {error ? <div className="notice-error p-4">{error}</div> : null}
 
-        <PortfolioAirdropsSection address={address} />
+        <PortfolioAirdropsSection address={walletAddress} />
 
         {data && !error ? (
           <>
