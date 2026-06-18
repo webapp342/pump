@@ -7,26 +7,24 @@ export async function POST(request: Request) {
     const body = (await request.json()) as {
       address?: string;
       creatorAddress?: string;
-      tokenAddress?: string;
     };
 
     const address = normalizeAddressParam(body.address);
-    const creatorAddress = normalizeAddressParam(body.creatorAddress);
-    const tokenAddress = normalizeAddressParam(body.tokenAddress);
+    const followeeAddress = normalizeAddressParam(body.creatorAddress);
 
-    if (!address || !creatorAddress) {
+    if (!address || !followeeAddress) {
       return NextResponse.json(
         { error: "Valid address and creatorAddress are required" },
         { status: 400 }
       );
     }
 
-    const following = await toggleCreatorFollow(address, creatorAddress, tokenAddress);
+    const following = await toggleCreatorFollow(address, followeeAddress);
     return NextResponse.json({ data: { following } });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
     const status =
-      message === "Creator not found" || message === "Cannot follow yourself" ? 400 : 500;
+      message === "User not found" || message === "Cannot follow yourself" ? 400 : 500;
     return NextResponse.json({ error: message }, { status });
   }
 }

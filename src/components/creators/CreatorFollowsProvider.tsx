@@ -14,15 +14,10 @@ import { normalizeAddressParam } from "@/lib/address";
 import { useOpenConnectModal } from "@/hooks/useOpenConnectModal";
 import { useAccount } from "wagmi";
 
-type CreatorFollowOptions = {
-  /** Token page context — verifies creator against this token row if needed. */
-  tokenAddress?: string;
-};
-
 type CreatorFollowsContextValue = {
   follows: Set<string>;
   isFollowing: (creatorAddress: string) => boolean;
-  toggleFollow: (creatorAddress: string, options?: CreatorFollowOptions) => void;
+  toggleFollow: (followeeAddress: string) => void;
   loading: boolean;
 };
 
@@ -85,19 +80,18 @@ export function CreatorFollowsProvider({ children }: { children: React.ReactNode
   );
 
   const toggleFollow = useCallback(
-    (creatorAddress: string, options?: CreatorFollowOptions) => {
+    (followeeAddress: string) => {
       if (!isConnected || !address) {
         if (openConnectModal) openConnectModal();
         return;
       }
 
       const follower = normalizeAddressParam(address);
-      const creator = normalizeAddressParam(creatorAddress);
-      const tokenAddress = normalizeAddressParam(options?.tokenAddress);
-      if (!follower || !creator) return;
-      if (creator === follower) return;
+      const followee = normalizeAddressParam(followeeAddress);
+      if (!follower || !followee) return;
+      if (followee === follower) return;
 
-      const key = creator;
+      const key = followee;
       if (pendingRef.current.has(key)) return;
 
       const wasFollowing = follows.has(key);
@@ -117,8 +111,7 @@ export function CreatorFollowsProvider({ children }: { children: React.ReactNode
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               address: follower,
-              creatorAddress: creator,
-              tokenAddress: tokenAddress ?? undefined,
+              creatorAddress: followee,
             }),
           });
           const body = (await response.json()) as { data?: { following?: boolean }; error?: string };

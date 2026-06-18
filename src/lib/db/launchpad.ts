@@ -1952,59 +1952,74 @@ export async function listFollowedCreatorAddresses(userAddress: string): Promise
 
 export async function toggleCreatorFollow(
   followerAddress: string,
-  creatorAddress: string,
-  tokenAddress?: string | null
+  followeeAddress: string
 ): Promise<boolean> {
   const db = getLaunchpadWritePool();
   const follower = followerAddress.toLowerCase();
-  const creator = creatorAddress.toLowerCase();
+  const followee = followeeAddress.toLowerCase();
 
-  if (follower === creator) {
+  if (follower === followee) {
     throw new Error("Cannot follow yourself");
   }
 
+  await ensureLaunchpadUser(db, follower);
+
   const existing = await db.query(
     `SELECT 1 FROM creator_follows WHERE follower_address = $1 AND creator_address = $2`,
-    [follower, creator]
+    [follower, followee]
   );
 
   if (existing.rows.length > 0) {
     await db.query(
       `DELETE FROM creator_follows WHERE follower_address = $1 AND creator_address = $2`,
-      [follower, creator]
+      [follower, followee]
     );
     return false;
   }
 
-  await assertFollowableCreator(db, creator, tokenAddress);
+  await assertFollowableUser(db, followee);
 
   await db.query(
     `INSERT INTO creator_follows (follower_address, creator_address) VALUES ($1, $2)`,
-    [follower, creator]
+    [follower, followee]
   );
   return true;
 }
 
-async function assertFollowableCreator(
+async function ensureLaunchpadUser(
   db: ReturnType<typeof getLaunchpadWritePool>,
-  creator: string,
-  tokenAddress?: string | null
+  address: string
 ): Promise<void> {
-  const byCreator = await db.query(
-    `SELECT 1 FROM tokens WHERE creator_address = $1 LIMIT 1`,
-    [creator]
-  );
-  if (byCreator.rows.length > 0) return;
+  await db.query(`SELECT launchpad_ensure_user($1)`, [address]);
+}
 
-  if (tokenAddress) {
-    const viaToken = await db.query<{ creator_address: string }>(
-      `SELECT creator_address FROM tokens WHERE address = $1 LIMIT 1`,
-      [tokenAddress.toLowerCase()]
-    );
-    if (viaToken.rows[0]?.creator_address?.toLowerCase() === creator) return;
+/** Any registered user or platform participant (trader, holder, creator) may be followed. */
+async function assertFollowableUser(
+  db: ReturnType<typeof getLaunchpadWritePool>,
+  targetAddress: string
+): Promise<void> {
+  const registered = await db.query(`SELECT 1 FROM users WHERE address = $1`, [targetAddress]);
+  if (registered.rows.length > 0) return;
+
+  const footprint = await db.query(
+    `
+    SELECT 1 AS ok FROM (
+      SELECT 1 FROM tokens WHERE creator_address = $1
+      UNION ALL
+      SELECT 1 FROM trades WHERE trader_address = $1
+      UNION ALL
+      SELECT 1 FROM user_positions WHERE address = $1
+    ) s
+    LIMIT 1
+    `,
+    [targetAddress]
+  );
+
+  if (footprint.rows.length === 0) {
+    throw new Error("User not found");
   }
 
-  throw new Error("Creator not found");
+  await ensureLaunchpadUser(db, targetAddress);
 }
 
 export async function getCreatorCardData(
