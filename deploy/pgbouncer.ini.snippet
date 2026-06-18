@@ -1,0 +1,26 @@
+;; PgBouncer — transaction pooling for Next.js + indexer (single VM)
+;; Install: apt install pgbouncer
+;; Copy to /etc/pgbouncer/pgbouncer.ini and adjust auth + users.
+
+[databases]
+pump_db = host=127.0.0.1 port=5432 dbname=pump_db
+
+[pgbouncer]
+listen_addr = 127.0.0.1
+listen_port = 6432
+auth_type = scram-sha-256
+auth_file = /etc/pgbouncer/userlist.txt
+pool_mode = transaction
+max_client_conn = 200
+default_pool_size = 20
+min_pool_size = 5
+reserve_pool_size = 5
+server_reset_query = DISCARD ALL
+ignore_startup_parameters = extra_float_digits,search_path
+max_prepared_statements = 0
+
+;; App connection strings (after PgBouncer is live):
+;; LAUNCHPAD_DATABASE_URL=postgres://pump_app:PASS@127.0.0.1:6432/pump_db
+;; LAUNCHPAD_DATABASE_READ_URL=postgres://pump_app:PASS@127.0.0.1:6432/pump_db
+;; PGBOUNCER_ENABLED=true
+;; PG_POOL_MAX=4

@@ -1,4 +1,4 @@
-import { createPublicClient, fallback, http, parseEventLogs, type Address, type Log } from "viem";
+import { createPublicClient, fallback, http, webSocket, parseEventLogs, type Address, type Log } from "viem";
 import { config } from "./config.js";
 import {
   closePools,
@@ -24,12 +24,26 @@ type IndexedContract = {
 };
 
 const pools = createPools(config.launchpadDatabaseUrl, config.vm1MainDatabaseUrl);
-const publicClient = createPublicClient({
-  transport:
-    config.rpcUrls.length > 1
-      ? fallback(config.rpcUrls.map((url) => http(url, { timeout: 30_000 })))
-      : http(config.rpcUrl, { timeout: 30_000 })
-});
+
+function createChainClient() {
+  if (config.useWsBlocks && config.wsRpcUrl) {
+    return createPublicClient({
+      transport: webSocket(config.wsRpcUrl, {
+        timeout: 30_000,
+        reconnect: true,
+      }),
+    });
+  }
+
+  return createPublicClient({
+    transport:
+      config.rpcUrls.length > 1
+        ? fallback(config.rpcUrls.map((url) => http(url, { timeout: 30_000 })))
+        : http(config.rpcUrl, { timeout: 30_000 }),
+  });
+}
+
+const publicClient = createChainClient();
 
 const LOG_FETCH_MAX_RETRIES = 6;
 const LOG_FETCH_BASE_DELAY_MS = 1_500;
@@ -60,11 +74,23 @@ async function main(): Promise<void> {
   });
 
   console.log(
-    `launchpad indexer ready: chain=${config.chainId}, rpc=${config.rpcUrls.join(" | ")}, airdrop=${registry.pumpAirdropManager ?? "disabled"}, contracts=${contracts
+    `launchpad indexer ready: chain=${config.chainId}, rpc=${config.rpcUrls.join(" | ")}, mode=${config.useWsBlocks && config.wsRpcUrl ? `watchBlocks(${config.wsRpcUrl})` : "poll"}, airdrop=${registry.pumpAirdropManager ?? "disabled"}, contracts=${contracts
       .map((contract) => contract.address)
       .join(", ")}`
   );
 
+  if (config.useWsBlocks && config.wsRpcUrl) {
+    await runWatchBlocksLoop(contracts, handlers);
+    return;
+  }
+
+  await runPollLoop(contracts, handlers);
+}
+
+async function runPollLoop(
+  contracts: IndexedContract[],
+  handlers: LaunchpadEventHandlers
+): Promise<void> {
   while (!shuttingDown) {
     const fromBlock = await getIndexerStartBlock(pools.launchpad, config.stateKey, config.startBlock);
     const latestBlock = await publicClient.getBlockNumber();
@@ -85,6 +111,73 @@ async function main(): Promise<void> {
 
     if (config.once) break;
   }
+}
+
+async function runWatchBlocksLoop(
+  contracts: IndexedContract[],
+  handlers: LaunchpadEventHandlers
+): Promise<void> {
+  await catchUpToSafeHead(contracts, handlers);
+
+  if (config.once) return;
+
+  return new Promise<void>((resolve) => {
+    let processing = false;
+
+    const unwatch = publicClient.watchBlocks({
+      onBlock: (block) => {
+        if (shuttingDown) {
+          unwatch();
+          resolve();
+          return;
+        }
+        if (processing) return;
+
+        processing = true;
+        void (async () => {
+          try {
+            await indexThroughSafeBlock(contracts, handlers, block.number);
+          } catch (error) {
+            console.error("watchBlocks index error:", error);
+          } finally {
+            processing = false;
+          }
+        })();
+      },
+      onError: (error) => {
+        console.warn("watchBlocks error:", error);
+      },
+    });
+  });
+}
+
+async function catchUpToSafeHead(
+  contracts: IndexedContract[],
+  handlers: LaunchpadEventHandlers
+): Promise<void> {
+  while (!shuttingDown) {
+    const latestBlock = await publicClient.getBlockNumber();
+    const hasMore = await indexThroughSafeBlock(contracts, handlers, latestBlock);
+    if (!hasMore) break;
+  }
+}
+
+async function indexThroughSafeBlock(
+  contracts: IndexedContract[],
+  handlers: LaunchpadEventHandlers,
+  latestBlock: bigint
+): Promise<boolean> {
+  const fromBlock = await getIndexerStartBlock(pools.launchpad, config.stateKey, config.startBlock);
+  const safeBlock = latestBlock > config.confirmations ? latestBlock - config.confirmations : 0n;
+
+  if (fromBlock > safeBlock) return false;
+
+  const toBlock = minBigInt(safeBlock, fromBlock + config.chunkSize - 1n);
+  await processRangeAdaptive(contracts, handlers, fromBlock, toBlock);
+  await updateIndexerState(pools.launchpad, config.stateKey, toBlock);
+  scheduleMvRefresh(pools.launchpad);
+  console.log(`indexed blocks ${fromBlock.toString()}-${toBlock.toString()}`);
+  return toBlock < safeBlock;
 }
 
 async function processRangeAdaptive(

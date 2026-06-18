@@ -13,6 +13,7 @@ import { publishTrade, publishWalletTrade } from "./redis-publish.js";
 import {
   incrementalBoardStatsEnabled,
   marketCapZugFromSpot,
+  readBoardStatsForPublish,
   seedBoardStatsOnTokenCreated,
   upsertBoardStatsAfterTrade,
 } from "./board-stats.js";
@@ -354,6 +355,8 @@ export class LaunchpadEventHandlers {
     await this.awardTradeMissions(token, trader, isBuy, zugAmount, tradeEventId, txHash, blockTime);
     await recomputeKingAfterTrade(this.context, blockTime, txHash, token);
 
+    const boardStats = await readBoardStatsForPublish(this.context.launchpadPool, token);
+
     await publishTrade({
       type: "trade",
       tokenAddress: token,
@@ -376,6 +379,8 @@ export class LaunchpadEventHandlers {
         progressBps: tradeResult.bonding.progress_bps,
         tradeCount: tradeResult.bonding.trade_count,
         holderCount: tradeResult.bonding.holder_count,
+        volume24hZug: boardStats?.volume24hZug,
+        traders24h: boardStats?.traders24h,
       },
     });
 

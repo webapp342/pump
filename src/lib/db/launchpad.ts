@@ -1,4 +1,5 @@
 import { Pool } from "pg";
+import { getLaunchpadReadPool, getLaunchpadWritePool } from "@/lib/db/pool";
 import { parseSocialLinksFromDb, type TokenSocialLinks } from "@/lib/token-social";
 import { useBondingStateCounts, useMvTokenStats, useTokenBoardStats } from "@/lib/db/perf-flags";
 import {
@@ -6,8 +7,6 @@ import {
   BONDING_VIRTUAL_BNB_HUMAN,
   spotPriceBnbFromBondingDecimals,
 } from "@/lib/bonding-curve";
-
-let pool: Pool | null = null;
 
 /** SQL: marginal spot from bonding_state reserves (human units). */
 const SQL_BONDING_MARK_PRICE_ZUG = `
@@ -33,20 +32,7 @@ function resolvePositionMarkPriceBnb(
 }
 
 export function getLaunchpadPool(): Pool {
-  const url = process.env.LAUNCHPAD_DATABASE_URL;
-  if (!url) {
-    throw new Error("LAUNCHPAD_DATABASE_URL is required");
-  }
-
-  if (!pool) {
-    pool = new Pool({
-      connectionString: url,
-      max: 8,
-      idleTimeoutMillis: 30_000,
-    });
-  }
-
-  return pool;
+  return getLaunchpadWritePool();
 }
 
 export type TokenListItem = {
@@ -572,7 +558,7 @@ export async function listArenaBoardTokens(
     LIMIT $1 OFFSET $2
   `;
 
-  const db = getLaunchpadPool();
+  const db = getLaunchpadReadPool();
   const queryParams =
     filterParams.length > 0 ? [limit, offset, filterParams] : [limit, offset];
   const result = await db.query<TokenListQueryRow>(sql, queryParams);
@@ -606,14 +592,14 @@ export async function listTokenListItemsByAddresses(
         AND LOWER(t.address) = ANY($1::text[])
     `;
 
-  const db = getLaunchpadPool();
+  const db = getLaunchpadReadPool();
   const sql = `${buildTokenListSelectSql(baseInner)} ORDER BY bt.created_at DESC`;
   const result = await db.query<TokenListQueryRow>(sql, [normalized]);
   return result.rows.map(mapTokenListRow);
 }
 
 async function countKothContenders(): Promise<number> {
-  const db = getLaunchpadPool();
+  const db = getLaunchpadReadPool();
   const result = await db.query<{ count: string }>(
     `
       SELECT COUNT(*)::text AS count
@@ -683,7 +669,7 @@ export async function listTokensPaginated(
   const limit = options.limit ?? 50;
   const offset = options.offset ?? 0;
   const sort = options.sort ?? "age";
-  const db = getLaunchpadPool();
+  const db = getLaunchpadReadPool();
   const sql = buildTokenListSql(
     ARENA_TOKEN_BASE_INNER,
     `${arenaListOrderBy(sort)} LIMIT $1 OFFSET $2`
@@ -702,7 +688,7 @@ export async function listTopTokensByMcap(limit = 20): Promise<TokenListItem[]> 
 }
 
 export async function countVisibleTokens(): Promise<number> {
-  const db = getLaunchpadPool();
+  const db = getLaunchpadReadPool();
   const result = await db.query<{ count: string }>(
     `SELECT COUNT(*)::text AS count FROM tokens WHERE is_hidden = false`
   );
@@ -712,7 +698,7 @@ export async function countVisibleTokens(): Promise<number> {
 export async function getArenaFilterCounts(
   airdropAddresses: string[] = []
 ): Promise<ArenaFilterCounts> {
-  const db = getLaunchpadPool();
+  const db = getLaunchpadReadPool();
   const normalizedAirdrops = airdropAddresses.map((address) => address.toLowerCase());
   const total = await countVisibleTokens();
   const kothContenders = await countKothContenders();
@@ -825,7 +811,7 @@ export async function listTokensByCreator(
   limit?: number,
   offset = 0
 ): Promise<TokenListItem[]> {
-  const db = getLaunchpadPool();
+  const db = getLaunchpadReadPool();
   const normalized = creatorAddress.toLowerCase();
   let orderBy = limit ? "ORDER BY bt.created_at DESC LIMIT $2" : "ORDER BY bt.created_at DESC";
   const params: (string | number)[] = [normalized];
@@ -862,7 +848,7 @@ export async function listTokensByCreator(
 }
 
 export async function countTokensByCreator(creatorAddress: string): Promise<number> {
-  const db = getLaunchpadPool();
+  const db = getLaunchpadReadPool();
   const normalized = creatorAddress.toLowerCase();
   const result = await db.query<{ count: number }>(
     `
@@ -877,7 +863,7 @@ export async function countTokensByCreator(creatorAddress: string): Promise<numb
 }
 
 export async function getKothSummary(limit = 5): Promise<KothSummary | null> {
-  const db = getLaunchpadPool();
+  const db = getLaunchpadReadPool();
 
   try {
     const [activeResult, recentResult] = await Promise.all([
@@ -944,7 +930,7 @@ export async function getKothSummary(limit = 5): Promise<KothSummary | null> {
 
 /** Persist logo URL after R2 upload (no-op if token row not indexed yet). */
 export async function setTokenLogoUrl(address: string, logoUrl: string): Promise<void> {
-  const db = getLaunchpadPool();
+  const db = getLaunchpadWritePool();
   const normalized = address.toLowerCase();
   const storedUrl = logoUrl.split("?")[0];
 
@@ -991,7 +977,7 @@ export async function upsertTokenMetadata(input: {
   description: string | null;
   socialLinks: TokenSocialLinks;
 }): Promise<void> {
-  const db = getLaunchpadPool();
+  const db = getLaunchpadWritePool();
   const normalized = input.address.toLowerCase();
 
   await db.query(
@@ -1054,7 +1040,7 @@ export type TokenHolderSnapshot = {
 };
 
 export async function getTokenByAddress(address: string): Promise<TokenDetail | null> {
-  const db = getLaunchpadPool();
+  const db = getLaunchpadReadPool();
   const normalized = address.toLowerCase();
 
   const result = await db.query<{
@@ -1140,7 +1126,7 @@ export async function getTokenByAddress(address: string): Promise<TokenDetail | 
 }
 
 export async function listTradesForToken(address: string, limit = 20): Promise<TradeItem[]> {
-  const db = getLaunchpadPool();
+  const db = getLaunchpadReadPool();
   const result = await db.query<{
     id: string;
     side: string;
@@ -1194,7 +1180,7 @@ export async function listTokenHolders(
   tokenAddress: string,
   limit = 200
 ): Promise<TokenHolderSnapshot[]> {
-  const db = getLaunchpadPool();
+  const db = getLaunchpadReadPool();
   const normalized = tokenAddress.toLowerCase();
   const result = await db.query<{
     address: string;
@@ -1233,7 +1219,7 @@ export async function listTokenHolders(
 
 /** All bonding trades for chart (ascending time). */
 export async function listTradesForChart(address: string, limit = 5000): Promise<TradeItem[]> {
-  const db = getLaunchpadPool();
+  const db = getLaunchpadReadPool();
   const result = await db.query<{
     id: string;
     side: string;
@@ -1299,7 +1285,7 @@ export async function listTradesForChart(address: string, limit = 5000): Promise
 }
 
 export async function getUserVolumeBnb(address: string): Promise<number> {
-  const db = getLaunchpadPool();
+  const db = getLaunchpadReadPool();
   const result = await db.query<{ total_volume_zug: string | null }>(
     "SELECT total_volume_zug::text FROM user_volumes WHERE address = $1",
     [address.toLowerCase()]
@@ -1322,7 +1308,7 @@ export type FirstSmartBuyTrade = {
 export async function getFirstSmartBuyQualifyingTrade(
   traderAddress: string
 ): Promise<FirstSmartBuyTrade | null> {
-  const db = getLaunchpadPool();
+  const db = getLaunchpadReadPool();
   const normalized = traderAddress.toLowerCase();
 
   const result = await db.query<{
@@ -1414,7 +1400,7 @@ export type CreatorFeeClaimRow = {
 };
 
 export async function getCreatorFeesClaimedBnb(address: string): Promise<number> {
-  const db = getLaunchpadPool();
+  const db = getLaunchpadReadPool();
   const result = await db.query<{ total: string | null }>(
     `
     SELECT COALESCE(SUM(amount_bnb), 0)::text AS total
@@ -1431,7 +1417,7 @@ export async function listCreatorFeeClaims(
   address: string,
   limit = 20
 ): Promise<CreatorFeeClaimRow[]> {
-  const db = getLaunchpadPool();
+  const db = getLaunchpadReadPool();
   const result = await db.query<{
     amount_bnb: string;
     tx_hash: string;
@@ -1462,10 +1448,10 @@ export async function recordCreatorFeeClaim(input: {
   blockNumber: string;
   blockTime: Date;
 }): Promise<void> {
-  const db = getLaunchpadPool();
+  const db = getLaunchpadWritePool();
   await db.query(
     `
-    INSERT INTO creator_fee_claims (
+      INSERT INTO creator_fee_claims (
       creator_address,
       amount_bnb,
       tx_hash,
@@ -1494,7 +1480,7 @@ export type ReferralStats = {
 };
 
 export async function getReferralStats(address: string): Promise<ReferralStats> {
-  const db = getLaunchpadPool();
+  const db = getLaunchpadReadPool();
   const normalized = address.toLowerCase();
 
   const result = await db.query<{
@@ -1544,10 +1530,10 @@ export async function recordReferrerFeeClaim(input: {
   blockNumber: string;
   blockTime: Date;
 }): Promise<void> {
-  const db = getLaunchpadPool();
+  const db = getLaunchpadWritePool();
   await db.query(
     `
-    INSERT INTO referrer_fee_claims (
+      INSERT INTO referrer_fee_claims (
       referrer_address,
       amount_bnb,
       tx_hash,
@@ -1584,7 +1570,7 @@ export type LaunchpadTokenWalletCatalogEntry = {
 export async function listLaunchpadTokensForWalletBalance(): Promise<
   LaunchpadTokenWalletCatalogEntry[]
 > {
-  const db = getLaunchpadPool();
+  const db = getLaunchpadReadPool();
   const result = await db.query<{
     address: string;
     symbol: string;
@@ -1619,7 +1605,7 @@ export async function listLaunchpadTokensByCreatorForWalletBalance(
   creatorAddress: string,
   limit?: number
 ): Promise<LaunchpadTokenWalletCatalogEntry[]> {
-  const db = getLaunchpadPool();
+  const db = getLaunchpadReadPool();
   const normalized = creatorAddress.toLowerCase();
   const cappedLimit =
     limit != null && Number.isFinite(limit) && limit > 0 ? Math.floor(limit) : null;
@@ -1682,7 +1668,7 @@ export async function getPortfolioForAddress(
   address: string,
   options?: { createdLimit?: number }
 ): Promise<PortfolioSnapshot> {
-  const db = getLaunchpadPool();
+  const db = getLaunchpadReadPool();
   const normalized = address.toLowerCase();
   const createdLimit = options?.createdLimit;
 
@@ -1816,7 +1802,7 @@ export async function getCreatorFollowNetwork(
   address: string,
   limit = 100
 ): Promise<CreatorFollowNetwork> {
-  const db = getLaunchpadPool();
+  const db = getLaunchpadReadPool();
   const normalized = address.toLowerCase();
 
   const [countsResult, followingResult, followersResult] = await Promise.all([
@@ -1893,7 +1879,7 @@ export async function getCreatorFollowNetwork(
 }
 
 export async function listFavoriteTokenAddresses(userAddress: string): Promise<string[]> {
-  const db = getLaunchpadPool();
+  const db = getLaunchpadReadPool();
   const normalized = userAddress.toLowerCase();
   const result = await db.query<{ token_address: string }>(
     `
@@ -1912,7 +1898,7 @@ export async function toggleTokenFavorite(
   userAddress: string,
   tokenAddress: string
 ): Promise<boolean> {
-  const db = getLaunchpadPool();
+  const db = getLaunchpadWritePool();
   const user = userAddress.toLowerCase();
   const token = tokenAddress.toLowerCase();
 
@@ -1949,7 +1935,7 @@ export type CreatorCardData = {
 };
 
 export async function listFollowedCreatorAddresses(userAddress: string): Promise<string[]> {
-  const db = getLaunchpadPool();
+  const db = getLaunchpadReadPool();
   const normalized = userAddress.toLowerCase();
   const result = await db.query<{ creator_address: string }>(
     `
@@ -1968,7 +1954,7 @@ export async function toggleCreatorFollow(
   followerAddress: string,
   creatorAddress: string
 ): Promise<boolean> {
-  const db = getLaunchpadPool();
+  const db = getLaunchpadWritePool();
   const follower = followerAddress.toLowerCase();
   const creator = creatorAddress.toLowerCase();
 
@@ -2007,7 +1993,7 @@ export async function getCreatorCardData(
   tokenAddress: string,
   viewerAddress?: string | null
 ): Promise<CreatorCardData | null> {
-  const db = getLaunchpadPool();
+  const db = getLaunchpadReadPool();
   const token = tokenAddress.toLowerCase();
   const viewer = viewerAddress?.toLowerCase() ?? null;
 
@@ -2086,7 +2072,7 @@ export type CreatorProfile = {
 };
 
 export async function getCreatorProfile(address: string): Promise<CreatorProfile> {
-  const db = getLaunchpadPool();
+  const db = getLaunchpadReadPool();
   const normalized = address.toLowerCase();
 
   const [countsResult, volumeResult, createdResult, otherHoldingsResult, creatorFeesClaimedBnb] =

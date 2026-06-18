@@ -15,6 +15,8 @@ export type IndexerConfig = {
   mvRefreshEnabled: boolean;
   redisPublishEnabled: boolean;
   redisUrl?: string;
+  useWsBlocks: boolean;
+  wsRpcUrl?: string;
 };
 
 function required(name: string): string {
@@ -78,4 +80,6 @@ export const config: IndexerConfig = {
   mvRefreshEnabled: booleanFlag("MV_REFRESH_ENABLED", false),
   redisPublishEnabled: booleanFlag("REDIS_PUBLISH_ENABLED", false),
   redisUrl: optional("REDIS_URL"),
+  useWsBlocks: booleanFlag("INDEXER_USE_WS_BLOCKS", false),
+  wsRpcUrl: optional("BSC_WS_URL") ?? optional("ZUGCHAIN_WS_URL"),
 };

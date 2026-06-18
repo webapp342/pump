@@ -12,9 +12,12 @@ export type ArenaTradeWsPayload = {
     tokenSold?: string;
     marketCapZug?: string;
     lastPriceZug?: string;
+    spotPriceZug?: string;
     progressBps?: number;
     tradeCount?: number;
     holderCount?: number;
+    volume24hZug?: string;
+    traders24h?: number;
   };
 };
 
@@ -98,6 +101,8 @@ export function patchTokenFromArenaTrade(
     marketCapBnb: nextMcap,
     tradeCount: bonding.tradeCount ?? token.tradeCount,
     holderCount: bonding.holderCount ?? token.holderCount,
+    volume24hBnb: bonding.volume24hZug ?? token.volume24hBnb,
+    traders24h: bonding.traders24h ?? token.traders24h,
   };
 }
 

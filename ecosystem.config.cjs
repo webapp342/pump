@@ -1,5 +1,5 @@
 /**
- * PM2 — pump-tma + pump-realtime
+ * PM2 — pump-tma + pump-realtime (Tier 3: 2× cluster workers each)
  *
  *   pm2 start ecosystem.config.cjs
  *   pm2 save
@@ -10,6 +10,8 @@ module.exports = {
       name: "pump-tma",
       cwd: "/var/www/pump/tma/.next/standalone",
       script: "server.js",
+      exec_mode: "cluster",
+      instances: 2,
       env: {
         NODE_ENV: "production",
         PORT: "3012",
@@ -18,12 +20,13 @@ module.exports = {
       env_file: "/var/www/pump/tma/.env",
       autorestart: true,
       max_memory_restart: "512M",
-      instances: 1,
     },
     {
       name: "pump-realtime",
       cwd: "/var/www/pump/tma/realtime",
       script: "dist/server.js",
+      exec_mode: "cluster",
+      instances: 2,
       env: {
         NODE_ENV: "production",
         PORT: "3013",
@@ -32,7 +35,6 @@ module.exports = {
       env_file: "/var/www/pump/tma/realtime/.env",
       autorestart: true,
       max_memory_restart: "256M",
-      instances: 1,
     },
   ],
 };

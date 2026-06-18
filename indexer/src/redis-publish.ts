@@ -51,6 +51,7 @@ export type TradePublishPayload = {
     tradeCount: number;
     holderCount: number;
     volume24hZug?: string;
+    traders24h?: number;
   };
 };
 

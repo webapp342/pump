@@ -44,13 +44,24 @@ Redis Pub/Sub → pump-realtime → Browser WS rooms → delta patches
 - Arena chip filter cache + skeleton (flash fix)
 - User bootstrap (4→1 API)
 
-### Kritik eksikler (Tier 3+)
+### Kritik eksikler (Tier 4+)
 
 | Eksik | Etki |
 |-------|------|
-| TanStack Query standard | Liste geçişlerinde stale flash |
-| Enriched WS trade payload | Client-side recompute |
-| Horizontal WS scale | Tek VM fan-out limiti |
+| Horizontal multi-VM split | >2000 WS / >200 trade/s |
+| Rocicorp Zero | Favorites/portfolio 0ms reads |
+| Client bonding curve state machine | Offline quote preview |
+
+### Tier 3 tamamlananlar ✅
+
+| Yetenek | Durum |
+|---------|-------|
+| Read replica routing | ✅ `pool.ts` + arena SELECT path |
+| PgBouncer-ready pools | ✅ `PGBOUNCER_ENABLED` + low `PG_POOL_MAX` |
+| PM2 cluster 2×2 | ✅ Next + realtime |
+| Indexer `watchBlocks` | ✅ opt-in WS newHeads |
+| Enriched WS (`volume24h`, `traders24h`) | ✅ indexer → arena delta |
+| TanStack Query arena board | ✅ `fetchQuery` + hooks |
 
 ### Tier 2 tamamlananlar ✅
 
@@ -149,19 +160,20 @@ Redis Pub/Sub → pump-realtime → Browser WS rooms → delta patches
 | 6 | WS seq + Redis Streams replay | ✅ |
 | 7 | rAF patch coalescing (arena/token) | ✅ |
 | 8 | Per-token Redis snapshot | ✅ |
-| 9 | Enriched WS trade payload | ⏳ spotPriceZug alias only |
+| 9 | Enriched WS trade payload | ✅ volume24h + traders24h |
 | 10 | `price_accuracy_violation` metrics | ✅ |
-| 11 | TanStack Query standard (keepPreviousData) | ⏳ Tier 3 |
+| 11 | TanStack Query standard (keepPreviousData) | ✅ |
 
-### Tier 3 — Ölçek (2–4 ay)
+### Tier 3 — Ölçek (2–4 ay) ✅ kod hazır (VM deploy gerekir)
 
-| # | İş |
-|---|-----|
-| 12 | PgBouncer transaction mode |
-| 13 | PG tuning + partial index audit |
-| 14 | PM2: 2× realtime + 2× Next + nginx |
-| 15 | Read replica (arena read-only) |
-| 16 | Indexer: eth_subscribe logs |
+| # | İş | Durum |
+|---|-----|-------|
+| 11 | TanStack Query (`keepPreviousData` + arena cache) | ✅ |
+| 12 | PgBouncer transaction mode | ✅ snippet + phase-5 script |
+| 13 | PG tuning + partial index audit | ✅ `012_tier3_scale_indexes.sql` |
+| 14 | PM2: 2× realtime + 2× Next | ✅ `ecosystem.config.cjs` cluster |
+| 15 | Read replica (arena read-only) | ✅ `LAUNCHPAD_DATABASE_READ_URL` |
+| 16 | Indexer: `watchBlocks` (eth_subscribe heads) | ✅ `INDEXER_USE_WS_BLOCKS` |
 
 ### Tier 4 — Cesur yenilikler
 

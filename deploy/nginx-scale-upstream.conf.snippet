@@ -1,0 +1,18 @@
+# Tier 3 — nginx upstream (optional when not using PM2 cluster on shared ports)
+# Include inside http { } or merge into deploy/nginx-pump.conf
+
+upstream pump_tma {
+    least_conn;
+    server 127.0.0.1:3012;
+    keepalive 32;
+}
+
+upstream pump_realtime {
+    ip_hash;
+    server 127.0.0.1:3013;
+    keepalive 16;
+}
+
+# Replace proxy_pass targets:
+#   location /     { proxy_pass http://pump_tma; ... }
+#   location /ws   { proxy_pass http://pump_realtime; ... }

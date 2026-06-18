@@ -234,6 +234,30 @@ export function marketCapZugFromSpot(spotPriceZug: string | number): string {
   return String(spot * TOKEN_SUPPLY);
 }
 
+export async function readBoardStatsForPublish(
+  db: PgQueryable,
+  tokenAddress: string
+): Promise<{ volume24hZug: string; traders24h: number } | null> {
+  if (!incrementalBoardStatsEnabled()) return null;
+
+  const result = await db.query<{ volume_24h_zug: string; traders_24h: number }>(
+    `
+      SELECT volume_24h_zug::text, traders_24h
+      FROM token_board_stats
+      WHERE token_address = $1
+    `,
+    [tokenAddress.toLowerCase()]
+  );
+
+  const row = result.rows[0];
+  if (!row) return null;
+
+  return {
+    volume24hZug: row.volume_24h_zug,
+    traders24h: row.traders_24h,
+  };
+}
+
 function isWithinLast24Hours(blockTime: Date): boolean {
   return blockTime.getTime() >= Date.now() - 24 * 60 * 60 * 1000;
 }

@@ -62,6 +62,12 @@ import {
 import type { ArenaTradeWsPayload } from "@/lib/arena-live-delta";
 import { patchArenaTokenList } from "@/lib/arena-live-delta";
 import type { AirdropListItem } from "@/lib/db/airdrops";
+import { useQueryClient } from "@tanstack/react-query";
+import {
+  arenaBoardQueryKey,
+  fetchArenaBoard,
+  type ArenaBoardQueryParams,
+} from "@/lib/arena-client-api";
 import type { ArenaHomePayload } from "@/lib/arena-server";
 
 const ARENA_FILTER_ITEMS = [
@@ -355,6 +361,7 @@ export function ArenaListClient({
 }: {
   initialPayload?: ArenaHomePayload | null;
 }) {
+  const queryClient = useQueryClient();
   const initialBoardKey = initialPayload
     ? boardCacheKey("new", "age", "desc", "")
     : "";
@@ -711,24 +718,22 @@ export function ArenaListClient({
         setBoardRefreshing(true);
       }
       try {
-        const response = await fetch(buildTokensUrl(limit), { cache: "no-store" });
-        const body = (await response.json()) as {
-          data?: TokenListItem[];
-          topByMcap?: TokenListItem[];
-          koth?: KothSummary | null;
-          meta?: {
-            total: number;
-            limit: number;
-            hasMore: boolean;
-            filterCounts: ArenaFilterCounts;
-          };
-          bnbUsd?: number | null;
-          error?: string;
+        const boardParams: ArenaBoardQueryParams = {
+          limit,
+          sortKey: apiSortKey,
+          sortDir: apiSortDir,
+          filter: activeFilter === "favorites" ? "all" : activeFilter,
+          airdropAddresses:
+            activeFilter === "hasAirdrop" && airdropTokenAddresses.size > 0
+              ? [...airdropTokenAddresses]
+              : undefined,
         };
 
-        if (!response.ok) {
-          throw new Error(body.error ?? "Failed to load tokens");
-        }
+        const body = await queryClient.fetchQuery({
+          queryKey: arenaBoardQueryKey(boardParams),
+          queryFn: () => fetchArenaBoard(boardParams),
+          staleTime: 2_000,
+        });
 
         if (requestBoardKey !== currentBoardKeyRef.current) {
           return;
@@ -787,7 +792,7 @@ export function ArenaListClient({
         setBoardRefreshing(false);
       }
     },
-    [buildTokensUrl, getComparableValues, triggerFlash, currentBoardKey]
+    [queryClient, apiSortKey, apiSortDir, activeFilter, airdropTokenAddresses, getComparableValues, triggerFlash, currentBoardKey]
   );
 
   tokensRef.current = tokens;

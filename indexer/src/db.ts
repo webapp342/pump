@@ -16,10 +16,13 @@ export type DatabasePools = {
 };
 
 export function createPools(launchpadDatabaseUrl: string, vm1MainDatabaseUrl?: string): DatabasePools {
+  const viaBouncer = process.env.PGBOUNCER_ENABLED === "true";
+  const max = viaBouncer ? Number(process.env.PG_POOL_MAX ?? 4) : 10;
+
   return {
     launchpad: new Pool({
       connectionString: launchpadDatabaseUrl,
-      max: 10
+      max,
     }),
     vm1: vm1MainDatabaseUrl
       ? new Pool({
