@@ -47,9 +47,6 @@ import { TokenAvatar } from "@/components/token/TokenAvatar";
 import { BnbLogo } from "@/components/token/BnbLogo";
 import { useBnbUsdPrice } from "@/hooks/useBnbUsdPrice";
 import { formatUsdReadable } from "@/lib/format-usd";
-import { HIGH_VALUE_USD_THRESHOLD } from "@/lib/airdrop-trust";
-import { AirdropGuaranteeExplainer } from "@/components/airdrops/AirdropGuaranteeExplainer";
-import { AirdropGuaranteeBadge } from "@/components/airdrops/AirdropGuaranteeBadge";
 
 type AirdropFilter =
   | "all"
@@ -60,9 +57,7 @@ type AirdropFilter =
   | "ended"
   | "highValue"
   | "saved"
-  | "mine"
-  | "created";
-
+  | "mine";
 type SortKey = "reward" | "end" | "start" | "status";
 type SortDir = "asc" | "desc";
 
@@ -72,6 +67,7 @@ type EnrichedAirdrop = AirdropListItem & {
   rewardUsd: number;
 };
 
+const HIGH_VALUE_THRESHOLD = 10_000;
 const ENDING_SOON_HOURS = 48;
 
 const AIRDROP_FILTER_ITEMS = [
@@ -81,10 +77,9 @@ const AIRDROP_FILTER_ITEMS = [
   ["upcoming", "Upcoming", "Upcoming"],
   ["endingSoon", "Ending", "Ending soon"],
   ["ended", "Ended", "Ended"],
-  ["highValue", "High", `High value (≥$${Math.round(HIGH_VALUE_USD_THRESHOLD / 1000)}k)`],
-  ["saved", "Saved", "Bookmarked"],
-  ["mine", "Joined", "Participating"],
-  ["created", "Mine", "My campaigns"],
+  ["highValue", "High", "High value"],
+  ["saved", "Saved", "Saved"],
+  ["mine", "Joined", "Joined airdrops"],
 ] as const;
 
 function AirdropFilterChips({
@@ -239,16 +234,10 @@ function matchesFilter(
   item: EnrichedAirdrop,
   filter: AirdropFilter,
   savedIds: Set<string>,
-  mineIds: Set<string>,
-  creatorAddress?: string
+  mineIds: Set<string>
 ): boolean {
   if (filter === "saved") return savedIds.has(item.id);
   if (filter === "mine") return mineIds.has(item.id);
-  if (filter === "created") {
-    return creatorAddress
-      ? item.creatorAddress.toLowerCase() === creatorAddress.toLowerCase()
-      : false;
-  }
   if (filter === "qualifying") return item.displayStatus === "QUALIFYING";
   if (filter === "claimable") return item.displayStatus === "CLAIMABLE";
   if (filter === "upcoming") return item.displayStatus === "UPCOMING";
@@ -256,7 +245,7 @@ function matchesFilter(
     return item.displayStatus === "QUALIFYING" && isEndingSoon(item.qualifyEnd, ENDING_SOON_HOURS);
   }
   if (filter === "ended") return item.displayStatus === "CLOSED";
-  if (filter === "highValue") return item.rewardUsd >= HIGH_VALUE_USD_THRESHOLD;
+  if (filter === "highValue") return item.rewardUsd >= HIGH_VALUE_THRESHOLD;
   return true;
 }
 
@@ -316,7 +305,7 @@ function AirdropSaveButton({
       className={`inline-flex shrink-0 items-center justify-center transition ${
         saved ? "text-pump-accent" : "text-pump-muted hover:text-pump-text"
       } ${className}`}
-      aria-label={saved ? "Remove bookmark" : "Bookmark campaign"}
+      aria-label={saved ? "Remove from saved" : "Save campaign"}
     >
       <Bookmark
         className={`h-4 w-4 ${saved ? "fill-current" : ""}`}
@@ -589,12 +578,9 @@ export function AirdropsListClient({
       ended: resolvedItems.filter((i) => matchesFilter(i, "ended", saves, mineIds)).length,
       highValue: resolvedItems.filter((i) => matchesFilter(i, "highValue", saves, mineIds)).length,
       saved: resolvedItems.filter((i) => matchesFilter(i, "saved", saves, mineIds)).length,
-      mine: resolvedItems.filter((i) => matchesFilter(i, "mine", saves, mineIds, address)).length,
-      created: address
-        ? resolvedItems.filter((i) => matchesFilter(i, "created", saves, mineIds, address)).length
-        : 0,
+      mine: resolvedItems.filter((i) => matchesFilter(i, "mine", saves, mineIds)).length,
     };
-  }, [resolvedItems, saves, mineIds, address]);
+  }, [resolvedItems, saves, mineIds]);
 
   const boardItems = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -611,7 +597,7 @@ export function AirdropsListClient({
           .toLowerCase();
         if (!haystack.includes(term)) return false;
       }
-      return matchesFilter(item, activeFilter, saves, mineIds, address);
+      return matchesFilter(item, activeFilter, saves, mineIds);
     });
 
     const sorted = [...filtered].sort((a, b) => {
@@ -634,11 +620,10 @@ export function AirdropsListClient({
     });
 
     return sorted;
-  }, [resolvedItems, search, activeFilter, sortKey, sortDir, saves, mineIds, address]);
+  }, [resolvedItems, search, activeFilter, sortKey, sortDir, saves, mineIds]);
 
   const walletFilterActive =
-    (activeFilter === "saved" || activeFilter === "mine" || activeFilter === "created") &&
-    !isConnected;
+    (activeFilter === "saved" || activeFilter === "mine") && !isConnected;
 
   function onSort(nextKey: SortKey) {
     if (sortKey === nextKey) {
@@ -675,8 +660,6 @@ export function AirdropsListClient({
 
   return (
     <div className="space-y-3 md:space-y-4">
-      <AirdropGuaranteeExplainer />
-
       {featured ? (
         <section className="space-y-2 md:space-y-3">
           <SectionHeadingIcon icon={MetricIcons.featured}>Featured campaign</SectionHeadingIcon>
@@ -707,9 +690,7 @@ export function AirdropsListClient({
                     </p>
                     <AirdropStatusMetric status={featured.displayStatus} />
                   </div>
-                  <div className="mt-1">
-                    <AirdropGuaranteeBadge compact />
-                  </div>
+                  <p className="mt-1 text-caption text-pump-muted">Escrow on-chain</p>
                 </div>
               </div>
 
@@ -878,12 +859,7 @@ export function AirdropsListClient({
             <div className="p-8 text-center">
               <p className="text-body-sm text-pump-muted">
                 Connect your wallet to view{" "}
-                {activeFilter === "saved"
-                  ? "bookmarked campaigns"
-                  : activeFilter === "created"
-                    ? "campaigns you created"
-                    : "joined airdrops"}
-                .
+                {activeFilter === "saved" ? "saved campaigns" : "joined airdrops"}.
               </p>
               <button
                 type="button"
@@ -896,12 +872,10 @@ export function AirdropsListClient({
           ) : boardItems.length === 0 ? (
             <div className="p-8 text-center text-body-sm text-pump-muted">
               {activeFilter === "saved"
-                ? "No bookmarked campaigns yet. Tap the bookmark on any campaign to save it."
+                ? "No saved campaigns yet. Tap the bookmark on any campaign to save it."
                 : activeFilter === "mine"
                   ? "No joined airdrops yet. Complete on-chain requirements during qualify to track progress here."
-                  : activeFilter === "created"
-                    ? "You have not created any campaigns yet."
-                    : activeFilter === "claimable"
+                  : activeFilter === "claimable"
                     ? "No campaigns in the claimable phase. Winners can claim after qualify ends and results are finalized."
                     : activeFilter === "qualifying"
                       ? "No campaigns open for qualify right now."

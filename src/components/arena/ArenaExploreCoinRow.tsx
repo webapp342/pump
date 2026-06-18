@@ -26,7 +26,6 @@ type ArenaExploreCoinRowProps = {
   mcapFlash?: FlashTone;
   priceFlash?: FlashTone;
   change24hPct: number | null;
-  hasAirdrop?: boolean;
 };
 
 export function ArenaExploreCoinRow({
@@ -37,7 +36,6 @@ export function ArenaExploreCoinRow({
   mcapFlash,
   priceFlash,
   change24hPct,
-  hasAirdrop = false,
 }: ArenaExploreCoinRowProps) {
   const change = change24hPct ?? token.change24hPct ?? null;
   const resolvedPriceUsd =
@@ -57,10 +55,7 @@ export function ArenaExploreCoinRow({
         className="ring-1 ring-pump-border/25"
       />
       <div className="min-w-0">
-        <div className="flex min-w-0 items-center gap-1.5">
-          <p className="truncate text-body font-semibold leading-tight text-pump-text">{token.symbol}</p>
-          {hasAirdrop ? <span className="arena-airdrop-chip shrink-0">Airdrop</span> : null}
-        </div>
+        <p className="truncate text-body font-semibold leading-tight text-pump-text">{token.symbol}</p>
         <p
           className={`financial-value mt-0.5 truncate text-caption leading-tight text-pump-muted ${flashText(mcapFlash)}`}
         >

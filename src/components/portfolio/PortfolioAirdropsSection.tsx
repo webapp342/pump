@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { MyAirdropParticipation } from "@/lib/db/airdrops";
 import { MetricIcons } from "@/lib/metric-icons";
@@ -93,35 +92,13 @@ export function PortfolioAirdropsSection({ address }: { address: string }) {
     [items]
   );
 
-  const claimableItems = useMemo(
-    () => partitionJoinedAirdrops(items.filter(isPortfolioTrackedAirdrop)).claimable,
-    [items]
+  const claimableCount = useMemo(
+    () => partitionJoinedAirdrops(visibleItems).claimable.length,
+    [visibleItems]
   );
 
-  const claimableCount = claimableItems.length;
-
-  if (loading) {
+  if (loading || visibleItems.length === 0) {
     return null;
-  }
-
-  if (visibleItems.length === 0) {
-    return (
-      <div className="panel-surface empty-state">
-        <p className="empty-state-copy">
-          {claimableCount > 0
-            ? `You have ${claimableCount} claimable reward${claimableCount === 1 ? "" : "s"} — open Airdrops to claim.`
-            : "No active airdrop campaigns yet. Explore guaranteed reward pools or launch your own."}
-        </p>
-        <div className="mt-4 flex flex-wrap justify-center gap-2">
-          <Link href="/airdrops" className="primary-button h-10 px-5 text-body-sm">
-            Browse airdrops
-          </Link>
-          <Link href="/airdrops/create" className="secondary-button h-10 px-5 text-body-sm">
-            Create campaign
-          </Link>
-        </div>
-      </div>
-    );
   }
 
   return (

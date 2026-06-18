@@ -62,8 +62,6 @@ import {
 import { Bookmark } from "lucide-react";
 import { useAirdropSaves } from "@/components/airdrops/AirdropSavesProvider";
 import { ICON_STROKE } from "@/lib/icons";
-import { AirdropGuaranteeBadge } from "@/components/airdrops/AirdropGuaranteeBadge";
-import { AirdropTrustPanel } from "@/components/airdrops/AirdropTrustPanel";
 
 function formatAmount(value: string): string {
   const n = Number(value);
@@ -1236,10 +1234,6 @@ export function AirdropDetailPanel({ airdropId }: { airdropId: string }) {
             </div>
           </div>
 
-          <div className="mt-2.5 flex flex-wrap items-center gap-2">
-            <AirdropGuaranteeBadge compact />
-          </div>
-
           <div className="mt-2.5 flex items-stretch gap-2">
             <span
               className={`${airdropStatusBadgeClass(displayStatus)} h-8 min-w-0 flex-1 items-center justify-center`}
@@ -1254,7 +1248,7 @@ export function AirdropDetailPanel({ airdropId }: { airdropId: string }) {
                   ? "border-pump-accent/35 bg-pump-accent/15 text-pump-accent"
                   : "border-pump-border/25 bg-pump-surface/65 text-pump-muted hover:text-pump-text"
               }`}
-              aria-label={saved ? "Remove bookmark" : "Bookmark campaign"}
+              aria-label={saved ? "Remove from saved" : "Save campaign"}
             >
               <Bookmark
                 className={`h-4 w-4 ${saved ? "fill-current" : ""}`}
@@ -1293,7 +1287,7 @@ export function AirdropDetailPanel({ airdropId }: { airdropId: string }) {
                         ? "border-pump-accent/35 bg-pump-accent/15 text-pump-accent"
                         : "border-pump-border/25 bg-pump-surface/65 text-pump-muted hover:text-pump-text"
                     }`}
-                    aria-label={saved ? "Remove bookmark" : "Bookmark campaign"}
+                    aria-label={saved ? "Remove from saved" : "Save campaign"}
                   >
                     <Bookmark
                       className={`h-4 w-4 ${saved ? "fill-current" : ""}`}
@@ -1314,7 +1308,7 @@ export function AirdropDetailPanel({ airdropId }: { airdropId: string }) {
                     <TokenAvatar address={detail.linkedToken} symbol={symbol} size={14} className="!ring-0" />
                     <span>{symbol}</span>
                   </Link>
-                  <AirdropGuaranteeBadge compact />
+                  <span className="shrink-0">· Escrow on-chain</span>
                 </p>
               </div>
             </div>
@@ -1342,14 +1336,6 @@ export function AirdropDetailPanel({ airdropId }: { airdropId: string }) {
           />
         </div>
       </section>
-
-      <AirdropTrustPanel
-        totalFunded={detail.totalFunded}
-        rewardToken={detail.rewardToken}
-        rewardSymbol={detail.rewardSymbol}
-        createTxHash={detail.createTxHash}
-        onChainId={detail.onChainId}
-      />
 
       {displayStatus === "UPCOMING" ? (
         <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 rounded-lg border border-pump-border/25 bg-pump-surface/40 px-3 py-2.5 text-body-sm text-pump-muted">

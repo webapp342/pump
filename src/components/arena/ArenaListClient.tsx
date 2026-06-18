@@ -1245,14 +1245,6 @@ export function ArenaListClient({
     return (
       <div className="panel-surface empty-state">
         <p className="empty-state-copy">No tokens yet. Be the first to launch a meme.</p>
-        <div className="mt-4 flex flex-wrap justify-center gap-2">
-          <Link href="/create" className="primary-button h-10 px-5 text-body-sm">
-            Launch token
-          </Link>
-          <Link href="/airdrops" className="secondary-button h-10 px-5 text-body-sm">
-            Browse airdrops
-          </Link>
-        </div>
       </div>
     );
   }
@@ -1667,7 +1659,6 @@ export function ArenaListClient({
                   mcapFlash={flashes[`${addressKey}:mcap`]}
                   priceFlash={flashes[`${addressKey}:mcap`]}
                   change24hPct={token.change24hPct ?? null}
-                  hasAirdrop={airdropTokenAddresses.has(addressKey)}
                 />
               </HoldingSwipeRow>
             );
@@ -1754,9 +1745,6 @@ export function ArenaListClient({
                       <div className="flex min-w-0 items-baseline gap-2">
                         <p className="truncate text-body-sm font-medium text-pump-text">{token.name}</p>
                         <p className="shrink-0 text-caption text-pump-muted">{token.symbol}</p>
-                        {airdropTokenAddresses.has(addressKey) ? (
-                          <span className="arena-airdrop-chip shrink-0">Airdrop</span>
-                        ) : null}
                       </div>
                     </div>
                   </td>

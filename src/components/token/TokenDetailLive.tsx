@@ -43,7 +43,6 @@ import { useFavorites } from "@/components/favorites/FavoritesProvider";
 import { TokenAvatar } from "@/components/token/TokenAvatar";
 import { CreatorProfileModal } from "@/components/creators/CreatorProfileModal";
 import { CreatorRewardsCard } from "@/components/creators/CreatorRewardsCard";
-import { AirdropCampaignStrip } from "@/components/airdrops/AirdropCampaignStrip";
 import { ShareSheetModal } from "@/components/ui/ShareSheetModal";
 import { TokenSocialLinksBar } from "@/components/token/TokenSocialLinksBar";
 import { UserAvatarForAddress } from "@/components/user/UserAvatarForAddress";
@@ -661,8 +660,6 @@ export function TokenDetailLive({
           </button>
         </div>
       </header>
-
-      <AirdropCampaignStrip tokenAddress={tokenAddress} />
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start">
         <div className="min-w-0 space-y-6">

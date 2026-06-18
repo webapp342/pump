@@ -62,7 +62,6 @@ import {
   validateQualifyWindow,
 } from "@/lib/airdrop-datetime";
 import { formatCampaignAmount, formatCampaignAmountInput, floorCampaignAmountWei, formatAirdropReward } from "@/lib/airdrop-board-format";
-import { AIRDROP_GUARANTEE_TAGLINE } from "@/lib/airdrop-trust";
 
 const ZERO = "0x0000000000000000000000000000000000000000" as const;
 
@@ -1006,7 +1005,7 @@ export function CreateAirdropForm({
         <section className="panel-surface p-4 md:p-5">
           <p className="section-label">2 · Reward & timing</p>
           <p className="mt-1 field-hint">
-            {AIRDROP_GUARANTEE_TAGLINE} TOP 100 linked-token holders split the locked pool.
+            Escrow locks until qualify ends. TOP 100 wallets split the pool.
           </p>
 
           <div className="mt-4 space-y-4">
