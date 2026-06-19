@@ -13,10 +13,13 @@ Before implementing or researching in this repo, read and follow the matching sk
 | **Ultra-fast Faz 2–6, DB/Redis/WS architecture** | `.cursor/docs/ultra-fast-architecture-phases-2-6.md` |
 | **Strateji + sektör karşılaştırma + tier roadmap** | `.cursor/docs/ultra-fast-strategy-2026.md` |
 | **99.9% price accuracy (spot/quote/fill)** | `.cursor/docs/price-accuracy-contract.md` |
+| **Seamless Web3 UX / AA araştırma** | `.cursor/docs/seamless-web3-ux-research-2026.md` |
+| **Account Abstraction (Privy/Kernel/Pimlico)** | `pump-tma-account-abstraction` |
 | Design system, tokens, nav, layout specs | `pump-tma-design-system` |
 | Pages, modals, forms, styling, trading UI | `pump-tma-ui-ux` |
 | App Router pages, API routes, PostgreSQL layer | `pump-tma-nextjs` |
-| wagmi, viem, RainbowKit, on-chain writes | `pump-tma-web3` |
+| wagmi, viem, AppKit, on-chain writes | `pump-tma-web3` |
+| Smart wallet, session keys, gasless tx | `pump-tma-account-abstraction` |
 
 ## Defaults
 

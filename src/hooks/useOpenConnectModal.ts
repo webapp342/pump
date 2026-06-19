@@ -1,13 +1,14 @@
 "use client";
 
 import { useCallback } from "react";
-import { modal } from "@reown/appkit/react";
-import "@/lib/appkit";
+import { usePumpWallet } from "@/components/wallet/PumpWalletProvider";
 
 export function useOpenConnectModal() {
+  const { login } = usePumpWallet();
+
   const openConnectModal = useCallback(() => {
-    void modal?.open();
-  }, []);
+    login();
+  }, [login]);
 
   return { openConnectModal };
 }

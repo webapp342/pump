@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { formatEther, formatUnits, parseEther, parseSignature, parseUnits } from "viem";
 import type { TransactionReceipt } from "viem";
 import { useOpenConnectModal } from "@/hooks/useOpenConnectModal";
+import { useSessionTrade } from "@/hooks/useSessionTrade";
 import { useWalletFunding } from "@/components/wallet/WalletFundingProvider";
 import {
   useAccount,
@@ -179,7 +180,10 @@ export function TradePanel({
   const { address, isConnected, chain } = useAccount();
   const { data: gasPrice } = useGasPrice({ chainId: pumpChain.id });
   const { openConnectModal } = useOpenConnectModal();
+  const { executeBuy, isPending: isSessionBuyPending, hasValidSession, requestSessionGrant } =
+    useSessionTrade();
   const { openFundChoice } = useWalletFunding();
+  const [sessionBuyTxHash, setSessionBuyTxHash] = useState<`0x${string}` | undefined>();
   const { bnbUsd } = useBnbUsdPrice();
   const [side, setSide] = useState<Side>("buy");
   const [buyInputMode, setBuyInputMode] = useState<TradeInputMode>("usd");
@@ -422,6 +426,9 @@ export function TradePanel({
 
   const { writeContract, data: txHash, isPending, reset, error: writeError } = useWriteContract();
   const { data: receipt, isLoading: isConfirming } = useWaitForTransactionReceipt({ hash: txHash });
+  const { data: sessionBuyReceipt, isLoading: isSessionBuyConfirming } =
+    useWaitForTransactionReceipt({ hash: sessionBuyTxHash });
+  const activeReceipt = receipt ?? sessionBuyReceipt;
 
   useEffect(() => {
     if (!writeError) return;
@@ -791,14 +798,15 @@ export function TradePanel({
   }, [side, buyInputMode, linkedBuySpendWei, bondingCurve, protocolFeeBps, amount]);
 
   useEffect(() => {
-    if (!receipt || !pendingAction) return;
+    if (!activeReceipt || !pendingAction) return;
 
-    if (receipt.status !== "success") {
+    if (activeReceipt.status !== "success") {
       setError("Transaction reverted on-chain. Check wallet balance, token status, and amount.");
       setPendingAction(null);
       pendingSellRef.current = null;
       pendingTradeReferrerRef.current = null;
       reset();
+      setSessionBuyTxHash(undefined);
       return;
     }
 
@@ -841,11 +849,11 @@ export function TradePanel({
     setPendingAction(null);
     pendingSellRef.current = null;
 
-    if (receipt.transactionHash && (confirmedSide === "buy" || confirmedSide === "sell")) {
+    if (activeReceipt.transactionHash && (confirmedSide === "buy" || confirmedSide === "sell")) {
       const quoteUsd = quoteUsdAtSubmitRef.current;
       quoteUsdAtSubmitRef.current = null;
       if (quoteUsd != null && quoteUsd > 0 && bnbUsd != null && bnbUsd > 0) {
-        const parsed = parseTradesFromReceipt(receipt, tokenAddress);
+        const parsed = parseTradesFromReceipt(activeReceipt, tokenAddress);
         const trade = parsed[0];
         if (trade) {
           const native = formatEther(trade.nativeAmount);
@@ -863,7 +871,7 @@ export function TradePanel({
                 quoteUsd,
                 fillUsd,
                 deviationBps,
-                txHash: receipt.transactionHash,
+                txHash: activeReceipt.transactionHash,
               });
             }
           }
@@ -871,9 +879,9 @@ export function TradePanel({
       }
 
       onTradeConfirmed?.({
-        txHash: receipt.transactionHash,
+        txHash: activeReceipt.transactionHash,
         side: confirmedSide,
-        receipt,
+        receipt: activeReceipt,
       });
     } else {
       quoteUsdAtSubmitRef.current = null;
@@ -883,8 +891,9 @@ export function TradePanel({
     refetchBalance();
     refetchAllowance();
     reset();
+    setSessionBuyTxHash(undefined);
   }, [
-    receipt,
+    activeReceipt,
     pendingAction,
     refetchAllowance,
     refetchBalance,
@@ -1104,16 +1113,20 @@ export function TradePanel({
         pendingTradeReferrerRef.current = tradeReferrer;
         quoteUsdAtSubmitRef.current = estimatedQuotePriceUsd;
         setPendingAction("buy");
-        writeContract({
-          address: contracts.bondingCurveManager,
-          abi: bondingCurveManagerAbi,
-          functionName: tradeReferrer ? "buyWithReferrer" : "buy",
-          args: tradeReferrer
-            ? [tokenAddress, minOutWithSlippage(tokenOut), tradeReferrer]
-            : [tokenAddress, minOutWithSlippage(tokenOut)],
+
+        if (!hasValidSession) {
+          requestSessionGrant();
+          setPendingAction(null);
+          return;
+        }
+
+        const hash = await executeBuy({
+          tokenAddress,
+          minTokenOut: minOutWithSlippage(tokenOut),
           value: submitValue,
-          chainId: pumpChain.id,
+          referrer: tradeReferrer ?? undefined,
         });
+        setSessionBuyTxHash(hash);
         return;
       }
 
@@ -1253,7 +1266,7 @@ export function TradePanel({
     await submitTrade();
   }
 
-  const isBusy = isPending || isConfirming;
+  const isBusy = isPending || isConfirming || isSessionBuyPending || isSessionBuyConfirming;
 
   useEffect(() => {
     if (!autoSubmitPendingRef.current || autoSubmitTriggeredRef.current) return;
@@ -1271,7 +1284,7 @@ export function TradePanel({
   }, [side, sellTokenWei, sellQuoteOut, buyCostWei, balancePending, isBusy]);
 
   const submitLabel = !isConnected
-    ? "Connect wallet to trade"
+    ? "Sign in to trade"
     : wrongChain
       ? "Switch to BSC Testnet"
       : needsBnbFunding

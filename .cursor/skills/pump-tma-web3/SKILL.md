@@ -1,16 +1,17 @@
 ---
 name: pump-tma-web3
 description: >-
-  Web3 patterns for pump-tma: wagmi 2, viem 2, RainbowKit, BSC chain config,
+  Web3 patterns for pump-tma: wagmi 2, viem 2, Reown AppKit, BSC chain config,
   contract ABIs, and transaction flows. Use when adding wallet connect, on-chain
-  reads/writes, token approvals, or bonding-curve interactions.
+  reads/writes, token approvals, or bonding-curve interactions. For AA / session
+  keys / popup-free writes, see pump-tma-account-abstraction.
 ---
 
 # Pump TMA — Web3
 
 ## Stack
 
-- **wagmi** 2 + **viem** 2 + **@rainbow-me/rainbowkit** 2
+- **wagmi** 2 + **viem** 2 + **@reown/appkit** 2
 - **@tanstack/react-query** via `Web3Provider` (`src/components/wallet/Web3Provider.tsx`)
 - Chain: `pumpChain` from `src/config/chain.ts` (BSC testnet by default, `NEXT_PUBLIC_CHAIN_ID`)
 
@@ -18,10 +19,10 @@ description: >-
 
 | Item | Location |
 |------|----------|
-| wagmi config | `src/lib/wagmi.ts` — `getDefaultConfig`, single chain, `ssr: true` |
+| wagmi config | `src/lib/appkit.ts` — `WagmiAdapter`, single chain, `ssr: true` |
 | Contract addresses | `src/config/chain.ts` → `contracts` (`memeFactory`, `bondingCurveManager`, `airdropManager`) |
 | ABIs | `src/lib/abis/*.ts` |
-| Wallet UI | `WalletBar` + RainbowKit; theme from `getRainbowAccent(theme)` |
+| Wallet UI | `WalletBar` + Reown AppKit; theme from `getAppKitThemeOptions` |
 
 Env: `NEXT_PUBLIC_RPC_URL`, `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID`, `NEXT_PUBLIC_MEME_FACTORY`, etc.
 
@@ -80,7 +81,8 @@ Token price charts: `lightweight-charts` with trade data from API routes — not
 
 ## Docs lookup
 
-Use `research-verified` — Context7: `/wevm/wagmi`, `/wevm/viem`, `/rainbow-me/rainbowkit`.
+Use `research-verified` — Context7: `/wevm/wagmi`, `/wevm/viem`.  
+**Account Abstraction (hedef):** `pump-tma-account-abstraction` + `.cursor/docs/seamless-web3-ux-research-2026.md`
 
 ## Do not
 

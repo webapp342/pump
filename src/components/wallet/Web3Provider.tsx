@@ -1,38 +1,31 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { modal } from "@reown/appkit/react";
-import { cookieToInitialState, WagmiProvider, type Config } from "wagmi";
-import { useTheme } from "@/components/theme/ThemeProvider";
-import { getAppKitThemeOptions } from "@/lib/appkit-theme";
-import type { ThemeId } from "@/lib/theme";
+import { PrivyProvider } from "@privy-io/react-auth";
+import { WagmiProvider as PrivyWagmiProvider } from "@privy-io/wagmi";
+import { WagmiProvider } from "wagmi";
+import { privyAppId, privyConfig, isPrivyConfigured } from "@/lib/privy-config";
+import { wagmiConfig } from "@/lib/wagmi";
+import { PumpWalletProvider, PumpWalletProviderStub } from "@/components/wallet/PumpWalletProvider";
+import { SmartAccountConnectorSetup } from "@/components/wallet/SmartAccountConnectorSetup";
 import { WalletFundingProvider } from "@/components/wallet/WalletFundingProvider";
-import { wagmiAdapter } from "@/lib/appkit";
 
-function AppKitThemeSync() {
-  const { theme } = useTheme();
-  const lastThemeRef = useRef<ThemeId | null>(null);
-
-  useEffect(() => {
-    if (!modal || lastThemeRef.current === theme) return;
-    lastThemeRef.current = theme;
-
-    const { themeMode, themeVariables } = getAppKitThemeOptions(theme);
-    modal.setThemeMode(themeMode);
-    modal.setThemeVariables(themeVariables);
-  }, [theme]);
-
-  return null;
+function MissingPrivyConfig({ children }: { children: ReactNode }) {
+  return (
+    <>
+      {children}
+      <div className="pointer-events-none fixed inset-x-0 bottom-0 z-[200] p-2">
+        <p className="notice-warning pointer-events-auto text-center text-caption">
+          Set <code className="font-mono">NEXT_PUBLIC_PRIVY_APP_ID</code> in{" "}
+          <code className="font-mono">.env</code> to enable login.
+        </p>
+      </div>
+    </>
+  );
 }
 
-export function Web3Provider({
-  children,
-  cookies,
-}: {
-  children: ReactNode;
-  cookies?: string | null;
-}) {
+export function Web3Provider({ children }: { children: ReactNode }) {
   const [queryClient] = useState(
     () =>
       new QueryClient({
@@ -45,19 +38,30 @@ export function Web3Provider({
       })
   );
 
-  const initialState = useMemo(() => {
-    const cookieHeader =
-      cookies ??
-      (typeof document !== "undefined" ? document.cookie || undefined : undefined);
-    return cookieToInitialState(wagmiAdapter.wagmiConfig as Config, cookieHeader);
-  }, [cookies]);
+  if (!isPrivyConfigured()) {
+    return (
+      <QueryClientProvider client={queryClient}>
+        <WagmiProvider config={wagmiConfig}>
+          <PumpWalletProviderStub>
+            <WalletFundingProvider>
+              <MissingPrivyConfig>{children}</MissingPrivyConfig>
+            </WalletFundingProvider>
+          </PumpWalletProviderStub>
+        </WagmiProvider>
+      </QueryClientProvider>
+    );
+  }
 
   return (
-    <WagmiProvider config={wagmiAdapter.wagmiConfig as Config} initialState={initialState}>
+    <PrivyProvider appId={privyAppId} config={privyConfig}>
       <QueryClientProvider client={queryClient}>
-        <AppKitThemeSync />
-        <WalletFundingProvider>{children}</WalletFundingProvider>
+        <PrivyWagmiProvider config={wagmiConfig}>
+          <SmartAccountConnectorSetup />
+          <PumpWalletProvider>
+            <WalletFundingProvider>{children}</WalletFundingProvider>
+          </PumpWalletProvider>
+        </PrivyWagmiProvider>
       </QueryClientProvider>
-    </WagmiProvider>
+    </PrivyProvider>
   );
 }

@@ -2,17 +2,17 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState, type MouseEvent } from "react";
-import { modal } from "@reown/appkit/react";
 import { formatEther } from "viem";
-import { useAccount, useBalance, useChainId, useDisconnect } from "wagmi";
+import { useAccount, useBalance } from "wagmi";
 import { pumpChain, shortAddress } from "@/config/chain";
-import "@/lib/appkit";
 import { UserAvatar } from "@/components/user/UserAvatar";
 import { useUserAvatar } from "@/components/user/UserAvatarProvider";
 import { useBnbUsdPrice } from "@/hooks/useBnbUsdPrice";
 import { bnbToUsd } from "@/lib/format-usd";
 import { copyToClipboard } from "@/lib/copy-to-clipboard";
 import { useWalletFunding } from "@/components/wallet/WalletFundingProvider";
+import { usePumpWallet } from "@/components/wallet/PumpWalletProvider";
+import { isPrivyConfigured } from "@/lib/privy-config";
 
 function formatHeaderBalanceUsd(usd: number | null): string {
   if (usd == null || !Number.isFinite(usd)) return "$0.00";
@@ -54,11 +54,7 @@ function CopyIcon() {
 function PortfolioIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden className="h-5 w-5 fill-none stroke-current">
-      <path
-        d="M4 7h16M4 12h16M4 17h10"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-      />
+      <path d="M4 7h16M4 12h16M4 17h10" strokeWidth="1.6" strokeLinecap="round" />
     </svg>
   );
 }
@@ -83,6 +79,7 @@ type WalletMenuProps = {
   showBnb: boolean;
   onToggleBalanceUnit: () => void;
   onClose: () => void;
+  onLogout: () => void;
 };
 
 function WalletMenu({
@@ -92,9 +89,9 @@ function WalletMenu({
   showBnb,
   onToggleBalanceUnit,
   onClose,
+  onLogout,
 }: WalletMenuProps) {
-  const { disconnect } = useDisconnect();
-  const { openDeposit, openOnRamp } = useWalletFunding();
+  const { openDeposit, openWithdraw, openOnRamp } = useWalletFunding();
   const [copied, setCopied] = useState(false);
 
   async function onCopyAddress(event: MouseEvent<HTMLButtonElement>) {
@@ -102,11 +99,6 @@ function WalletMenu({
     const ok = await copyToClipboard(address);
     setCopied(ok);
     if (ok) setTimeout(() => setCopied(false), 2000);
-  }
-
-  function onDisconnect() {
-    disconnect();
-    onClose();
   }
 
   return (
@@ -135,13 +127,14 @@ function WalletMenu({
         type="button"
         onClick={(event) => void onCopyAddress(event)}
         className="mt-4 flex w-full items-center justify-between gap-2 border border-pump-border/45 bg-pump-border/4 px-3 py-2 text-caption text-pump-text transition hover:bg-pump-border/8"
-        aria-label={copied ? "Address copied" : "Copy wallet address"}
+        aria-label={copied ? "Address copied" : "Copy smart wallet address"}
       >
         <span className="financial-value">{shortAddress(address)}</span>
         <span className="flex items-center gap-1 text-pump-muted">
           {copied ? "Copied" : <CopyIcon />}
         </span>
       </button>
+      <p className="mt-1 text-caption text-pump-muted">Smart wallet · deposit address</p>
 
       <div className="mt-3 grid grid-cols-2 gap-2">
         <button
@@ -158,13 +151,24 @@ function WalletMenu({
           type="button"
           onClick={() => {
             onClose();
-            openOnRamp();
+            openWithdraw();
           }}
           className="secondary-button py-2.5 text-body-sm"
         >
-          Buy
+          Withdraw
         </button>
       </div>
+
+      <button
+        type="button"
+        onClick={() => {
+          onClose();
+          openOnRamp();
+        }}
+        className="mt-2 w-full secondary-button py-2.5 text-body-sm"
+      >
+        Buy with card
+      </button>
 
       <div className="mt-2 grid grid-cols-2 gap-2">
         <Link
@@ -193,10 +197,13 @@ function WalletMenu({
 
       <button
         type="button"
-        onClick={onDisconnect}
+        onClick={() => {
+          onLogout();
+          onClose();
+        }}
         className="mt-3 w-full py-2.5 text-body-sm font-medium text-pump-danger transition hover:bg-pump-danger/10"
       >
-        Disconnect
+        Log out
       </button>
     </div>
   );
@@ -205,6 +212,7 @@ function WalletMenu({
 function ConnectedWalletButton({ address }: { address: string }) {
   const { avatarId } = useUserAvatar();
   const { bnbUsd } = useBnbUsdPrice();
+  const { logout } = usePumpWallet();
   const [open, setOpen] = useState(false);
   const [showBnb, setShowBnb] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -260,6 +268,7 @@ function ConnectedWalletButton({ address }: { address: string }) {
           showBnb={showBnb}
           onToggleBalanceUnit={() => setShowBnb((value) => !value)}
           onClose={() => setOpen(false)}
+          onLogout={() => void logout()}
         />
       ) : null}
     </div>
@@ -267,17 +276,13 @@ function ConnectedWalletButton({ address }: { address: string }) {
 }
 
 export function WalletBar() {
-  const { address, isConnected, isConnecting, isReconnecting } = useAccount();
-  const chainId = useChainId();
-  const wrongNetwork = isConnected && chainId !== pumpChain.id;
-  const ready = !isConnecting && !isReconnecting;
+  const { ready, authenticated, login } = usePumpWallet();
+  const { address, isConnected } = useAccount();
 
-  function openConnect() {
-    void modal?.open();
-  }
-
-  function openNetworks() {
-    void modal?.open({ view: "Networks" });
+  if (!isPrivyConfigured()) {
+    return (
+      <span className="text-caption text-pump-muted">Configure Privy to sign in</span>
+    );
   }
 
   return (
@@ -291,17 +296,9 @@ export function WalletBar() {
         },
       })}
     >
-      {!isConnected ? (
-        <button type="button" onClick={openConnect} className="toolbar-btn font-semibold">
-          Connect wallet
-        </button>
-      ) : wrongNetwork ? (
-        <button
-          type="button"
-          onClick={openNetworks}
-          className="toolbar-btn border-pump-danger/45 bg-pump-danger/10 text-pump-danger"
-        >
-          Wrong network
+      {!authenticated || !isConnected ? (
+        <button type="button" onClick={login} className="toolbar-btn font-semibold">
+          Sign in
         </button>
       ) : address ? (
         <ConnectedWalletButton address={address} />

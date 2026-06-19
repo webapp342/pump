@@ -11,7 +11,7 @@ import {
 import { openOnRamp } from "@/lib/wallet-funding";
 import { WalletFundingModal } from "@/components/wallet/WalletFundingModal";
 
-export type WalletFundingView = "choice" | "deposit";
+export type WalletFundingView = "choice" | "deposit" | "withdraw";
 
 export type WalletFundingOptions = {
   title?: string;
@@ -21,6 +21,7 @@ export type WalletFundingOptions = {
 
 type WalletFundingContextValue = {
   openDeposit: () => void;
+  openWithdraw: () => void;
   openFundChoice: (options?: WalletFundingOptions) => void;
   openOnRamp: () => void;
 };
@@ -52,6 +53,13 @@ export function WalletFundingProvider({ children }: { children: ReactNode }) {
     setOpen(true);
   }, []);
 
+  const openWithdraw = useCallback(() => {
+    setOptions({});
+    setCanReturnToChoice(false);
+    setView("withdraw");
+    setOpen(true);
+  }, []);
+
   const openFundChoice = useCallback((opts?: WalletFundingOptions) => {
     setOptions(opts ?? {});
     setCanReturnToChoice(true);
@@ -67,10 +75,11 @@ export function WalletFundingProvider({ children }: { children: ReactNode }) {
   const value = useMemo(
     () => ({
       openDeposit,
+      openWithdraw,
       openFundChoice,
       openOnRamp: handleOpenOnRamp,
     }),
-    [openDeposit, openFundChoice, handleOpenOnRamp]
+    [openDeposit, openWithdraw, openFundChoice, handleOpenOnRamp]
   );
 
   return (
