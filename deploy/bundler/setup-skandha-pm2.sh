@@ -15,12 +15,33 @@ fi
 
 RPC="${BSC_RPC_URL:-https://bsc-testnet-rpc.publicnode.com}"
 
+ensure_build_deps() {
+  local missing=()
+  for cmd in git curl python3 unzip; do
+    command -v "$cmd" >/dev/null 2>&1 || missing+=("$cmd")
+  done
+  if [[ ${#missing[@]} -eq 0 ]]; then
+    return 0
+  fi
+  if command -v apt-get >/dev/null 2>&1; then
+    echo "Installing build deps: ${missing[*]}…"
+    apt-get update -qq
+    DEBIAN_FRONTEND=noninteractive apt-get install -y -qq git curl python3 unzip ca-certificates
+  else
+    echo "Missing: ${missing[*]}. Install manually (e.g. apt install unzip git curl python3)."
+    exit 1
+  fi
+}
+
+ensure_build_deps
+
 if ! command -v pm2 >/dev/null 2>&1; then
   echo "pm2 not found. Install: npm i -g pm2"
   exit 1
 fi
 
 if ! command -v bun >/dev/null 2>&1; then
+  ensure_build_deps
   echo "Installing bun…"
   curl -fsSL https://bun.sh/install | bash
   export BUN="$HOME/.bun/bin/bun"
