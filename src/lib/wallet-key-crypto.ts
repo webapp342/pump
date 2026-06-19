@@ -1,12 +1,14 @@
 import { createCipheriv, createDecipheriv, randomBytes, scryptSync } from "crypto";
 import type { Hex } from "viem";
 
-const SCRYPT_SALT = "pump-email-wallet-v1";
+const SCRYPT_SALT = "pump-wallet-v1";
 
 function encryptionKey(): Buffer {
-  const secret = process.env.EMAIL_WALLET_ENCRYPTION_SECRET?.trim();
-  if (!secret || secret === "CHANGE_ME") {
-    throw new Error("EMAIL_WALLET_ENCRYPTION_SECRET is required");
+  const secret =
+    process.env.WALLET_ENCRYPTION_SECRET?.trim() ??
+    process.env.EMAIL_WALLET_ENCRYPTION_SECRET?.trim();
+  if (!secret || secret === "CHANGE_ME" || secret === "CHANGE_ME_USE_32_PLUS_CHAR_RANDOM_STRING") {
+    throw new Error("WALLET_ENCRYPTION_SECRET is required");
   }
   return scryptSync(secret, SCRYPT_SALT, 32);
 }

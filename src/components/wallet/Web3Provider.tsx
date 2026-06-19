@@ -3,19 +3,20 @@
 import { useState, type ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { WagmiProvider } from "wagmi";
-import { isZeroDevConfigured } from "@/lib/zerodev-config";
+import { isTelegramAuthConfigured } from "@/lib/telegram-config";
 import { wagmiConfig } from "@/lib/wagmi";
 import { PumpWalletProvider, PumpWalletProviderStub } from "@/components/wallet/PumpWalletProvider";
-import { ZeroDevWagmiSetup } from "@/components/wallet/ZeroDevWagmiSetup";
+import { PumpWagmiSetup } from "@/components/wallet/PumpWagmiSetup";
 import { WalletFundingProvider } from "@/components/wallet/WalletFundingProvider";
 
-function MissingZeroDevConfig({ children }: { children: ReactNode }) {
+function MissingTelegramConfig({ children }: { children: ReactNode }) {
   return (
     <>
       {children}
       <div className="pointer-events-none fixed inset-x-0 bottom-0 z-[200] p-2">
         <p className="notice-warning pointer-events-auto text-center text-caption">
-          Set <code className="font-mono">NEXT_PUBLIC_ZERODEV_PROJECT_ID</code> in{" "}
+          Set <code className="font-mono">TELEGRAM_BOT_TOKEN</code> and{" "}
+          <code className="font-mono">NEXT_PUBLIC_TELEGRAM_BOT_USERNAME</code> in{" "}
           <code className="font-mono">.env</code> to enable login.
         </p>
       </div>
@@ -36,13 +37,13 @@ export function Web3Provider({ children }: { children: ReactNode }) {
       })
   );
 
-  if (!isZeroDevConfigured()) {
+  if (!isTelegramAuthConfigured()) {
     return (
       <QueryClientProvider client={queryClient}>
         <WagmiProvider config={wagmiConfig}>
           <PumpWalletProviderStub>
             <WalletFundingProvider>
-              <MissingZeroDevConfig>{children}</MissingZeroDevConfig>
+              <MissingTelegramConfig>{children}</MissingTelegramConfig>
             </WalletFundingProvider>
           </PumpWalletProviderStub>
         </WagmiProvider>
@@ -54,7 +55,7 @@ export function Web3Provider({ children }: { children: ReactNode }) {
     <QueryClientProvider client={queryClient}>
       <WagmiProvider config={wagmiConfig}>
         <PumpWalletProvider>
-          <ZeroDevWagmiSetup />
+          <PumpWagmiSetup />
           <WalletFundingProvider>{children}</WalletFundingProvider>
         </PumpWalletProvider>
       </WagmiProvider>

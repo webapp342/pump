@@ -5,7 +5,7 @@ import { pumpChain, rpcUrl } from "@/config/chain";
 let activeProvider: EIP1193Provider | null = null;
 let activeAddress: `0x${string}` | null = null;
 
-export function setZeroDevConnectorSession(
+export function setPumpConnectorSession(
   provider: EIP1193Provider,
   address: `0x${string}`
 ): void {
@@ -13,12 +13,12 @@ export function setZeroDevConnectorSession(
   activeAddress = address;
 }
 
-export function clearZeroDevConnectorSession(): void {
+export function clearPumpConnectorSession(): void {
   activeProvider = null;
   activeAddress = null;
 }
 
-export function getZeroDevConnectorSession(): {
+export function getPumpConnectorSession(): {
   provider: EIP1193Provider;
   address: `0x${string}`;
 } | null {
@@ -26,16 +26,23 @@ export function getZeroDevConnectorSession(): {
   return { provider: activeProvider, address: activeAddress };
 }
 
-function zerodevEmailConnector() {
+/** @deprecated Use setPumpConnectorSession */
+export const setZeroDevConnectorSession = setPumpConnectorSession;
+/** @deprecated Use clearPumpConnectorSession */
+export const clearZeroDevConnectorSession = clearPumpConnectorSession;
+/** @deprecated Use getPumpConnectorSession */
+export const getZeroDevConnectorSession = getPumpConnectorSession;
+
+function pumpKernelConnector() {
   return createConnector((config) => ({
-    id: "zerodev-email",
+    id: "pump-kernel",
     name: "Pump Wallet",
-    type: "zerodevEmail" as const,
+    type: "pumpKernel" as const,
 
     async setup() {},
 
     async connect({ chainId, withCapabilities } = {}) {
-      const session = getZeroDevConnectorSession();
+      const session = getPumpConnectorSession();
       if (!session) {
         throw new Error("Sign in required.");
       }
@@ -87,7 +94,7 @@ function zerodevEmailConnector() {
 
 export const wagmiConfig = createConfig({
   chains: [pumpChain],
-  connectors: [zerodevEmailConnector()],
+  connectors: [pumpKernelConnector()],
   transports: {
     [pumpChain.id]: http(rpcUrl),
   },

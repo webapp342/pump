@@ -13,15 +13,17 @@ import {
   kernelVersion,
 } from "@/lib/aa/kernel-account";
 
-export type EmailKernelSession = {
-  email: string;
+export type KernelWalletSession = {
+  telegramId: string;
+  telegramUsername: string | null;
+  firstName: string | null;
   eoaAddress: Address;
   scwAddress: Address;
   kernelClient: KernelAccountClient;
   provider: EIP1193Provider;
 };
 
-export async function deriveEmailWalletAddresses(privateKey: Hex): Promise<{
+export async function deriveWalletAddresses(privateKey: Hex): Promise<{
   eoaAddress: Address;
   scwAddress: Address;
 }> {
@@ -46,12 +48,14 @@ export async function deriveEmailWalletAddresses(privateKey: Hex): Promise<{
   };
 }
 
-export async function buildEmailKernelSession(
-  email: string,
-  privateKey: Hex
-): Promise<EmailKernelSession> {
+export async function buildKernelWalletSession(input: {
+  telegramId: string;
+  telegramUsername: string | null;
+  firstName: string | null;
+  privateKey: Hex;
+}): Promise<KernelWalletSession> {
   const publicClient = createPumpPublicClient();
-  const localAccount = privateKeyToAccount(privateKey);
+  const localAccount = privateKeyToAccount(input.privateKey);
 
   const ecdsaValidator = await signerToEcdsaValidator(publicClient, {
     signer: localAccount,
@@ -69,7 +73,9 @@ export async function buildEmailKernelSession(
   const provider = new KernelEIP1193Provider(kernelClient) as EIP1193Provider;
 
   return {
-    email,
+    telegramId: input.telegramId,
+    telegramUsername: input.telegramUsername,
+    firstName: input.firstName,
     eoaAddress: localAccount.address,
     scwAddress: account.address,
     kernelClient,

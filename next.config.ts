@@ -4,9 +4,9 @@ import path from "node:path";
 const projectRoot = path.join(__dirname);
 
 /**
- * ZeroDev passkey + bundler CSP — WebAuthn runs in-page; connect-src allows rpc.zerodev.app.
+ * Telegram Login Widget + bundler CSP.
  */
-const scriptSrc = "'self' 'unsafe-inline' 'unsafe-eval'";
+const scriptSrc = "'self' 'unsafe-inline' 'unsafe-eval' https://telegram.org";
 
 const contentSecurityPolicy = [
   "default-src 'self'",
@@ -15,9 +15,9 @@ const contentSecurityPolicy = [
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob: https:",
   "font-src 'self'",
-  "connect-src 'self' https: wss: https://rpc.zerodev.app https://*.zerodev.app",
-  "child-src 'self'",
-  "frame-src 'self'",
+  "connect-src 'self' https: wss: https://rpc.zerodev.app https://*.zerodev.app https://oauth.telegram.org",
+  "child-src 'self' https://oauth.telegram.org",
+  "frame-src 'self' https://oauth.telegram.org",
   "worker-src 'self' blob:",
   "object-src 'none'",
   "base-uri 'self'",

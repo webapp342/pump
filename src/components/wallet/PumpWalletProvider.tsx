@@ -13,20 +13,23 @@ import type { KernelAccountClient } from "@zerodev/sdk";
 import type { Address } from "viem";
 import { useDisconnect } from "wagmi";
 import {
-  createEmailKernelSession,
-  type EmailAccountSession,
-} from "@/lib/aa/email-account";
+  logoutTelegramSession,
+  restoreTelegramKernelSession,
+  type TelegramAccountSession,
+} from "@/lib/aa/telegram-account";
 import { withdrawFromKernelClient } from "@/lib/aa/kernel-account";
 import {
-  clearZeroDevConnectorSession,
-  setZeroDevConnectorSession,
+  clearPumpConnectorSession,
+  setPumpConnectorSession,
 } from "@/lib/wagmi";
-import { EmailLoginModal } from "@/components/wallet/EmailLoginModal";
+import { TelegramLoginModal } from "@/components/wallet/TelegramLoginModal";
 
 type PumpWalletContextValue = {
   ready: boolean;
   authenticated: boolean;
-  email: string | undefined;
+  telegramId: string | undefined;
+  telegramUsername: string | null | undefined;
+  telegramFirstName: string | null | undefined;
   scwAddress: Address | undefined;
   kernelClient: KernelAccountClient | null;
   login: () => void;
@@ -45,13 +48,15 @@ export function usePumpWallet() {
 }
 
 const noopAsync = async () => {
-  throw new Error("Configure NEXT_PUBLIC_ZERODEV_PROJECT_ID");
+  throw new Error("Configure Telegram bot auth in .env");
 };
 
 const stubPumpWallet: PumpWalletContextValue = {
   ready: true,
   authenticated: false,
-  email: undefined,
+  telegramId: undefined,
+  telegramUsername: undefined,
+  telegramFirstName: undefined,
   scwAddress: undefined,
   kernelClient: null,
   login: () => {},
@@ -65,45 +70,35 @@ export function PumpWalletProviderStub({ children }: { children: ReactNode }) {
   );
 }
 
-const EMAIL_SESSION_KEY = "pump-email-session";
-
 export function PumpWalletProvider({ children }: { children: ReactNode }) {
   const { disconnect } = useDisconnect();
   const [ready, setReady] = useState(false);
   const [authenticated, setAuthenticated] = useState(false);
-  const [email, setEmail] = useState<string | undefined>();
+  const [telegramId, setTelegramId] = useState<string | undefined>();
+  const [telegramUsername, setTelegramUsername] = useState<string | null | undefined>();
+  const [telegramFirstName, setTelegramFirstName] = useState<string | null | undefined>();
   const [scwAddress, setScwAddress] = useState<Address | undefined>();
   const [kernelClient, setKernelClient] = useState<KernelAccountClient | null>(null);
   const [loginModalOpen, setLoginModalOpen] = useState(false);
 
-  const applySession = useCallback((session: EmailAccountSession) => {
-    setZeroDevConnectorSession(session.provider, session.scwAddress);
-    setEmail(session.email);
+  const applySession = useCallback((session: TelegramAccountSession) => {
+    setPumpConnectorSession(session.provider, session.scwAddress);
+    setTelegramId(session.telegramId);
+    setTelegramUsername(session.telegramUsername);
+    setTelegramFirstName(session.firstName);
     setScwAddress(session.scwAddress);
     setKernelClient(session.kernelClient);
     setAuthenticated(true);
-    try {
-      localStorage.setItem(EMAIL_SESSION_KEY, session.email);
-    } catch {
-      // ignore
-    }
   }, []);
 
   useEffect(() => {
     let cancelled = false;
     async function hydrate() {
       try {
-        const savedEmail = localStorage.getItem(EMAIL_SESSION_KEY);
-        if (savedEmail) {
-          const session = await createEmailKernelSession(savedEmail);
-          if (!cancelled) applySession(session);
-        }
+        const session = await restoreTelegramKernelSession();
+        if (session && !cancelled) applySession(session);
       } catch {
-        try {
-          localStorage.removeItem(EMAIL_SESSION_KEY);
-        } catch {
-          // ignore
-        }
+        // ignore stale session
       } finally {
         if (!cancelled) setReady(true);
       }
@@ -118,8 +113,8 @@ export function PumpWalletProvider({ children }: { children: ReactNode }) {
     setLoginModalOpen(true);
   }, []);
 
-  const onEmailSuccess = useCallback(
-    (session: EmailAccountSession) => {
+  const onTelegramSuccess = useCallback(
+    (session: TelegramAccountSession) => {
       applySession(session);
       setLoginModalOpen(false);
     },
@@ -127,16 +122,14 @@ export function PumpWalletProvider({ children }: { children: ReactNode }) {
   );
 
   const logout = useCallback(async () => {
-    clearZeroDevConnectorSession();
-    setEmail(undefined);
+    clearPumpConnectorSession();
+    setTelegramId(undefined);
+    setTelegramUsername(undefined);
+    setTelegramFirstName(undefined);
     setScwAddress(undefined);
     setKernelClient(null);
     setAuthenticated(false);
-    try {
-      localStorage.removeItem(EMAIL_SESSION_KEY);
-    } catch {
-      // ignore
-    }
+    await logoutTelegramSession();
     disconnect();
   }, [disconnect]);
 
@@ -154,33 +147,36 @@ export function PumpWalletProvider({ children }: { children: ReactNode }) {
     () => ({
       ready,
       authenticated,
-      email,
+      telegramId,
+      telegramUsername,
+      telegramFirstName,
       scwAddress,
       kernelClient,
       login,
       logout,
       withdraw,
     }),
-    [ready, authenticated, email, scwAddress, kernelClient, login, logout, withdraw]
+    [
+      ready,
+      authenticated,
+      telegramId,
+      telegramUsername,
+      telegramFirstName,
+      scwAddress,
+      kernelClient,
+      login,
+      logout,
+      withdraw,
+    ]
   );
-
-  const savedEmail = useMemo(() => {
-    if (typeof window === "undefined") return "";
-    try {
-      return localStorage.getItem(EMAIL_SESSION_KEY) ?? "";
-    } catch {
-      return "";
-    }
-  }, [loginModalOpen]);
 
   return (
     <PumpWalletContext.Provider value={value}>
       {children}
-      <EmailLoginModal
+      <TelegramLoginModal
         open={loginModalOpen}
-        initialEmail={savedEmail}
         onClose={() => setLoginModalOpen(false)}
-        onSuccess={onEmailSuccess}
+        onSuccess={onTelegramSuccess}
       />
     </PumpWalletContext.Provider>
   );

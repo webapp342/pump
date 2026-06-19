@@ -12,7 +12,7 @@ import { bnbToUsd } from "@/lib/format-usd";
 import { copyToClipboard } from "@/lib/copy-to-clipboard";
 import { useWalletFunding } from "@/components/wallet/WalletFundingProvider";
 import { usePumpWallet } from "@/components/wallet/PumpWalletProvider";
-import { isZeroDevConfigured } from "@/lib/zerodev-config";
+import { isTelegramAuthConfigured } from "@/lib/telegram-config";
 
 function formatHeaderBalanceUsd(usd: number | null): string {
   if (usd == null || !Number.isFinite(usd)) return "$0.00";
@@ -268,8 +268,8 @@ export function WalletBar() {
   const { ready, authenticated, login } = usePumpWallet();
   const { address, isConnected } = useAccount();
 
-  if (!isZeroDevConfigured()) {
-    return <span className="text-caption text-pump-muted">Configure ZeroDev to sign in</span>;
+  if (!isTelegramAuthConfigured()) {
+    return <span className="text-caption text-pump-muted">Configure Telegram bot to sign in</span>;
   }
 
   return (
