@@ -3,12 +3,12 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Plus } from "lucide-react";
-import { useAccount } from "wagmi";
 import { WalletBar } from "@/components/wallet/WalletBar";
 import { ThemePicker } from "@/components/theme/ThemePicker";
 import { ADMIN_NAV_ITEM, APP_NAV_ITEMS } from "@/lib/nav-config";
 import { ICON_STROKE } from "@/lib/icons";
-import { isAdminWallet } from "@/config/admin";
+import { isAdminTelegramUser } from "@/config/admin";
+import { usePumpWallet } from "@/components/wallet/PumpWalletProvider";
 import { shellInnerClassForPath } from "@/components/layout/layout-shell";
 
 function navLinkClass(active: boolean): string {
@@ -16,8 +16,8 @@ function navLinkClass(active: boolean): string {
 }
 
 export function AppHeaderView({ pathname }: { pathname: string }) {
-  const { address } = useAccount();
-  const showAdminLink = isAdminWallet(address);
+  const { authenticated, telegramId } = usePumpWallet();
+  const showAdminLink = authenticated && isAdminTelegramUser(telegramId);
 
   const navItems = showAdminLink ? [...APP_NAV_ITEMS, ADMIN_NAV_ITEM] : APP_NAV_ITEMS;
 

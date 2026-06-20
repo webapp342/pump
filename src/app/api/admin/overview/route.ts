@@ -1,13 +1,12 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
-import { isAdminWallet } from "@/config/admin";
+import { requireAdminSession } from "@/lib/auth/admin-access";
 import { getAdminProtocolSnapshot, readAirdropOnChain } from "@/lib/admin-onchain";
 import { listAdminAirdrops } from "@/lib/db/admin";
 import { formatEther } from "viem";
 
 export async function GET(request: NextRequest) {
-  const wallet = request.nextUrl.searchParams.get("address");
-  if (!isAdminWallet(wallet ?? undefined)) {
+  if (!requireAdminSession(request)) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 

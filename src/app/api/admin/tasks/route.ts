@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
-import { isAdminWallet } from "@/config/admin";
+import { requireAdminSession } from "@/lib/auth/admin-access";
 import {
   createAdminLinkTask,
   deleteAdminLinkTask,
@@ -8,10 +8,8 @@ import {
   setAdminLinkTaskActive,
 } from "@/lib/db/incentive";
 
-function requireAdmin(request: NextRequest): string | null {
-  const wallet = request.nextUrl.searchParams.get("address");
-  if (!isAdminWallet(wallet ?? undefined)) return null;
-  return wallet!.toLowerCase();
+function requireAdmin(request: NextRequest): boolean {
+  return requireAdminSession(request) != null;
 }
 
 export async function GET(request: NextRequest) {
@@ -29,8 +27,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const wallet = requireAdmin(request);
-  if (!wallet) {
+  if (!requireAdmin(request)) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 

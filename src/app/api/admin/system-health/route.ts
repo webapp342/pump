@@ -1,11 +1,10 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
-import { isAdminWallet } from "@/config/admin";
+import { requireAdminSession } from "@/lib/auth/admin-access";
 import { collectSystemHealth } from "@/lib/admin/system-health";
 
 export async function GET(request: NextRequest) {
-  const wallet = request.nextUrl.searchParams.get("address");
-  if (!isAdminWallet(wallet ?? undefined)) {
+  if (!requireAdminSession(request)) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 

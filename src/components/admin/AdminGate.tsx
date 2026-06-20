@@ -1,13 +1,13 @@
 "use client";
 
-import { useAccount } from "wagmi";
 import { PageBackLink } from "@/components/ui/PageBackLink";
-import { isAdminWallet } from "@/config/admin";
+import { isAdminTelegramUser } from "@/config/admin";
+import { usePumpWallet } from "@/components/wallet/PumpWalletProvider";
 
 export function AdminGate({ children }: { children: React.ReactNode }) {
-  const { address, isConnected, isConnecting } = useAccount();
+  const { ready, authenticated, telegramId } = usePumpWallet();
 
-  if (isConnecting) {
+  if (!ready) {
     return (
       <div className="admin-page">
         <div className="empty-state admin-empty">
@@ -17,7 +17,7 @@ export function AdminGate({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (!isConnected || !isAdminWallet(address)) {
+  if (!authenticated || !isAdminTelegramUser(telegramId)) {
     return (
       <div className="admin-page py-16 text-center">
         <div className="empty-state mx-auto max-w-sm">

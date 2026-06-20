@@ -10,7 +10,7 @@ import {
   useWaitForTransactionReceipt,
   useWriteContract,
 } from "wagmi";
-import { ADMIN_ADDRESS, isAdminWallet } from "@/config/admin";
+import { ADMIN_ADDRESS } from "@/config/admin";
 import { contracts, explorerAddressUrl, explorerTxUrl, pumpChain, shortAddress } from "@/config/chain";
 import { erc20Abi } from "@/lib/abis/erc20";
 import { launchpadTreasuryAbi } from "@/lib/abis/launchpad-treasury";
@@ -337,19 +337,17 @@ export function AdminPanel() {
   const [stats, setStats] = useState<AdminPlatformStats | null>(null);
   const [statsLoading, setStatsLoading] = useState(true);
 
-  const isAdmin = isAdminWallet(address);
   const treasuryContract = protocol?.treasury.address as `0x${string}` | undefined;
   const treasuryOwner = protocol?.treasury.owner;
+  const bondingOwner = protocol?.bondingCurveManager.owner;
+
   const canWithdrawTreasury =
-    isAdmin &&
     Boolean(address) &&
     Boolean(treasuryContract) &&
     treasuryOwner != null &&
     address!.toLowerCase() === treasuryOwner.toLowerCase();
 
-  const bondingOwner = protocol?.bondingCurveManager.owner;
   const canEmergencySweepBonding =
-    isAdmin &&
     Boolean(address) &&
     Boolean(contracts.bondingCurveManager) &&
     bondingOwner != null &&
@@ -388,7 +386,7 @@ export function AdminPanel() {
     if (!address) return;
     setPromoLoading(true);
     try {
-      const res = await fetch(`/api/admin/tasks?address=${address}`, { cache: "no-store" });
+      const res = await fetch("/api/admin/tasks", { cache: "no-store" });
       const json = (await res.json()) as { data?: { tasks: AdminLinkTask[] }; error?: string };
       if (!res.ok) throw new Error(json.error ?? "Failed to load promo tasks");
       setPromoTasks(json.data?.tasks ?? []);
@@ -403,7 +401,7 @@ export function AdminPanel() {
     if (!address) return;
     setStatsLoading(true);
     try {
-      const res = await fetch(`/api/admin/stats?address=${address}`, { cache: "no-store" });
+      const res = await fetch("/api/admin/stats", { cache: "no-store" });
       const json = (await res.json()) as { data?: AdminPlatformStats; error?: string };
       if (!res.ok) throw new Error(json.error ?? "Failed to load platform stats");
       setStats(json.data ?? null);
@@ -420,7 +418,7 @@ export function AdminPanel() {
     setPlatformSettingsLoading(true);
     try {
       if (!address) return;
-      const res = await fetch(`/api/admin/overview?address=${address}`, { cache: "no-store" });
+      const res = await fetch("/api/admin/overview", { cache: "no-store" });
       const json = (await res.json()) as {
         data?: { protocol: ProtocolSnapshot; airdrops: SweepRow[] };
         error?: string;
@@ -609,7 +607,7 @@ export function AdminPanel() {
     setError(null);
     try {
       const rewardPoints = Number.parseInt(promoPoints.trim(), 10);
-      const res = await fetch(`/api/admin/tasks?address=${address}`, {
+      const res = await fetch("/api/admin/tasks", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -641,7 +639,7 @@ export function AdminPanel() {
     setDeletingKey(taskKey);
     setError(null);
     try {
-      const res = await fetch(`/api/admin/tasks?address=${address}`, {
+      const res = await fetch("/api/admin/tasks", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ taskKey }),
@@ -770,7 +768,7 @@ export function AdminPanel() {
       <AdminTabs active={activeTab} onChange={setActiveTab} />
 
       <AdminTabPanel id="dashboard" active={activeTab}>
-        {address ? <AdminSystemHealth address={address} /> : null}
+        <AdminSystemHealth />
 
         <AdminBlock title="Platform">
           <AdminDataTable>
@@ -1194,11 +1192,11 @@ export function AdminPanel() {
               </p>
             ) : null}
           </AdminBlock>
-        ) : isAdmin ? (
+        ) : (
           <p className="admin-note">
             Withdrawals require treasury owner ({shortAddress(treasuryOwner ?? ADMIN_ADDRESS)}).
           </p>
-        ) : null}
+        )}
       </AdminTabPanel>
 
       <AdminTabPanel id="airdrops" active={activeTab}>

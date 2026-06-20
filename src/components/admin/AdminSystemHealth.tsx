@@ -272,7 +272,7 @@ function SystemHealthDetailModal({
   );
 }
 
-export function AdminSystemHealth({ address }: { address: string }) {
+export function AdminSystemHealth() {
   const [report, setReport] = useState<SystemHealthReport | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -283,7 +283,7 @@ export function AdminSystemHealth({ address }: { address: string }) {
     setError(null);
     setLoading(true);
     try {
-      const res = await fetch(`/api/admin/system-health?address=${address}`, { cache: "no-store" });
+      const res = await fetch("/api/admin/system-health", { cache: "no-store" });
       const json = await parseJsonResponse<{ data?: SystemHealthReport; error?: string }>(res);
       if (!res.ok) throw new Error(json.error ?? "Failed to load system health");
       setReport(json.data ?? null);
@@ -292,7 +292,7 @@ export function AdminSystemHealth({ address }: { address: string }) {
     } finally {
       setLoading(false);
     }
-  }, [address]);
+  }, []);
 
   useEffect(() => {
     if (initialLoad.current) return;
