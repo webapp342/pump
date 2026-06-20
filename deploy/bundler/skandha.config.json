@@ -5,6 +5,9 @@
   "minSignerBalance": 0.01,
   "enforceGasPrice": false,
   "gasPriceMarkup": 10,
+  "vglMarkup": 100000,
+  "vglMarkupPercent": 5000,
+  "pvgMarkup": 10000,
   "bundleInterval": 3,
   "useropsTTL": 300
 }

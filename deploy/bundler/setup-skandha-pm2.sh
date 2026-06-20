@@ -17,7 +17,7 @@ RPC="${BSC_RPC_URL:-https://bsc-testnet-rpc.publicnode.com}"
 
 ensure_build_deps() {
   local missing=()
-  for cmd in git curl python3 unzip; do
+  for cmd in git curl python3 unzip make g++; do
     command -v "$cmd" >/dev/null 2>&1 || missing+=("$cmd")
   done
   if [[ ${#missing[@]} -eq 0 ]]; then
@@ -28,9 +28,30 @@ ensure_build_deps() {
     apt-get update -qq
     DEBIAN_FRONTEND=noninteractive apt-get install -y -qq git curl python3 unzip ca-certificates build-essential
   else
-    echo "Missing: ${missing[*]}. Install manually (e.g. apt install unzip git curl python3)."
+    echo "Missing: ${missing[*]}. Install manually (e.g. apt install build-essential unzip git curl python3)."
     exit 1
   fi
+}
+
+find_bcrypto_node() {
+  find "$SKANDHA_DIR/node_modules/bcrypto" -name 'bcrypto.node' -print -quit 2>/dev/null || true
+}
+
+ensure_bcrypto_native() {
+  local node_file
+  node_file="$(find_bcrypto_node)"
+  if [[ -n "$node_file" ]]; then
+    echo "bcrypto native OK: $node_file"
+    return 0
+  fi
+  echo "Building bcrypto native module (requires make/gcc)…"
+  (cd "$SKANDHA_DIR/node_modules/bcrypto" && bun install && make -j"$(nproc 2>/dev/null || echo 2)")
+  node_file="$(find_bcrypto_node)"
+  if [[ -z "$node_file" ]]; then
+    echo "bcrypto.node still missing after make — try: cd $SKANDHA_DIR && rm -rf node_modules && bun install && bun run build"
+    exit 1
+  fi
+  echo "bcrypto native OK: $node_file"
 }
 
 ensure_build_deps
@@ -72,10 +93,10 @@ SKANDHA_CLI_LIB="$SKANDHA_DIR/packages/cli/lib/index.js"
 if [[ ! -f "$SKANDHA_CLI_LIB" ]]; then
   echo "Building Skandha (one-time, ~3–8 min)…"
   bun install
-  if [[ -d node_modules/bcrypto ]]; then
-    (cd node_modules/bcrypto && bun install)
-  fi
+  ensure_bcrypto_native
   bun run build
+else
+  ensure_bcrypto_native
 fi
 
 if [[ ! -f "$SKANDHA_CLI_LIB" ]]; then
