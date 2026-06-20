@@ -1,9 +1,9 @@
 import { parseGwei } from "viem";
 import { getBundlerRpcUrl } from "@/lib/aa/bundler-config";
 
-/** Pimlico bundlers reject UserOps below 1 gwei priority fee on BSC. */
-export const MIN_USER_OP_MAX_FEE = parseGwei("1");
-export const MIN_USER_OP_PRIORITY_FEE = parseGwei("1");
+/** BSC mainnet priority fee is ~0.1 gwei (2026). Legacy 1 gwei floors overcharged users ~10×. */
+export const MIN_USER_OP_MAX_FEE = parseGwei("0.1");
+export const MIN_USER_OP_PRIORITY_FEE = parseGwei("0.1");
 
 type GasTier = { maxFeePerGas: string; maxPriorityFeePerGas: string };
 type PimlicoGasTiers = { slow: GasTier; standard: GasTier; fast: GasTier };
@@ -12,14 +12,18 @@ function maxBigInt(a: bigint, b: bigint): bigint {
   return a > b ? a : b;
 }
 
+function minBigInt(a: bigint, b: bigint): bigint {
+  return a < b ? a : b;
+}
+
+function clampUserOpFees(maxFeePerGas: bigint, maxPriorityFeePerGas: bigint) {
+  const priority = maxBigInt(maxPriorityFeePerGas, MIN_USER_OP_PRIORITY_FEE);
+  const maxFee = maxBigInt(maxFeePerGas, maxBigInt(priority, MIN_USER_OP_MAX_FEE));
+  return { maxFeePerGas: maxFee, maxPriorityFeePerGas: priority };
+}
+
 function clampGasTier(tier: GasTier) {
-  return {
-    maxFeePerGas: maxBigInt(BigInt(tier.maxFeePerGas), MIN_USER_OP_MAX_FEE),
-    maxPriorityFeePerGas: maxBigInt(
-      BigInt(tier.maxPriorityFeePerGas),
-      MIN_USER_OP_PRIORITY_FEE
-    ),
-  };
+  return clampUserOpFees(BigInt(tier.maxFeePerGas), BigInt(tier.maxPriorityFeePerGas));
 }
 
 /** Pimlico-recommended gas for UserOps (via bundler proxy). */
@@ -50,15 +54,39 @@ export async function fetchPimlicoUserOpGasPrice(): Promise<{
   return clampGasTier(tier);
 }
 
+function feesFromChainGasPrice(gasPrice: bigint) {
+  const priority = maxBigInt(gasPrice, MIN_USER_OP_PRIORITY_FEE);
+  return clampUserOpFees(gasPrice, priority);
+}
+
 export async function resolveUserOpGasPrice(
   chainGasPrice: () => Promise<bigint>
 ): Promise<{ maxFeePerGas: bigint; maxPriorityFeePerGas: bigint }> {
-  const pimlico = await fetchPimlicoUserOpGasPrice().catch(() => null);
-  if (pimlico) return pimlico;
+  let chainFees: { maxFeePerGas: bigint; maxPriorityFeePerGas: bigint } | null = null;
 
-  const gasPrice = await chainGasPrice();
+  try {
+    const gasPrice = await chainGasPrice();
+    if (gasPrice > 0n) {
+      chainFees = feesFromChainGasPrice(gasPrice);
+    }
+  } catch {
+    // fall through to bundler tiers
+  }
+
+  const bundler = await fetchPimlicoUserOpGasPrice().catch(() => null);
+
+  if (chainFees && bundler) {
+    return clampUserOpFees(
+      minBigInt(chainFees.maxFeePerGas, bundler.maxFeePerGas),
+      minBigInt(chainFees.maxPriorityFeePerGas, bundler.maxPriorityFeePerGas)
+    );
+  }
+
+  if (chainFees) return chainFees;
+  if (bundler) return bundler;
+
   return {
-    maxFeePerGas: maxBigInt(gasPrice, MIN_USER_OP_MAX_FEE),
-    maxPriorityFeePerGas: maxBigInt(gasPrice, MIN_USER_OP_PRIORITY_FEE),
+    maxFeePerGas: MIN_USER_OP_MAX_FEE,
+    maxPriorityFeePerGas: MIN_USER_OP_PRIORITY_FEE,
   };
 }

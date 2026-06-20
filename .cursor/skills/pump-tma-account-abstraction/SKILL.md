@@ -74,7 +74,8 @@ src/app/api/bundler/rpc/route.ts
 ## Gas rules (BSC)
 
 - `pimlico_getUserOperationGasPrice` → standard tier (Alto)
-- Fallback min **1 gwei** `maxFeePerGas` and `maxPriorityFeePerGas`
+- Fallback min **0.1 gwei** `maxFeePerGas` and `maxPriorityFeePerGas` (BSC mainnet market)
+- Prefer live `eth_gasPrice` when lower than bundler tier
 - Never `gasPrice/10` for priority fee on BSC
 
 ## Alto BSC flags
