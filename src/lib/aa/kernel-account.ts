@@ -7,22 +7,18 @@ import { prepareUserOperation as viemPrepareUserOperation } from "viem/account-a
 import {
   createPublicClient,
   http,
-  parseGwei,
   type Address,
   type Hex,
   type PublicClient,
 } from "viem";
 import { pumpChain, rpcUrl } from "@/config/chain";
 import { createBundlerTransport } from "@/lib/aa/bundler-transport";
+import { resolveUserOpGasPrice } from "@/lib/aa/pimlico-gas-price";
 import { sendKernelTransaction } from "@/lib/aa/send-kernel-transaction";
 import { assertScwReadyForUserOp } from "@/lib/aa/scw-preflight";
 
 export const entryPoint = getEntryPoint("0.7");
 export const kernelVersion = KERNEL_V3_1;
-
-/** BSC often reports sub-1 gwei; bundler rejects UserOps below 1 gwei maxFee. */
-const MIN_MAX_FEE_PER_GAS = parseGwei("1");
-const MIN_PRIORITY_FEE_PER_GAS = parseGwei("0.05");
 
 /** Skandha can underestimate Kernel deploy + ECDSA validation on BSC (AA26). */
 const GAS_BUFFER_NUM = 13n;
@@ -75,13 +71,7 @@ function createKernelUserOperationConfig(publicClient: PublicClient) {
   }) as typeof viemPrepareUserOperation;
 
   return {
-    estimateFeesPerGas: async () => {
-      const gasPrice = await publicClient.getGasPrice();
-      return {
-        maxFeePerGas: maxBigInt(gasPrice, MIN_MAX_FEE_PER_GAS),
-        maxPriorityFeePerGas: maxBigInt(gasPrice / 10n, MIN_PRIORITY_FEE_PER_GAS),
-      };
-    },
+    estimateFeesPerGas: () => resolveUserOpGasPrice(() => publicClient.getGasPrice()),
     prepareUserOperation,
   };
 }

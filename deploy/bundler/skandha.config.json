@@ -9,8 +9,10 @@
   "vglMarkup": 100000,
   "vglMarkupPercent": 5000,
   "pvgMarkup": 10000,
-  "bundleInterval": 10,
+  "bundleInterval": 10000,
   "receiptLookupRange": 9,
+  "pollingInterval": 5000,
+  "disableWatchContract": true,
   "waitForConfirmationInterval": 5000,
   "useropsTTL": 300
 }

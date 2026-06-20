@@ -14,25 +14,18 @@ if [[ -z "${BUNDLER_RELAYER_PRIVATE_KEY:-}" ]]; then
 fi
 
 if [[ -n "${BSC_RPC_URL:-}" ]]; then
-  RPC_READ="$BSC_RPC_URL"
+  RPC="$BSC_RPC_URL"
 elif [[ -n "${ALCHEMY_API_KEY:-}" ]]; then
-  RPC_READ="https://bnb-testnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}"
+  RPC="https://bnb-testnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}"
 else
-  RPC_READ="https://bsc-testnet-dataseed.bnbchain.org"
+  RPC="https://bsc-testnet-dataseed.bnbchain.org"
 fi
 
-# Alchemy free tier: eth_getLogs max 10 blocks. Skandha polls fromBlock→latest without
-# toBlock (EventsService) and uses head-range→latest for receipts (off-by-one: range 10 = 11 blocks).
-# Use dataseed for reads/polling; Alchemy only for bundle submit when available.
-RPC_SUBMIT="${BSC_RPC_SUBMIT_URL:-$RPC_READ}"
-if [[ -n "${ALCHEMY_API_KEY:-}" ]]; then
-  RPC_SUBMIT="https://bnb-testnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}"
-fi
-if [[ "$RPC_READ" == *alchemy.com* ]]; then
-  RPC_READ="https://bsc-testnet-dataseed.bnbchain.org"
-  echo "Using BSC dataseed for read/poll (Alchemy free tier getLogs ≤10 blocks)."
-fi
+# Submit can differ (e.g. private relay); default same as read RPC.
+RPC_SUBMIT="${BSC_RPC_SUBMIT_URL:-$RPC}"
 
+# Alchemy free: eth_getLogs ≤10 blocks. Skandha receipt uses head-N→latest (off-by-one → use 9).
+# Event polling is 1 block/tick when healthy; dataseed rejects wide fromBlock→latest scans.
 RECEIPT_LOOKUP_RANGE="${SKANDHA_RECEIPT_LOOKUP_RANGE:-9}"
 
 ensure_build_deps() {
@@ -102,12 +95,15 @@ src = Path("$CONFIG_SRC")
 dst = Path("$SKANDHA_DIR/config.json")
 data = json.loads(src.read_text())
 data["relayers"] = ["${BUNDLER_RELAYER_PRIVATE_KEY}"]
-data["rpcEndpoint"] = "${RPC_READ}"
+data["rpcEndpoint"] = "${RPC}"
 data["rpcEndpointSubmit"] = "${RPC_SUBMIT}"
 data["receiptLookupRange"] = int("${RECEIPT_LOOKUP_RANGE}")
-data["bundleInterval"] = 10
+# Skandha bundleInterval is milliseconds (10000 = 10s), NOT seconds.
+data["bundleInterval"] = 10000
+data["pollingInterval"] = 5000
+data["disableWatchContract"] = True
 dst.write_text(json.dumps(data, indent=2) + "\n")
-print("Wrote", dst, "rpcRead=", "${RPC_READ}", "rpcSubmit=", "${RPC_SUBMIT}", "receiptLookupRange=", data["receiptLookupRange"])
+print("Wrote", dst, "rpc=", "${RPC}", "rpcSubmit=", "${RPC_SUBMIT}", "receiptLookupRange=", data["receiptLookupRange"], "bundleInterval=", data["bundleInterval"])
 PY
 
 cd "$SKANDHA_DIR"
@@ -125,6 +121,13 @@ fi
 if [[ ! -f "$SKANDHA_CLI_LIB" ]]; then
   echo "Build failed — missing $SKANDHA_CLI_LIB"
   exit 1
+fi
+
+# Stuck Submitted userops + stale event cursor → getLogs spans too many blocks.
+SKANDHA_DB="${SKANDHA_DATA_DIR:-/root/.skandha/db}"
+if [[ -d "$SKANDHA_DB" ]]; then
+  echo "Clearing Skandha mempool db ($SKANDHA_DB)…"
+  rm -rf "$SKANDHA_DB"
 fi
 
 pm2 delete pump-skandha 2>/dev/null || true

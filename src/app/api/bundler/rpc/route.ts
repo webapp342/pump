@@ -41,8 +41,8 @@ export async function POST(request: NextRequest) {
     const normalized = normalizeBundlerRpcPayload(method, payload);
     if (payload.error && !normalized.error && normalized.result === null) {
       bundlerDebug("warn", "proxy pending", method, {
-        note: "normalized Skandha pending receipt to null",
-        skandhaError: payload.error,
+        note: "normalized pending bundler receipt to null",
+        bundlerError: payload.error,
       });
     } else {
       bundlerDebug("info", "proxy ←", method, normalized);

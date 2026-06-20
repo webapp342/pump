@@ -44,8 +44,8 @@ export function createBundlerTransport(): HttpTransport {
 
       if (beforeError && !normalized.error && normalized.result === null) {
         bundlerDebug("warn", "pending", method, {
-          note: "Skandha receipt not ready — treating as null for polling",
-          skandhaError: beforeError,
+          note: "bundler receipt not ready — treating as null for polling",
+          bundlerError: beforeError,
         });
       } else if (normalized.error) {
         bundlerDebug("error", "←", method, normalized);
