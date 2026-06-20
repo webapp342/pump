@@ -13,7 +13,15 @@ if [[ -z "${BUNDLER_RELAYER_PRIVATE_KEY:-}" ]]; then
   exit 1
 fi
 
-RPC="${BSC_RPC_URL:-https://bsc-testnet.public.blastapi.io}"
+if [[ -n "${BSC_RPC_URL:-}" ]]; then
+  RPC="$BSC_RPC_URL"
+elif [[ -n "${ALCHEMY_API_KEY:-}" ]]; then
+  RPC="https://bnb-testnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}"
+else
+  RPC="https://bsc-testnet-dataseed.bnbchain.org"
+fi
+
+RECEIPT_LOOKUP_RANGE="${SKANDHA_RECEIPT_LOOKUP_RANGE:-16}"
 
 ensure_build_deps() {
   local missing=()
@@ -83,8 +91,11 @@ dst = Path("$SKANDHA_DIR/config.json")
 data = json.loads(src.read_text())
 data["relayers"] = ["${BUNDLER_RELAYER_PRIVATE_KEY}"]
 data["rpcEndpoint"] = "${RPC}"
+data["rpcEndpointSubmit"] = "${RPC}"
+data["receiptLookupRange"] = int("${RECEIPT_LOOKUP_RANGE}")
+data["bundleInterval"] = 10
 dst.write_text(json.dumps(data, indent=2) + "\n")
-print("Wrote", dst)
+print("Wrote", dst, "rpc=", "${RPC}", "receiptLookupRange=", data["receiptLookupRange"])
 PY
 
 cd "$SKANDHA_DIR"

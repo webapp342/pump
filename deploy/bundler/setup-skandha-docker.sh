@@ -15,7 +15,7 @@ if ! command -v docker >/dev/null 2>&1; then
   exit 1
 fi
 
-RPC="${BSC_RPC_URL:-https://bsc-testnet.public.blastapi.io}"
+RPC="${BSC_RPC_URL:-https://bsc-testnet-dataseed.bnbchain.org}"
 
 python3 - <<PY
 import json
