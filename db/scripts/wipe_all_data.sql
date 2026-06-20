@@ -1,6 +1,7 @@
 -- Tüm uygulama verisini siler; şema (tablolar, index, trigger, MV tanımları, fonksiyonlar) aynen kalır.
 --
--- Korunan: contract_registry, launchpad_tasks (sabit 5 system mission tanımı)
+-- Korunan: contract_registry, launchpad_tasks, platform_settings
+-- (system mission tanımları + admin platform ayarları)
 --
 -- VM örnek:
 --   sudo -u postgres psql -d pump_db -f db/scripts/wipe_all_data.sql
@@ -38,6 +39,8 @@ TRUNCATE TABLE
   public.user_volumes,
   public.tokens,
   public.users,
+  public.telegram_wallets,
+  public.email_wallets,
   public.indexer_state
 RESTART IDENTITY CASCADE;
 
