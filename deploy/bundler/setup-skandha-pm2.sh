@@ -21,7 +21,7 @@ else
   RPC="https://bsc-testnet-dataseed.bnbchain.org"
 fi
 
-RECEIPT_LOOKUP_RANGE="${SKANDHA_RECEIPT_LOOKUP_RANGE:-16}"
+RECEIPT_LOOKUP_RANGE="${SKANDHA_RECEIPT_LOOKUP_RANGE:-10}"
 
 ensure_build_deps() {
   local missing=()

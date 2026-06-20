@@ -10,7 +10,7 @@
   "vglMarkupPercent": 5000,
   "pvgMarkup": 10000,
   "bundleInterval": 10,
-  "receiptLookupRange": 16,
+  "receiptLookupRange": 10,
   "waitForConfirmationInterval": 5000,
   "useropsTTL": 300
 }
