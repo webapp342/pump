@@ -59,6 +59,13 @@
 - `REDIS_PUBLISH_ENABLED`
 - `MV_REFRESH_ENABLED=true` *(CPU düşükken OK; %50+ olunca gözden geçir)*
 
+**Bundler (Alto, VM):**
+
+- `BUNDLER_RPC_URL=http://127.0.0.1:4337/rpc` — no `PIMLICO_API_KEY`
+- `BUNDLER_CHAIN_RPC_URL` — paid Alchemy/PAYG on VM only (not dataseed)
+- Health: `bash deploy/bundler/alto/health.sh`
+- Docs: `.cursor/docs/self-hosted-bundler-2026.md`
+
 ---
 
 ## Haftalık ritüel (senin checklist)

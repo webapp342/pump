@@ -41,12 +41,13 @@ export function verifySessionToken(token: string | undefined | null): string | n
   return telegramId;
 }
 
-/** Secure cookies on HTTPS tunnels (Cloudflare) even when NODE_ENV=development. */
-export function authCookieOptions(request?: Pick<NextRequest, "headers">) {
+/** Secure cookies only when the browser connection is HTTPS (or explicitly forced). */
+export function authCookieOptions(request?: Pick<NextRequest, "headers" | "nextUrl">) {
   const forwardedProto = request?.headers.get("x-forwarded-proto")?.split(",")[0]?.trim();
+  const requestProto = request?.nextUrl?.protocol?.replace(":", "");
   const secure =
     forwardedProto === "https" ||
-    process.env.NODE_ENV === "production" ||
+    requestProto === "https" ||
     process.env.FORCE_SECURE_COOKIES === "true";
 
   return {

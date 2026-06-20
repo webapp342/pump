@@ -56,8 +56,23 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Bundler proxy failed";
-    bundlerDebug("error", "proxy", "?", { message });
+    const upstream = getBundlerUpstreamUrl();
+    const base =
+      error instanceof Error ? error.message : "Bundler proxy failed";
+    const refused =
+      base.includes("ECONNREFUSED") ||
+      base.includes("fetch failed") ||
+      base.includes("Failed to fetch");
+    const tunnelHint =
+      refused && upstream.includes("127.0.0.1")
+        ? " Alto bundler unreachable at " +
+          upstream +
+          ". Local dev: open SSH tunnel — ssh -p 22022 -L 4337:127.0.0.1:4337 root@104.207.64.115"
+        : refused
+          ? ` Bundler upstream unreachable: ${upstream}`
+          : "";
+    const message = base + tunnelHint;
+    bundlerDebug("error", "proxy", "?", { message, upstream });
     return NextResponse.json({ error: message }, { status: 502 });
   }
 }
