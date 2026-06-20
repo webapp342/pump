@@ -3,7 +3,7 @@ import { defineChain } from "viem";
 export const CHAIN_ID = Number(process.env.NEXT_PUBLIC_CHAIN_ID ?? 97);
 
 export const rpcUrl =
-  process.env.NEXT_PUBLIC_RPC_URL ?? "https://bsc-testnet-rpc.publicnode.com";
+  process.env.NEXT_PUBLIC_RPC_URL ?? "https://data-seed-prebsc-1-s1.binance.org:8545";
 
 export const pumpChain = defineChain({
   id: CHAIN_ID,
