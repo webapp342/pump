@@ -54,7 +54,12 @@ if [ ! -f "$REALTIME_DIR/dist/server.js" ]; then
 fi
 
 log "Restarting PM2 apps: $PM2_APP, $REALTIME_PM2_APP"
-pm2 restart "$PM2_APP" --update-env
+if pm2 describe "$PM2_APP" >/dev/null 2>&1; then
+  pm2 restart "$PM2_APP" --update-env
+else
+  log "$PM2_APP not registered in PM2; starting from ecosystem.config.cjs"
+  pm2 start "$REPO_ROOT/ecosystem.config.cjs" --only "$PM2_APP"
+fi
 if pm2 describe "$REALTIME_PM2_APP" >/dev/null 2>&1; then
   pm2 restart "$REALTIME_PM2_APP" --update-env
 else

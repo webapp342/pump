@@ -42,7 +42,12 @@ if [ -d "$WEB_DIR/public" ]; then
 fi
 
 log "Restarting PM2 app: $PM2_APP (realtime + indexer unchanged)"
-pm2 restart "$PM2_APP" --update-env
+if pm2 describe "$PM2_APP" >/dev/null 2>&1; then
+  pm2 restart "$PM2_APP" --update-env
+else
+  log "$PM2_APP not registered in PM2; starting from ecosystem.config.cjs"
+  pm2 start "$REPO_ROOT/ecosystem.config.cjs" --only "$PM2_APP"
+fi
 
 log "Health check: $HEALTH_URL"
 health_ok=0

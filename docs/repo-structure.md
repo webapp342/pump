@@ -65,22 +65,25 @@ if [ -f realtime/.env ] && [ ! -f apps/realtime/.env ]; then
   mv realtime/.env apps/realtime/.env
 fi
 
-# 2. PM2 — standalone cwd moved to apps/web
-pm2 delete pump-tma 2>/dev/null || true
-pm2 start ecosystem.config.cjs --only pump-tma
-pm2 restart pump-realtime --update-env
-pm2 save
-
-# 3. Nginx admin static path
+# 2. Nginx admin static path
 sudo sed -i 's|admin-console/dist|apps/admin/dist|g' /etc/nginx/sites-available/pump
 sudo nginx -t && sudo systemctl reload nginx
 
-# 4. Full deploy (build web + admin + realtime + indexer)
+# 3. Full deploy (build + PM2 start/restart + indexer) — do NOT pm2 delete before this
 chmod +x deploy/tma-deploy.sh
 ./deploy/tma-deploy.sh
+
+# 4. Persist PM2 after successful deploy
+pm2 save
 ```
 
-If CI already ran `git pull` but failed on admin build, after the vite fix lands on `main` either re-run GitHub Actions or run step 4 locally on the VM.
+If you already deleted `pump-tma` from PM2 before the first build, either re-run `./deploy/tma-deploy.sh` after `git pull` or start manually:
+
+```bash
+pm2 start ecosystem.config.cjs --only pump-tma
+pm2 save
+bash deploy/vm/indexer-deploy.sh   # if deploy exited before indexer step
+```
 
 Verify:
 
