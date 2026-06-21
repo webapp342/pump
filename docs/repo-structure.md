@@ -91,5 +91,5 @@ Verify:
 curl -sf http://127.0.0.1:3012/api/health
 curl -sf http://127.0.0.1:3013
 bash deploy/vm/system-health.sh | head -20
-ls apps/admin/dist/index.html apps/web/.next/standalone/server.js
+ls apps/admin/dist/index.html apps/web/.next/standalone/apps/web/server.js
 ```

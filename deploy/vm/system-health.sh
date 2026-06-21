@@ -292,7 +292,10 @@ fi
 # --- Static assets ---
 probe="ls .next/standalone/static/chunks"
 ls_started="$(now_ms_fn)"
-chunk_count="$(ls "$APP_DIR/apps/web/.next/standalone/.next/static/chunks/" 2>/dev/null | wc -l | tr -d ' ')"
+chunk_count="$(ls "$APP_DIR/apps/web/.next/standalone/apps/web/.next/static/chunks/" 2>/dev/null | wc -l | tr -d ' ')"
+if [[ "$chunk_count" == "0" ]]; then
+  chunk_count="$(ls "$APP_DIR/apps/web/.next/standalone/.next/static/chunks/" 2>/dev/null | wc -l | tr -d ' ')"
+fi
 ls_ms=$(( $(now_ms_fn) - ls_started ))
 timings_json="$(make_timings "{\"ls\":${ls_ms}}")"
 if [[ "${chunk_count:-0}" -gt 0 ]]; then

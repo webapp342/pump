@@ -8,7 +8,7 @@ module.exports = {
   apps: [
     {
       name: "pump-tma",
-      cwd: "/var/www/pump/tma/apps/web/.next/standalone",
+      cwd: "/var/www/pump/tma/apps/web/.next/standalone/apps/web",
       script: "server.js",
       exec_mode: "cluster",
       instances: 2,

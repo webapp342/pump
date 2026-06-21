@@ -39,11 +39,20 @@ else
   log "WARN: deploy/admin-console-build.sh missing — skip admin build"
 fi
 
-log "Copying static assets into standalone output"
-mkdir -p "$WEB_DIR/.next/standalone/.next"
-cp -r "$WEB_DIR/.next/static" "$WEB_DIR/.next/standalone/.next/static"
+STANDALONE_APP_DIR="$WEB_DIR/.next/standalone/apps/web"
+if [[ ! -f "$STANDALONE_APP_DIR/server.js" ]]; then
+  STANDALONE_APP_DIR="$WEB_DIR/.next/standalone"
+fi
+if [[ ! -f "$STANDALONE_APP_DIR/server.js" ]]; then
+  log "standalone server.js missing under apps/web/.next/standalone"
+  exit 1
+fi
+
+log "Copying static assets into standalone output ($STANDALONE_APP_DIR)"
+mkdir -p "$STANDALONE_APP_DIR/.next"
+cp -r "$WEB_DIR/.next/static" "$STANDALONE_APP_DIR/.next/static"
 if [ -d "$WEB_DIR/public" ]; then
-  cp -r "$WEB_DIR/public" "$WEB_DIR/.next/standalone/public"
+  cp -r "$WEB_DIR/public" "$STANDALONE_APP_DIR/public"
 fi
 
 log "Building pump-realtime"
