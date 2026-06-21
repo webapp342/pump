@@ -20,6 +20,7 @@ import {
 } from "wagmi";
 import { ADMIN_ADDRESS } from "@/config/admin";
 import { adminApiUrl } from "@/lib/admin-api-client";
+import { ADMIN_COPY } from "@/lib/admin/copy";
 import { contracts, explorerAddressUrl, explorerTxUrl, pumpChain, shortAddress } from "@/config/chain";
 import { erc20Abi } from "@/lib/abis/erc20";
 import { launchpadTreasuryAbi } from "@/lib/abis/launchpad-treasury";
@@ -55,6 +56,7 @@ import {
   AdminKpiSkeleton,
   AdminLayout,
   AdminNum,
+  AdminSection,
   AdminShell,
   AdminStatusBadge,
   AdminTabPanel,
@@ -163,19 +165,20 @@ function formatBnb(value: string): string {
 }
 
 function sweepStatusLabel(status: string): string {
+  const labels = ADMIN_COPY.airdrops.status;
   switch (status) {
     case "ready":
-      return "Ready to sweep";
+      return labels.ready;
     case "claim_window_open":
-      return "Claim window open";
+      return labels.claimWindowOpen;
     case "claim_window_open_no_winners":
-      return "No winners";
+      return labels.noWinners;
     case "swept":
-      return "Already swept";
+      return labels.swept;
     case "not_finalized":
-      return "Not finalized";
+      return labels.notFinalized;
     case "nothing_to_sweep":
-      return "Fully claimed";
+      return labels.fullyClaimed;
     default:
       return status;
   }
@@ -777,7 +780,7 @@ export function AdminPanel() {
         refreshing={loading || statsLoading || promoLoading}
         headerActions={
           <button type="button" className="admin-btn" onClick={() => disconnect()}>
-            Disconnect
+            {ADMIN_COPY.auth.disconnect}
           </button>
         }
       >
@@ -789,23 +792,23 @@ export function AdminPanel() {
           ) : (
             <AdminKpiGrid>
               <AdminKpiCard
-                label="Users registered"
+                label={ADMIN_COPY.dashboard.kpi.users.label}
                 icon={Users}
                 value={stats?.usersRegistered ?? "—"}
                 hint={
                   stats
                     ? `+${stats.usersRegistered24h} last 24h · ${stats.usersTraded} traded`
-                    : "All app profiles"
+                    : ADMIN_COPY.dashboard.kpi.users.hintEmpty
                 }
               />
               <AdminKpiCard
-                label="Trades (24h)"
+                label={ADMIN_COPY.dashboard.kpi.trades24h.label}
                 icon={ArrowRightLeft}
                 value={stats?.trades24h ?? "—"}
-                hint={stats ? `${stats.totalTrades} total indexed` : undefined}
+                hint={stats ? `${stats.totalTrades} total indexed` : ADMIN_COPY.dashboard.kpi.trades24h.hintEmpty}
               />
               <AdminKpiCard
-                label="Treasury balance"
+                label={ADMIN_COPY.dashboard.kpi.treasury.label}
                 icon={Landmark}
                 value={
                   stats ? (
@@ -821,7 +824,7 @@ export function AdminPanel() {
                 }
               />
               <AdminKpiCard
-                label="Ready to sweep"
+                label={ADMIN_COPY.dashboard.kpi.sweeps.label}
                 icon={Gift}
                 value={sweepStats.readyCount}
                 hint={
@@ -837,16 +840,20 @@ export function AdminPanel() {
           <div className="flex items-center gap-2 admin-meta" style={{ marginBottom: "16px" }}>
             <Clock size={12} aria-hidden="true" />
             <span>
-              Last refreshed: {lastRefreshedAt ? lastRefreshedAt.toLocaleTimeString() : "—"}
+              {ADMIN_COPY.dashboard.lastRefreshed}:{" "}
+              {lastRefreshedAt ? lastRefreshedAt.toLocaleTimeString() : "—"}
             </span>
             <span aria-hidden="true">·</span>
-            <span>Auto-refresh every 60s</span>
+            <span>{ADMIN_COPY.dashboard.autoRefresh}</span>
           </div>
 
           <AdminSystemHealth />
 
           <AdminContentGrid columns={2}>
-            <AdminBlock title="Platform activity">
+            <AdminBlock
+              title={ADMIN_COPY.dashboard.sections.activity.title}
+              description={ADMIN_COPY.dashboard.sections.activity.description}
+            >
           <AdminDataTable>
             <AdminDataRow label="Tokens launched" loading={statsLoading && !stats}>
               <AdminNum>{stats?.totalTokens ?? "—"}</AdminNum>
@@ -866,7 +873,10 @@ export function AdminPanel() {
           </AdminDataTable>
             </AdminBlock>
 
-            <AdminBlock title="Fee summary">
+            <AdminBlock
+              title={ADMIN_COPY.dashboard.sections.fees.title}
+              description={ADMIN_COPY.dashboard.sections.fees.description}
+            >
           <AdminDataTable>
             <AdminDataRow label="Pending creator fees" loading={statsLoading && !stats}>
               {stats ? (
@@ -923,20 +933,25 @@ export function AdminPanel() {
         {address ? (
           <AdminPortfolioTab address={address} />
         ) : (
-          <AdminEmptyState title="Connect MetaMask to view portfolio holdings." />
+          <AdminEmptyState title={ADMIN_COPY.portfolio.empty} />
         )}
       </AdminTabPanel>
 
       <AdminTabPanel id="treasury" active={activeTab}>
         <AdminContentGrid columns={2}>
-        <AdminBlock title="Fee settings">
+        <AdminBlock
+          title={ADMIN_COPY.treasury.feeSettings.title}
+          description={ADMIN_COPY.treasury.feeSettings.description}
+        >
           <AdminDataTable>
             <AdminDataRow
               label="Trade protocol fee"
               loading={!protocol}
               action={
                 protocol ? (
-                  <AdminTextButton onClick={() => setProtocolFeeModalOpen(true)}>Edit</AdminTextButton>
+                  <AdminTextButton onClick={() => setProtocolFeeModalOpen(true)}>
+                    {ADMIN_COPY.actions.update}
+                  </AdminTextButton>
                 ) : undefined
               }
             >
@@ -959,7 +974,9 @@ export function AdminPanel() {
               loading={!protocol}
               action={
                 protocol ? (
-                  <AdminTextButton onClick={() => setCreatorShareModalOpen(true)}>Edit</AdminTextButton>
+                  <AdminTextButton onClick={() => setCreatorShareModalOpen(true)}>
+                    {ADMIN_COPY.actions.update}
+                  </AdminTextButton>
                 ) : undefined
               }
             >
@@ -972,7 +989,9 @@ export function AdminPanel() {
               loading={!protocol}
               action={
                 protocol ? (
-                  <AdminTextButton onClick={() => setReferrerShareModalOpen(true)}>Edit</AdminTextButton>
+                  <AdminTextButton onClick={() => setReferrerShareModalOpen(true)}>
+                    {ADMIN_COPY.actions.update}
+                  </AdminTextButton>
                 ) : undefined
               }
             >
@@ -985,7 +1004,9 @@ export function AdminPanel() {
               loading={!protocol}
               action={
                 protocol ? (
-                  <AdminTextButton onClick={() => setMemeCreateFeeModalOpen(true)}>Edit</AdminTextButton>
+                  <AdminTextButton onClick={() => setMemeCreateFeeModalOpen(true)}>
+                    {ADMIN_COPY.actions.update}
+                  </AdminTextButton>
                 ) : undefined
               }
             >
@@ -1005,7 +1026,9 @@ export function AdminPanel() {
               label="Min initial buy"
               loading={platformSettingsLoading}
               action={
-                <AdminTextButton onClick={() => setMinInitialBuyModalOpen(true)}>Edit</AdminTextButton>
+                <AdminTextButton onClick={() => setMinInitialBuyModalOpen(true)}>
+                  {ADMIN_COPY.actions.update}
+                </AdminTextButton>
               }
             >
               {formatBnb(minInitialBuyBnb)} BNB
@@ -1014,7 +1037,9 @@ export function AdminPanel() {
             <AdminDataRow
               label="Create fee exemption"
               action={
-                <AdminTextButton onClick={() => setFeeExemptModalOpen(true)}>Manage</AdminTextButton>
+                <AdminTextButton onClick={() => setFeeExemptModalOpen(true)}>
+                  {ADMIN_COPY.actions.manage}
+                </AdminTextButton>
               }
             >
               On-chain <span className="admin-meta"> · MemeFactory + AirdropManager</span>
@@ -1024,7 +1049,9 @@ export function AdminPanel() {
               loading={!protocol?.airdropManager}
               action={
                 protocol?.airdropManager ? (
-                  <AdminTextButton onClick={() => setAirdropCreateFeeModalOpen(true)}>Edit</AdminTextButton>
+                  <AdminTextButton onClick={() => setAirdropCreateFeeModalOpen(true)}>
+                    {ADMIN_COPY.actions.update}
+                  </AdminTextButton>
                 ) : undefined
               }
             >
@@ -1043,7 +1070,10 @@ export function AdminPanel() {
           </AdminDataTable>
         </AdminBlock>
 
-        <AdminBlock title="Treasury balances">
+        <AdminBlock
+          title={ADMIN_COPY.treasury.balances.title}
+          description={ADMIN_COPY.treasury.balances.description}
+        >
           <AdminDataTable>
             <AdminDataRow label="Contract">
               {treasuryContract ? (
@@ -1092,7 +1122,7 @@ export function AdminPanel() {
                     onClick={onEmergencySweepBonding}
                     disabled={adminTxPending && bondingEmergencySweepPending}
                   >
-                    {adminTxPending && bondingEmergencySweepPending ? "…" : "Sweep all BNB"}
+                    {adminTxPending && bondingEmergencySweepPending ? "…" : ADMIN_COPY.actions.sweepAll}
                   </AdminBtn>
                 }
               >
@@ -1101,10 +1131,10 @@ export function AdminPanel() {
                   value={emergencySweepTo}
                   onChange={(e) => setEmergencySweepTo(e.target.value)}
                   className="admin-input admin-num"
-                  placeholder="Recipient (treasury)"
+                  placeholder={ADMIN_COPY.treasury.emergency.recipientPlaceholder}
                   aria-label="Emergency sweep recipient"
                 />
-                <span className="admin-meta"> · halts all trading</span>
+                <span className="admin-meta"> · {ADMIN_COPY.treasury.emergency.warning}</span>
               </AdminDataRow>
             ) : null}
             <AdminDataRow label="Sweep recipient">
@@ -1115,7 +1145,10 @@ export function AdminPanel() {
         </AdminContentGrid>
 
         {canWithdrawTreasury ? (
-          <AdminBlock title="Withdraw from treasury">
+          <AdminBlock
+            title={ADMIN_COPY.treasury.withdraw.title}
+            description={ADMIN_COPY.treasury.withdraw.description}
+          >
             <table className="admin-grid">
               <tbody>
                 <tr>
@@ -1131,7 +1164,7 @@ export function AdminPanel() {
                         }
                         onClick={() => setWithdrawMode("bnb")}
                       >
-                        BNB
+                        {ADMIN_COPY.treasury.withdraw.typeBnb}
                       </button>
                       <button
                         type="button"
@@ -1142,13 +1175,13 @@ export function AdminPanel() {
                         }
                         onClick={() => setWithdrawMode("token")}
                       >
-                        Token
+                        {ADMIN_COPY.treasury.withdraw.typeToken}
                       </button>
                     </div>
                   </td>
                 </tr>
                 <tr>
-                  <th scope="row">Recipient</th>
+                  <th scope="row">{ADMIN_COPY.treasury.withdraw.recipient}</th>
                   <td colSpan={2}>
                     <input
                       type="text"
@@ -1161,7 +1194,7 @@ export function AdminPanel() {
                 {withdrawMode === "bnb" ? (
                   <>
                     <tr>
-                      <th scope="row">Amount BNB</th>
+                      <th scope="row">{ADMIN_COPY.treasury.withdraw.amountBnb}</th>
                       <td>
                         <input
                           type="text"
@@ -1173,12 +1206,12 @@ export function AdminPanel() {
                       </td>
                       <td>
                         <AdminBtn onClick={fillMaxTreasuryBnb} disabled={!treasuryLiveBalance?.value}>
-                          Max
+                          {ADMIN_COPY.actions.useMax}
                         </AdminBtn>
                       </td>
                     </tr>
                     <tr>
-                      <th scope="row">Available</th>
+                      <th scope="row">{ADMIN_COPY.treasury.withdraw.available}</th>
                       <td colSpan={2}>
                         <AdminNum>{formatBnb(treasuryBnb)} BNB</AdminNum>
                       </td>
@@ -1187,7 +1220,7 @@ export function AdminPanel() {
                 ) : (
                   <>
                     <tr>
-                      <th scope="row">Token contract</th>
+                      <th scope="row">{ADMIN_COPY.treasury.withdraw.tokenContract}</th>
                       <td colSpan={2}>
                         <input
                           type="text"
@@ -1198,7 +1231,7 @@ export function AdminPanel() {
                       </td>
                     </tr>
                     <tr>
-                      <th scope="row">Amount</th>
+                      <th scope="row">{ADMIN_COPY.treasury.withdraw.amountToken}</th>
                       <td>
                         <input
                           type="text"
@@ -1213,7 +1246,7 @@ export function AdminPanel() {
                           onClick={fillMaxTreasuryToken}
                           disabled={treasuryTokenBalance == null || treasuryTokenBalance === 0n}
                         >
-                          Max
+                          {ADMIN_COPY.actions.useMax}
                         </AdminBtn>
                       </td>
                     </tr>
@@ -1228,7 +1261,7 @@ export function AdminPanel() {
                       }
                       disabled={adminTxPending}
                     >
-                      {adminTxPending ? "Withdrawing…" : "Withdraw"}
+                      {adminTxPending ? ADMIN_COPY.actions.withdrawing : ADMIN_COPY.actions.withdraw}
                     </AdminBtn>
                   </td>
                 </tr>
@@ -1244,34 +1277,30 @@ export function AdminPanel() {
             ) : null}
           </AdminBlock>
         ) : (
-          <p className="admin-note">
-            Withdrawals require treasury owner ({shortAddress(treasuryOwner ?? ADMIN_ADDRESS)}).
-          </p>
+          <p className="admin-note">{ADMIN_COPY.treasury.withdraw.ownerRequired}</p>
         )}
       </AdminTabPanel>
 
       <AdminTabPanel id="airdrops" active={activeTab}>
-        <AdminBlock
-          title="Airdrop sweeps"
+        <AdminSection
+          title={ADMIN_COPY.pages.airdrops.title}
+          description={ADMIN_COPY.pages.airdrops.description}
+          callout={ADMIN_COPY.airdrops.callout}
           actions={
             <AdminBtn onClick={() => void load()} disabled={loading}>
-              {loading ? "…" : "Refresh"}
+              {loading ? "…" : ADMIN_COPY.actions.refreshList}
             </AdminBtn>
           }
         >
           {loading ? (
-            <p className="admin-empty">Loading…</p>
+            <p className="admin-empty">{ADMIN_COPY.empty.loading}</p>
           ) : airdrops.length === 0 ? (
-            <AdminEmptyState title="No airdrops" />
+            <AdminEmptyState title={ADMIN_COPY.airdrops.empty} />
           ) : (
             <>
-              <p className="admin-note">
-                Sweep unlocks when on-chain <span className="admin-num">claimEnd</span> passes
-                (qualify end + 24h). Finalize is not required if there are no winners.
-              </p>
               {readySweeps.length > 0 ? (
                 <p className="admin-note">
-                  {readySweeps.length} ready to sweep
+                  {readySweeps.length} {ADMIN_COPY.airdrops.ready}
                   {sweepStats.remainingUsd != null
                     ? ` · ${formatUsdReadable(sweepStats.remainingUsd, { compact: true })}`
                     : ""}
@@ -1279,23 +1308,23 @@ export function AdminPanel() {
               ) : null}
               {pendingSweeps.length > 0 ? (
                 <p className="admin-note admin-status-warn">
-                  {pendingSweeps.length} campaign{pendingSweeps.length === 1 ? "" : "s"} locked
-                  until claim window ends — see countdown below.
+                  {pendingSweeps.length} campaign{pendingSweeps.length === 1 ? "" : "s"}{" "}
+                  {ADMIN_COPY.airdrops.locked}
                 </p>
               ) : null}
               <AdminGridTable>
                 <thead>
                   <tr>
-                    <th>ID</th>
-                    <th>Campaign</th>
-                    <th>Symbol</th>
-                    <th>Reward pool</th>
-                    <th>Claimed</th>
-                    <th>Remaining</th>
-                    <th>Claim until</th>
-                    <th>Sweep in</th>
-                    <th>Status</th>
-                    <th>Action</th>
+                    <th>{ADMIN_COPY.airdrops.columns.id}</th>
+                    <th>{ADMIN_COPY.airdrops.columns.campaign}</th>
+                    <th>{ADMIN_COPY.airdrops.columns.symbol}</th>
+                    <th>{ADMIN_COPY.airdrops.columns.pool}</th>
+                    <th>{ADMIN_COPY.airdrops.columns.claimed}</th>
+                    <th>{ADMIN_COPY.airdrops.columns.remaining}</th>
+                    <th>{ADMIN_COPY.airdrops.columns.claimUntil}</th>
+                    <th>{ADMIN_COPY.airdrops.columns.sweepIn}</th>
+                    <th>{ADMIN_COPY.airdrops.columns.status}</th>
+                    <th>{ADMIN_COPY.airdrops.columns.action}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1378,10 +1407,10 @@ export function AdminPanel() {
                             onClick={() => onSweep(row)}
                             disabled={adminTxPending && sweepingId === row.onChainId}
                           >
-                            {adminTxPending && sweepingId === row.onChainId ? "…" : "Sweep"}
+                            {adminTxPending && sweepingId === row.onChainId ? "…" : ADMIN_COPY.actions.sweep}
                           </AdminBtn>
                         ) : row.sweepStatus === "swept" ? (
-                          "Swept"
+                          ADMIN_COPY.airdrops.status.swept
                         ) : row.sweepStatus === "nothing_to_sweep" ? (
                           "—"
                         ) : (
@@ -1407,39 +1436,40 @@ export function AdminPanel() {
               ) : null}
             </>
           )}
-        </AdminBlock>
+        </AdminSection>
       </AdminTabPanel>
 
       <AdminTabPanel id="promo" active={activeTab}>
         <AdminBlock
-          title="Create promo task"
+          title={ADMIN_COPY.promo.create.title}
+          description={ADMIN_COPY.promo.create.description}
           actions={
             <AdminBtn onClick={() => void loadPromoTasks()} disabled={promoLoading}>
-              {promoLoading ? "…" : "Refresh list"}
+              {promoLoading ? "…" : ADMIN_COPY.actions.refreshList}
             </AdminBtn>
           }
         >
           <div className="admin-form-grid" style={{ padding: "16px" }}>
-            <AdminField label="Title">
+            <AdminField label={ADMIN_COPY.promo.create.titleField}>
               <input
                 type="text"
                 value={promoTitle}
                 onChange={(e) => setPromoTitle(e.target.value)}
                 className="admin-input"
-                placeholder="Follow us on X"
+                placeholder={ADMIN_COPY.promo.create.titlePlaceholder}
               />
             </AdminField>
-            <AdminField label="Description (optional)">
+            <AdminField label={ADMIN_COPY.promo.create.descField}>
               <input
                 type="text"
                 value={promoDescription}
                 onChange={(e) => setPromoDescription(e.target.value)}
                 className="admin-input"
-                placeholder="Short task description"
+                placeholder={ADMIN_COPY.promo.create.descPlaceholder}
               />
             </AdminField>
             <div className="admin-form-row-2">
-              <AdminField label="Reward points">
+              <AdminField label={ADMIN_COPY.promo.create.pointsField}>
                 <input
                   type="number"
                   min={0}
@@ -1449,13 +1479,13 @@ export function AdminPanel() {
                   className="admin-input admin-num"
                 />
               </AdminField>
-              <AdminField label="Target URL">
+              <AdminField label={ADMIN_COPY.promo.create.urlField}>
                 <input
                   type="url"
                   value={promoUrl}
                   onChange={(e) => setPromoUrl(e.target.value)}
                   className="admin-input"
-                  placeholder="https://…"
+                  placeholder={ADMIN_COPY.promo.create.urlPlaceholder}
                 />
               </AdminField>
             </div>
@@ -1467,17 +1497,20 @@ export function AdminPanel() {
                   promoSaving || !promoTitle.trim() || !promoUrl.trim() || !promoPoints.trim()
                 }
               >
-                {promoSaving ? "Creating…" : "Create task"}
+                {promoSaving ? "Creating…" : ADMIN_COPY.actions.create}
               </AdminBtn>
             </div>
           </div>
         </AdminBlock>
 
-        <AdminBlock title="Active promo tasks">
+        <AdminBlock
+          title={ADMIN_COPY.promo.list.title}
+          description={ADMIN_COPY.promo.list.description}
+        >
           {promoLoading ? (
-            <p className="admin-empty">Loading…</p>
+            <p className="admin-empty">{ADMIN_COPY.empty.loading}</p>
           ) : promoTasks.length === 0 ? (
-            <AdminEmptyState title="No promo tasks" />
+            <AdminEmptyState title={ADMIN_COPY.promo.list.empty} />
           ) : (
             <AdminGridTable>
               <thead>
@@ -1518,7 +1551,7 @@ export function AdminPanel() {
                         onClick={() => void onDeletePromoTask(task.taskKey, task.title)}
                         disabled={deletingKey === task.taskKey}
                       >
-                        {deletingKey === task.taskKey ? "…" : "Delete"}
+                        {deletingKey === task.taskKey ? "…" : ADMIN_COPY.actions.delete}
                       </AdminBtn>
                     </td>
                   </tr>
@@ -1530,20 +1563,23 @@ export function AdminPanel() {
       </AdminTabPanel>
 
       <AdminTabPanel id="contracts" active={activeTab}>
-        <AdminBlock title="UUPS proxies">
-          <p className="admin-card-note admin-note">
-            Proxy addresses in <code className="admin-num">.env</code> and{" "}
-            <code className="admin-num">contract_registry</code> — upgrades swap implementation only.
-          </p>
+        <AdminBlock
+          title={ADMIN_COPY.pages.contracts.title}
+          description={ADMIN_COPY.pages.contracts.description}
+        >
+          <p className="admin-card-note admin-note">{ADMIN_COPY.contracts.intro}</p>
           <AdminDataTable>
             {[
-              ["MemeFactory", protocol?.memeFactory.address ?? contracts.memeFactory],
-              ["BondingCurveManager", protocol?.bondingCurveManager.address ?? contracts.bondingCurveManager],
+              [ADMIN_COPY.contracts.labels.memeFactory, protocol?.memeFactory.address ?? contracts.memeFactory],
               [
-                "PumpAirdropManager",
+                ADMIN_COPY.contracts.labels.bonding,
+                protocol?.bondingCurveManager.address ?? contracts.bondingCurveManager,
+              ],
+              [
+                ADMIN_COPY.contracts.labels.airdrop,
                 protocol?.airdropManager?.address ?? contracts.airdropManager ?? "—",
               ],
-              ["LaunchpadTreasury", protocol?.treasury.address ?? treasuryContract ?? "—"],
+              [ADMIN_COPY.contracts.labels.treasury, protocol?.treasury.address ?? treasuryContract ?? "—"],
             ].map(([label, addr]) => (
               <AdminDataRow key={label} label={String(label)}>
                 {addr && addr !== "—" ? (

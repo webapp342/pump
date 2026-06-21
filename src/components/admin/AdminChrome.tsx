@@ -4,7 +4,6 @@ import { type ReactNode, useMemo, useState } from "react";
 import {
   Boxes,
   ChevronRight,
-  Command,
   CreditCard,
   FileCode2,
   Gift,
@@ -16,6 +15,7 @@ import {
   X,
 } from "lucide-react";
 import { explorerAddressUrl, shortAddress } from "@/config/chain";
+import { ADMIN_COPY } from "@/lib/admin/copy";
 
 export type AdminTabId =
   | "dashboard"
@@ -37,58 +37,64 @@ type NavGroup = {
   items: NavItem[];
 };
 
-export const ADMIN_PAGE_META: Record<AdminTabId, { title: string; description: string }> = {
-  dashboard: {
-    title: "Dashboard",
-    description: "Platform KPIs, infrastructure health, and fee overview.",
-  },
-  portfolio: {
-    title: "Portfolio",
-    description: "Admin wallet token holdings and bulk sell tools.",
-  },
-  treasury: {
-    title: "Treasury & fees",
-    description: "Protocol fee settings, treasury balances, and withdrawals.",
-  },
-  airdrops: {
-    title: "Airdrop sweeps",
-    description: "Recover unclaimed escrow after the on-chain claim window.",
-  },
-  promo: {
-    title: "Promo tasks",
-    description: "Create and manage off-chain link tasks for launchpad points.",
-  },
-  contracts: {
-    title: "Contracts",
-    description: "UUPS proxy addresses referenced by the app and indexer.",
-  },
-};
+export const ADMIN_PAGE_META: Record<AdminTabId, { title: string; description: string }> =
+  ADMIN_COPY.pages;
 
 const NAV_GROUPS: NavGroup[] = [
   {
-    label: "Overview",
+    label: ADMIN_COPY.nav.overview,
     items: [
-      { id: "dashboard", label: "Dashboard", description: "KPIs & health", icon: LayoutDashboard },
+      {
+        id: "dashboard",
+        label: ADMIN_COPY.nav.items.dashboard.label,
+        description: ADMIN_COPY.nav.items.dashboard.desc,
+        icon: LayoutDashboard,
+      },
     ],
   },
   {
-    label: "Operations",
+    label: ADMIN_COPY.nav.operations,
     items: [
-      { id: "portfolio", label: "Portfolio", description: "Wallet holdings", icon: Wallet },
-      { id: "airdrops", label: "Airdrop sweeps", description: "Escrow recovery", icon: Gift },
-      { id: "promo", label: "Promo tasks", description: "Points campaigns", icon: CreditCard },
+      {
+        id: "portfolio",
+        label: ADMIN_COPY.nav.items.portfolio.label,
+        description: ADMIN_COPY.nav.items.portfolio.desc,
+        icon: Wallet,
+      },
+      {
+        id: "airdrops",
+        label: ADMIN_COPY.nav.items.airdrops.label,
+        description: ADMIN_COPY.nav.items.airdrops.desc,
+        icon: Gift,
+      },
+      {
+        id: "promo",
+        label: ADMIN_COPY.nav.items.promo.label,
+        description: ADMIN_COPY.nav.items.promo.desc,
+        icon: CreditCard,
+      },
     ],
   },
   {
-    label: "Finance",
+    label: ADMIN_COPY.nav.finance,
     items: [
-      { id: "treasury", label: "Treasury & fees", description: "Fees & withdraw", icon: Landmark },
+      {
+        id: "treasury",
+        label: ADMIN_COPY.nav.items.treasury.label,
+        description: ADMIN_COPY.nav.items.treasury.desc,
+        icon: Landmark,
+      },
     ],
   },
   {
-    label: "System",
+    label: ADMIN_COPY.nav.system,
     items: [
-      { id: "contracts", label: "Contracts", description: "On-chain refs", icon: FileCode2 },
+      {
+        id: "contracts",
+        label: ADMIN_COPY.nav.items.contracts.label,
+        description: ADMIN_COPY.nav.items.contracts.desc,
+        icon: FileCode2,
+      },
     ],
   },
 ];
@@ -141,8 +147,8 @@ export function AdminLayout({
           <Boxes className="admin-sidebar-brand-icon" aria-hidden="true" />
         </div>
         <div>
-          <p className="admin-sidebar-brand-title">Pump Admin</p>
-          <p className="admin-sidebar-brand-sub">BSC Testnet · Operations</p>
+          <p className="admin-sidebar-brand-title">{ADMIN_COPY.brand.title}</p>
+          <p className="admin-sidebar-brand-sub">{ADMIN_COPY.brand.subtitle}</p>
         </div>
       </div>
 
@@ -192,7 +198,7 @@ export function AdminLayout({
                 {shortAddress(address)}
               </a>
             </div>
-            <span className="admin-wallet-network">Connected</span>
+            <span className="admin-wallet-network">{ADMIN_COPY.auth.sidebarConnected}</span>
           </div>
         ) : (
           <span className="admin-sidebar-foot-note">No wallet connected</span>
@@ -221,7 +227,7 @@ export function AdminLayout({
                 <Boxes className="admin-sidebar-brand-icon" aria-hidden="true" />
               </div>
               <div>
-                <p className="admin-sidebar-brand-title">Pump Admin</p>
+                <p className="admin-sidebar-brand-title">{ADMIN_COPY.brand.title}</p>
                 <p className="admin-sidebar-brand-sub">BSC Testnet</p>
               </div>
             </div>
@@ -251,7 +257,7 @@ export function AdminLayout({
             </button>
             <div className="min-w-0">
               <nav className="admin-breadcrumb" aria-label="Breadcrumb">
-                <span className="admin-breadcrumb-root">Operations</span>
+                <span className="admin-breadcrumb-root">{ADMIN_COPY.brand.breadcrumbRoot}</span>
                 <ChevronRight size={14} className="admin-breadcrumb-sep" aria-hidden="true" />
                 <span className="admin-breadcrumb-current" aria-current="page">
                   {meta.title}
@@ -263,19 +269,6 @@ export function AdminLayout({
           </div>
 
           <div className="admin-topbar-actions">
-            <button
-              type="button"
-              className="admin-search-trigger"
-              aria-label="Search (Cmd+K)"
-              onClick={() => {
-                // Reserved for future command palette integration
-              }}
-            >
-              <Command size={14} aria-hidden="true" />
-              <span>Search</span>
-              <kbd className="admin-kbd">⌘K</kbd>
-            </button>
-
             {headerActions}
 
             {onRefreshAll ? (
@@ -290,7 +283,7 @@ export function AdminLayout({
                   className={refreshing ? "admin-spin" : ""}
                   aria-hidden="true"
                 />
-                <span>{refreshing ? "Refreshing…" : "Refresh"}</span>
+                <span>{refreshing ? ADMIN_COPY.actions.refreshing : ADMIN_COPY.actions.refresh}</span>
               </button>
             ) : null}
           </div>
@@ -403,12 +396,14 @@ export function AdminContentGrid({
 
 export function AdminCard({
   title,
+  description,
   actions,
   children,
   padded,
   footer,
 }: {
   title: string;
+  description?: string;
   actions?: ReactNode;
   children: ReactNode;
   padded?: boolean;
@@ -417,7 +412,10 @@ export function AdminCard({
   return (
     <section className="admin-card">
       <div className="admin-card-head">
-        <h2 className="admin-card-title">{title}</h2>
+        <div className="admin-card-head-text">
+          <h2 className="admin-card-title">{title}</h2>
+          {description ? <p className="admin-section-desc">{description}</p> : null}
+        </div>
         {actions ? <div className="admin-card-actions">{actions}</div> : null}
       </div>
       <div
@@ -434,18 +432,54 @@ export function AdminCard({
 
 export function AdminBlock({
   title,
+  description,
   actions,
   children,
 }: {
   title: string;
+  description?: string;
   actions?: ReactNode;
   children: ReactNode;
 }) {
   return (
-    <AdminCard title={title} actions={actions}>
+    <AdminCard title={title} description={description} actions={actions}>
       {children}
     </AdminCard>
   );
+}
+
+/** Section with optional callout banner above body content. */
+export function AdminSection({
+  title,
+  description,
+  actions,
+  callout,
+  calloutTone = "info",
+  children,
+}: {
+  title: string;
+  description?: string;
+  actions?: ReactNode;
+  callout?: ReactNode;
+  calloutTone?: "info" | "warn" | "danger";
+  children: ReactNode;
+}) {
+  return (
+    <AdminCard title={title} description={description} actions={actions}>
+      {callout ? <AdminCallout tone={calloutTone}>{callout}</AdminCallout> : null}
+      {children}
+    </AdminCard>
+  );
+}
+
+export function AdminCallout({
+  children,
+  tone = "info",
+}: {
+  children: ReactNode;
+  tone?: "info" | "warn" | "danger";
+}) {
+  return <div className={`admin-callout admin-callout--${tone}`}>{children}</div>;
 }
 
 export function AdminScroll({ children }: { children: ReactNode }) {
@@ -704,18 +738,4 @@ export function AdminTableWrap({ children }: { children: ReactNode }) {
 /** @deprecated use AdminEmpty */
 export function AdminEmptyState({ title }: { title: string }) {
   return <AdminEmpty>{title}</AdminEmpty>;
-}
-
-/** @deprecated use AdminCard */
-export function AdminSection(props: {
-  title: string;
-  actions?: ReactNode;
-  children: ReactNode;
-  compact?: boolean;
-}) {
-  return (
-    <AdminBlock title={props.title} actions={props.actions}>
-      {props.children}
-    </AdminBlock>
-  );
 }

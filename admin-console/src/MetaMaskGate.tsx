@@ -1,6 +1,7 @@
 import { useAccount, useConnect, useConnectors, useDisconnect } from "wagmi";
 import { isAdminWallet } from "@/config/admin";
 import { shortAddress } from "@/config/chain";
+import { ADMIN_COPY } from "@/lib/admin/copy";
 
 function hasBrowserProvider(): boolean {
   return typeof window !== "undefined" && "ethereum" in window && Boolean(window.ethereum);
@@ -18,7 +19,7 @@ export function MetaMaskGate({ children }: { children: React.ReactNode }) {
     return (
       <div className="admin-page admin-gate">
         <div className="admin-gate-card">
-          <p className="admin-meta">Connecting wallet…</p>
+          <p className="admin-meta">{ADMIN_COPY.auth.connecting}</p>
         </div>
       </div>
     );
@@ -28,14 +29,11 @@ export function MetaMaskGate({ children }: { children: React.ReactNode }) {
     return (
       <div className="admin-page admin-gate">
         <div className="admin-gate-card">
-          <h1 className="admin-title">Pump Admin</h1>
-          <p className="admin-meta mt-3">
-            Connect the operations wallet configured in{" "}
-            <code className="admin-num">NEXT_PUBLIC_ADMIN_ADDRESS</code>.
-          </p>
+          <h1 className="admin-title">{ADMIN_COPY.auth.gateTitle}</h1>
+          <p className="admin-meta mt-3">{ADMIN_COPY.auth.gateBody}</p>
           {!hasBrowserProvider() ? (
             <p className="admin-status-bad mt-4 text-caption">
-              No wallet extension detected. Install MetaMask and refresh.
+              No wallet extension detected. Install MetaMask and refresh this page.
             </p>
           ) : null}
           <button
@@ -47,7 +45,7 @@ export function MetaMaskGate({ children }: { children: React.ReactNode }) {
               connect({ connector: walletConnector });
             }}
           >
-            Connect wallet
+            {ADMIN_COPY.auth.connect}
           </button>
           {connectError ? (
             <p className="admin-status-bad mt-4 text-caption">{connectError.message}</p>
@@ -61,14 +59,13 @@ export function MetaMaskGate({ children }: { children: React.ReactNode }) {
     return (
       <div className="admin-page admin-gate">
         <div className="admin-gate-card">
-          <h1 className="admin-title">Not authorized</h1>
+          <h1 className="admin-title">{ADMIN_COPY.auth.unauthorizedTitle}</h1>
           <p className="admin-meta mt-3">
-            Connected wallet{" "}
-            <span className="admin-num">{shortAddress(address)}</span> is not the configured admin
-            address.
+            {ADMIN_COPY.auth.unauthorizedBody}{" "}
+            <span className="admin-num">({shortAddress(address)})</span>
           </p>
           <button type="button" className="admin-btn mt-6 w-full" onClick={() => disconnect()}>
-            Disconnect
+            {ADMIN_COPY.auth.disconnect}
           </button>
         </div>
       </div>

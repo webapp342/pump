@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useState } from "react";
 import { useAccount } from "wagmi";
 import { adminApiUrl } from "@/lib/admin-api-client";
+import { ADMIN_COPY } from "@/lib/admin/copy";
 import {
   AdminBlock,
   AdminBtn,
   AdminDataRow,
   AdminDataTable,
   AdminGridTable,
+  AdminStatusBadge,
   AdminTextButton,
 } from "@/components/admin/AdminChrome";
 import { ModalPortal } from "@/components/ui/ModalPortal";
@@ -64,14 +66,7 @@ type SystemHealthReport = {
 };
 
 function statusLabel(status: ServiceHealthStatus): string {
-  switch (status) {
-    case "healthy":
-      return "Healthy";
-    case "degraded":
-      return "Degraded";
-    case "down":
-      return "Down";
-  }
+  return ADMIN_COPY.health.labels[status === "down" ? "down" : status];
 }
 
 function statusClass(status: ServiceHealthStatus): string {
@@ -167,7 +162,7 @@ function HostMetricsTables({ metrics }: { metrics: HostMetrics }) {
 
 function ChecksTable({ checks }: { checks: ServiceHealthCheck[] }) {
   return (
-    <AdminBlock title="Service checks">
+    <AdminBlock title={ADMIN_COPY.health.checks}>
       <AdminGridTable>
         <thead>
           <tr>
@@ -185,7 +180,19 @@ function ChecksTable({ checks }: { checks: ServiceHealthCheck[] }) {
             return (
               <tr key={check.id}>
                 <td>{check.name}</td>
-                <td className={statusClass(check.status)}>{statusLabel(check.status)}</td>
+                <td>
+                  <AdminStatusBadge
+                    tone={
+                      check.status === "healthy"
+                        ? "ok"
+                        : check.status === "degraded"
+                          ? "warn"
+                          : "bad"
+                    }
+                  >
+                    {statusLabel(check.status)}
+                  </AdminStatusBadge>
+                </td>
                 <td className="admin-num">{check.latencyMs != null ? `${check.latencyMs}ms` : "—"}</td>
                 <td>{check.summary}</td>
                 <td className="admin-num">{timingDetail ?? "—"}</td>
@@ -237,27 +244,30 @@ function SystemHealthDetailModal({
       />
       <div className="admin-page admin-modal relative z-10">
         <div className="admin-modal-head">
-          <span>Infrastructure details</span>
+          <span>{ADMIN_COPY.health.modalTitle}</span>
           <div className="flex gap-2">
             <AdminBtn onClick={onRefresh} disabled={loading}>
-              {loading ? "…" : "Refresh"}
+              {loading ? "…" : ADMIN_COPY.actions.refresh}
             </AdminBtn>
-            <AdminBtn onClick={onClose}>Close</AdminBtn>
+            <AdminBtn onClick={onClose}>{ADMIN_COPY.actions.close}</AdminBtn>
           </div>
         </div>
         <div className="admin-modal-body">
           {error ? <div className="admin-alert">{error}</div> : null}
           <AdminDataTable>
-            <AdminDataRow label="Overall">
-              <span className={statusClass(overall)}>{statusLabel(overall)}</span>
+            <AdminDataRow label={ADMIN_COPY.health.status}>
+              <AdminStatusBadge
+                tone={
+                  overall === "healthy" ? "ok" : overall === "degraded" ? "warn" : "bad"
+                }
+              >
+                {statusLabel(overall)}
+              </AdminStatusBadge>
             </AdminDataRow>
-            <AdminDataRow label="Checks">
+            <AdminDataRow label={ADMIN_COPY.health.checks}>
               {report ? `${passing}/${total} passing` : loading ? "Running…" : "—"}
             </AdminDataRow>
-            <AdminDataRow label="Script">
-              {report?.scriptDurationMs != null ? `${report.scriptDurationMs}ms` : "—"}
-            </AdminDataRow>
-            <AdminDataRow label="Checked at">
+            <AdminDataRow label={ADMIN_COPY.health.checkedAt}>
               {report ? formatCheckedAt(report.checkedAt) : "—"}
             </AdminDataRow>
             <AdminDataRow label="Host">{report?.host ?? "—"}</AdminDataRow>
@@ -316,22 +326,29 @@ export function AdminSystemHealth() {
   return (
     <>
       <AdminBlock
-        title="Infrastructure health"
+        title={ADMIN_COPY.health.title}
+        description={ADMIN_COPY.health.description}
         actions={
           <>
             <AdminBtn onClick={() => void load()} disabled={loading}>
-              {loading ? "…" : "Refresh"}
+              {loading ? "…" : ADMIN_COPY.actions.refresh}
             </AdminBtn>
-            <AdminTextButton onClick={() => setModalOpen(true)}>Details</AdminTextButton>
+            <AdminTextButton onClick={() => setModalOpen(true)}>
+              {ADMIN_COPY.actions.viewDetails}
+            </AdminTextButton>
           </>
         }
       >
         <AdminDataTable>
-          <AdminDataRow label="Status">
-            <span className={statusClass(overall)}>{statusLabel(overall)}</span>
+          <AdminDataRow label={ADMIN_COPY.health.status}>
+            <AdminStatusBadge
+              tone={overall === "healthy" ? "ok" : overall === "degraded" ? "warn" : "bad"}
+            >
+              {statusLabel(overall)}
+            </AdminStatusBadge>
           </AdminDataRow>
-          <AdminDataRow label="Checks">{summaryText}</AdminDataRow>
-          <AdminDataRow label="Checked at">
+          <AdminDataRow label={ADMIN_COPY.health.checks}>{summaryText}</AdminDataRow>
+          <AdminDataRow label={ADMIN_COPY.health.checkedAt}>
             {report ? formatCheckedAt(report.checkedAt) : "—"}
           </AdminDataRow>
         </AdminDataTable>

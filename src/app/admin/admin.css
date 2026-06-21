@@ -456,7 +456,7 @@
 
 .admin-card-head {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
   border-bottom: 1px solid rgb(var(--pump-border) / 0.22);
@@ -464,10 +464,52 @@
   padding: 14px 16px;
 }
 
+.admin-card-head-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
 .admin-card-title {
   margin: 0;
   font-size: var(--text-body-sm);
   font-weight: 600;
+  color: rgb(var(--pump-text));
+}
+
+.admin-section-desc {
+  margin: 0;
+  font-size: var(--text-caption);
+  line-height: 1.45;
+  color: rgb(var(--pump-muted));
+  max-width: 52ch;
+}
+
+.admin-callout {
+  margin: 12px 16px 0;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  font-size: var(--text-caption);
+  line-height: 1.5;
+  border: 1px solid transparent;
+}
+
+.admin-callout--info {
+  background: rgb(var(--pump-surface) / 0.5);
+  border-color: rgb(var(--pump-border) / 0.35);
+  color: rgb(var(--pump-muted));
+}
+
+.admin-callout--warn {
+  background: rgb(var(--pump-warning) / 0.08);
+  border-color: rgb(var(--pump-warning) / 0.25);
+  color: rgb(var(--pump-text));
+}
+
+.admin-callout--danger {
+  background: rgb(var(--pump-danger) / 0.08);
+  border-color: rgb(var(--pump-danger) / 0.25);
   color: rgb(var(--pump-text));
 }
 
