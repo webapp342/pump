@@ -6,6 +6,7 @@ import { formatEther, isAddress, parseEther } from "viem";
 import {
   useAccount,
   useBalance,
+  useDisconnect,
   useReadContract,
   useWaitForTransactionReceipt,
   useWriteContract,
@@ -36,15 +37,18 @@ import {
   AdminAlert,
   AdminBlock,
   AdminBtn,
+  AdminContentGrid,
   AdminDataRow,
   AdminDataTable,
   AdminEmptyState,
+  AdminField,
   AdminGridTable,
+  AdminKpiCard,
+  AdminKpiGrid,
+  AdminLayout,
   AdminNum,
-  AdminPageHeader,
   AdminShell,
   AdminTabPanel,
-  AdminTabs,
   AdminTextButton,
   type AdminTabId,
 } from "@/components/admin/AdminChrome";
@@ -305,6 +309,7 @@ function AdminSweepCountdown({
 
 export function AdminPanel() {
   const { address } = useAccount();
+  const { disconnect } = useDisconnect();
   const { bnbUsd } = useBnbUsdPrice();
   const [protocol, setProtocol] = useState<ProtocolSnapshot | null>(null);
   const [airdrops, setAirdrops] = useState<SweepRow[]>([]);
@@ -759,70 +764,90 @@ export function AdminPanel() {
         onUpdated={() => void load()}
       />
 
-      <AdminPageHeader
+      <AdminLayout
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
         address={address}
         onRefreshAll={() => void refreshAll()}
         refreshing={loading || statsLoading || promoLoading}
-      />
+        headerActions={
+          <button type="button" className="admin-btn" onClick={() => disconnect()}>
+            Disconnect
+          </button>
+        }
+      >
+        {error ? <AdminAlert>{error}</AdminAlert> : null}
 
-      {error ? <AdminAlert>{error}</AdminAlert> : null}
+        <AdminTabPanel id="dashboard" active={activeTab}>
+          <AdminKpiGrid>
+            <AdminKpiCard
+              label="Users registered"
+              value={statsLoading && !stats ? "…" : (stats?.usersRegistered ?? "—")}
+              hint={
+                stats
+                  ? `+${stats.usersRegistered24h} last 24h · ${stats.usersTraded} traded`
+                  : "All app profiles"
+              }
+            />
+            <AdminKpiCard
+              label="Trades (24h)"
+              value={statsLoading && !stats ? "…" : (stats?.trades24h ?? "—")}
+              hint={stats ? `${stats.totalTrades} total indexed` : undefined}
+            />
+            <AdminKpiCard
+              label="Treasury balance"
+              value={
+                statsLoading && !stats ? (
+                  "…"
+                ) : stats ? (
+                  <BnbAmountWithUsd bnb={stats.treasuryBalanceBnb} bnbUsd={bnbUsd} inline />
+                ) : (
+                  "—"
+                )
+              }
+              hint={
+                stats
+                  ? `${formatUsdReadable(bnbToUsd(Number(stats.availableTotalBnb), bnbUsd) ?? 0, { compact: true })} available est.`
+                  : undefined
+              }
+            />
+            <AdminKpiCard
+              label="Ready to sweep"
+              value={sweepStats.readyCount}
+              hint={
+                sweepStats.remainingUsd != null
+                  ? `${formatUsdReadable(sweepStats.remainingUsd, { compact: true })} recoverable`
+                  : `${airdrops.length} campaigns tracked`
+              }
+              tone={sweepStats.readyCount > 0 ? "warn" : undefined}
+            />
+          </AdminKpiGrid>
 
-      <AdminTabs active={activeTab} onChange={setActiveTab} />
+          <AdminSystemHealth />
 
-      <AdminTabPanel id="dashboard" active={activeTab}>
-        <AdminSystemHealth />
-
-        <AdminBlock title="Platform">
+          <AdminContentGrid columns={2}>
+            <AdminBlock title="Platform activity">
           <AdminDataTable>
+            <AdminDataRow label="Tokens launched" loading={statsLoading && !stats}>
+              <AdminNum>{stats?.totalTokens ?? "—"}</AdminNum>
+              {stats ? <span className="admin-meta"> · {stats.tokensToday} today UTC</span> : null}
+            </AdminDataRow>
+            <AdminDataRow label="Airdrops launched" loading={statsLoading && !stats}>
+              <AdminNum>{stats?.totalAirdrops ?? "—"}</AdminNum>
+              {stats ? <span className="admin-meta"> · {stats.airdropsToday} today UTC</span> : null}
+            </AdminDataRow>
             <AdminDataRow label="Users (registered)" loading={statsLoading && !stats}>
               <AdminNum>{stats?.usersRegistered ?? "—"}</AdminNum>
-              {stats ? <span className="admin-meta"> · app / points profile</span> : null}
-            </AdminDataRow>
-            <AdminDataRow label="New users (24h)" loading={statsLoading && !stats}>
-              <AdminNum>{stats?.usersRegistered24h ?? "—"}</AdminNum>
-              {stats ? <span className="admin-meta"> · registered last 24h</span> : null}
             </AdminDataRow>
             <AdminDataRow label="Users (traded)" loading={statsLoading && !stats}>
               <AdminNum>{stats?.usersTraded ?? "—"}</AdminNum>
-              {stats ? <span className="admin-meta"> · ≥1 trade indexed</span> : null}
-            </AdminDataRow>
-            <AdminDataRow label="Total trades" loading={statsLoading && !stats}>
-              <AdminNum>{stats?.totalTrades ?? "—"}</AdminNum>
-            </AdminDataRow>
-            <AdminDataRow label="Trades (24h)" loading={statsLoading && !stats}>
-              <AdminNum>{stats?.trades24h ?? "—"}</AdminNum>
-            </AdminDataRow>
-            <AdminDataRow label="Tokens launched (total)" loading={statsLoading && !stats}>
-              <AdminNum>{stats?.totalTokens ?? "—"}</AdminNum>
-            </AdminDataRow>
-            <AdminDataRow label="Tokens launched (today UTC)" loading={statsLoading && !stats}>
-              <AdminNum>{stats?.tokensToday ?? "—"}</AdminNum>
-            </AdminDataRow>
-            <AdminDataRow label="Airdrops launched (total)" loading={statsLoading && !stats}>
-              <AdminNum>{stats?.totalAirdrops ?? "—"}</AdminNum>
-            </AdminDataRow>
-            <AdminDataRow label="Airdrops launched (today UTC)" loading={statsLoading && !stats}>
-              <AdminNum>{stats?.airdropsToday ?? "—"}</AdminNum>
+              {stats ? <span className="admin-meta"> · ≥1 trade</span> : null}
             </AdminDataRow>
           </AdminDataTable>
-        </AdminBlock>
+            </AdminBlock>
 
-        <AdminBlock title="Fees">
+            <AdminBlock title="Fee summary">
           <AdminDataTable>
-            <AdminDataRow label="Available (total est.)" loading={statsLoading && !stats}>
-              {stats ? (
-                <BnbAmountWithUsd bnb={stats.availableTotalBnb} bnbUsd={bnbUsd} inline />
-              ) : (
-                "—"
-              )}
-            </AdminDataRow>
-            <AdminDataRow label="Treasury balance" loading={statsLoading && !stats}>
-              {stats ? (
-                <BnbAmountWithUsd bnb={stats.treasuryBalanceBnb} bnbUsd={bnbUsd} inline />
-              ) : (
-                "—"
-              )}
-            </AdminDataRow>
             <AdminDataRow label="Pending creator fees" loading={statsLoading && !stats}>
               {stats ? (
                 <BnbAmountWithUsd bnb={stats.pendingCreatorBnb} bnbUsd={bnbUsd} inline />
@@ -851,44 +876,28 @@ export function AdminPanel() {
                 "—"
               )}
             </AdminDataRow>
-            <AdminDataRow label="Claimed (creator + referrer)" loading={statsLoading && !stats}>
+            <AdminDataRow label="Claimed (total)" loading={statsLoading && !stats}>
               {stats ? (
                 <BnbAmountWithUsd bnb={stats.claimedTotalBnb} bnbUsd={bnbUsd} inline />
               ) : (
                 "—"
               )}
             </AdminDataRow>
-            <AdminDataRow label="Treasury share from trades" loading={statsLoading && !stats}>
+            <AdminDataRow label="Treasury share (trades)" loading={statsLoading && !stats}>
               {stats ? (
                 <BnbAmountWithUsd bnb={stats.treasuryShareFromTradesBnb} bnbUsd={bnbUsd} inline />
               ) : (
                 "—"
               )}
             </AdminDataRow>
-          </AdminDataTable>
-          {stats?.feesNote ? <p className="admin-note">{stats.feesNote}</p> : null}
-        </AdminBlock>
-
-        <AdminBlock title="Treasury & escrow">
-          <AdminDataTable>
-            <AdminDataRow label="Treasury balance" loading={loading && !protocol}>
-              <BnbAmountWithUsd bnb={treasuryBnb} bnbUsd={bnbUsd} inline />
-            </AdminDataRow>
             <AdminDataRow label="Airdrop escrow" loading={loading && !protocol}>
               <BnbAmountWithUsd bnb={escrowBnb} bnbUsd={bnbUsd} inline />
             </AdminDataRow>
-            <AdminDataRow label="Ready to sweep" loading={loading && !protocol}>
-              {sweepStats.readyCount} campaign{sweepStats.readyCount === 1 ? "" : "s"}
-              {sweepStats.remainingUsd != null
-                ? ` · ${formatUsdReadable(sweepStats.remainingUsd, { compact: true })}`
-                : ""}
-            </AdminDataRow>
-            <AdminDataRow label="Total campaigns" loading={loading && !protocol}>
-              {airdrops.length}
-            </AdminDataRow>
           </AdminDataTable>
-        </AdminBlock>
-      </AdminTabPanel>
+          {stats?.feesNote ? <p className="admin-note">{stats.feesNote}</p> : null}
+            </AdminBlock>
+          </AdminContentGrid>
+        </AdminTabPanel>
 
       <AdminTabPanel id="portfolio" active={activeTab}>
         {address ? (
@@ -899,6 +908,7 @@ export function AdminPanel() {
       </AdminTabPanel>
 
       <AdminTabPanel id="treasury" active={activeTab}>
+        <AdminContentGrid columns={2}>
         <AdminBlock title="Fee settings">
           <AdminDataTable>
             <AdminDataRow
@@ -1013,7 +1023,7 @@ export function AdminPanel() {
           </AdminDataTable>
         </AdminBlock>
 
-        <AdminBlock title="Treasury">
+        <AdminBlock title="Treasury balances">
           <AdminDataTable>
             <AdminDataRow label="Contract">
               {treasuryContract ? (
@@ -1082,9 +1092,10 @@ export function AdminPanel() {
             </AdminDataRow>
           </AdminDataTable>
         </AdminBlock>
+        </AdminContentGrid>
 
         {canWithdrawTreasury ? (
-          <AdminBlock title="Withdraw">
+          <AdminBlock title="Withdraw from treasury">
             <table className="admin-grid">
               <tbody>
                 <tr>
@@ -1360,76 +1371,68 @@ export function AdminPanel() {
 
       <AdminTabPanel id="promo" active={activeTab}>
         <AdminBlock
-          title="New promo task"
+          title="Create promo task"
           actions={
             <AdminBtn onClick={() => void loadPromoTasks()} disabled={promoLoading}>
-              {promoLoading ? "…" : "Refresh"}
+              {promoLoading ? "…" : "Refresh list"}
             </AdminBtn>
           }
         >
-          <table className="admin-grid">
-            <tbody>
-              <tr>
-                <th scope="row">Title</th>
-                <td colSpan={2}>
-                  <input
-                    type="text"
-                    value={promoTitle}
-                    onChange={(e) => setPromoTitle(e.target.value)}
-                    className="admin-input"
-                  />
-                </td>
-              </tr>
-              <tr>
-                <th scope="row">Description</th>
-                <td colSpan={2}>
-                  <input
-                    type="text"
-                    value={promoDescription}
-                    onChange={(e) => setPromoDescription(e.target.value)}
-                    className="admin-input"
-                  />
-                </td>
-              </tr>
-              <tr>
-                <th scope="row">Points</th>
-                <td>
-                  <input
-                    type="number"
-                    min={0}
-                    step={1}
-                    value={promoPoints}
-                    onChange={(e) => setPromoPoints(e.target.value)}
-                    className="admin-input admin-num"
-                  />
-                </td>
-                <td rowSpan={2} className="align-middle">
-                  <AdminBtn
-                    onClick={() => void onCreatePromoTask()}
-                    disabled={
-                      promoSaving || !promoTitle.trim() || !promoUrl.trim() || !promoPoints.trim()
-                    }
-                  >
-                    {promoSaving ? "…" : "Create"}
-                  </AdminBtn>
-                </td>
-              </tr>
-              <tr>
-                <th scope="row">URL</th>
-                <td>
-                  <input
-                    type="url"
-                    value={promoUrl}
-                    onChange={(e) => setPromoUrl(e.target.value)}
-                    className="admin-input"
-                  />
-                </td>
-              </tr>
-            </tbody>
-          </table>
+          <div className="admin-form-grid" style={{ padding: "16px" }}>
+            <AdminField label="Title">
+              <input
+                type="text"
+                value={promoTitle}
+                onChange={(e) => setPromoTitle(e.target.value)}
+                className="admin-input"
+                placeholder="Follow us on X"
+              />
+            </AdminField>
+            <AdminField label="Description (optional)">
+              <input
+                type="text"
+                value={promoDescription}
+                onChange={(e) => setPromoDescription(e.target.value)}
+                className="admin-input"
+                placeholder="Short task description"
+              />
+            </AdminField>
+            <div className="admin-form-row-2">
+              <AdminField label="Reward points">
+                <input
+                  type="number"
+                  min={0}
+                  step={1}
+                  value={promoPoints}
+                  onChange={(e) => setPromoPoints(e.target.value)}
+                  className="admin-input admin-num"
+                />
+              </AdminField>
+              <AdminField label="Target URL">
+                <input
+                  type="url"
+                  value={promoUrl}
+                  onChange={(e) => setPromoUrl(e.target.value)}
+                  className="admin-input"
+                  placeholder="https://…"
+                />
+              </AdminField>
+            </div>
+            <div>
+              <AdminBtn
+                primary
+                onClick={() => void onCreatePromoTask()}
+                disabled={
+                  promoSaving || !promoTitle.trim() || !promoUrl.trim() || !promoPoints.trim()
+                }
+              >
+                {promoSaving ? "Creating…" : "Create task"}
+              </AdminBtn>
+            </div>
+          </div>
         </AdminBlock>
 
-        <AdminBlock title="Promo tasks">
+        <AdminBlock title="Active promo tasks">
           {promoLoading ? (
             <p className="admin-empty">Loading…</p>
           ) : promoTasks.length === 0 ? (
@@ -1482,10 +1485,10 @@ export function AdminPanel() {
       </AdminTabPanel>
 
       <AdminTabPanel id="contracts" active={activeTab}>
-        <AdminBlock title="UUPS proxies (user-facing)">
-          <p className="admin-note mb-3">
-            Addresses in <code className="admin-num">.env</code> and <code className="admin-num">contract_registry</code>{" "}
-            must be proxy addresses. Upgrades change implementation only.
+        <AdminBlock title="UUPS proxies">
+          <p className="admin-card-note admin-note">
+            Proxy addresses in <code className="admin-num">.env</code> and{" "}
+            <code className="admin-num">contract_registry</code> — upgrades swap implementation only.
           </p>
           <AdminDataTable>
             {[
@@ -1515,6 +1518,7 @@ export function AdminPanel() {
           </AdminDataTable>
         </AdminBlock>
       </AdminTabPanel>
+      </AdminLayout>
     </AdminShell>
   );
 }

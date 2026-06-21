@@ -316,7 +316,7 @@ export function AdminSystemHealth() {
   return (
     <>
       <AdminBlock
-        title="Infrastructure"
+        title="Infrastructure health"
         actions={
           <>
             <AdminBtn onClick={() => void load()} disabled={loading}>
