@@ -3,14 +3,43 @@ import { NextResponse } from "next/server";
 import { requireAdminWallet } from "@/lib/auth/admin-access";
 import {
   getEnvFileDef,
-  readAdminEnvFile,
-  writeAdminEnvFile,
+  readAdminEnvVariables,
+  writeAdminEnvVariables,
   type AdminEnvFileId,
 } from "@/lib/admin/env-files";
+import { isSensitiveEnvKey, extractEnvVariables, parseEnvDocument, type EnvVariableRow } from "@/lib/admin/env-parse";
 
 function parseId(id: string): AdminEnvFileId | null {
   if (id === "tma" || id === "realtime" || id === "indexer") return id;
   return null;
+}
+
+function parseVariables(body: unknown): EnvVariableRow[] | null {
+  if (!body || typeof body !== "object" || !("variables" in body)) return null;
+  const raw = (body as { variables: unknown }).variables;
+  if (!Array.isArray(raw)) return null;
+
+  const rows: EnvVariableRow[] = [];
+  const seen = new Set<string>();
+
+  for (const item of raw) {
+    if (!item || typeof item !== "object") return null;
+    const key = (item as { key?: unknown }).key;
+    const value = (item as { value?: unknown }).value;
+    if (typeof key !== "string" || typeof value !== "string") return null;
+    const trimmedKey = key.trim();
+    if (!trimmedKey || seen.has(trimmedKey)) return null;
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(trimmedKey)) return null;
+    seen.add(trimmedKey);
+    rows.push({
+      key: trimmedKey,
+      value,
+      sensitive: isSensitiveEnvKey(trimmedKey),
+      scope: trimmedKey.startsWith("NEXT_PUBLIC_") ? "client" : "server",
+    });
+  }
+
+  return rows;
 }
 
 export async function GET(request: NextRequest, context: { params: Promise<{ id: string }> }) {
@@ -25,7 +54,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
   }
 
   try {
-    const file = await readAdminEnvFile(envId);
+    const file = await readAdminEnvVariables(envId);
     const def = getEnvFileDef(envId)!;
     return NextResponse.json(
       {
@@ -36,7 +65,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
           service: def.service,
           reloadHint: def.reloadHint,
           path: file.path,
-          content: file.content,
+          variables: file.variables,
         },
       },
       { headers: { "Cache-Control": "no-store" } }
@@ -59,19 +88,20 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ id:
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  let body: { content?: unknown };
+  let body: unknown;
   try {
-    body = (await request.json()) as { content?: unknown };
+    body = await request.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  if (typeof body.content !== "string") {
-    return NextResponse.json({ error: "content must be a string" }, { status: 400 });
+  const variables = parseVariables(body);
+  if (!variables) {
+    return NextResponse.json({ error: "variables must be an array of { key, value }" }, { status: 400 });
   }
 
   try {
-    const result = await writeAdminEnvFile(envId, body.content);
+    const result = await writeAdminEnvVariables(envId, variables);
     const def = getEnvFileDef(envId)!;
     return NextResponse.json({
       data: {
@@ -79,6 +109,8 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ id:
         path: result.path,
         backupPath: result.backupPath,
         reloadHint: def.reloadHint,
+        variables: extractEnvVariables(parseEnvDocument(result.content)),
+        needsReload: true,
       },
     });
   } catch (error) {

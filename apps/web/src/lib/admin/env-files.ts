@@ -1,5 +1,11 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import {
+  applyEnvVariables,
+  extractEnvVariables,
+  parseEnvDocument,
+  type EnvVariableRow,
+} from "@/lib/admin/env-parse";
 
 export type AdminEnvFileId = "tma" | "realtime" | "indexer";
 
@@ -143,6 +149,45 @@ export async function readAdminEnvFile(id: AdminEnvFileId): Promise<{ path: stri
   const filePath = resolveEnvFilePath(id);
   const content = await fs.readFile(filePath, "utf8");
   return { path: filePath, content };
+}
+
+export async function readAdminEnvVariables(id: AdminEnvFileId): Promise<{
+  path: string;
+  content: string;
+  variables: EnvVariableRow[];
+}> {
+  const filePath = resolveEnvFilePath(id);
+  let content = "";
+  try {
+    content = await fs.readFile(filePath, "utf8");
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code !== "ENOENT") throw error;
+  }
+  const entries = parseEnvDocument(content);
+  return {
+    path: filePath,
+    content,
+    variables: extractEnvVariables(entries),
+  };
+}
+
+export async function writeAdminEnvVariables(
+  id: AdminEnvFileId,
+  variables: EnvVariableRow[]
+): Promise<{ path: string; backupPath: string | null; content: string }> {
+  const filePath = resolveEnvFilePath(id);
+  let content = "";
+  try {
+    content = await fs.readFile(filePath, "utf8");
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code !== "ENOENT") throw error;
+  }
+  const entries = content ? parseEnvDocument(content) : [];
+  const nextContent = applyEnvVariables(entries, variables);
+  const result = await writeAdminEnvFile(id, nextContent);
+  return { ...result, content: nextContent };
 }
 
 export async function writeAdminEnvFile(
