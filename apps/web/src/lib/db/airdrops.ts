@@ -157,6 +157,15 @@ export async function listAirdrops(): Promise<AirdropListItem[]> {
   }));
 }
 
+export async function getAirdropIdByCreateTxHash(txHash: string): Promise<string | null> {
+  const pool = getLaunchpadPool();
+  const result = await pool.query<{ id: string }>(
+    `SELECT id FROM airdrops WHERE LOWER(create_tx_hash) = LOWER($1) LIMIT 1`,
+    [txHash]
+  );
+  return result.rows[0]?.id ?? null;
+}
+
 export type TokenAirdropPromo = {
   id: string;
   title: string | null;

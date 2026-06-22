@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { formatEther, formatUnits, parseEther, parseEventLogs } from "viem";
+import { formatEther, formatUnits, parseEther } from "viem";
 import { TokenAvatar } from "@/components/token/TokenAvatar";
 import { BnbLogo } from "@/components/token/BnbLogo";
 import {
@@ -33,6 +33,8 @@ import { useOpenConnectModal } from "@/hooks/useOpenConnectModal";
 import { useWalletFunding } from "@/components/wallet/WalletFundingProvider";
 import { useKernelWriteContract } from "@/hooks/useKernelWriteContract";
 import { formatTradeError } from "@/lib/trade-errors";
+import { fetchAirdropCreatedFromTx, lookupAirdropDbIdByTxHash } from "@/lib/airdrop-create-tx";
+import { createPumpPublicClient } from "@/lib/aa/kernel-account";
 import {
   useAccount,
   useBalance,
@@ -128,6 +130,7 @@ export function CreateAirdropForm({
 }: CreateAirdropFormProps = {}) {
   const router = useRouter();
   const handledRef = useRef<string | null>(null);
+  const approveTxHashRef = useRef<string | null>(null);
   const pendingCreateRef = useRef<PendingCreate | null>(null);
   const socialTasksRef = useRef<SocialTaskDraft[]>([]);
   const rulesRef = useRef<AirdropRules>({});
@@ -367,9 +370,10 @@ export function CreateAirdropForm({
   rulesRef.current = rules;
 
   useEffect(() => {
-    if (!receiptOk || !receipt || !address || !contracts.airdropManager) return;
+    if (!receiptOk || !receipt || !address || !contracts.airdropManager || !txHash) return;
 
     if (pendingAction === "approve") {
+      approveTxHashRef.current = receipt.transactionHash;
       setPendingAction(null);
       void refetchAllowance();
       const pending = pendingCreateRef.current;
@@ -394,20 +398,28 @@ export function CreateAirdropForm({
     }
 
     if (pendingAction !== "create") return;
+    if (receipt.transactionHash !== txHash) return;
+    if (approveTxHashRef.current && receipt.transactionHash === approveTxHashRef.current) return;
     if (handledRef.current === receipt.transactionHash) return;
     handledRef.current = receipt.transactionHash;
     setPendingAction(null);
     pendingCreateRef.current = null;
+    approveTxHashRef.current = null;
 
     (async () => {
       try {
-        const logs = parseEventLogs({
-          abi: pumpAirdropManagerAbi,
-          logs: receipt.logs,
-          eventName: "AirdropCreated",
-        });
-        const created = logs[0];
-        if (!created) throw new Error("AirdropCreated event not found");
+        const publicClient = createPumpPublicClient();
+        let created;
+        try {
+          created = await fetchAirdropCreatedFromTx(publicClient, receipt.transactionHash);
+        } catch {
+          const existingId = await lookupAirdropDbIdByTxHash(receipt.transactionHash);
+          if (existingId) {
+            router.push(`/airdrops/${existingId}`);
+            return;
+          }
+          throw new Error("AirdropCreated event not found");
+        }
 
         const qualifyStart = new Date(Number(created.args.qualifyStart) * 1000).toISOString();
         const qualifyEnd = new Date(Number(created.args.qualifyEnd) * 1000).toISOString();
@@ -441,7 +453,14 @@ export function CreateAirdropForm({
           }),
         });
         const syncJson = (await syncRes.json()) as { data?: { id: string }; error?: string };
-        if (!syncRes.ok) throw new Error(syncJson.error ?? "Metadata sync failed");
+        if (!syncRes.ok) {
+          const existingId = await lookupAirdropDbIdByTxHash(receipt.transactionHash);
+          if (existingId) {
+            router.push(`/airdrops/${existingId}`);
+            return;
+          }
+          throw new Error(syncJson.error ?? "Metadata sync failed");
+        }
         const dbId = syncJson.data?.id;
         if (!dbId) throw new Error("Airdrop saved on-chain but DB sync returned no id");
         router.push(`/airdrops/${dbId}`);
@@ -461,6 +480,7 @@ export function CreateAirdropForm({
     pendingAction,
     refetchAllowance,
     writeContract,
+    txHash,
   ]);
 
   function toggleSocialTask(taskType: SocialTaskDraft["taskType"]) {
@@ -506,6 +526,7 @@ export function CreateAirdropForm({
     e.preventDefault();
     setError(null);
     reset();
+    approveTxHashRef.current = null;
 
     if (!isConnected || !address) {
       openConnectModal?.();
