@@ -8,6 +8,7 @@ import {
 } from "@/lib/airdrop-participant-snapshot";
 import { getAirdropDisplayStatus, isPromotableAirdropStatus, type AirdropDisplayStatus } from "@/lib/airdrop-status";
 import { getLaunchpadPool } from "@/lib/db/launchpad";
+import { sqlBondingMarkPrice } from "@/lib/db/bonding-mark-price-sql";
 
 export type AirdropListItem = {
   id: string;
@@ -122,8 +123,8 @@ export async function listAirdrops(): Promise<AirdropListItem[]> {
              a.total_funded, a.rules_json, a.status, a.qualify_start, a.qualify_end, a.claim_end,
              t.symbol, t.name,
              rt.symbol AS reward_symbol, rt.name AS reward_name,
-             COALESCE(lb.last_price_zug, 0)::text AS linked_price_bnb,
-             COALESCE(rb.last_price_zug, 0)::text AS reward_price_bnb
+             COALESCE((${sqlBondingMarkPrice("lb")}), 0)::text AS linked_price_bnb,
+             COALESCE((${sqlBondingMarkPrice("rb")}), 0)::text AS reward_price_bnb
       FROM airdrops a
       LEFT JOIN tokens t ON t.address = a.linked_token
       LEFT JOIN tokens rt ON rt.address = a.reward_token
@@ -219,7 +220,7 @@ export async function getPrimaryOpenAirdropForToken(
       SELECT a.id, a.total_funded, a.reward_token, a.rules_json, a.status,
              a.qualify_start, a.qualify_end, a.claim_end,
              rt.symbol AS reward_symbol,
-             COALESCE(rb.last_price_zug, 0)::text AS reward_price_bnb
+             COALESCE((${sqlBondingMarkPrice("rb")}), 0)::text AS reward_price_bnb
       FROM airdrops a
       LEFT JOIN tokens rt ON rt.address = a.reward_token
       LEFT JOIN bonding_states rb ON rb.token_address = a.reward_token
@@ -303,8 +304,8 @@ export async function getAirdropById(id: string, viewerAddress?: string): Promis
     `
       SELECT a.*, t.symbol, t.name,
              rt.symbol AS reward_symbol, rt.name AS reward_name,
-             COALESCE(lb.last_price_zug, 0)::text AS linked_price_bnb,
-             COALESCE(rb.last_price_zug, 0)::text AS reward_price_bnb,
+             COALESCE((${sqlBondingMarkPrice("lb")}), 0)::text AS linked_price_bnb,
+             COALESCE((${sqlBondingMarkPrice("rb")}), 0)::text AS reward_price_bnb,
              (SELECT COUNT(*)::int FROM airdrop_participants ap WHERE ap.airdrop_id = a.id) AS participant_count
       FROM airdrops a
       LEFT JOIN tokens t ON t.address = a.linked_token
@@ -1054,7 +1055,7 @@ export async function listMyAirdropParticipations(
         t.symbol,
         t.name,
         rt.symbol AS reward_symbol,
-        COALESCE(rb.last_price_zug, 0)::text AS reward_price_bnb,
+        COALESCE((${sqlBondingMarkPrice("rb")}), 0)::text AS reward_price_bnb,
         p.social_tasks_total,
         p.social_tasks_completed,
         p.hold_met,

@@ -1,5 +1,6 @@
 import type { AirdropRules } from "@/lib/airdrop-rules";
 import { getLaunchpadPool } from "@/lib/db/launchpad";
+import { sqlBondingMarkPrice } from "@/lib/db/bonding-mark-price-sql";
 
 export type AdminAirdropRow = {
   id: string;
@@ -34,7 +35,7 @@ export async function listAdminAirdrops(): Promise<AdminAirdropRow[]> {
       SELECT a.id, a.on_chain_id, a.rules_json, a.reward_token, a.total_funded,
              a.status, a.merkle_root, a.claim_end, t.symbol,
              rt.symbol AS reward_symbol,
-             COALESCE(rb.last_price_zug, 0)::text AS reward_price_bnb
+             COALESCE((${sqlBondingMarkPrice("rb")}), 0)::text AS reward_price_bnb
       FROM airdrops a
       LEFT JOIN tokens t ON t.address = a.linked_token
       LEFT JOIN tokens rt ON rt.address = a.reward_token
