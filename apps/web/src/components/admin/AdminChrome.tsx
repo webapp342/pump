@@ -4,6 +4,7 @@ import { type ReactNode, createContext, useContext, useEffect, useMemo, useState
 import {
   Bell,
   ChevronRight,
+  Pencil,
   RefreshCw,
   Search,
 } from "lucide-react";
@@ -83,7 +84,6 @@ export function AdminLayout({
   headerActions?: ReactNode;
   children: ReactNode;
 }) {
-  const meta = ADMIN_PAGE_META[activeTab];
   const { globalQuery, setGlobalQuery } = useAdminShell();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
 
@@ -194,11 +194,6 @@ export function AdminLayout({
               ) : null}
             </div>
           </div>
-        </div>
-
-        <div className="admin-ent-page-bar">
-          <h1 className="admin-ent-page-title">{meta.title}</h1>
-          <span className="admin-ent-page-meta">{meta.description}</span>
         </div>
       </header>
 
@@ -340,22 +335,31 @@ export function AdminCard({
   padded,
   footer,
 }: {
-  title: string;
+  title?: string;
   description?: string;
   actions?: ReactNode;
   children: ReactNode;
   padded?: boolean;
   footer?: ReactNode;
 }) {
+  const hasHead = Boolean(title || description || actions);
   return (
     <section className="admin-card">
-      <div className="admin-card-head">
-        <div className="admin-card-head-text">
-          <h2 className="admin-card-title">{title}</h2>
-          {description ? <p className="admin-section-desc">{description}</p> : null}
+      {hasHead ? (
+        <div
+          className={
+            description
+              ? "admin-card-head"
+              : "admin-card-head admin-card-head--compact"
+          }
+        >
+          <div className="admin-card-head-text">
+            {title ? <h2 className="admin-card-title">{title}</h2> : null}
+            {description ? <p className="admin-section-desc">{description}</p> : null}
+          </div>
+          {actions ? <div className="admin-card-actions">{actions}</div> : null}
         </div>
-        {actions ? <div className="admin-card-actions">{actions}</div> : null}
-      </div>
+      ) : null}
       <div
         className={
           padded ? "admin-card-body admin-card-body--padded" : "admin-card-body"
@@ -374,7 +378,7 @@ export function AdminBlock({
   actions,
   children,
 }: {
-  title: string;
+  title?: string;
   description?: string;
   actions?: ReactNode;
   children: ReactNode;
@@ -446,18 +450,28 @@ export function AdminKvRow({
   label,
   children,
   action,
+  onEdit,
+  editLabel = "Edit",
   loading,
 }: {
   label: string;
   children: ReactNode;
   action?: ReactNode;
+  onEdit?: () => void;
+  editLabel?: string;
   loading?: boolean;
 }) {
+  const actionCell =
+    action ??
+    (onEdit ? (
+      <AdminIconButton icon={Pencil} onClick={onEdit} label={editLabel} />
+    ) : null);
+
   return (
     <tr>
       <th scope="row">{label}</th>
       <td>{loading ? <span className="admin-meta">…</span> : children}</td>
-      <td className="whitespace-nowrap">{action ?? null}</td>
+      <td className="admin-kv-action">{actionCell}</td>
     </tr>
   );
 }
@@ -560,14 +574,17 @@ export function AdminIconButton({
 export function AdminField({
   label,
   children,
+  hint,
 }: {
   label: string;
   children: ReactNode;
+  hint?: ReactNode;
 }) {
   return (
-    <label className="block">
+    <label className="admin-compact-field">
       <span className="admin-field-label">{label}</span>
       {children}
+      {hint ? <span className="admin-compact-hint">{hint}</span> : null}
     </label>
   );
 }

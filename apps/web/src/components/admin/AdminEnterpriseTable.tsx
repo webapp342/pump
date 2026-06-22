@@ -18,7 +18,7 @@ export type AdminTableColumn<T> = {
 };
 
 type AdminEnterpriseTableProps<T> = {
-  title: string;
+  title?: string;
   subtitle?: string;
   rows: T[];
   columns: AdminTableColumn<T>[];
@@ -51,7 +51,7 @@ export function AdminEnterpriseTable<T>({
   rowKey,
   loading,
   emptyMessage = "No records",
-  searchPlaceholder = "Search records…",
+  searchPlaceholder = "Search…",
   searchQuery: controlledQuery,
   onSearchQueryChange,
   searchFilter,
@@ -94,33 +94,47 @@ export function AdminEnterpriseTable<T>({
     setSortDir("asc");
   }
 
+  const showHead = Boolean(title || subtitle || toolbar || searchFilter);
+
   return (
     <section className="admin-ent-table">
-      <div className="admin-ent-table-head">
-        <div className="admin-ent-table-head-text">
-          <h2 className="admin-ent-table-title">{title}</h2>
-          {subtitle ? <p className="admin-ent-table-sub">{subtitle}</p> : null}
+      {showHead ? (
+        <div
+          className={
+            subtitle
+              ? "admin-ent-table-head"
+              : "admin-ent-table-head admin-ent-table-head--compact"
+          }
+        >
+          {title || subtitle ? (
+            <div className="admin-ent-table-head-text">
+              {title ? <h2 className="admin-ent-table-title">{title}</h2> : null}
+              {subtitle ? <p className="admin-ent-table-sub">{subtitle}</p> : null}
+            </div>
+          ) : (
+            <span aria-hidden />
+          )}
+          <div className="admin-ent-table-toolbar">
+            {searchFilter ? (
+              <label className="admin-ent-search">
+                <Search size={14} aria-hidden />
+                <input
+                  type="search"
+                  value={query}
+                  onChange={(e) => {
+                    setQuery(e.target.value);
+                    setPage(0);
+                  }}
+                  placeholder={searchPlaceholder}
+                  className="admin-ent-search-input"
+                  aria-label="Search table"
+                />
+              </label>
+            ) : null}
+            {toolbar}
+          </div>
         </div>
-        <div className="admin-ent-table-toolbar">
-          {searchFilter ? (
-            <label className="admin-ent-search">
-              <Search size={14} aria-hidden />
-              <input
-                type="search"
-                value={query}
-                onChange={(e) => {
-                  setQuery(e.target.value);
-                  setPage(0);
-                }}
-                placeholder={searchPlaceholder}
-                className="admin-ent-search-input"
-                aria-label="Search table"
-              />
-            </label>
-          ) : null}
-          {toolbar}
-        </div>
-      </div>
+      ) : null}
 
       <div className="admin-ent-table-scroll">
         <table className={`admin-ent-grid${zebra ? " admin-ent-grid--zebra" : ""}`}>

@@ -34,8 +34,6 @@ export async function GET(request: NextRequest) {
           ...db,
           treasuryBalanceBnb,
           availableTotalBnb,
-          feesNote:
-            "Treasury balance is on-chain. Pending creator/referrer = trade allocations minus indexed claims. Meme/airdrop create fees and treasury admin withdrawals are not fully indexed yet.",
         },
       },
       { headers: { "Cache-Control": "no-store" } }

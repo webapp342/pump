@@ -277,7 +277,9 @@ export function AdminEnvTab() {
       {error ? <AdminAlert>{error}</AdminAlert> : null}
       {notice && !pendingApply ? <AdminCallout tone="info">{notice}</AdminCallout> : null}
 
-      <AdminCallout tone="info">{ADMIN_COPY.environment.callout}</AdminCallout>
+      {ADMIN_COPY.environment.callout ? (
+        <AdminCallout tone="info">{ADMIN_COPY.environment.callout}</AdminCallout>
+      ) : null}
 
       {pendingApply ? (
         <div className="admin-env-apply-banner" role="status">
@@ -312,12 +314,10 @@ export function AdminEnvTab() {
 
       {selectedMeta ? (
         <AdminBlock
-          title={ADMIN_COPY.environment.variablesTitle}
-          description={
-            selectedMeta.description +
-            (variables.length > 0
-              ? ` · ${variables.length} variable${variables.length === 1 ? "" : "s"}`
-              : "")
+          title={
+            variables.length > 0
+              ? `${ADMIN_COPY.environment.variablesTitle} (${variables.length})`
+              : ADMIN_COPY.environment.variablesTitle
           }
           actions={
             <div className="admin-env-toolbar-actions">

@@ -47,45 +47,14 @@ export const ADMIN_COPY = {
   },
 
   pages: {
-    dashboard: {
-      title: "Dashboard",
-      description: "Platform metrics, recovery queue, and system status.",
-    },
-    todos: {
-      title: "Ops todo list",
-      description:
-        "Personal operations checklist — priorities, completion status, and manual sort order.",
-    },
-    portfolio: {
-      title: "Portfolio",
-      description:
-        "Review token holdings in the operations wallet and execute bulk sell actions when needed.",
-    },
-    treasury: {
-      title: "Treasury & fees",
-      description:
-        "Configure protocol fees, monitor treasury balances, and process authorized withdrawals.",
-    },
-    airdrops: {
-      title: "Airdrop recovery",
-      description:
-        "Recover unclaimed reward escrow after the on-chain claim window closes.",
-    },
-    promo: {
-      title: "Promo campaigns",
-      description:
-        "Create off-chain link tasks that award launchpad points after user completion.",
-    },
-    contracts: {
-      title: "Contract registry",
-      description:
-        "Canonical UUPS proxy addresses used by the app, indexer, and deployment scripts.",
-    },
-    environment: {
-      title: "Environment variables",
-      description:
-        "Manage VM configuration per service with key-value editing, masked secrets, and one-click apply — similar to Vercel project env.",
-    },
+    dashboard: { title: "Dashboard", description: "" },
+    todos: { title: "Todo list", description: "" },
+    portfolio: { title: "Portfolio", description: "" },
+    treasury: { title: "Treasury & fees", description: "" },
+    airdrops: { title: "Airdrop recovery", description: "" },
+    promo: { title: "Promo campaigns", description: "" },
+    contracts: { title: "Contract registry", description: "" },
+    environment: { title: "Environment", description: "" },
   } satisfies Record<AdminTabId, { title: string; description: string }>,
 
   nav: {
@@ -118,7 +87,7 @@ export const ADMIN_COPY = {
       sweeps: { label: "Recovery ready", hintEmpty: "Campaigns ready to sweep" },
     },
     financialPanel: "Fee ledger",
-    recoveryTable: "Operational recovery queue",
+    recoveryTable: "Recovery queue",
     lastRefreshed: "Last updated",
     autoRefresh: "Data refreshes every 60 seconds",
     sections: {
@@ -135,7 +104,7 @@ export const ADMIN_COPY = {
 
   health: {
     title: "Infrastructure",
-    description: "Live status of VM services, database, indexer, and realtime stack.",
+    description: "",
     status: "Overall status",
     checks: "Service checks",
     checkedAt: "Last checked",
@@ -151,15 +120,15 @@ export const ADMIN_COPY = {
   treasury: {
     feeSettings: {
       title: "Protocol fees",
-      description: "On-chain fee parameters for trades, launches, and airdrops.",
+      description: "",
     },
     balances: {
-      title: "Treasury balances",
-      description: "Contract balances and emergency controls for bonding curve escrow.",
+      title: "Balances",
+      description: "",
     },
     withdraw: {
-      title: "Treasury withdrawal",
-      description: "Send BNB or ERC-20 tokens from LaunchpadTreasury to an authorized recipient.",
+      title: "Withdrawal",
+      description: "",
       typeBnb: "BNB",
       typeToken: "Token",
       recipient: "Recipient address",
@@ -170,15 +139,14 @@ export const ADMIN_COPY = {
       ownerRequired: "Withdrawals require the treasury owner wallet.",
     },
     emergency: {
-      recipientPlaceholder: "Recipient address (treasury recommended)",
-      warning: "Permanently halts all curve trading.",
+      recipientPlaceholder: "Recipient",
+      warning: "Halts curve trading",
     },
   },
 
   airdrops: {
     tableTitle: "Recovery queue",
-    callout:
-      "Recovery unlocks when on-chain claimEnd passes (qualify end + 24 hours). Finalization is not required when there are no winners.",
+    callout: "",
     ready: "ready for recovery",
     locked: "awaiting claim window",
     empty: "No airdrop campaigns indexed yet.",
@@ -206,8 +174,8 @@ export const ADMIN_COPY = {
 
   promo: {
     create: {
-      title: "New promo campaign",
-      description: "Users earn points once after visiting the target URL.",
+      title: "New campaign",
+      description: "",
       titleField: "Campaign title",
       titlePlaceholder: "Follow Pump on X",
       descField: "Description (optional)",
@@ -217,15 +185,14 @@ export const ADMIN_COPY = {
       urlPlaceholder: "https://…",
     },
     list: {
-      title: "Active campaigns",
-      description: "Completed tasks retain earned points if a campaign is removed.",
+      title: "Campaigns",
+      description: "",
       empty: "No promo campaigns configured.",
     },
   },
 
   contracts: {
-    intro:
-      "These UUPS proxy addresses must match .env and contract_registry. Upgrades replace implementation only — addresses stay stable.",
+    intro: "",
     labels: {
       memeFactory: "MemeFactory",
       bonding: "BondingCurveManager",
@@ -235,8 +202,7 @@ export const ADMIN_COPY = {
   },
 
   environment: {
-    callout:
-      "Variables are written to disk on save. Running services do not pick up changes until you apply them — like Vercel redeploy after editing project env.",
+    callout: "",
     servicesTitle: "Services",
     variablesTitle: "Environment variables",
     variablesDescription: "Key-value configuration for the selected service. Sensitive values are masked at rest in the UI.",
@@ -326,11 +292,9 @@ export const ADMIN_COPY = {
   },
 
   wipe: {
-    title: "Reset application data",
-    description:
-      "Truncate indexed launchpad data for a clean testnet reset. Contract registry, missions, platform settings, and your todo list are kept.",
-    warning:
-      "This permanently deletes users, tokens, trades, airdrops, wallets, and indexer cursor. On-chain state is unchanged — the indexer is restarted automatically to resync from chain.",
+    title: "Reset data",
+    description: "",
+    warning: "Deletes indexed app data. On-chain state unchanged.",
     preservedTitle: "Kept",
     wipedTitle: "Deleted",
     confirmLabel: "Type WIPE PUMP DATA to enable",
@@ -341,8 +305,7 @@ export const ADMIN_COPY = {
       "Data wiped, but indexer restart could not be confirmed — run systemctl restart manually if needed.",
     finalConfirm:
       "Last chance: wipe all application data except contract registry, missions, platform settings, and admin todos?",
-    indexerNote:
-      "Before wipe: set INDEXER_START_BLOCK to chain head − 1 in Admin → Environment → Indexer .env. Wipe seeds indexer_state from that file (INDEXER_STATE_KEY) and restarts pump-indexer.",
+    indexerNote: "",
   },
 } as const;
 

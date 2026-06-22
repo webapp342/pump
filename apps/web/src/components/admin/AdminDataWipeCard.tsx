@@ -74,7 +74,7 @@ export function AdminDataWipeCard({ onWiped }: AdminDataWipeCardProps) {
   }
 
   return (
-    <AdminBlock title={ADMIN_COPY.wipe.title} description={ADMIN_COPY.wipe.description}>
+    <AdminBlock title={ADMIN_COPY.wipe.title}>
       <div className="admin-wipe-zone">
         <div className="admin-wipe-warning">
           <AlertTriangle size={16} aria-hidden />
@@ -99,8 +99,6 @@ export function AdminDataWipeCard({ onWiped }: AdminDataWipeCardProps) {
             </ul>
           </div>
         </div>
-
-        <p className="admin-note">{ADMIN_COPY.wipe.indexerNote}</p>
 
         <label className="admin-wipe-confirm">
           <span className="admin-field-label">{ADMIN_COPY.wipe.confirmLabel}</span>

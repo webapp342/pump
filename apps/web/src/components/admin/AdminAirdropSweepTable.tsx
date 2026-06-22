@@ -130,7 +130,7 @@ export function AdminAirdropSweepTable({
   adminTxHash,
   onSweep,
   toolbar,
-  title = ADMIN_COPY.airdrops.tableTitle,
+  title,
   subtitle,
 }: AdminAirdropSweepTableProps) {
   const columns: AdminTableColumn<SweepRow>[] = [
@@ -280,7 +280,7 @@ export function AdminAirdropSweepTable({
       rowKey={(r) => r.id}
       loading={loading}
       emptyMessage={ADMIN_COPY.airdrops.empty}
-      searchPlaceholder="Filter campaigns…"
+      searchPlaceholder="Filter…"
       searchQuery={searchQuery}
       onSearchQueryChange={onSearchQueryChange}
       searchFilter={(row, q) => {

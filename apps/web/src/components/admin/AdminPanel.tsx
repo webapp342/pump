@@ -57,7 +57,6 @@ import {
   AdminShell,
   AdminStatusBadge,
   AdminTabPanel,
-  AdminTextButton,
   useAdminShell,
   type AdminTabId,
 } from "@/components/admin/AdminChrome";
@@ -131,7 +130,6 @@ type AdminPlatformStats = {
   claimedTotalBnb: string;
   treasuryBalanceBnb: string;
   availableTotalBnb: string;
-  feesNote: string;
 };
 
 function formatBnb(value: string): string {
@@ -233,6 +231,14 @@ export function AdminPanel() {
     address!.toLowerCase() === bondingOwner.toLowerCase();
   const memeFactoryOwner = protocol?.memeFactory.owner;
   const airdropAdmin = protocol?.airdropManager?.admin;
+  const opsWallet = treasuryOwner ?? ADMIN_ADDRESS;
+  const opsWalletsUnified = useMemo(() => {
+    const wallets = [treasuryOwner, bondingOwner, airdropAdmin]
+      .filter(Boolean)
+      .map((w) => w!.toLowerCase());
+    if (wallets.length <= 1) return true;
+    return wallets.every((w) => w === wallets[0]);
+  }, [treasuryOwner, bondingOwner, airdropAdmin]);
 
   const { data: treasuryLiveBalance, refetch: refetchTreasuryBalance } = useBalance({
     address: treasuryContract,
@@ -742,12 +748,9 @@ export function AdminPanel() {
             <AdminPageGridCell span={12}>
               <p className="admin-ent-sync-line">
                 <Clock size={12} aria-hidden />
-                {ADMIN_COPY.dashboard.lastRefreshed}{" "}
                 <span className="admin-num">
                   {lastRefreshedAt ? lastRefreshedAt.toLocaleTimeString() : "—"}
                 </span>
-                <span aria-hidden> · </span>
-                {ADMIN_COPY.dashboard.autoRefresh}
               </p>
             </AdminPageGridCell>
 
@@ -783,14 +786,11 @@ export function AdminPanel() {
                     <BnbAmountWithUsd bnb={escrowBnb} bnbUsd={bnbUsd} inline />
                   </AdminDataRow>
                 </AdminDataTable>
-                {stats?.feesNote ? <p className="admin-note admin-card-note">{stats.feesNote}</p> : null}
               </AdminBlock>
             </AdminPageGridCell>
 
             <AdminPageGridCell span={12}>
               <AdminAirdropSweepTable
-                title={ADMIN_COPY.dashboard.recoveryTable}
-                subtitle={ADMIN_COPY.airdrops.callout}
                 rows={airdrops}
                 loading={loading}
                 bnbUsd={bnbUsd}
@@ -833,21 +833,13 @@ export function AdminPanel() {
 
       <AdminTabPanel id="treasury" active={activeTab}>
         <AdminContentGrid columns={2}>
-        <AdminBlock
-          title={ADMIN_COPY.treasury.feeSettings.title}
-          description={ADMIN_COPY.treasury.feeSettings.description}
-        >
+        <AdminBlock title={ADMIN_COPY.treasury.feeSettings.title}>
           <AdminDataTable>
             <AdminDataRow
-              label="Trade protocol fee"
+              label="Trade fee"
               loading={!protocol}
-              action={
-                protocol ? (
-                  <AdminTextButton onClick={() => setProtocolFeeModalOpen(true)}>
-                    {ADMIN_COPY.actions.update}
-                  </AdminTextButton>
-                ) : undefined
-              }
+              onEdit={protocol ? () => setProtocolFeeModalOpen(true) : undefined}
+              editLabel="Edit trade fee"
             >
               {protocol ? (
                 <>
@@ -866,13 +858,7 @@ export function AdminPanel() {
             <AdminDataRow
               label="Creator share"
               loading={!protocol}
-              action={
-                protocol ? (
-                  <AdminTextButton onClick={() => setCreatorShareModalOpen(true)}>
-                    {ADMIN_COPY.actions.update}
-                  </AdminTextButton>
-                ) : undefined
-              }
+              onEdit={protocol ? () => setCreatorShareModalOpen(true) : undefined}
             >
               {protocol
                 ? `${creatorShareBpsToPercent(creatorFeeShareBps).toFixed(2)}% of protocol fee`
@@ -881,13 +867,7 @@ export function AdminPanel() {
             <AdminDataRow
               label="Referrer share"
               loading={!protocol}
-              action={
-                protocol ? (
-                  <AdminTextButton onClick={() => setReferrerShareModalOpen(true)}>
-                    {ADMIN_COPY.actions.update}
-                  </AdminTextButton>
-                ) : undefined
-              }
+              onEdit={protocol ? () => setReferrerShareModalOpen(true) : undefined}
             >
               {protocol
                 ? `${referrerShareBpsToPercent(referrerShareBps).toFixed(2)}% of protocol fee`
@@ -896,13 +876,7 @@ export function AdminPanel() {
             <AdminDataRow
               label="Meme launch fee"
               loading={!protocol}
-              action={
-                protocol ? (
-                  <AdminTextButton onClick={() => setMemeCreateFeeModalOpen(true)}>
-                    {ADMIN_COPY.actions.update}
-                  </AdminTextButton>
-                ) : undefined
-              }
+              onEdit={protocol ? () => setMemeCreateFeeModalOpen(true) : undefined}
             >
               {protocol ? (
                 <>
@@ -910,7 +884,6 @@ export function AdminPanel() {
                   {memeFeeUsd != null
                     ? ` · ${formatUsdReadable(memeFeeUsd, { compact: true })}`
                     : ""}
-                  <span className="admin-meta"> · on-chain · owner free</span>
                 </>
               ) : (
                 "—"
@@ -919,34 +892,22 @@ export function AdminPanel() {
             <AdminDataRow
               label="Min initial buy"
               loading={platformSettingsLoading}
-              action={
-                <AdminTextButton onClick={() => setMinInitialBuyModalOpen(true)}>
-                  {ADMIN_COPY.actions.update}
-                </AdminTextButton>
-              }
+              onEdit={() => setMinInitialBuyModalOpen(true)}
             >
               {formatBnb(minInitialBuyBnb)} BNB
-              <span className="admin-meta"> · on-chain · MemeFactory</span>
             </AdminDataRow>
             <AdminDataRow
-              label="Create fee exemption"
-              action={
-                <AdminTextButton onClick={() => setFeeExemptModalOpen(true)}>
-                  {ADMIN_COPY.actions.manage}
-                </AdminTextButton>
-              }
+              label="Fee exemption"
+              onEdit={() => setFeeExemptModalOpen(true)}
+              editLabel="Manage exemptions"
             >
-              On-chain <span className="admin-meta"> · MemeFactory + AirdropManager</span>
+              MemeFactory · AirdropManager
             </AdminDataRow>
             <AdminDataRow
               label="Airdrop create fee"
               loading={!protocol?.airdropManager}
-              action={
-                protocol?.airdropManager ? (
-                  <AdminTextButton onClick={() => setAirdropCreateFeeModalOpen(true)}>
-                    {ADMIN_COPY.actions.update}
-                  </AdminTextButton>
-                ) : undefined
+              onEdit={
+                protocol?.airdropManager ? () => setAirdropCreateFeeModalOpen(true) : undefined
               }
             >
               {protocol?.airdropManager ? (
@@ -955,7 +916,6 @@ export function AdminPanel() {
                   {airdropFeeUsd != null
                     ? ` · ${formatUsdReadable(airdropFeeUsd, { compact: true })}`
                     : ""}
-                  <span className="admin-meta"> · on-chain · admin free</span>
                 </>
               ) : (
                 "—"
@@ -964,12 +924,9 @@ export function AdminPanel() {
           </AdminDataTable>
         </AdminBlock>
 
-        <AdminBlock
-          title={ADMIN_COPY.treasury.balances.title}
-          description={ADMIN_COPY.treasury.balances.description}
-        >
+        <AdminBlock title={ADMIN_COPY.treasury.balances.title}>
           <AdminDataTable>
-            <AdminDataRow label="Contract">
+            <AdminDataRow label="Treasury">
               {treasuryContract ? (
                 <a
                   href={explorerAddressUrl(treasuryContract)}
@@ -983,13 +940,10 @@ export function AdminPanel() {
                 "—"
               )}
             </AdminDataRow>
-            <AdminDataRow label="Owner">
-              {shortAddress(treasuryOwner ?? ADMIN_ADDRESS)}
-            </AdminDataRow>
             <AdminDataRow label="Balance">
               <BnbAmountWithUsd bnb={treasuryBnb} bnbUsd={bnbUsd} inline />
             </AdminDataRow>
-            <AdminDataRow label="Bonding curve balance">
+            <AdminDataRow label="Curve escrow">
               {protocol ? (
                 <>
                   <BnbAmountWithUsd
@@ -998,173 +952,178 @@ export function AdminPanel() {
                     inline
                   />
                   {protocol.bondingCurveManager.emergencyHalt ? (
-                    <span className="admin-meta"> · trading halted</span>
+                    <span className="admin-meta"> · halted</span>
                   ) : null}
                 </>
               ) : (
                 "—"
               )}
             </AdminDataRow>
-            <AdminDataRow label="Bonding curve owner">
-              {shortAddress(bondingOwner ?? ADMIN_ADDRESS)}
-            </AdminDataRow>
-            {canEmergencySweepBonding ? (
-              <AdminDataRow
-                label="Emergency curve sweep"
-                action={
-                  <AdminBtn
-                    onClick={onEmergencySweepBonding}
-                    disabled={adminTxPending && bondingEmergencySweepPending}
-                  >
-                    {adminTxPending && bondingEmergencySweepPending ? "…" : ADMIN_COPY.actions.sweepAll}
-                  </AdminBtn>
-                }
-              >
-                <input
-                  type="text"
-                  value={emergencySweepTo}
-                  onChange={(e) => setEmergencySweepTo(e.target.value)}
-                  className="admin-input admin-num"
-                  placeholder={ADMIN_COPY.treasury.emergency.recipientPlaceholder}
-                  aria-label="Emergency sweep recipient"
-                />
-                <span className="admin-meta"> · {ADMIN_COPY.treasury.emergency.warning}</span>
+            {opsWalletsUnified ? (
+              <AdminDataRow label="Owner">
+                <a
+                  href={explorerAddressUrl(opsWallet)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="admin-link admin-num"
+                >
+                  {shortAddress(opsWallet)}
+                </a>
               </AdminDataRow>
-            ) : null}
-            <AdminDataRow label="Sweep recipient">
-              {shortAddress(protocol?.airdropManager?.admin ?? ADMIN_ADDRESS)}
-            </AdminDataRow>
+            ) : (
+              <>
+                <AdminDataRow label="Treasury owner">
+                  {shortAddress(treasuryOwner ?? ADMIN_ADDRESS)}
+                </AdminDataRow>
+                <AdminDataRow label="Curve owner">
+                  {shortAddress(bondingOwner ?? ADMIN_ADDRESS)}
+                </AdminDataRow>
+              </>
+            )}
           </AdminDataTable>
+          {canEmergencySweepBonding ? (
+            <div className="admin-emergency-sweep">
+              <input
+                type="text"
+                value={emergencySweepTo}
+                onChange={(e) => setEmergencySweepTo(e.target.value)}
+                className="admin-input admin-num"
+                placeholder={ADMIN_COPY.treasury.emergency.recipientPlaceholder}
+                aria-label="Emergency sweep recipient"
+              />
+              <AdminBtn
+                size="sm"
+                onClick={onEmergencySweepBonding}
+                disabled={adminTxPending && bondingEmergencySweepPending}
+              >
+                {adminTxPending && bondingEmergencySweepPending ? "…" : "Curve sweep"}
+              </AdminBtn>
+              <span className="admin-compact-hint">{ADMIN_COPY.treasury.emergency.warning}</span>
+            </div>
+          ) : null}
         </AdminBlock>
         </AdminContentGrid>
 
         {canWithdrawTreasury ? (
-          <AdminBlock
-            title={ADMIN_COPY.treasury.withdraw.title}
-            description={ADMIN_COPY.treasury.withdraw.description}
-          >
-            <table className="admin-grid">
-              <tbody>
-                <tr>
-                  <th scope="row">Type</th>
-                  <td colSpan={2}>
-                    <div className="segment-control">
-                      <button
-                        type="button"
-                        className={
-                          withdrawMode === "bnb"
-                            ? "chip-button chip-button-active"
-                            : "chip-button"
-                        }
-                        onClick={() => setWithdrawMode("bnb")}
+          <AdminBlock title={ADMIN_COPY.treasury.withdraw.title}>
+            <div className="admin-compact-form admin-compact-form--withdraw">
+              <div className="admin-compact-row">
+                <span className="admin-field-label">Type</span>
+                <div className="segment-control segment-control--compact">
+                  <button
+                    type="button"
+                    className={
+                      withdrawMode === "bnb"
+                        ? "chip-button chip-button-active"
+                        : "chip-button"
+                    }
+                    onClick={() => setWithdrawMode("bnb")}
+                  >
+                    {ADMIN_COPY.treasury.withdraw.typeBnb}
+                  </button>
+                  <button
+                    type="button"
+                    className={
+                      withdrawMode === "token"
+                        ? "chip-button chip-button-active"
+                        : "chip-button"
+                    }
+                    onClick={() => setWithdrawMode("token")}
+                  >
+                    {ADMIN_COPY.treasury.withdraw.typeToken}
+                  </button>
+                </div>
+              </div>
+
+              <AdminField label={ADMIN_COPY.treasury.withdraw.recipient}>
+                <input
+                  type="text"
+                  value={withdrawTo}
+                  onChange={(e) => setWithdrawTo(e.target.value)}
+                  className="admin-input admin-num"
+                />
+              </AdminField>
+
+              {withdrawMode === "bnb" ? (
+                <>
+                  <AdminField
+                    label={ADMIN_COPY.treasury.withdraw.amountBnb}
+                    hint={
+                      <span className="admin-num">
+                        {formatBnb(treasuryBnb)} BNB available
+                      </span>
+                    }
+                  >
+                    <div className="admin-input-with-action">
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        value={withdrawAmount}
+                        onChange={(e) => setWithdrawAmount(e.target.value)}
+                        className="admin-input admin-num"
+                      />
+                      <AdminBtn
+                        size="sm"
+                        onClick={fillMaxTreasuryBnb}
+                        disabled={!treasuryLiveBalance?.value}
                       >
-                        {ADMIN_COPY.treasury.withdraw.typeBnb}
-                      </button>
-                      <button
-                        type="button"
-                        className={
-                          withdrawMode === "token"
-                            ? "chip-button chip-button-active"
-                            : "chip-button"
-                        }
-                        onClick={() => setWithdrawMode("token")}
-                      >
-                        {ADMIN_COPY.treasury.withdraw.typeToken}
-                      </button>
+                        Max
+                      </AdminBtn>
                     </div>
-                  </td>
-                </tr>
-                <tr>
-                  <th scope="row">{ADMIN_COPY.treasury.withdraw.recipient}</th>
-                  <td colSpan={2}>
+                  </AdminField>
+                </>
+              ) : (
+                <>
+                  <AdminField label={ADMIN_COPY.treasury.withdraw.tokenContract}>
                     <input
                       type="text"
-                      value={withdrawTo}
-                      onChange={(e) => setWithdrawTo(e.target.value)}
+                      value={withdrawTokenAddress}
+                      onChange={(e) => setWithdrawTokenAddress(e.target.value)}
                       className="admin-input admin-num"
                     />
-                  </td>
-                </tr>
-                {withdrawMode === "bnb" ? (
-                  <>
-                    <tr>
-                      <th scope="row">{ADMIN_COPY.treasury.withdraw.amountBnb}</th>
-                      <td>
-                        <input
-                          type="text"
-                          inputMode="decimal"
-                          value={withdrawAmount}
-                          onChange={(e) => setWithdrawAmount(e.target.value)}
-                          className="admin-input admin-num"
-                        />
-                      </td>
-                      <td>
-                        <AdminBtn onClick={fillMaxTreasuryBnb} disabled={!treasuryLiveBalance?.value}>
-                          {ADMIN_COPY.actions.useMax}
-                        </AdminBtn>
-                      </td>
-                    </tr>
-                    <tr>
-                      <th scope="row">{ADMIN_COPY.treasury.withdraw.available}</th>
-                      <td colSpan={2}>
-                        <AdminNum>{formatBnb(treasuryBnb)} BNB</AdminNum>
-                      </td>
-                    </tr>
-                  </>
-                ) : (
-                  <>
-                    <tr>
-                      <th scope="row">{ADMIN_COPY.treasury.withdraw.tokenContract}</th>
-                      <td colSpan={2}>
-                        <input
-                          type="text"
-                          value={withdrawTokenAddress}
-                          onChange={(e) => setWithdrawTokenAddress(e.target.value)}
-                          className="admin-input admin-num"
-                        />
-                      </td>
-                    </tr>
-                    <tr>
-                      <th scope="row">{ADMIN_COPY.treasury.withdraw.amountToken}</th>
-                      <td>
-                        <input
-                          type="text"
-                          inputMode="decimal"
-                          value={withdrawTokenAmount}
-                          onChange={(e) => setWithdrawTokenAmount(e.target.value)}
-                          className="admin-input admin-num"
-                        />
-                      </td>
-                      <td>
-                        <AdminBtn
-                          onClick={fillMaxTreasuryToken}
-                          disabled={treasuryTokenBalance == null || treasuryTokenBalance === 0n}
-                        >
-                          {ADMIN_COPY.actions.useMax}
-                        </AdminBtn>
-                      </td>
-                    </tr>
-                  </>
-                )}
-                <tr>
-                  <th scope="row">Action</th>
-                  <td colSpan={2}>
-                    <AdminBtn
-                      onClick={
-                        withdrawMode === "bnb" ? onWithdrawTreasuryBnb : onWithdrawTreasuryToken
-                      }
-                      disabled={adminTxPending}
-                    >
-                      {adminTxPending ? ADMIN_COPY.actions.withdrawing : ADMIN_COPY.actions.withdraw}
-                    </AdminBtn>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+                  </AdminField>
+                  <AdminField label={ADMIN_COPY.treasury.withdraw.amountToken}>
+                    <div className="admin-input-with-action">
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        value={withdrawTokenAmount}
+                        onChange={(e) => setWithdrawTokenAmount(e.target.value)}
+                        className="admin-input admin-num"
+                      />
+                      <AdminBtn
+                        size="sm"
+                        onClick={fillMaxTreasuryToken}
+                        disabled={treasuryTokenBalance == null || treasuryTokenBalance === 0n}
+                      >
+                        Max
+                      </AdminBtn>
+                    </div>
+                  </AdminField>
+                </>
+              )}
+
+              <div className="admin-compact-actions">
+                <AdminBtn
+                  primary
+                  onClick={
+                    withdrawMode === "bnb" ? onWithdrawTreasuryBnb : onWithdrawTreasuryToken
+                  }
+                  disabled={adminTxPending}
+                >
+                  {adminTxPending ? ADMIN_COPY.actions.withdrawing : ADMIN_COPY.actions.withdraw}
+                </AdminBtn>
+              </div>
+            </div>
             {adminTxHash && !sweepingId ? (
-              <p className="admin-note">
+              <p className="admin-note admin-card-note">
                 Tx{" "}
-                <a href={explorerTxUrl(adminTxHash)} target="_blank" rel="noopener noreferrer" className="admin-link admin-num">
+                <a
+                  href={explorerTxUrl(adminTxHash)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="admin-link admin-num"
+                >
                   {shortAddress(adminTxHash)}
                 </a>
               </p>
@@ -1177,8 +1136,7 @@ export function AdminPanel() {
 
       <AdminTabPanel id="airdrops" active={activeTab}>
         <AdminAirdropSweepTable
-          title={ADMIN_COPY.pages.airdrops.title}
-          subtitle={ADMIN_COPY.pages.airdrops.description}
+          title={ADMIN_COPY.airdrops.tableTitle}
           rows={airdrops}
           loading={loading}
           bnbUsd={bnbUsd}
@@ -1199,7 +1157,6 @@ export function AdminPanel() {
       <AdminTabPanel id="promo" active={activeTab}>
         <AdminBlock
           title={ADMIN_COPY.promo.create.title}
-          description={ADMIN_COPY.promo.create.description}
           actions={
             <AdminBtn onClick={() => void loadPromoTasks()} disabled={promoLoading}>
               {promoLoading ? "…" : ADMIN_COPY.actions.refreshList}
@@ -1260,10 +1217,7 @@ export function AdminPanel() {
           </div>
         </AdminBlock>
 
-        <AdminBlock
-          title={ADMIN_COPY.promo.list.title}
-          description={ADMIN_COPY.promo.list.description}
-        >
+        <AdminBlock title={ADMIN_COPY.promo.list.title}>
           {promoLoading ? (
             <p className="admin-empty">{ADMIN_COPY.empty.loading}</p>
           ) : promoTasks.length === 0 ? (
@@ -1320,11 +1274,7 @@ export function AdminPanel() {
       </AdminTabPanel>
 
       <AdminTabPanel id="contracts" active={activeTab}>
-        <AdminBlock
-          title={ADMIN_COPY.pages.contracts.title}
-          description={ADMIN_COPY.pages.contracts.description}
-        >
-          <p className="admin-card-note admin-note">{ADMIN_COPY.contracts.intro}</p>
+        <AdminBlock title={ADMIN_COPY.pages.contracts.title}>
           <AdminDataTable>
             {[
               [ADMIN_COPY.contracts.labels.memeFactory, protocol?.memeFactory.address ?? contracts.memeFactory],

@@ -5,7 +5,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { adminFetch } from "@/lib/admin-api-client";
 import { ADMIN_COPY } from "@/lib/admin/copy";
 import type { AdminTodo, AdminTodoPriority, AdminTodoSortMode } from "@/lib/db/admin-todos";
-import { AdminAlert, AdminBlock, AdminBtn } from "@/components/admin/AdminChrome";
+import { AdminAlert, AdminBtn } from "@/components/admin/AdminChrome";
+import { ModalPortal } from "@/components/ui/ModalPortal";
 
 type TodoFilter = "all" | "open" | "done";
 
@@ -34,6 +35,82 @@ function reorderList<T extends { id: string }>(list: T[], fromId: string, toId: 
   return next;
 }
 
+function formatTodoWhen(iso: string): string {
+  try {
+    return new Date(iso).toLocaleString();
+  } catch {
+    return iso;
+  }
+}
+
+function AdminTodoDetailModal({
+  todo,
+  busy,
+  onClose,
+  onEdit,
+  onToggleComplete,
+  onDelete,
+}: {
+  todo: AdminTodo;
+  busy: boolean;
+  onClose: () => void;
+  onEdit: () => void;
+  onToggleComplete: () => void;
+  onDelete: () => void;
+}) {
+  return (
+    <ModalPortal open>
+      <div className="modal-backdrop modal-backdrop-shell z-50" role="dialog" aria-modal="true">
+        <button
+          type="button"
+          className="absolute inset-0 cursor-default border-0 bg-transparent p-0"
+          aria-label={ADMIN_COPY.actions.close}
+          onClick={onClose}
+        />
+        <div className="admin-page admin-modal admin-todo-modal relative z-10">
+          <div className="admin-modal-head">
+            <div className="admin-todo-modal-head">
+              <span className={priorityClass(todo.priority)}>{priorityShort(todo.priority)}</span>
+              <h2 className="admin-todo-modal-title">{todo.title}</h2>
+            </div>
+            <button type="button" className="admin-icon-btn" aria-label={ADMIN_COPY.actions.close} onClick={onClose}>
+              <X size={16} />
+            </button>
+          </div>
+          <div className="admin-modal-body admin-todo-modal-body">
+            <div className="admin-todo-modal-meta">
+              <span>
+                {todo.isCompleted ? "Done" : "Open"}
+                {todo.completedAt ? ` · ${formatTodoWhen(todo.completedAt)}` : ""}
+              </span>
+              <span className="admin-meta">
+                Updated {formatTodoWhen(todo.updatedAt)}
+                {todo.createdAt !== todo.updatedAt ? ` · Created ${formatTodoWhen(todo.createdAt)}` : ""}
+              </span>
+            </div>
+            {todo.body ? (
+              <div className="admin-todo-modal-notes">{todo.body}</div>
+            ) : (
+              <p className="admin-todo-modal-empty">—</p>
+            )}
+          </div>
+          <div className="admin-todo-modal-foot">
+            <AdminBtn onClick={onToggleComplete} disabled={busy}>
+              {todo.isCompleted ? ADMIN_COPY.todos.filters.open : ADMIN_COPY.todos.filters.done}
+            </AdminBtn>
+            <AdminBtn onClick={onEdit} disabled={busy}>
+              {ADMIN_COPY.todos.edit}
+            </AdminBtn>
+            <AdminBtn danger onClick={onDelete} disabled={busy}>
+              {ADMIN_COPY.actions.delete}
+            </AdminBtn>
+          </div>
+        </div>
+      </div>
+    </ModalPortal>
+  );
+}
+
 export function AdminTodosTab() {
   const [todos, setTodos] = useState<AdminTodo[]>([]);
   const [sortMode, setSortMode] = useState<AdminTodoSortMode>("priority");
@@ -52,6 +129,7 @@ export function AdminTodosTab() {
   const [editTitle, setEditTitle] = useState("");
   const [editBody, setEditBody] = useState("");
   const [editPriority, setEditPriority] = useState<AdminTodoPriority>("medium");
+  const [viewingId, setViewingId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setError(null);
@@ -84,6 +162,7 @@ export function AdminTodosTab() {
 
   const openCount = todos.filter((t) => !t.isCompleted).length;
   const doneCount = todos.filter((t) => t.isCompleted).length;
+  const viewingTodo = viewingId ? (todos.find((t) => t.id === viewingId) ?? null) : null;
 
   async function persistOrder(orderedVisible: AdminTodo[]) {
     const orderedIds = orderedVisible.map((t) => t.id);
@@ -184,6 +263,7 @@ export function AdminTodosTab() {
       const json = (await res.json()) as { error?: string };
       if (!res.ok) throw new Error(json.error ?? "Failed to delete todo");
       if (editingId === id) setEditingId(null);
+      if (viewingId === id) setViewingId(null);
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to delete todo");
@@ -192,7 +272,12 @@ export function AdminTodosTab() {
     }
   }
 
+  function openView(todo: AdminTodo) {
+    setViewingId(todo.id);
+  }
+
   function startEdit(todo: AdminTodo) {
+    setViewingId(null);
     setEditingId(todo.id);
     setEditTitle(todo.title);
     setEditBody(todo.body ?? "");
@@ -231,11 +316,8 @@ export function AdminTodosTab() {
   }
 
   return (
-    <AdminBlock
-      title={ADMIN_COPY.pages.todos.title}
-      description={ADMIN_COPY.pages.todos.description}
-    >
-      <div className="admin-todos-shell">
+    <>
+    <div className="admin-todos-shell">
         <div className="admin-todos-shell-bar">
           <div className="admin-todos-filters" role="tablist" aria-label="Todo filters">
             {(
@@ -440,12 +522,16 @@ export function AdminTodosTab() {
                     {priorityShort(todo.priority)}
                   </span>
 
-                  <div className="admin-todo-line">
+                  <button
+                    type="button"
+                    className="admin-todo-line admin-todo-line--open"
+                    onClick={() => openView(todo)}
+                  >
                     <span className="admin-todo-line-title">{todo.title}</span>
                     {todo.body ? (
                       <span className="admin-todo-line-note">{todo.body}</span>
                     ) : null}
-                  </div>
+                  </button>
 
                   <div className="admin-todo-row-actions">
                     <button
@@ -473,6 +559,19 @@ export function AdminTodosTab() {
           </ul>
         )}
       </div>
-    </AdminBlock>
+
+      {viewingTodo ? (
+        <AdminTodoDetailModal
+          todo={viewingTodo}
+          busy={busyId === viewingTodo.id}
+          onClose={() => setViewingId(null)}
+          onEdit={() => startEdit(viewingTodo)}
+          onToggleComplete={() =>
+            void patchTodo(viewingTodo.id, { isCompleted: !viewingTodo.isCompleted })
+          }
+          onDelete={() => void onDelete(viewingTodo.id)}
+        />
+      ) : null}
+    </>
   );
 }

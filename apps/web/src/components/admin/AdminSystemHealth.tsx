@@ -327,7 +327,6 @@ export function AdminSystemHealth() {
     <>
       <AdminBlock
         title={ADMIN_COPY.health.title}
-        description={ADMIN_COPY.health.description}
         actions={
           <>
             <AdminBtn onClick={() => void load()} disabled={loading}>
