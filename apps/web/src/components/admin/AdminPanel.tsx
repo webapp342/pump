@@ -41,6 +41,7 @@ import { AdminMinInitialBuyModal } from "@/components/admin/AdminMinInitialBuyMo
 import { AdminFeeExemptModal } from "@/components/admin/AdminFeeExemptModal";
 import { AdminProtocolFeeModal } from "@/components/admin/AdminProtocolFeeModal";
 import { AdminEnvTab } from "@/components/admin/AdminEnvTab";
+import { AdminTodosTab } from "@/components/admin/AdminTodosTab";
 import { AdminSystemHealth } from "@/components/admin/AdminSystemHealth";
 import { AdminPortfolioTab } from "@/components/admin/AdminPortfolioTab";
 import {
@@ -937,6 +938,10 @@ export function AdminPanel() {
             </AdminBlock>
           </AdminContentGrid>
         </AdminTabPanel>
+
+      <AdminTabPanel id="todos" active={activeTab}>
+        {address ? <AdminTodosTab /> : <AdminEmptyState title={ADMIN_COPY.portfolio.empty} />}
+      </AdminTabPanel>
 
       <AdminTabPanel id="portfolio" active={activeTab}>
         {address ? (

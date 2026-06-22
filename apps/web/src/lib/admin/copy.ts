@@ -51,6 +51,11 @@ export const ADMIN_COPY = {
       description:
         "At-a-glance platform health, treasury position, and recovery queue for BSC Testnet.",
     },
+    todos: {
+      title: "Ops todo list",
+      description:
+        "Personal operations checklist — priorities, completion status, and manual sort order.",
+    },
     portfolio: {
       title: "Portfolio",
       description:
@@ -90,6 +95,7 @@ export const ADMIN_COPY = {
     system: "System",
     items: {
       dashboard: { label: "Dashboard", desc: "Metrics & health" },
+      todos: { label: "Todo list", desc: "Ops checklist" },
       portfolio: { label: "Portfolio", desc: "Wallet holdings" },
       airdrops: { label: "Airdrop recovery", desc: "Escrow sweeps" },
       promo: { label: "Promo campaigns", desc: "Points tasks" },
@@ -267,6 +273,34 @@ export const ADMIN_COPY = {
 
   portfolio: {
     empty: "Connect the operations wallet to view holdings.",
+  },
+
+  todos: {
+    add: "Add todo",
+    creating: "Adding…",
+    save: "Save changes",
+    loading: "Loading todos…",
+    empty: "No todos in this view yet.",
+    listTitle: "Your todos",
+    listDesc: "Reorder with arrows. Completed items move to the Done filter.",
+    deleteConfirm: "Delete this todo permanently?",
+    moveUp: "Move up",
+    moveDown: "Move down",
+    edit: "Edit todo",
+    filters: {
+      open: "Open",
+      done: "Done",
+      all: "All",
+    },
+    fields: {
+      title: "Title",
+      notes: "Notes (optional)",
+      priority: "Priority",
+    },
+    placeholders: {
+      title: "e.g. Rotate RPC keys before mainnet",
+      notes: "Extra context, links, or acceptance criteria",
+    },
   },
 
   empty: {

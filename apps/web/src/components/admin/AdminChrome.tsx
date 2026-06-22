@@ -10,6 +10,7 @@ import {
   KeyRound,
   Landmark,
   LayoutDashboard,
+  ListTodo,
   Menu,
   RefreshCw,
   Wallet,
@@ -20,6 +21,7 @@ import { ADMIN_COPY } from "@/lib/admin/copy";
 
 export type AdminTabId =
   | "dashboard"
+  | "todos"
   | "portfolio"
   | "treasury"
   | "airdrops"
@@ -51,6 +53,12 @@ const NAV_GROUPS: NavGroup[] = [
         label: ADMIN_COPY.nav.items.dashboard.label,
         description: ADMIN_COPY.nav.items.dashboard.desc,
         icon: LayoutDashboard,
+      },
+      {
+        id: "todos",
+        label: ADMIN_COPY.nav.items.todos.label,
+        description: ADMIN_COPY.nav.items.todos.desc,
+        icon: ListTodo,
       },
     ],
   },

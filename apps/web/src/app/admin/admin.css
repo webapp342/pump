@@ -1410,3 +1410,171 @@
     gap: 12px;
   }
 }
+
+/* Ops todo list */
+.admin-todos {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.admin-todos-compose {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.admin-todos-compose-row {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 640px) {
+  .admin-todos-compose-row {
+    grid-template-columns: 1fr minmax(9rem, 11rem);
+  }
+}
+
+.admin-todos-notes {
+  min-height: 4.5rem;
+  resize: vertical;
+}
+
+.admin-todos-compose-actions {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.admin-todos-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.admin-todos-filters {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.admin-todos-filter {
+  border: 1px solid var(--pump-border, rgba(255, 255, 255, 0.08));
+  background: transparent;
+  color: var(--pump-muted);
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: var(--text-caption, 0.75rem);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.admin-todos-filter:hover {
+  color: var(--pump-text);
+  border-color: rgba(255, 255, 255, 0.16);
+}
+
+.admin-todos-filter--active {
+  color: var(--pump-text);
+  border-color: rgba(255, 193, 7, 0.35);
+  background: rgba(255, 193, 7, 0.08);
+}
+
+.admin-todos-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.admin-todo-item {
+  border: 1px solid var(--pump-border, rgba(255, 255, 255, 0.08));
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.02);
+  padding: 12px 14px;
+}
+
+.admin-todo-item--done .admin-todo-title {
+  text-decoration: line-through;
+  color: var(--pump-muted);
+}
+
+.admin-todo-main {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.admin-todo-check {
+  position: relative;
+  display: inline-flex;
+  margin-top: 2px;
+  cursor: pointer;
+}
+
+.admin-todo-check input {
+  position: absolute;
+  opacity: 0;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  cursor: pointer;
+}
+
+.admin-todo-check-box {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.admin-todo-check input:checked + .admin-todo-check-box {
+  border-color: rgba(34, 197, 94, 0.5);
+  background: rgba(34, 197, 94, 0.2);
+  box-shadow: inset 0 0 0 2px rgba(34, 197, 94, 0.85);
+}
+
+.admin-todo-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.admin-todo-title {
+  margin: 0;
+  font-size: var(--text-body-sm, 0.875rem);
+  font-weight: 600;
+  color: var(--pump-text);
+}
+
+.admin-todo-body {
+  margin: 6px 0 0;
+  font-size: var(--text-caption, 0.75rem);
+  color: var(--pump-muted);
+  white-space: pre-wrap;
+}
+
+.admin-todo-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px;
+  margin-top: 10px;
+}
+
+.admin-todo-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.admin-todo-edit-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
