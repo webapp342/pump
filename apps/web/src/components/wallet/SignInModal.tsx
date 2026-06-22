@@ -72,8 +72,10 @@ export function SignInModal({ open, onClose, onSuccess }: SignInModalProps) {
   const [error, setError] = useState<string | null>(null);
 
   const showTelegram = isTelegramAuthConfigured();
-  const showGoogle = isGoogleAuthConfigured();
-  const showApple = isAppleAuthConfigured();
+  const [googleVisible, setGoogleVisible] = useState(isGoogleAuthConfigured());
+  const [appleVisible, setAppleVisible] = useState(isAppleAuthConfigured());
+  const showGoogle = googleVisible;
+  const showApple = appleVisible;
 
   useEffect(() => {
     onSuccessRef.current = onSuccess;
@@ -95,24 +97,38 @@ export function SignInModal({ open, onClose, onSuccess }: SignInModalProps) {
         .catch(() => setTelegramReady(false));
     }
 
-    if (showGoogle) {
-      void fetch("/api/auth/google/config", { cache: "no-store" })
-        .then(async (response) => {
-          const body = (await response.json()) as { data?: ProviderConfig };
-          setGoogleReady(Boolean(response.ok && body.data?.redirectReady));
-        })
-        .catch(() => setGoogleReady(false));
-    }
+    void fetch("/api/auth/google/config", { cache: "no-store" })
+      .then(async (response) => {
+        const body = (await response.json()) as { data?: ProviderConfig };
+        if (response.ok) {
+          setGoogleVisible(true);
+          setGoogleReady(Boolean(body.data?.redirectReady));
+          return;
+        }
+        setGoogleVisible(isGoogleAuthConfigured());
+        setGoogleReady(false);
+      })
+      .catch(() => {
+        setGoogleVisible(isGoogleAuthConfigured());
+        setGoogleReady(false);
+      });
 
-    if (showApple) {
-      void fetch("/api/auth/apple/config", { cache: "no-store" })
-        .then(async (response) => {
-          const body = (await response.json()) as { data?: ProviderConfig };
-          setAppleReady(Boolean(response.ok && body.data?.redirectReady));
-        })
-        .catch(() => setAppleReady(false));
-    }
-  }, [open, showTelegram, showGoogle, showApple]);
+    void fetch("/api/auth/apple/config", { cache: "no-store" })
+      .then(async (response) => {
+        const body = (await response.json()) as { data?: ProviderConfig };
+        if (response.ok) {
+          setAppleVisible(true);
+          setAppleReady(Boolean(body.data?.redirectReady));
+          return;
+        }
+        setAppleVisible(isAppleAuthConfigured());
+        setAppleReady(false);
+      })
+      .catch(() => {
+        setAppleVisible(isAppleAuthConfigured());
+        setAppleReady(false);
+      });
+  }, [open, showTelegram]);
 
   const startProvider = useCallback(async (provider: "telegram" | "google" | "apple") => {
     setPending(provider);

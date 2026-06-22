@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
     data: {
       configured: true,
       serverReady: isAppleServerConfigured(),
-      redirectReady: isAppleOidcRedirectConfigured(),
+      redirectReady: isAppleServerConfigured() && isAppleOidcRedirectConfigured(),
       publicOrigin: resolvePublicAppOrigin(request),
     },
   });

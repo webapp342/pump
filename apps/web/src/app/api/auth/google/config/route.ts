@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
     data: {
       configured: true,
       serverReady: isGoogleServerConfigured(),
-      redirectReady: isGoogleOidcRedirectConfigured(),
+      redirectReady: isGoogleServerConfigured() && isGoogleOidcRedirectConfigured(),
       publicOrigin: resolvePublicAppOrigin(request),
     },
   });

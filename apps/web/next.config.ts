@@ -13,7 +13,7 @@ loadMonorepoRootEnv(monorepoRoot);
  * COOP must allow popup postMessage from oauth.telegram.org.
  */
 const scriptSrc =
-  "'self' 'unsafe-inline' 'unsafe-eval' https://telegram.org https://oauth.telegram.org https://accounts.google.com https://appleid.cdn-apple.com";
+  "'self' 'unsafe-inline' 'unsafe-eval' https://telegram.org https://oauth.telegram.org https://accounts.google.com https://appleid.cdn-apple.com https://static.cloudflareinsights.com";
 
 const contentSecurityPolicy = [
   "default-src 'self'",
@@ -22,7 +22,7 @@ const contentSecurityPolicy = [
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob: https:",
   "font-src 'self'",
-  "connect-src 'self' https: wss: https://oauth.telegram.org https://accounts.google.com https://appleid.apple.com",
+  "connect-src 'self' https: wss: https://oauth.telegram.org https://accounts.google.com https://appleid.apple.com https://static.cloudflareinsights.com",
   "child-src 'self' https://oauth.telegram.org https://telegram.org https://accounts.google.com https://appleid.apple.com",
   "frame-src 'self' https://oauth.telegram.org https://telegram.org https://accounts.google.com https://appleid.apple.com",
   "worker-src 'self' blob:",
