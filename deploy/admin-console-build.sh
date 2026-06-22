@@ -10,11 +10,6 @@ log() {
 
 cd "$REPO_ROOT"
 
-if [[ -f "$REPO_ROOT/.env" ]]; then
-  log "Linking root .env for Vite build (NEXT_PUBLIC_ADMIN_ADDRESS, etc.)"
-  ln -sfn "$REPO_ROOT/.env" "$REPO_ROOT/apps/admin/.env"
-fi
-
 log "Building admin (@pump/admin, base=/admin/)"
 VITE_ADMIN_BASE=/admin/ npm run build -w @pump/admin
 
