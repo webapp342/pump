@@ -55,5 +55,5 @@ BEGIN
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.wipe_launchpad_app_data() TO PUBLIC;
+REVOKE ALL ON FUNCTION public.wipe_launchpad_app_data() FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.wipe_launchpad_app_data() TO pump_app;
