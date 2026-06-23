@@ -1,8 +1,9 @@
 import { formatEther, type Address, type PublicClient } from "viem";
 import { createPumpPublicClient } from "@/lib/aa/kernel-account";
+import { bufferedGasCostWei } from "@/lib/aa/gas-buffer";
 
-/** Minimum SCW BNB to relay a UserOp (gas) on BSC testnet without paymaster. */
-export const MIN_SCW_GAS_RESERVE_WEI = 500_000_000_000_000n; // 0.0005 BNB
+/** Rough AA relay floor when no explicit estimate is available. */
+const MIN_USER_OP_GAS_UNITS = 200_000n;
 
 export async function getScwNativeBalance(
   scwAddress: Address,
@@ -15,8 +16,11 @@ export async function assertScwReadyForUserOp(
   scwAddress: Address,
   callValueWei: bigint
 ): Promise<void> {
-  const balance = await getScwNativeBalance(scwAddress);
-  const required = callValueWei + MIN_SCW_GAS_RESERVE_WEI;
+  const publicClient = createPumpPublicClient();
+  const balance = await getScwNativeBalance(scwAddress, publicClient);
+  const gasPrice = await publicClient.getGasPrice();
+  const gasReserve = bufferedGasCostWei(MIN_USER_OP_GAS_UNITS, gasPrice);
+  const required = callValueWei + gasReserve;
 
   if (balance < required) {
     const have = formatEther(balance);

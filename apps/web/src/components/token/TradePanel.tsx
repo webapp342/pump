@@ -8,6 +8,7 @@ import type { SessionBuyParams, SessionSellParams } from "@/hooks/useSessionTrad
 import { useWalletFunding } from "@/components/wallet/WalletFundingProvider";
 import { TradeConfirmModal } from "@/components/token/TradeConfirmModal";
 import { assertScwReadyForUserOp } from "@/lib/aa/scw-preflight";
+import { bufferCostWei, bufferedGasCostWei } from "@/lib/aa/gas-buffer";
 import { loadTradeAutoConfirm, saveTradeAutoConfirm } from "@/lib/trade-confirm-storage";
 import {
   useAccount,
@@ -111,9 +112,9 @@ function formatGasCostLabel(gasCostWei: bigint, bnbUsd: number | null): string {
   return usdLabel ? `≈ ${bnbStr} BNB (${usdLabel})` : `≈ ${bnbStr} BNB`;
 }
 
-const GAS_EXTRA_WEI = parseEther("0.00015");
 const GAS_PROBE_BNB_WEI = parseEther("0.001");
 const GAS_PROBE_TOKEN_WEI = parseUnits("0.000001", 18);
+const PROBE_GAS_UNITS = 200_000n;
 
 function capSpendToBalance(
   spendWei: bigint,
@@ -517,14 +518,21 @@ export function TradePanel({
     return quoted > 0n ? quoted : undefined;
   }, [side, bondingCurve, protocolFeeBps, sellQuoteOut, gasProbeSellTokenWei]);
 
+  const probeGasReserveWei = useMemo(() => {
+    if (gasPrice != null && gasPrice > 0n) {
+      return bufferedGasCostWei(PROBE_GAS_UNITS, gasPrice);
+    }
+    return 0n;
+  }, [gasPrice]);
+
   const gasProbeBuySpendWei = useMemo(() => {
     if (side !== "buy") return 0n;
     if (buyCostWei > 0n) return buyCostWei;
-    if (bnbBalance != null && bnbBalance.value > GAS_EXTRA_WEI) {
-      return bnbBalance.value - GAS_EXTRA_WEI;
+    if (bnbBalance != null && probeGasReserveWei > 0n && bnbBalance.value > probeGasReserveWei) {
+      return bnbBalance.value - probeGasReserveWei;
     }
     return GAS_PROBE_BNB_WEI;
-  }, [side, buyCostWei, bnbBalance]);
+  }, [side, buyCostWei, bnbBalance, probeGasReserveWei]);
 
   const gasProbeTokenOut = useMemo(() => {
     if (side !== "buy" || !bondingCurve || protocolFeeBps === undefined) return 1n;
@@ -580,9 +588,9 @@ export function TradePanel({
     return 0n;
   }, [gasCostWei, gasPrice, side, needsLegacyApproval]);
 
-  /** On-chain estimate + hidden buffer for Max / balance checks (not shown in UI). */
+  /** On-chain estimate + % buffer for Max / balance checks (not shown in UI). */
   const gasReserveWei = useMemo(
-    () => estimatedGasWei + GAS_EXTRA_WEI,
+    () => bufferCostWei(estimatedGasWei),
     [estimatedGasWei]
   );
 

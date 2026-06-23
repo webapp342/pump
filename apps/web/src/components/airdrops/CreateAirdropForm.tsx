@@ -65,11 +65,9 @@ import {
   validateQualifyWindow,
 } from "@/lib/airdrop-datetime";
 import { formatCampaignAmount, formatCampaignAmountInput, floorCampaignAmountWei, formatAirdropReward } from "@/lib/airdrop-board-format";
+import { useCreateGasReserve } from "@/hooks/useCreateGasReserve";
 
 const ZERO = "0x0000000000000000000000000000000000000000" as const;
-
-/** Leave headroom for create tx gas on top of escrow + fee. */
-const GAS_BUFFER_BNB = parseEther("0.002");
 
 function tryParseEtherWei(value: string): bigint | null {
   const trimmed = value.trim();
@@ -655,19 +653,35 @@ export function CreateAirdropForm({
 
   const feeWei = effectiveCreateFee;
 
-  const maxRewardWei = useMemo(() => {
-    if (isBnbReward) {
-      const avail = bnbBalance?.value ?? 0n;
-      const overhead = feeWei + GAS_BUFFER_BNB;
-      return avail > overhead ? avail - overhead : 0n;
-    }
-    return rewardTokenBalance ?? 0n;
-  }, [isBnbReward, bnbBalance?.value, feeWei, rewardTokenBalance]);
-
   const parsedRewardWei = useMemo(
     () => tryParseEtherWei(rewardAmountInput),
     [rewardAmountInput]
   );
+
+  const needsTokenApprove = useMemo(() => {
+    if (isBnbReward || !rewardTokenAddress || parsedRewardWei == null || parsedRewardWei <= 0n) {
+      return false;
+    }
+    return (tokenAllowance ?? 0n) < parsedRewardWei;
+  }, [isBnbReward, rewardTokenAddress, tokenAllowance, parsedRewardWei]);
+
+  const { gasReserveWei, isLoading: gasReserveLoading } = useCreateGasReserve({
+    kind: "airdrop",
+    enabled: isConnected && Boolean(address) && Boolean(contracts.airdropManager),
+    address,
+    needsApprove: needsTokenApprove,
+    rewardToken: rewardTokenAddress,
+  });
+  const gasWei = gasReserveWei ?? 0n;
+
+  const maxRewardWei = useMemo(() => {
+    if (isBnbReward) {
+      const avail = bnbBalance?.value ?? 0n;
+      const overhead = feeWei + gasWei;
+      return avail > overhead ? avail - overhead : 0n;
+    }
+    return rewardTokenBalance ?? 0n;
+  }, [isBnbReward, bnbBalance?.value, feeWei, gasWei, rewardTokenBalance]);
 
   const parsedRewardAmount = useMemo(() => {
     if (parsedRewardWei == null || parsedRewardWei <= 0n) return null;
@@ -824,9 +838,9 @@ export function CreateAirdropForm({
 
     const fee = effectiveCreateFee;
 
-    if (isConnected && bnbBalance !== undefined) {
+    if (isConnected && bnbBalance !== undefined && !gasReserveLoading) {
       const bnbAvail = bnbBalance.value;
-      const minBnbNeeded = fee + GAS_BUFFER_BNB;
+      const minBnbNeeded = fee + gasWei;
 
       if (isBnbReward) {
         const targetReward = parsedRewardAmount ?? 0n;
@@ -850,11 +864,11 @@ export function CreateAirdropForm({
       }
     }
 
-    if (isConnected && parsedRewardAmount) {
+    if (isConnected && parsedRewardAmount && !gasReserveLoading) {
       const bnbAvail = bnbBalance?.value ?? 0n;
 
       if (isBnbReward) {
-        const neededBnb = parsedRewardAmount + fee + GAS_BUFFER_BNB;
+        const neededBnb = parsedRewardAmount + fee + gasWei;
         if (bnbAvail < neededBnb) {
           warnings.push(
             `Need ${formatCampaignAmount(neededBnb - bnbAvail)} more BNB for reward pool, create fee, and gas.`
@@ -862,7 +876,7 @@ export function CreateAirdropForm({
           canSubmit = false;
         }
       } else if (rewardToken) {
-        const neededBnb = fee + GAS_BUFFER_BNB;
+        const neededBnb = fee + gasWei;
         if (bnbAvail < neededBnb) {
           warnings.push(
             `Need ${formatCampaignAmount(neededBnb - bnbAvail)} more BNB for create fee and gas.`
@@ -878,8 +892,8 @@ export function CreateAirdropForm({
           canSubmit = false;
         }
       }
-    } else if (isConnected && isBnbReward && maxRewardWei === 0n && bnbBalance !== undefined) {
-      const minBnbNeeded = fee + GAS_BUFFER_BNB;
+    } else if (isConnected && isBnbReward && maxRewardWei === 0n && bnbBalance !== undefined && !gasReserveLoading) {
+      const minBnbNeeded = fee + gasWei;
       if (bnbBalance.value < minBnbNeeded) {
         warnings.push(
           `Need ${formatCampaignAmount(minBnbNeeded - bnbBalance.value)} more BNB for create fee and gas.`
@@ -905,9 +919,12 @@ export function CreateAirdropForm({
     socialTasks,
     isConnected,
     createFee,
+    effectiveCreateFee,
     bnbBalance?.value,
     rewardTokenBalance,
     selectedRewardSymbol,
+    gasWei,
+    gasReserveLoading,
   ]);
 
   if (!contracts.airdropManager) {

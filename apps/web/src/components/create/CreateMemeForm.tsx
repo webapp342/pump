@@ -42,6 +42,7 @@ import {
 import { TokenLaunchSuccessModal } from "@/components/create/TokenLaunchSuccessModal";
 import { DEFAULT_MIN_INITIAL_BUY_BNB } from "@/lib/platform-settings";
 import { formatCampaignAmount, formatCampaignAmountInput } from "@/lib/airdrop-board-format";
+import { useCreateGasReserve } from "@/hooks/useCreateGasReserve";
 
 type LaunchSuccess = {
   tokenAddress: string;
@@ -49,9 +50,6 @@ type LaunchSuccess = {
   tokenSymbol: string;
   logoPreviewUrl?: string;
 };
-
-/** Headroom for create + initial-buy tx gas on top of fee + buy amount. */
-const CREATE_GAS_BUFFER_BNB = parseEther("0.003");
 
 async function fileToDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -419,8 +417,19 @@ export function CreateMemeForm() {
   const totalValue = feeWei + initialBuyWei;
   const showReceivePreview = initialBuyWei > 0n && estimatedTokens > 0n && protocolFeeBps !== undefined;
 
+  const { gasReserveWei, isLoading: gasReserveLoading } = useCreateGasReserve({
+    kind: "meme",
+    enabled: isConnected && Boolean(address) && contractsReady,
+    address,
+    name,
+    symbol,
+    minTokenOut: minInitialBuyTokens,
+    valueWei: totalValue,
+  });
+  const gasWei = gasReserveWei ?? 0n;
+
   const maxInitialBuyWei = useMemo(() => {
-    const overhead = feeWei + CREATE_GAS_BUFFER_BNB;
+    const overhead = feeWei + gasWei;
     if (!isConnected || bnbBalance === undefined) {
       return minInitialBuyWei;
     }
@@ -429,7 +438,7 @@ export function CreateMemeForm() {
     }
     const afford = bnbBalance.value - overhead;
     return afford > minInitialBuyWei ? afford : minInitialBuyWei;
-  }, [isConnected, bnbBalance, feeWei, minInitialBuyWei]);
+  }, [isConnected, bnbBalance, feeWei, gasWei, minInitialBuyWei]);
 
   const canUseInitialBuySlider =
     isConnected &&
@@ -444,17 +453,19 @@ export function CreateMemeForm() {
         : initialBuyWei > 0n
           ? initialBuyWei
           : minInitialBuyWei;
-    return feeWei + buyWei + CREATE_GAS_BUFFER_BNB;
-  }, [feeWei, initialBuyWei, minInitialBuyWei]);
+    return feeWei + buyWei + gasWei;
+  }, [feeWei, initialBuyWei, minInitialBuyWei, gasWei]);
 
   const bnbShortfallWei = useMemo(() => {
-    if (!isConnected || bnbBalanceLoading || bnbBalance === undefined) return 0n;
+    if (!isConnected || bnbBalanceLoading || gasReserveLoading || bnbBalance === undefined) {
+      return 0n;
+    }
     if (bnbBalance.value >= launchRequiredWei) return 0n;
     return launchRequiredWei - bnbBalance.value;
-  }, [isConnected, bnbBalanceLoading, bnbBalance, launchRequiredWei]);
+  }, [isConnected, bnbBalanceLoading, gasReserveLoading, bnbBalance, launchRequiredWei]);
 
   const needsBnbFunding =
-    isConnected && !bnbBalanceLoading && bnbShortfallWei > 0n;
+    isConnected && !bnbBalanceLoading && !gasReserveLoading && bnbShortfallWei > 0n;
 
   function openLaunchFundingModal() {
     openFundChoice({
