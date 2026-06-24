@@ -737,7 +737,6 @@ export function formatPumpSubscriptPrice(value: number, prefix = "$"): string {
   if (!Number.isFinite(value) || value <= 0) return `${prefix}0`;
   if (value >= 1) return `${prefix}${value.toFixed(2)}`;
   if (value >= 0.01) return `${prefix}${value.toFixed(4)}`;
-  if (value >= 0.0001) return `${prefix}${value.toFixed(6)}`;
 
   const scientific = value.toExponential(12);
   const match = /^(\d)\.(\d+)e-(\d+)$/.exec(scientific);
@@ -767,7 +766,8 @@ export function formatChartPrice(value: number, currency: "bnb" | "usd" | "mcap"
 
 export function resolveChartPriceFormat(
   candles: CandleBar[],
-  currency: "bnb" | "usd" | "mcap"
+  currency: "bnb" | "usd" | "mcap",
+  bnbUsd?: number | null
 ): {
   type: "custom";
   formatter: (price: number) => string;
@@ -785,15 +785,24 @@ export function resolveChartPriceFormat(
   }
 
   const minMove = Math.pow(10, -precision);
-  const prefix = currency === "usd" || currency === "mcap" ? "$" : "";
+  const usdRate = bnbUsd != null && bnbUsd > 0 ? bnbUsd : 1;
 
   return {
     type: "custom",
     minMove,
     formatter: (price: number) => {
       if (!Number.isFinite(price)) return "—";
-      if (price === 0) return `${prefix}0`;
-      if (currency === "usd" || currency === "mcap") return formatPumpSubscriptPrice(price, "$");
+      if (price === 0) return currency === "usd" || currency === "mcap" ? "$0" : "0";
+      if (currency === "mcap") {
+        const usd = price * usdRate;
+        if (!Number.isFinite(usd) || usd <= 0) return "$0";
+        if (usd >= 1_000_000) return `$${(usd / 1_000_000).toFixed(2)}M`;
+        if (usd >= 10_000) return `$${(usd / 1_000).toFixed(1)}K`;
+        return `$${usd.toFixed(2)}`;
+      }
+      if (currency === "usd") {
+        return formatPumpSubscriptPrice(price * usdRate, "$");
+      }
       if (price >= 0.001) return price.toFixed(Math.min(6, precision));
       return formatPumpSubscriptPrice(price, "") + " BNB";
     },

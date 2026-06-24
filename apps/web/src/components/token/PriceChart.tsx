@@ -120,9 +120,14 @@ function chartHeightPx(): number {
   return 280;
 }
 
-function formatOhlc(value: number, currency: "usd" | "mcap"): string {
-  if (currency === "mcap") return formatUsd(value, { compact: true }) ?? "$0";
-  if (currency === "usd") return formatPumpSubscriptPrice(value, "$");
+function formatOhlc(
+  value: number,
+  currency: "usd" | "mcap",
+  bnbUsd: number | null | undefined
+): string {
+  const rate = bnbUsd != null && bnbUsd > 0 ? bnbUsd : 0;
+  if (currency === "mcap") return formatUsd(value * rate, { compact: true }) ?? "$0";
+  if (currency === "usd") return formatPumpSubscriptPrice(value * rate, "$");
   if (value >= 0.001) return value.toFixed(6);
   return formatPumpSubscriptPrice(value, "");
 }
@@ -235,14 +240,9 @@ export function PriceChart({
   const [ready, setReady] = useState(false);
 
   const frozen = false;
-  const priceScale =
-    currency === "mcap"
-      ? bnbUsd != null && bnbUsd > 0
-        ? bnbUsd * DEFAULT_TOKEN_TOTAL_SUPPLY
-        : 1
-      : bnbUsd != null && bnbUsd > 0
-        ? bnbUsd
-        : 1;
+  /** Series values: BNB spot (usd) or BNB mcap — USD only in formatters. */
+  const candleUnitScale =
+    currency === "mcap" ? DEFAULT_TOKEN_TOTAL_SUPPLY : 1;
   const unitLabel = currency === "usd" ? "USD" : "MCAP";
 
   const fetchCandles = useCallback(async () => {
@@ -314,8 +314,8 @@ export function PriceChart({
     let baseVolumes: VolumeBar[] = [];
 
     if (storedCandles.length > 0) {
-      const scaledCandles = scaleCandleBars(storedCandles, priceScale);
-      const scaledVolumes = scaleVolumeBars(storedVolumes, priceScale);
+      const scaledCandles = scaleCandleBars(storedCandles, candleUnitScale);
+      const scaledVolumes = scaleVolumeBars(storedVolumes, candleUnitScale);
       if (candleSource === "db") {
         const filled = fillGapsForStoredCandles(scaledCandles, scaledVolumes, timeInterval, {
           endTimeMs: chartEndTimeMs,
@@ -334,7 +334,7 @@ export function PriceChart({
         baseVolumes,
         timeInterval,
         actorOptimisticSpot,
-        1
+        candleUnitScale
       );
     }
 
@@ -344,7 +344,7 @@ export function PriceChart({
     storedCandles,
     storedVolumes,
     timeInterval,
-    priceScale,
+    candleUnitScale,
     chartEndTimeMs,
     actorOptimisticSpot,
   ]);
@@ -357,9 +357,17 @@ export function PriceChart({
   const displayCandle = hoverOhlc ?? lastCandle;
 
   const priceFormat = useMemo(
-    () => resolveChartPriceFormat(candlesForChart, currency),
-    [candlesForChart, currency]
+    () => resolveChartPriceFormat(candlesForChart, currency, bnbUsd),
+    [candlesForChart, currency, bnbUsd]
   );
+
+  const chartPriceFormatter = useCallback(
+    (price: number) => priceFormat.formatter(price),
+    [priceFormat]
+  );
+
+  const chartPriceFormatterRef = useRef(chartPriceFormatter);
+  chartPriceFormatterRef.current = chartPriceFormatter;
 
   const fitChartViewport = useCallback(() => {
     const chart = chartRef.current;
@@ -410,11 +418,11 @@ export function PriceChart({
   }, [storedCandles.length, candleSource, tokenAddress]);
 
   useEffect(() => {
-    if (prevPriceScaleRef.current != null && prevPriceScaleRef.current !== priceScale) {
+    if (prevPriceScaleRef.current != null && prevPriceScaleRef.current !== candleUnitScale) {
       shouldFitViewportRef.current = true;
     }
-    prevPriceScaleRef.current = priceScale;
-  }, [priceScale]);
+    prevPriceScaleRef.current = candleUnitScale;
+  }, [candleUnitScale]);
 
   const selectCurrency = useCallback((next: "usd" | "mcap") => {
     shouldFitViewportRef.current = true;
@@ -492,6 +500,7 @@ export function PriceChart({
       localization: {
         locale: "en-US",
         timeFormatter: formatUtcTime,
+        priceFormatter: (price: number) => chartPriceFormatterRef.current(price),
       },
     });
 
@@ -638,7 +647,7 @@ export function PriceChart({
 
     const nextCandles = candlesForChart;
     const nextVolumes = volumesForChart;
-    const fingerprint = `${tokenAddress}|${timeInterval}|${currency}|${priceScale}`;
+    const fingerprint = `${tokenAddress}|${timeInterval}|${currency}|${candleUnitScale}`;
     const prevCandles = renderedCandlesRef.current;
 
     const applyFullSeries = () => {
@@ -706,20 +715,20 @@ export function PriceChart({
     tokenAddress,
     timeInterval,
     currency,
-    priceScale,
+    candleUnitScale,
   ]);
 
   const summaryValue =
     currency === "usd"
       ? (currentPriceUsd != null && currentPriceUsd > 0
           ? formatPumpSubscriptPrice(currentPriceUsd, "$")
-          : lastCandle != null
-            ? formatPumpSubscriptPrice(lastCandle.close, "$")
+          : lastCandle != null && bnbUsd != null && bnbUsd > 0
+            ? formatPumpSubscriptPrice(lastCandle.close * bnbUsd, "$")
             : "—")
       : (currentMcapUsd != null && currentMcapUsd > 0
           ? formatUsd(currentMcapUsd, { compact: true }) ?? "—"
-          : lastCandle != null
-            ? formatUsd(lastCandle.close, { compact: true }) ?? "—"
+          : lastCandle != null && bnbUsd != null && bnbUsd > 0
+            ? formatUsd(lastCandle.close * bnbUsd, { compact: true }) ?? "—"
             : "—");
   const summaryDeltaPct = price24hChangePct;
 
@@ -827,16 +836,16 @@ export function PriceChart({
       {displayCandle ? (
         <div className="financial-value flex items-center gap-x-3 overflow-x-auto border-t border-pump-border/10 px-3 py-1.5 text-[11px] text-pump-muted [scrollbar-width:none] md:gap-x-4 md:py-2 md:text-xs [&::-webkit-scrollbar]:hidden">
           <span className="shrink-0">
-            O <span className="text-pump-text">{formatOhlc(displayCandle.open, currency)}</span>
+            O <span className="text-pump-text">{formatOhlc(displayCandle.open, currency, bnbUsd)}</span>
           </span>
           <span className="shrink-0">
-            H <span className="text-pump-accent">{formatOhlc(displayCandle.high, currency)}</span>
+            H <span className="text-pump-accent">{formatOhlc(displayCandle.high, currency, bnbUsd)}</span>
           </span>
           <span className="shrink-0">
-            L <span className="text-pump-danger">{formatOhlc(displayCandle.low, currency)}</span>
+            L <span className="text-pump-danger">{formatOhlc(displayCandle.low, currency, bnbUsd)}</span>
           </span>
           <span className="shrink-0">
-            C <span className="text-pump-text">{formatOhlc(displayCandle.close, currency)}</span>
+            C <span className="text-pump-text">{formatOhlc(displayCandle.close, currency, bnbUsd)}</span>
           </span>
           {hoverOhlc && displayTimeUtc ? (
             <span className="hidden shrink-0 sm:inline">{displayTimeUtc}</span>
