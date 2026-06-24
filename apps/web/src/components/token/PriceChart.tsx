@@ -351,6 +351,12 @@ export function PriceChart({
   }, [fetchCandles, frozen, wsConnected]);
 
   useEffect(() => {
+    if (!actorOptimisticSpot) return;
+    setNowMs(Date.now());
+    shouldFitViewportRef.current = true;
+  }, [actorOptimisticSpot]);
+
+  useEffect(() => {
     if (frozen) return;
     const tickMs = actorOptimisticSpot ? 1_000 : 15_000;
     const timer = setInterval(() => setNowMs(Date.now()), tickMs);
@@ -361,8 +367,9 @@ export function PriceChart({
     if (frozen && seriesState.candles.length > 0) {
       return seriesState.candles[seriesState.candles.length - 1]!.time * 1000;
     }
-    return nowMs;
-  }, [frozen, seriesState.candles, nowMs]);
+    const actorMs = actorOptimisticSpot?.blockTimeMs;
+    return actorMs != null ? Math.max(nowMs, actorMs) : nowMs;
+  }, [frozen, seriesState.candles, nowMs, actorOptimisticSpot?.blockTimeMs]);
 
   useEffect(() => {
     if (seriesState.source !== "db" || liveCandleUpdates.length === 0) return;

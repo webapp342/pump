@@ -447,6 +447,12 @@ export function fillGapsForStoredCandles(
   const volumeByTime = new Map(volumes.map((v) => [v.time, v]));
   const sortedTimes = candles.map((c) => c.time).sort((a, b) => a - b);
   const lastTradeSec = sortedTimes[sortedTimes.length - 1]!;
+  let lastTradedBucketSec = sortedTimes[0]!;
+  for (const t of sortedTimes) {
+    if ((volumeByTime.get(t)?.value ?? 0) > 0) {
+      lastTradedBucketSec = t;
+    }
+  }
   const endBucketMs = Math.floor(endTimeMs / intervalMs) * intervalMs;
   const liveEndSec = Math.floor(endBucketMs / 1000);
   const endSec = Math.max(lastTradeSec, liveEndSec);
@@ -487,7 +493,9 @@ export function fillGapsForStoredCandles(
       continue;
     }
     if (lastClose == null) continue;
-    const flat = coherentGapClose(lastClose, anchorPrice);
+    const flatBase =
+      anchorPrice != null && t > lastTradedBucketSec ? anchorPrice : lastClose;
+    const flat = coherentGapClose(flatBase, anchorPrice);
     nextCandles.push({
       time: t,
       open: flat,
@@ -500,6 +508,7 @@ export function fillGapsForStoredCandles(
       value: 0,
       color: volumeBarColor(0, 0),
     });
+    lastClose = flat;
   }
 
   return { candles: nextCandles, volumes: nextVolumes };
@@ -884,7 +893,21 @@ export function pinTailCandleToLiveMark(
   if (!existing) return { candles, volumes };
 
   const bucketVolume = volumes[targetIdx]?.value ?? 0;
-  // Never paint ghost candles on idle gap-fill buckets — only sync buckets with trades.
+  const isLiveBucket = existing.time === liveBucketSec;
+
+  // Idle live bucket: flat at mark (matches header) — no open/close spread (ghost wick).
+  if (bucketVolume <= 0 && isLiveBucket) {
+    const nextCandles = candles.slice();
+    nextCandles[targetIdx] = {
+      time: existing.time,
+      open: liveMarkBnb,
+      high: liveMarkBnb,
+      low: liveMarkBnb,
+      close: liveMarkBnb,
+    };
+    return { candles: nextCandles, volumes };
+  }
+
   if (bucketVolume <= 0) {
     return { candles, volumes };
   }
