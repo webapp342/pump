@@ -11,6 +11,7 @@ import {
   sendKernelTransaction,
   type KernelTransactionResult,
 } from "@/lib/aa/send-kernel-transaction";
+import { failTradeTrace, tradeTraceStep } from "@/lib/trade-timing";
 
 export type KernelTradeWriteParams = {
   address: Address;
@@ -43,12 +44,14 @@ export function useKernelTradeWriteContract() {
     (params: KernelTradeWriteParams) => {
       if (!kernelClient) {
         setError(new Error("Sign in to trade."));
+        failTradeTrace("ux.kernel_client_missing", new Error("Sign in to trade."));
         return;
       }
 
       setIsPending(true);
       setError(null);
       setReceipt(undefined);
+      tradeTraceStep("ux.isPending=true");
 
       void (async () => {
         const t0 = performance.now();
@@ -58,16 +61,27 @@ export function useKernelTradeWriteContract() {
           }
 
           const flashblocks = isTradeFlashblocksActive();
+          tradeTraceStep("kernel.resolve_clients.start", { flashblocks });
           const { kernelClient: activeClient, publicClient } = resolveTradeKernelClients(
             kernelClient,
             flashblocks
           );
+          tradeTraceStep("kernel.resolve_clients.done", {
+            scw: activeClient.account!.address,
+            flashblocks,
+          });
 
           tradeBundlerLog("tradeWrite start", {
             scw: activeClient.account!.address,
             to: params.address,
             fn: params.functionName,
             flashblocks,
+          });
+
+          tradeTraceStep("chain.trade_write.invoke", {
+            to: params.address,
+            fn: params.functionName,
+            value: params.value?.toString() ?? "0",
           });
 
           const result: KernelTransactionResult = await sendKernelTransaction(
@@ -85,6 +99,12 @@ export function useKernelTradeWriteContract() {
             { flashblocks }
           );
 
+          tradeTraceStep("chain.trade_write.returned", {
+            txHash: result.hash,
+            hasReceipt: Boolean(result.receipt),
+            ms: Math.round(performance.now() - t0),
+          });
+
           tradeBundlerLog("tradeWrite done", {
             txHash: result.hash,
             hasReceipt: Boolean(result.receipt),
@@ -92,8 +112,12 @@ export function useKernelTradeWriteContract() {
           });
 
           setTxHash(result.hash);
+          tradeTraceStep("ux.txHash_set", { txHash: result.hash });
           if (result.receipt) {
             setReceipt(result.receipt);
+            tradeTraceStep("ux.kernel_receipt_set", {
+              blockNumber: result.receipt.blockNumber.toString(),
+            });
           }
         } catch (err) {
           const error = err instanceof Error ? err : new Error(String(err));
@@ -101,9 +125,11 @@ export function useKernelTradeWriteContract() {
             message: error.message,
             ms: Math.round(performance.now() - t0),
           });
+          failTradeTrace("chain.trade_write.failed", error);
           setError(error);
         } finally {
           setIsPending(false);
+          tradeTraceStep("ux.isPending=false");
         }
       })();
     },

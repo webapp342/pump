@@ -23,6 +23,12 @@ import {
   createTradeHttpPublicClient,
   isTradeFlashblocksActive,
 } from "@/config/flashblocks";
+import {
+  endTradeTrace,
+  failTradeTrace,
+  startTradeTrace,
+  tradeTraceStep,
+} from "@/lib/trade-timing";
 import { usePumpWallet } from "@/components/wallet/PumpWalletProvider";
 import { contracts, pumpChain } from "@/config/chain";
 import { erc20Abi, maxUint256 } from "@/lib/abis/erc20";
@@ -460,12 +466,54 @@ export function TradePanel({
   const activeReceipt = kernelReceipt ?? fallbackReceipt;
   const isConfirming = Boolean(txHash && !activeReceipt && isFallbackReceiptLoading);
 
+  const uxTraceRef = useRef({
+    pending: false,
+    confirming: false,
+    lastTxHash: undefined as string | undefined,
+  });
+
+  useEffect(() => {
+    if (isPending && !uxTraceRef.current.pending) {
+      tradeTraceStep("ux.state.isPending=true");
+      uxTraceRef.current.pending = true;
+    } else if (!isPending && uxTraceRef.current.pending) {
+      tradeTraceStep("ux.state.isPending=false");
+      uxTraceRef.current.pending = false;
+    }
+  }, [isPending]);
+
+  useEffect(() => {
+    if (isConfirming && !uxTraceRef.current.confirming) {
+      tradeTraceStep("ux.state.isConfirming=true");
+      uxTraceRef.current.confirming = true;
+    } else if (!isConfirming && uxTraceRef.current.confirming) {
+      tradeTraceStep("ux.state.isConfirming=false");
+      uxTraceRef.current.confirming = false;
+    }
+  }, [isConfirming]);
+
+  useEffect(() => {
+    if (txHash && txHash !== uxTraceRef.current.lastTxHash) {
+      tradeTraceStep("ux.state.txHash", { txHash });
+      uxTraceRef.current.lastTxHash = txHash;
+    }
+  }, [txHash]);
+
+  useEffect(() => {
+    if (fallbackReceipt && !kernelReceipt) {
+      tradeTraceStep("ux.fallback_receipt", {
+        blockNumber: fallbackReceipt.blockNumber.toString(),
+      });
+    }
+  }, [fallbackReceipt, kernelReceipt]);
+
   useEffect(() => {
     if (!writeError) return;
     setPendingAction(null);
     pendingSellRef.current = null;
     handledReceiptHashRef.current = null;
     setError(formatTradeError(writeError));
+    failTradeTrace("ux.write_error", writeError);
   }, [writeError]);
 
   const paused =
@@ -843,6 +891,7 @@ export function TradePanel({
 
     if (activeReceipt.status !== "success") {
       handledReceiptHashRef.current = txHash;
+      failTradeTrace("chain.receipt_reverted", new Error("Transaction reverted on-chain"));
       setError("Transaction reverted on-chain. Check wallet balance, token status, and amount.");
       setPendingAction(null);
       pendingSellRef.current = null;
@@ -871,6 +920,7 @@ export function TradePanel({
         handledReceiptHashRef.current = null;
         reset();
         setPendingAction("sell");
+        tradeTraceStep("ui.approve_complete.starting_sell");
         tradeWrite({
           address: contracts.bondingCurveManager,
           abi: bondingCurveManagerAbi,
@@ -931,13 +981,27 @@ export function TradePanel({
         side: confirmedSide,
         receipt: activeReceipt,
       });
+
+      void (async () => {
+        const t0 = performance.now();
+        tradeTraceStep("ux.refetch_balances.start");
+        await Promise.all([refetchBnbBalance(), refetchBalance(), refetchAllowance()]);
+        tradeTraceStep("ux.refetch_balances.done", {
+          ms: Math.round(performance.now() - t0),
+        });
+        endTradeTrace("ui.trade_complete", {
+          side: confirmedSide,
+          txHash: activeReceipt.transactionHash,
+          blockNumber: activeReceipt.blockNumber.toString(),
+        });
+      })();
     } else {
       quoteUsdAtSubmitRef.current = null;
+      void (async () => {
+        await Promise.all([refetchBnbBalance(), refetchBalance(), refetchAllowance()]);
+      })();
     }
 
-    void (async () => {
-      await Promise.all([refetchBnbBalance(), refetchBalance(), refetchAllowance()]);
-    })();
     reset();
   }, [
     activeReceipt,
@@ -1093,11 +1157,18 @@ export function TradePanel({
   }
 
   async function assertScwForTrade(scw: Address, callValueWei: bigint) {
+    const t0 = performance.now();
+    tradeTraceStep("ux.scw_preflight.start", { callValueWei: callValueWei.toString() });
     const client = fastTradeConfirm ? createTradeHttpPublicClient() : undefined;
     await assertScwReadyForUserOp(scw, callValueWei, client);
+    tradeTraceStep("ux.scw_preflight.done", { ms: Math.round(performance.now() - t0) });
   }
 
   async function submitBuyWriteContract(buyParams: SessionBuyParams) {
+    tradeTraceStep("ux.submit_buy.start", {
+      value: buyParams.value.toString(),
+      minTokenOut: buyParams.minTokenOut.toString(),
+    });
     if (address) {
       await assertScwForTrade(address, buyParams.value);
     }
@@ -1203,16 +1274,20 @@ export function TradePanel({
 
   async function submitTrade() {
     setError(null);
+    tradeTraceStep("ux.submit_trade.start", { side });
 
     if (!isConnected || !address) {
+      tradeTraceStep("ux.submit_trade.blocked", { reason: "not_connected" });
       openConnectModal?.();
       return;
     }
     if (wrongChain) {
+      tradeTraceStep("ux.submit_trade.blocked", { reason: "wrong_chain" });
       setError("Switch to BSC Testnet.");
       return;
     }
     if (paused) {
+      tradeTraceStep("ux.submit_trade.blocked", { reason: "paused" });
       setError("Trading is paused for this token.");
       return;
     }
@@ -1268,7 +1343,13 @@ export function TradePanel({
           referrer: tradeReferrer ?? undefined,
         };
 
+        tradeTraceStep("ux.buy_params.ready", {
+          submitValue: submitValue.toString(),
+          tokenOut: tokenOut.toString(),
+        });
+
         if (!loadTradeAutoConfirm()) {
+          tradeTraceStep("ux.confirm_modal.open");
           setPendingTrade({
             side: "buy",
             spendLabel: `${formatBnbReadable(Number(formatEther(submitValue)))} BNB`,
@@ -1324,6 +1405,7 @@ export function TradePanel({
       }
 
       if (!loadTradeAutoConfirm()) {
+        tradeTraceStep("ux.confirm_modal.open");
         setPendingTrade({
           side: "sell",
           spendLabel: `${formatReceiveAmount(formatUnits(sellTokenWei, 18))} ${symbol}`,
@@ -1342,6 +1424,7 @@ export function TradePanel({
     } catch (err) {
       setPendingAction(null);
       pendingSellRef.current = null;
+      failTradeTrace("ux.submit_trade.failed", err);
       setError(formatTradeError(err));
     }
   }
@@ -1382,6 +1465,7 @@ export function TradePanel({
     if (!pendingTrade) return;
     setTradeConfirmError(null);
     saveTradeAutoConfirm(rememberAutoConfirm);
+    tradeTraceStep("ux.confirm_modal.accepted", { side: pendingTrade.side });
     try {
       if (pendingTrade.side === "buy" && pendingTrade.buyParams) {
         await submitBuyWriteContract(pendingTrade.buyParams);
@@ -1415,6 +1499,7 @@ export function TradePanel({
       setPendingTrade(null);
     } catch (err) {
       setTradeConfirmError(formatTradeError(err));
+      failTradeTrace("ux.confirm_modal.failed", err);
     }
   }
 
@@ -1430,6 +1515,15 @@ export function TradePanel({
       });
       return;
     }
+    const traceSide =
+      side === "buy" ? "buy" : pendingAction === "approve" ? "approve" : "sell";
+    startTradeTrace(traceSide, {
+      tokenAddress,
+      side,
+      buyCostWei: side === "buy" ? buyCostWei.toString() : undefined,
+      sellTokenWei: side === "sell" ? sellTokenWei.toString() : undefined,
+      flashblocks: fastTradeConfirm,
+    });
     await submitTrade();
   }
 

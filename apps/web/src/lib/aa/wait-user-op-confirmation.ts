@@ -8,6 +8,7 @@ import { getAction } from "viem/utils";
 import type { Hash, PublicClient, TransactionReceipt } from "viem";
 import { bundlerDebug, tradeBundlerLog } from "@/lib/aa/bundler-debug";
 import { entryPoint } from "@/lib/aa/kernel-account";
+import { tradeTraceStep } from "@/lib/trade-timing";
 import {
   createTradeWebSocketPublicClient,
   FLASHBLOCKS_POLL_MS,
@@ -26,6 +27,7 @@ export type UserOpConfirmationOptions = {
 export type UserOpConfirmationResult = {
   txHash: Hash;
   receipt?: TransactionReceipt;
+  confirmPath: string;
 };
 
 function fastConfirmEnabled(options?: UserOpConfirmationOptions): boolean {
@@ -48,10 +50,18 @@ async function attachFlashblocksReceipt(
   if (!fastConfirmEnabled(options)) return undefined;
   const remaining = deadline - Date.now();
   if (remaining <= 0) return undefined;
-  return waitForFlashblocksTransactionReceipt(txHash, {
+  const t0 = performance.now();
+  tradeTraceStep("flashblocks.receipt_wait.start", { txHash });
+  const receipt = await waitForFlashblocksTransactionReceipt(txHash, {
     timeout: Math.min(remaining, 15_000),
     client: createTradeWebSocketPublicClient(),
   });
+  tradeTraceStep("flashblocks.receipt_wait.done", {
+    txHash,
+    blockNumber: receipt.blockNumber.toString(),
+    ms: Math.round(performance.now() - t0),
+  });
+  return receipt;
 }
 
 async function getUserOpEventChunked(
@@ -104,7 +114,7 @@ async function waitViaEntryPointLogs(
           throw new Error(`UserOperation reverted on-chain (${userOpHash})`);
         }
         const receipt = await attachFlashblocksReceipt(txHash, deadline, options);
-        return { txHash, receipt };
+        return { txHash, receipt, confirmPath: "entrypoint-logs" };
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -158,7 +168,7 @@ async function waitViaBundlerReceipt(
 
       const txHash = receipt.receipt.transactionHash;
       const fbReceipt = await attachFlashblocksReceipt(txHash, deadline, options);
-      return { txHash, receipt: fbReceipt };
+      return { txHash, receipt: fbReceipt, confirmPath: "bundler-receipt" };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       const lower = message.toLowerCase();
@@ -201,13 +211,15 @@ async function waitViaFlashblocksBundlerPoll(
         }
 
         const txHash = receipt.receipt.transactionHash;
-        const fbReceipt = await waitForFlashblocksTransactionReceipt(txHash, {
-          timeout: Math.min(deadline - Date.now(), 15_000),
-          client: createTradeWebSocketPublicClient(),
+        const fbReceipt = await attachFlashblocksReceipt(txHash, deadline, {
+          flashblocks: true,
         });
+        if (!fbReceipt) {
+          throw new Error(`Flashblocks receipt missing for ${txHash}`);
+        }
 
         tradeBundlerLog("confirmed via Flashblocks WSS", { userOpHash, txHash });
-        return { txHash, receipt: fbReceipt };
+        return { txHash, receipt: fbReceipt, confirmPath: "flashblocks-bundler-poll" };
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);

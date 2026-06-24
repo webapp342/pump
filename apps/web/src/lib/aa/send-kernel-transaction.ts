@@ -3,6 +3,7 @@ import { sendUserOperation } from "viem/account-abstraction";
 import { getAction } from "viem/utils";
 import type { Address, Hash, Hex, PublicClient, TransactionReceipt } from "viem";
 import { tradeBundlerLog } from "@/lib/aa/bundler-debug";
+import { tradeTraceStep } from "@/lib/trade-timing";
 import {
   waitForUserOpConfirmation,
   type UserOpConfirmationOptions,
@@ -30,8 +31,19 @@ export async function sendKernelTransaction(
     throw new Error("Smart account not ready.");
   }
 
-  const t0 = performance.now();
+  const submitT0 = performance.now();
+  tradeTraceStep("chain.get_block_number.start");
   const fromBlock = await publicClient.getBlockNumber();
+  tradeTraceStep("chain.get_block_number.done", {
+    block: fromBlock.toString(),
+    ms: Math.round(performance.now() - submitT0),
+  });
+
+  const sendT0 = performance.now();
+  tradeTraceStep("bundler.send_user_op.start", {
+    to: call.to,
+    value: call.value?.toString() ?? "0",
+  });
 
   const userOpHash = await getAction(client, sendUserOperation, "sendUserOperation")({
     account,
@@ -44,26 +56,38 @@ export async function sendKernelTransaction(
     ],
   });
 
+  const sendMs = Math.round(performance.now() - sendT0);
+  tradeTraceStep("bundler.send_user_op.done", { userOpHash, ms: sendMs });
   tradeBundlerLog("userOp submitted", {
     userOpHash,
     fromBlock: fromBlock.toString(),
-    submitMs: Math.round(performance.now() - t0),
+    submitMs: sendMs,
   });
 
   const confirmT0 = performance.now();
-  const { txHash, receipt } = await waitForUserOpConfirmation(
+  tradeTraceStep("bundler.wait_confirm.start", { userOpHash });
+  const { txHash, receipt, confirmPath } = await waitForUserOpConfirmation(
     client,
     publicClient,
     userOpHash,
     fromBlock,
     options
   );
+  const confirmMs = Math.round(performance.now() - confirmT0);
 
+  tradeTraceStep("bundler.wait_confirm.done", {
+    userOpHash,
+    txHash,
+    confirmPath,
+    hasReceipt: Boolean(receipt),
+    ms: confirmMs,
+  });
   tradeBundlerLog("userOp confirmed", {
     userOpHash,
     txHash,
     hasReceipt: Boolean(receipt),
-    confirmMs: Math.round(performance.now() - confirmT0),
+    confirmMs,
+    confirmPath,
   });
 
   return { hash: txHash, receipt };
