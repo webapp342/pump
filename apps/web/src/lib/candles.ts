@@ -447,12 +447,6 @@ export function fillGapsForStoredCandles(
   const volumeByTime = new Map(volumes.map((v) => [v.time, v]));
   const sortedTimes = candles.map((c) => c.time).sort((a, b) => a - b);
   const lastTradeSec = sortedTimes[sortedTimes.length - 1]!;
-  let lastTradedBucketSec = sortedTimes[0]!;
-  for (const t of sortedTimes) {
-    if ((volumeByTime.get(t)?.value ?? 0) > 0) {
-      lastTradedBucketSec = t;
-    }
-  }
   const endBucketMs = Math.floor(endTimeMs / intervalMs) * intervalMs;
   const liveEndSec = Math.floor(endBucketMs / 1000);
   const endSec = Math.max(lastTradeSec, liveEndSec);
@@ -493,9 +487,8 @@ export function fillGapsForStoredCandles(
       continue;
     }
     if (lastClose == null) continue;
-    const flatBase =
-      anchorPrice != null && t > lastTradedBucketSec ? anchorPrice : lastClose;
-    const flat = coherentGapClose(flatBase, anchorPrice);
+    // Always carry forward last close — pump.fun flat line. Live mark sync is pinTail only.
+    const flat = coherentGapClose(lastClose, anchorPrice);
     nextCandles.push({
       time: t,
       open: flat,

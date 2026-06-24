@@ -20,6 +20,7 @@ import {
   createOptimisticCandleBar,
   formatPumpSubscriptPrice,
   resolveChartPriceFormat,
+  seriesHasTemporalGaps,
   type ActorOptimisticChartSpot,
   type CandleBar,
   type CandleInterval,
@@ -806,6 +807,7 @@ export function PriceChart({
       shouldFitViewportRef.current ||
       fingerprint !== renderedFingerprintRef.current ||
       prevCandles.length === 0 ||
+      seriesHasTemporalGaps(nextCandles, timeInterval) ||
       !canIncrementalChartPatch(prevCandles, nextCandles) ||
       needsFullCandleResync(prevCandles, nextCandles);
 

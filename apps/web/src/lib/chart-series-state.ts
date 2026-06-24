@@ -193,17 +193,13 @@ export function deriveChartSeries(input: DeriveChartSeriesInput): {
     volumes = reconciled.volumes;
   }
 
-  const gapAnchorForActor = actorOptimisticSpot
-    ? actorOptimisticSpot.spotAfterBnb * priceScale
-    : (scaledMark ?? undefined);
-
   const gapFilled = gapFillChartSeries(
     candles,
     volumes,
     displayInterval,
     endTimeMs,
     state.gapFilledByApi,
-    gapAnchorForActor
+    scaledMark ?? undefined
   );
   candles = gapFilled.candles;
   volumes = gapFilled.volumes;
@@ -240,7 +236,7 @@ export function deriveChartSeries(input: DeriveChartSeriesInput): {
 
   if (scaledMark != null) {
     return {
-      candles: sanitizeCandleSeries(candles, scaledMark),
+      candles: sanitizeTailCandleSeries(candles, scaledMark),
       volumes,
     };
   }

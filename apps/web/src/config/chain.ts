@@ -2,16 +2,55 @@ import { defineChain } from "viem";
 
 export const CHAIN_ID = Number(process.env.NEXT_PUBLIC_CHAIN_ID ?? 97);
 
+const BASE_MAINNET_CHAIN_ID = 8453;
+const BASE_SEPOLIA_CHAIN_ID = 84532;
+
 export const rpcUrl =
   process.env.NEXT_PUBLIC_RPC_URL ?? "https://data-seed-prebsc-1-s1.binance.org:8545";
 
+function chainMeta(chainId: number): {
+  name: string;
+  nativeName: string;
+  nativeSymbol: string;
+  explorerName: string;
+  explorerUrl: string;
+} {
+  if (chainId === BASE_SEPOLIA_CHAIN_ID) {
+    return {
+      name: "Base Sepolia",
+      nativeName: "Ether",
+      nativeSymbol: "ETH",
+      explorerName: "BaseScan",
+      explorerUrl: "https://sepolia.basescan.org",
+    };
+  }
+  if (chainId === BASE_MAINNET_CHAIN_ID) {
+    return {
+      name: "Base",
+      nativeName: "Ether",
+      nativeSymbol: "ETH",
+      explorerName: "BaseScan",
+      explorerUrl: "https://basescan.org",
+    };
+  }
+  return {
+    name: "BSC Testnet",
+    nativeName: "BNB",
+    nativeSymbol: "BNB",
+    explorerName: "BscScan",
+    explorerUrl: "https://testnet.bscscan.com",
+  };
+}
+
+const meta = chainMeta(CHAIN_ID);
+
 export const pumpChain = defineChain({
   id: CHAIN_ID,
-  name: "BSC Testnet",
+  name: meta.name,
   nativeCurrency: {
     decimals: 18,
-    name: "BNB",
-    symbol: "BNB",
+    name: meta.nativeName,
+    symbol: meta.nativeSymbol,
   },
   rpcUrls: {
     default: { http: [rpcUrl] },
@@ -19,8 +58,8 @@ export const pumpChain = defineChain({
   },
   blockExplorers: {
     default: {
-      name: "BscScan",
-      url: "https://testnet.bscscan.com",
+      name: meta.explorerName,
+      url: meta.explorerUrl,
     },
   },
   contracts: {

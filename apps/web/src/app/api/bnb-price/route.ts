@@ -1,15 +1,17 @@
 import { NextResponse } from "next/server";
-import { fetchBnbUsdPrice } from "@/lib/bnb-price-server";
+import { fetchNativeUsdPrice } from "@/lib/native-usd-price";
 
 export async function GET() {
-  const { bnbUsd, quote, source } = await fetchBnbUsdPrice();
+  const { nativeUsd, quote, source, pair, symbol } = await fetchNativeUsdPrice();
 
   return NextResponse.json(
     {
-      bnbUsd,
+      bnbUsd: nativeUsd,
+      nativeUsd,
       quote,
       source,
-      pair: "BNB/USDT",
+      pair,
+      symbol,
     },
     {
       headers: {
