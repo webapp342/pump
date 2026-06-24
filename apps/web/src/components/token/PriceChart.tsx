@@ -75,6 +75,28 @@ const POLL_MS = 4_000;
 const WS_FALLBACK_POLL_MS = 30_000;
 const VOLUME_SCALE_ID = "volume";
 const DEFAULT_VISIBLE_CANDLES = 120;
+/** Minimum Y-axis span so micro-cap moves don't fill the entire chart height. */
+const MIN_CHART_PRICE_RANGE_RATIO = 0.04;
+
+function chartAutoscaleInfoProvider(
+  original: () => { priceRange: { minValue: number; maxValue: number } } | null
+) {
+  const info = original();
+  if (!info) return info;
+  const { minValue, maxValue } = info.priceRange;
+  const mid = (minValue + maxValue) / 2;
+  if (!Number.isFinite(mid) || mid <= 0) return info;
+  const span = maxValue - minValue;
+  const minSpan = mid * MIN_CHART_PRICE_RANGE_RATIO;
+  if (span >= minSpan) return info;
+  const half = minSpan / 2;
+  return {
+    priceRange: {
+      minValue: Math.max(0, mid - half),
+      maxValue: mid + half,
+    },
+  };
+}
 
 function shouldUseLogPriceScale(candles: CandleBar[]): boolean {
   let min = Number.POSITIVE_INFINITY;
@@ -544,6 +566,7 @@ export function PriceChart({
       wickDownColor: downColor,
       borderVisible: true,
       wickVisible: true,
+      autoscaleInfoProvider: chartAutoscaleInfoProvider,
     });
 
     const volumeSeries = chart.addSeries(HistogramSeries, {

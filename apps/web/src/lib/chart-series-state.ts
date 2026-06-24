@@ -1,7 +1,5 @@
 import {
   applyActorOptimisticCandleBucket,
-  CANDLE_INTERVALS,
-  ensureVisibleCandleBodies,
   fillGapsForStoredCandles,
   mergeWsCandleUpdate,
   pinTailCandleToLiveMark,
@@ -9,7 +7,6 @@ import {
   sanitizeCandleSeries,
   sanitizeTailCandleSeries,
   scaleCandleBars,
-  seriesHasTemporalGaps,
   type ActorOptimisticChartSpot,
   type CandleBar,
   type CandleInterval,
@@ -64,51 +61,21 @@ export type ChartSeriesAction =
       priceScale: number;
     };
 
-/** Extend only the live tail bucket — used when series is already gap-filled through prior buckets. */
-function extendLiveTailBucket(
-  candles: CandleBar[],
-  volumes: VolumeBar[],
-  interval: CandleInterval,
-  endTimeMs: number
-): { candles: CandleBar[]; volumes: VolumeBar[] } {
-  if (candles.length === 0) return { candles, volumes };
-
-  const intervalMs = CANDLE_INTERVALS.find((i) => i.id === interval)?.ms ?? 60_000;
-  const liveBucketSec = Math.floor(endTimeMs / intervalMs) * (intervalMs / 1000);
-  const last = candles[candles.length - 1]!;
-
-  if (liveBucketSec <= last.time) return { candles, volumes };
-
-  const flat = last.close;
-  const nextCandles = candles.slice();
-  const nextVolumes = volumes.slice();
-  for (let t = last.time + intervalMs / 1000; t <= liveBucketSec; t += intervalMs / 1000) {
-    nextCandles.push({ time: t, open: flat, high: flat, low: flat, close: flat });
-    nextVolumes.push({
-      time: t,
-      value: 0,
-      color: "rgba(128, 128, 128, 0.15)",
-    });
-  }
-  return { candles: nextCandles, volumes: nextVolumes };
-}
-
 function gapFillChartSeries(
   candles: CandleBar[],
   volumes: VolumeBar[],
   interval: CandleInterval,
   endTimeMs: number,
-  gapFilledByApi: boolean,
+  _gapFilledByApi: boolean,
   anchorPrice?: number
 ): { candles: CandleBar[]; volumes: VolumeBar[] } {
   if (candles.length === 0) return { candles, volumes };
-  if (!gapFilledByApi || seriesHasTemporalGaps(candles, interval)) {
-    return fillGapsForStoredCandles(candles, volumes, interval, {
-      endTimeMs,
-      anchorPrice,
-    });
-  }
-  return extendLiveTailBucket(candles, volumes, interval, endTimeMs);
+  // Always regap on derive — WS tail merges can reintroduce temporal holes even when
+  // the REST payload was marked gapFilled.
+  return fillGapsForStoredCandles(candles, volumes, interval, {
+    endTimeMs,
+    anchorPrice,
+  });
 }
 
 export function chartSeriesReducer(
@@ -259,26 +226,22 @@ export function deriveChartSeries(input: DeriveChartSeriesInput): {
     );
     const anchor = actorOptimisticSpot.spotAfterBnb * priceScale;
     return {
-      candles: ensureVisibleCandleBodies(
+      candles:
         scaledMark != null
           ? sanitizeCandleSeries(patched.candles, anchor)
-          : sanitizeTailCandleSeries(patched.candles, anchor)
-      ),
+          : sanitizeTailCandleSeries(patched.candles, anchor),
       volumes: patched.volumes,
     };
   }
 
   if (scaledMark != null) {
     return {
-      candles: ensureVisibleCandleBodies(sanitizeCandleSeries(candles, scaledMark)),
+      candles: sanitizeCandleSeries(candles, scaledMark),
       volumes,
     };
   }
 
-  return {
-    candles: ensureVisibleCandleBodies(candles),
-    volumes,
-  };
+  return { candles, volumes };
 }
 
 /** True when lightweight-charts can patch tail buckets with series.update(). */
