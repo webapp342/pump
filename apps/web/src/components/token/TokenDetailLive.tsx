@@ -11,6 +11,9 @@ import {
 } from "@/lib/bonding-curve";
 import type { ActorOptimisticChartSpot, CandleWsUpdate } from "@/lib/candles";
 import { resolveLatestSpotPriceBnb, sortTradesChronologically } from "@/lib/candles";
+import { mergeWsCandleUpdates } from "@/lib/chart-series-state";
+import { logChartWsMerge } from "@/lib/chart-observability";
+import type { InitialChartCandles } from "@/lib/token-server";
 import { resolveMarkPriceBnb } from "@/lib/mark-price";
 import {
   estimateFdvUsd,
@@ -114,6 +117,7 @@ type TokenDetailLiveProps = {
   initialToken: TokenDetail;
   initialTrades: TradeItem[];
   initialHolders?: TokenHolderSnapshot[];
+  initialCandles?: InitialChartCandles;
 };
 
 type PriceChange24h = {
@@ -205,10 +209,15 @@ export function TokenDetailLive({
   initialToken,
   initialTrades,
   initialHolders = [],
+  initialCandles,
 }: TokenDetailLiveProps) {
   const [token, setToken] = useState(initialToken);
   const [dbTrades, setDbTrades] = useState(initialTrades);
   const [liveCandleUpdates, setLiveCandleUpdates] = useState<CandleWsUpdate[]>([]);
+
+  useEffect(() => {
+    setLiveCandleUpdates([]);
+  }, [tokenAddress]);
   const [holdersRefreshKey, setHoldersRefreshKey] = useState(0);
   const [optimisticTrades, setOptimisticTrades] = useState<TradeItem[]>([]);
   const [actorChartSpot, setActorChartSpot] = useState<ActorOptimisticChartSpot | null>(null);
@@ -348,7 +357,16 @@ export function TokenDetailLive({
           }
           setDbTrades((prev) => prependTradeIfNew(prev, tradeItem));
           if (payload.candleUpdates?.length) {
-            setLiveCandleUpdates(payload.candleUpdates as CandleWsUpdate[]);
+            const updates = payload.candleUpdates as CandleWsUpdate[];
+            setLiveCandleUpdates((prev) => mergeWsCandleUpdates(prev, updates));
+            for (const update of updates) {
+              logChartWsMerge({
+                tokenAddress,
+                interval: update.interval,
+                updateCount: updates.length,
+                isNewBucket: update.isNewBucket,
+              });
+            }
           }
           setToken((prev) => patchTokenDetailFromWsTrade(prev, payload) ?? prev);
           setOptimisticTrades((prev) =>
@@ -367,7 +385,7 @@ export function TokenDetailLive({
         void fetchLiveRef.current();
       }
     }
-  }, []);
+  }, [tokenAddress]);
 
   const queueWsMessage = useRafMessageQueue(applyWsMessages);
 
@@ -745,7 +763,7 @@ export function TokenDetailLive({
             tokenAddress={tokenAddress}
             symbol={symbol}
             status={liveToken.status}
-            optimisticTrades={optimisticTrades}
+            initialCandles={initialCandles}
             actorOptimisticSpot={actorChartSpot}
             curveSnapshot={tradeCurveSnapshot}
             liveCandleUpdates={liveCandleUpdates}

@@ -2,7 +2,7 @@
 
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import type { TokenDetail, TradeItem } from "@/lib/db/launchpad";
-import type { TokenDetailBundle } from "@/lib/token-server";
+import type { TokenDetailBundle, InitialChartCandles } from "@/lib/token-server";
 import { AppShell } from "@/components/layout/AppShell";
 import { PageBackLink } from "@/components/ui/PageBackLink";
 import { TokenDetailLive } from "@/components/token/TokenDetailLive";
@@ -25,11 +25,13 @@ function TokenDetailView({
   token,
   trades,
   initialHolders,
+  initialCandles,
   indexerSyncing,
 }: {
   token: TokenDetail;
   trades: TradeItem[];
   initialHolders?: TokenDetailBundle["holders"];
+  initialCandles?: InitialChartCandles;
   indexerSyncing: boolean;
 }) {
   return (
@@ -52,6 +54,7 @@ function TokenDetailView({
           initialToken={token}
           initialTrades={trades}
           initialHolders={initialHolders}
+          initialCandles={initialCandles}
         />
       </Suspense>
     </>
@@ -63,12 +66,18 @@ export function TokenDetailShell({
   initialBundle = null,
 }: TokenDetailShellProps) {
   const normalized = address.toLowerCase();
-  const [data, setData] = useState<{ token: TokenDetail; trades: TradeItem[]; holders: TokenDetailBundle["holders"] } | null>(
+  const [data, setData] = useState<{
+    token: TokenDetail;
+    trades: TradeItem[];
+    holders: TokenDetailBundle["holders"];
+    initialCandles?: InitialChartCandles;
+  } | null>(
     initialBundle
       ? {
           token: initialBundle.token,
           trades: initialBundle.trades,
           holders: initialBundle.holders,
+          initialCandles: initialBundle.initialCandles,
         }
       : null
   );
@@ -99,6 +108,7 @@ export function TokenDetailShell({
         token: body.data.token,
         trades: body.data.trades,
         holders: body.data.holders ?? [],
+        initialCandles: body.data.initialCandles,
       });
       setOptimisticToken(null);
       setIndexerSyncing(false);
@@ -213,6 +223,7 @@ export function TokenDetailShell({
         token={token}
         trades={data?.trades ?? []}
         initialHolders={data?.holders}
+        initialCandles={data?.initialCandles}
         indexerSyncing={indexerSyncing && !data}
       />
     </AppShell>

@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict VG0d7PZXkTzeNHOMBR66T1B1Dpcmke5LlJdeKglnwD5TaIXGVbTZDyj1s5Akday
+\restrict v9UMsKzwqNyQWq0XAHdgbBa08qDTrJ5XqMI8UAJmfHZWoU1xALncXRHierqSRdf
 
 -- Dumped from database version 16.14 (Ubuntu 16.14-0ubuntu0.24.04.1)
 -- Dumped by pg_dump version 16.14 (Ubuntu 16.14-0ubuntu0.24.04.1)
@@ -476,6 +476,8 @@ CREATE TABLE public.bonding_states (
     progress_bps integer DEFAULT 0 NOT NULL,
     last_price_zug numeric(78,18) DEFAULT 0 NOT NULL,
     market_cap_zug numeric(78,18) DEFAULT 0 NOT NULL,
+    virtual_zug_reserve numeric(78,18) DEFAULT 5 NOT NULL,
+    virtual_token_reserve numeric(78,18) DEFAULT 1000000000 NOT NULL,
     holder_count integer DEFAULT 0 NOT NULL,
     trade_count integer DEFAULT 0 NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
@@ -837,6 +839,7 @@ CREATE TABLE public.trades (
     zug_amount numeric(78,18) NOT NULL,
     token_amount numeric(78,18) NOT NULL,
     price_zug numeric(78,18) NOT NULL,
+    spot_price_zug numeric(78,18),
     fee_zug numeric(78,18) DEFAULT 0 NOT NULL,
     creator_fee_zug numeric(78,18) DEFAULT 0 NOT NULL,
     treasury_fee_zug numeric(78,18) DEFAULT 0 NOT NULL,
@@ -854,30 +857,6 @@ CREATE TABLE public.trades (
     CONSTRAINT trades_trader_address_check CHECK ((trader_address = lower(trader_address))),
     CONSTRAINT trades_treasury_fee_zug_check CHECK ((treasury_fee_zug >= (0)::numeric)),
     CONSTRAINT trades_zug_amount_check CHECK ((zug_amount >= (0)::numeric))
-);
-
-
---
--- Name: token_candles; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.token_candles (
-    token_address text NOT NULL,
-    candle_interval text NOT NULL,
-    bucket_ts timestamp with time zone NOT NULL,
-    open_zug numeric NOT NULL,
-    high_zug numeric NOT NULL,
-    low_zug numeric NOT NULL,
-    close_zug numeric NOT NULL,
-    volume_zug numeric DEFAULT 0 NOT NULL,
-    buy_volume_zug numeric DEFAULT 0 NOT NULL,
-    trade_count integer DEFAULT 0 NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT token_candles_address_check CHECK ((token_address = lower(token_address))),
-    CONSTRAINT token_candles_interval_check CHECK ((candle_interval = ANY (ARRAY['15s'::text, '1m'::text, '5m'::text, '15m'::text, '1h'::text, '4h'::text]))),
-    CONSTRAINT token_candles_ohlc_check CHECK (((open_zug >= (0)::numeric) AND (high_zug >= (0)::numeric) AND (low_zug >= (0)::numeric) AND (close_zug >= (0)::numeric) AND (high_zug >= low_zug))),
-    CONSTRAINT token_candles_trade_count_check CHECK ((trade_count >= 0)),
-    CONSTRAINT token_candles_volume_check CHECK (((volume_zug >= (0)::numeric) AND (buy_volume_zug >= (0)::numeric) AND (buy_volume_zug <= volume_zug)))
 );
 
 
@@ -1081,6 +1060,30 @@ CREATE TABLE public.token_board_stats (
     trade_count_24h_ago integer DEFAULT 0 NOT NULL,
     traders_24h integer DEFAULT 0 NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: token_candles; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.token_candles (
+    token_address text NOT NULL,
+    candle_interval text NOT NULL,
+    bucket_ts timestamp with time zone NOT NULL,
+    open_zug numeric NOT NULL,
+    high_zug numeric NOT NULL,
+    low_zug numeric NOT NULL,
+    close_zug numeric NOT NULL,
+    volume_zug numeric DEFAULT 0 NOT NULL,
+    buy_volume_zug numeric DEFAULT 0 NOT NULL,
+    trade_count integer DEFAULT 0 NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT token_candles_address_check CHECK ((token_address = lower(token_address))),
+    CONSTRAINT token_candles_interval_check CHECK ((candle_interval = ANY (ARRAY['15s'::text, '1m'::text, '5m'::text, '15m'::text, '1h'::text, '4h'::text]))),
+    CONSTRAINT token_candles_ohlc_check CHECK (((open_zug >= (0)::numeric) AND (high_zug >= (0)::numeric) AND (low_zug >= (0)::numeric) AND (close_zug >= (0)::numeric) AND (high_zug >= low_zug))),
+    CONSTRAINT token_candles_trade_count_check CHECK ((trade_count >= 0)),
+    CONSTRAINT token_candles_volume_check CHECK (((volume_zug >= (0)::numeric) AND (buy_volume_zug >= (0)::numeric) AND (buy_volume_zug <= volume_zug)))
 );
 
 
@@ -1630,6 +1633,14 @@ ALTER TABLE ONLY public.token_board_stats
 
 
 --
+-- Name: token_candles token_candles_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.token_candles
+    ADD CONSTRAINT token_candles_pkey PRIMARY KEY (token_address, candle_interval, bucket_ts);
+
+
+--
 -- Name: token_favorites token_favorites_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1699,14 +1710,6 @@ ALTER TABLE ONLY public.trades
 
 ALTER TABLE ONLY public.trades
     ADD CONSTRAINT trades_tx_hash_log_index_key UNIQUE (tx_hash, log_index);
-
-
---
--- Name: token_candles token_candles_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.token_candles
-    ADD CONSTRAINT token_candles_pkey PRIMARY KEY (token_address, candle_interval, bucket_ts);
 
 
 --
@@ -1979,6 +1982,13 @@ CREATE INDEX idx_token_board_stats_volume_24h ON public.token_board_stats USING 
 
 
 --
+-- Name: idx_token_candles_lookup; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_token_candles_lookup ON public.token_candles USING btree (token_address, candle_interval, bucket_ts DESC);
+
+
+--
 -- Name: idx_token_favorites_user; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2067,13 +2077,6 @@ CREATE INDEX idx_trades_token_time_desc ON public.trades USING btree (token_addr
 --
 
 CREATE INDEX idx_trades_trader_time ON public.trades USING btree (trader_address, block_time DESC);
-
-
---
--- Name: idx_token_candles_lookup; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_token_candles_lookup ON public.token_candles USING btree (token_address, candle_interval, bucket_ts DESC);
 
 
 --
@@ -2223,6 +2226,14 @@ ALTER TABLE ONLY public.token_board_stats
 
 
 --
+-- Name: token_candles token_candles_token_address_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.token_candles
+    ADD CONSTRAINT token_candles_token_address_fkey FOREIGN KEY (token_address) REFERENCES public.tokens(address) ON DELETE CASCADE;
+
+
+--
 -- Name: token_favorites token_favorites_token_address_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2247,14 +2258,6 @@ ALTER TABLE ONLY public.trades
 
 
 --
--- Name: token_candles token_candles_token_address_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.token_candles
-    ADD CONSTRAINT token_candles_token_address_fkey FOREIGN KEY (token_address) REFERENCES public.tokens(address) ON DELETE CASCADE;
-
-
---
 -- Name: user_positions user_positions_token_address_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2266,5 +2269,5 @@ ALTER TABLE ONLY public.user_positions
 -- PostgreSQL database dump complete
 --
 
-\unrestrict VG0d7PZXkTzeNHOMBR66T1B1Dpcmke5LlJdeKglnwD5TaIXGVbTZDyj1s5Akday
+\unrestrict v9UMsKzwqNyQWq0XAHdgbBa08qDTrJ5XqMI8UAJmfHZWoU1xALncXRHierqSRdf
 

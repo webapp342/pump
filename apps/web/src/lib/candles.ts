@@ -98,12 +98,17 @@ export function buildTradeSpotTicks(
       sold -= tokens;
     }
 
-    const after = spotPriceZugFromReserves(
-      reserve,
-      sold,
-      virtualZugReserve,
-      virtualTokenReserve
-    );
+    const after =
+      trade.spotPriceBnb != null &&
+      Number.isFinite(Number(trade.spotPriceBnb)) &&
+      Number(trade.spotPriceBnb) > 0
+        ? Number(trade.spotPriceBnb)
+        : spotPriceZugFromReserves(
+            reserve,
+            sold,
+            virtualZugReserve,
+            virtualTokenReserve
+          );
     ticks.set(trade.id, { id: trade.id, before, after });
   }
 

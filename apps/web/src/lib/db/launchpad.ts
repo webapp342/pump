@@ -1027,7 +1027,10 @@ export type TradeItem = {
   feeBnb?: string;
   netBnb?: string;
   tokenAmount: string;
+  /** Execution fill price (BNB per token). */
   priceBnb: string;
+  /** Bonding-curve spot after trade when indexed. */
+  spotPriceBnb?: string;
   txHash: string;
   blockTime: string;
 };
@@ -1259,6 +1262,7 @@ export async function listTradesForChart(address: string, limit = 5000): Promise
     fee_zug: string;
     token_amount: string;
     price_zug: string;
+    spot_price_zug: string | null;
     tx_hash: string;
     block_time: Date;
   }>(
@@ -1271,6 +1275,7 @@ export async function listTradesForChart(address: string, limit = 5000): Promise
       recent.fee_zug::text,
       recent.token_amount::text,
       recent.price_zug::text,
+      recent.spot_price_zug::text,
       recent.tx_hash,
       recent.block_time
     FROM (
@@ -1282,6 +1287,7 @@ export async function listTradesForChart(address: string, limit = 5000): Promise
         fee_zug,
         token_amount,
         price_zug,
+        spot_price_zug,
         tx_hash,
         block_time,
         block_number,
@@ -1309,6 +1315,7 @@ export async function listTradesForChart(address: string, limit = 5000): Promise
       netBnb: String(net),
       tokenAmount: row.token_amount,
       priceBnb: row.price_zug,
+      spotPriceBnb: row.spot_price_zug ?? undefined,
       txHash: row.tx_hash,
       blockTime: row.block_time.toISOString(),
     };
@@ -1374,6 +1381,75 @@ export async function listTokenCandlesFromDb(
       tradeCount: row.trade_count,
     }))
     .reverse();
+}
+
+/** Gap-filled candles via `gap_fill_candles` SQL (migration 026). */
+export async function listTokenCandlesGapFilledFromDb(
+  address: string,
+  interval: string,
+  limit = 1000
+): Promise<StoredTokenCandleRow[]> {
+  const db = getLaunchpadReadPool();
+  const result = await db.query<{
+    bucket_sec: string;
+    open_zug: string;
+    high_zug: string;
+    low_zug: string;
+    close_zug: string;
+    volume_zug: string;
+    buy_volume_zug: string;
+    trade_count: number;
+  }>(
+    `
+    SELECT
+      bucket_sec::text,
+      open_zug::text,
+      high_zug::text,
+      low_zug::text,
+      close_zug::text,
+      volume_zug::text,
+      buy_volume_zug::text,
+      trade_count
+    FROM gap_fill_candles($1, $2, $3, now())
+    `,
+    [address.toLowerCase(), interval, limit]
+  );
+
+  return result.rows.map((row) => ({
+    bucketSec: Number(row.bucket_sec),
+    openZug: row.open_zug,
+    highZug: row.high_zug,
+    lowZug: row.low_zug,
+    closeZug: row.close_zug,
+    volumeZug: row.volume_zug,
+    buyVolumeZug: row.buy_volume_zug,
+    tradeCount: row.trade_count,
+  }));
+}
+
+let gapFillSqlAvailable: boolean | null = null;
+
+/** Probe once whether migration 026 function exists. */
+export async function isGapFillCandlesSqlAvailable(): Promise<boolean> {
+  if (gapFillSqlAvailable != null) return gapFillSqlAvailable;
+  const db = getLaunchpadReadPool();
+  try {
+    const result = await db.query<{ exists: boolean }>(
+      `
+      SELECT EXISTS (
+        SELECT 1
+        FROM pg_proc p
+        JOIN pg_namespace n ON n.oid = p.pronamespace
+        WHERE n.nspname = 'public'
+          AND p.proname = 'gap_fill_candles'
+      ) AS exists
+      `
+    );
+    gapFillSqlAvailable = Boolean(result.rows[0]?.exists);
+  } catch {
+    gapFillSqlAvailable = false;
+  }
+  return gapFillSqlAvailable;
 }
 
 export async function getUserVolumeBnb(address: string): Promise<number> {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from "react";
 import {
   createChart,
   CandlestickSeries,
@@ -14,25 +14,30 @@ import {
   ColorType,
   CrosshairMode,
 } from "lightweight-charts";
-import type { TradeItem } from "@/lib/db/launchpad";
 import {
-  applyActorOptimisticCandleBucket,
   CANDLE_INTERVALS,
-  fillGapsForStoredCandles,
   formatPumpSubscriptPrice,
-  mergeWsCandleUpdate,
-  pinTailCandleToLiveMark,
-  reconcileCandleSeriesToLiveMark,
   resolveChartPriceFormat,
-  sanitizeCandleSeries,
-  scaleCandleBars,
   type ActorOptimisticChartSpot,
   type CandleBar,
   type CandleInterval,
   type CandleWsUpdate,
-  type StoredCandleSource,
   type VolumeBar,
 } from "@/lib/candles";
+import type { InitialChartCandles } from "@/lib/token-server";
+import {
+  canSafeIncrementalUpdate,
+  chartSeriesReducer,
+  deriveChartSeries,
+  incrementalPatchStartIndex,
+  initialChartSeriesState,
+  needsFullCandleResync,
+} from "@/lib/chart-series-state";
+import {
+  logChartFetchComplete,
+  logChartWsLag,
+  markChartFetchStart,
+} from "@/lib/chart-observability";
 import type { BondingCurveSnapshot } from "@/lib/bonding-curve";
 import { useTheme } from "@/components/theme/ThemeProvider";
 import { PctChange } from "@/components/ui/PctChange";
@@ -47,7 +52,8 @@ type PriceChartProps = {
   tokenAddress: string;
   symbol: string;
   status: string;
-  optimisticTrades?: TradeItem[];
+  /** SSR seed from token bundle (default 1m). */
+  initialCandles?: InitialChartCandles;
   /** Trader-only optimistic bucket (other viewers rely on WS). */
   actorOptimisticSpot?: ActorOptimisticChartSpot | null;
   /** On-chain virtual reserves for spot replay fallback (pre-backfill). */
@@ -188,48 +194,14 @@ function volumeToChartData(v: VolumeBar): HistogramData {
 
 /** True when we can patch tail buckets with series.update() instead of setData(). */
 function canIncrementalChartPatch(prev: CandleBar[], next: CandleBar[]): boolean {
-  if (prev.length === 0 || next.length === 0) return false;
-  if (next.length < prev.length) return false;
-  if (next.length > prev.length + 1) return false;
-
-  const sharedPrefix = Math.min(prev.length, next.length);
-  if (sharedPrefix === 0) return false;
-
-  // All shared times must match exactly — no gap-fill inserts in the middle.
-  for (let i = 0; i < sharedPrefix; i++) {
-    if (prev[i]!.time !== next[i]!.time) return false;
-  }
-
-  if (next.length === prev.length + 1) {
-    return next[next.length - 1]!.time > prev[prev.length - 1]!.time;
-  }
-
-  // Same length — only the last bucket may have changed.
-  return prev.length === 1 || prev[prev.length - 2]!.time === next[next.length - 2]!.time;
-}
-
-function incrementalPatchStartIndex(prev: CandleBar[], next: CandleBar[]): number {
-  if (next.length > prev.length) return prev.length;
-  return Math.max(0, prev.length - 1);
-}
-
-/** Force setData when OHLC values jump (e.g. decade-scale reconcile). */
-function needsFullCandleResync(prev: CandleBar[], next: CandleBar[]): boolean {
-  const n = Math.min(prev.length, next.length);
-  for (let i = Math.max(0, n - 5); i < n; i++) {
-    const p = prev[i]!.close;
-    const q = next[i]!.close;
-    if (!Number.isFinite(p) || !Number.isFinite(q) || p <= 0 || q <= 0) continue;
-    if (Math.abs(Math.log10(q / p)) > 0.08) return true;
-  }
-  return false;
+  return canSafeIncrementalUpdate(prev, next);
 }
 
 export function PriceChart({
   tokenAddress,
   symbol,
   status,
-  optimisticTrades = [],
+  initialCandles,
   actorOptimisticSpot = null,
   curveSnapshot,
   liveCandleUpdates = [],
@@ -256,12 +228,8 @@ export function PriceChart({
 
   const [timeInterval, setTimeInterval] = useState<CandleInterval>("1m");
   const [currency, setCurrency] = useState<"usd" | "mcap">("usd");
-  const [storedCandles, setStoredCandles] = useState<CandleBar[]>([]);
-  const [storedVolumes, setStoredVolumes] = useState<VolumeBar[]>([]);
-  const storedVolumesRef = useRef<VolumeBar[]>([]);
-  const [candleSource, setCandleSource] = useState<StoredCandleSource>("db");
-  const [fetchedInterval, setFetchedInterval] = useState<CandleInterval | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [seriesState, dispatchSeries] = useReducer(chartSeriesReducer, initialChartSeriesState);
+  const [loading, setLoading] = useState(() => !initialCandles?.candles.length);
   const [error, setError] = useState<string | null>(null);
   const [hoverOhlc, setHoverOhlc] = useState<CandleBar | null>(null);
   const [hoverTimeLabel, setHoverTimeLabel] = useState<string | null>(null);
@@ -276,6 +244,8 @@ export function PriceChart({
 
   const fetchCandles = useCallback(async () => {
     const intervalAtFetch = timeInterval;
+    const mark = markChartFetchStart(tokenAddress, intervalAtFetch);
+    const startedAt = Date.now();
     try {
       const res = await fetch(
         `/api/tokens/${tokenAddress}/candles?interval=${intervalAtFetch}&limit=1000`,
@@ -286,14 +256,33 @@ export function PriceChart({
         data?: {
           candles?: CandleBar[];
           volumes?: VolumeBar[];
-          source?: StoredCandleSource;
+          source?: "db" | "trades";
+          gapFilled?: boolean;
+          gapFill?: "sql" | "ts" | "none";
         };
       };
-      setStoredCandles(body.data?.candles ?? []);
-      setStoredVolumes(body.data?.volumes ?? []);
-      storedVolumesRef.current = body.data?.volumes ?? [];
-      setCandleSource(body.data?.source ?? "trades");
-      setFetchedInterval(intervalAtFetch);
+      const candles = body.data?.candles ?? [];
+      const volumes = body.data?.volumes ?? [];
+      dispatchSeries({
+        type: "set_fetched",
+        candles,
+        volumes,
+        source: body.data?.source ?? "trades",
+        interval: intervalAtFetch,
+        gapFilledByApi: body.data?.gapFilled ?? false,
+      });
+      if (typeof performance !== "undefined") {
+        performance.mark(`${mark}_end`);
+      }
+      logChartFetchComplete({
+        mark,
+        tokenAddress,
+        interval: intervalAtFetch,
+        source: body.data?.source ?? "trades",
+        durationMs: Date.now() - startedAt,
+        bucketCount: candles.length,
+        gapFill: body.data?.gapFill ?? "none",
+      });
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Chart load failed");
@@ -303,17 +292,33 @@ export function PriceChart({
   }, [tokenAddress, timeInterval]);
 
   useEffect(() => {
-    setFetchedInterval(null);
-    setStoredCandles([]);
-    setStoredVolumes([]);
-    storedVolumesRef.current = [];
+    if (
+      initialCandles &&
+      initialCandles.interval === timeInterval &&
+      initialCandles.candles.length > 0 &&
+      seriesState.candles.length === 0
+    ) {
+      dispatchSeries({
+        type: "set_fetched",
+        candles: initialCandles.candles,
+        volumes: initialCandles.volumes,
+        source: initialCandles.source,
+        interval: initialCandles.interval,
+        gapFilledByApi: initialCandles.gapFilledByApi,
+      });
+      setLoading(false);
+    }
+  }, [initialCandles, seriesState.candles.length, timeInterval]);
+
+  useEffect(() => {
+    dispatchSeries({ type: "reset" });
+    shouldFitViewportRef.current = true;
     renderedCandlesRef.current = [];
     renderedVolumesRef.current = [];
     renderedFingerprintRef.current = "";
-    shouldFitViewportRef.current = true;
     setLoading(true);
     void fetchCandles();
-  }, [fetchCandles]);
+  }, [fetchCandles, tokenAddress]);
 
   useEffect(() => {
     if (frozen) return;
@@ -330,93 +335,49 @@ export function PriceChart({
   }, [frozen, actorOptimisticSpot]);
 
   const chartEndTimeMs = useMemo(() => {
-    if (frozen && storedCandles.length > 0) {
-      return storedCandles[storedCandles.length - 1]!.time * 1000;
+    if (frozen && seriesState.candles.length > 0) {
+      return seriesState.candles[seriesState.candles.length - 1]!.time * 1000;
     }
     return nowMs;
-  }, [frozen, storedCandles, nowMs]);
+  }, [frozen, seriesState.candles, nowMs]);
 
   useEffect(() => {
-    if (candleSource !== "db" || liveCandleUpdates.length === 0) return;
+    if (seriesState.source !== "db" || liveCandleUpdates.length === 0) return;
     const update = liveCandleUpdates.find((item) => item.interval === timeInterval);
     if (!update) return;
-    setStoredCandles((prevCandles) => {
-      const merged = mergeWsCandleUpdate(prevCandles, storedVolumesRef.current, update, 1);
-      setStoredVolumes(merged.volumes);
-      storedVolumesRef.current = merged.volumes;
-      return merged.candles;
+    logChartWsLag({
+      tokenAddress,
+      interval: update.interval,
+      bucketSec: update.time,
+      lagMs: Date.now() - update.time * 1000,
+      wsConnected,
     });
-  }, [liveCandleUpdates, timeInterval, candleSource]);
-
-  const { candles, volumes } = useMemo(() => {
-    let baseCandles: CandleBar[] = [];
-    let baseVolumes: VolumeBar[] = [];
-
-    if (fetchedInterval !== timeInterval || storedCandles.length === 0) {
-      return { candles: baseCandles, volumes: baseVolumes };
-    }
-
-    const scaledCandles = scaleCandleBars(storedCandles, candleUnitScale);
-    const scaledVolumes = scaleVolumeBars(storedVolumes, candleUnitScale);
-    const filled = fillGapsForStoredCandles(scaledCandles, scaledVolumes, timeInterval, {
-      endTimeMs: chartEndTimeMs,
+    dispatchSeries({
+      type: "merge_ws",
+      update,
+      priceScale: 1,
     });
-    baseCandles = filled.candles;
-    baseVolumes = filled.volumes;
+  }, [liveCandleUpdates, timeInterval, seriesState.source, tokenAddress, wsConnected]);
 
-    if (liveMarkPriceBnb != null && liveMarkPriceBnb > 0 && baseCandles.length > 0) {
-      const reconciled = reconcileCandleSeriesToLiveMark(
-        baseCandles,
-        baseVolumes,
-        liveMarkPriceBnb
-      );
-      baseCandles = reconciled.candles;
-      baseVolumes = reconciled.volumes;
-      const pinned = pinTailCandleToLiveMark(
-        baseCandles,
-        baseVolumes,
-        liveMarkPriceBnb,
-        timeInterval,
-        chartEndTimeMs
-      );
-      baseCandles = pinned.candles;
-      baseVolumes = pinned.volumes;
-    }
-
-    if (actorOptimisticSpot) {
-      const patched = applyActorOptimisticCandleBucket(
-        baseCandles,
-        baseVolumes,
-        timeInterval,
-        actorOptimisticSpot,
-        candleUnitScale
-      );
-      const anchor = actorOptimisticSpot.spotAfterBnb * candleUnitScale;
-      return {
-        candles: sanitizeCandleSeries(patched.candles, anchor),
-        volumes: patched.volumes,
-      };
-    }
-
-    if (liveMarkPriceBnb != null && liveMarkPriceBnb > 0 && baseCandles.length > 0) {
-      return {
-        candles: sanitizeCandleSeries(baseCandles, liveMarkPriceBnb * candleUnitScale),
-        volumes: baseVolumes,
-      };
-    }
-
-    return { candles: baseCandles, volumes: baseVolumes };
-  }, [
-    candleSource,
-    fetchedInterval,
-    storedCandles,
-    storedVolumes,
-    timeInterval,
-    candleUnitScale,
-    chartEndTimeMs,
-    liveMarkPriceBnb,
-    actorOptimisticSpot,
-  ]);
+  const { candles, volumes } = useMemo(
+    () =>
+      deriveChartSeries({
+        state: seriesState,
+        displayInterval: timeInterval,
+        priceScale: candleUnitScale,
+        endTimeMs: chartEndTimeMs,
+        liveMarkPriceBnb: liveMarkPriceBnb,
+        actorOptimisticSpot: actorOptimisticSpot,
+      }),
+    [
+      seriesState,
+      timeInterval,
+      candleUnitScale,
+      chartEndTimeMs,
+      liveMarkPriceBnb,
+      actorOptimisticSpot,
+    ]
+  );
 
   const candlesForChart = candles;
   const volumesForChart = volumes;
@@ -486,10 +447,10 @@ export function PriceChart({
   }, [tokenAddress]);
 
   useEffect(() => {
-    if (storedCandles.length > 0 && renderedCandlesRef.current.length === 0) {
+    if (seriesState.candles.length > 0 && renderedCandlesRef.current.length === 0) {
       shouldFitViewportRef.current = true;
     }
-  }, [storedCandles.length, candleSource, tokenAddress]);
+  }, [seriesState.candles.length, seriesState.source, tokenAddress]);
 
   useEffect(() => {
     if (prevPriceScaleRef.current != null && prevPriceScaleRef.current !== candleUnitScale) {

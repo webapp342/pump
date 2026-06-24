@@ -9,7 +9,9 @@ import {
 } from "@/lib/candles";
 import {
   getTokenByAddress,
+  isGapFillCandlesSqlAvailable,
   listTokenCandlesFromDb,
+  listTokenCandlesGapFilledFromDb,
   listTradesForChart,
 } from "@/lib/db/launchpad";
 
@@ -38,12 +40,29 @@ export async function GET(request: NextRequest, context: RouteContext) {
 
     const stored = await listTokenCandlesFromDb(address, interval, limit);
     if (stored.length > 0) {
-      const raw = storedCandlesToBars(stored);
-      const { candles, volumes } = fillGapsForStoredCandles(
-        raw.candles,
-        raw.volumes,
-        interval
-      );
+      let gapFill: "sql" | "ts" = "ts";
+      let raw: ReturnType<typeof storedCandlesToBars>;
+
+      if (await isGapFillCandlesSqlAvailable()) {
+        try {
+          const gapFilled = await listTokenCandlesGapFilledFromDb(address, interval, limit);
+          if (gapFilled.length > 0) {
+            raw = storedCandlesToBars(gapFilled);
+            gapFill = "sql";
+          } else {
+            raw = storedCandlesToBars(stored);
+          }
+        } catch {
+          raw = storedCandlesToBars(stored);
+        }
+      } else {
+        raw = storedCandlesToBars(stored);
+      }
+
+      const { candles, volumes } =
+        gapFill === "sql"
+          ? raw
+          : fillGapsForStoredCandles(raw.candles, raw.volumes, interval);
 
       return NextResponse.json(
         {
@@ -52,6 +71,8 @@ export async function GET(request: NextRequest, context: RouteContext) {
             volumes,
             interval,
             source: "db" as const,
+            gapFilled: true,
+            gapFill,
             bucketCount: stored.length,
             frozen: false,
             status: token.status,
@@ -77,6 +98,8 @@ export async function GET(request: NextRequest, context: RouteContext) {
           volumes,
           interval,
           source: "trades" as const,
+          gapFilled: true,
+          gapFill: "ts" as const,
           tradeCount: trades.length,
           frozen: false,
           status: token.status,

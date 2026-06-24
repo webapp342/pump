@@ -53,6 +53,9 @@ export class LaunchpadEventHandlers {
       case "TokenCreated":
         await this.handleTokenCreated(log);
         return;
+      case "TokenRegistered":
+        await this.handleTokenRegistered(log);
+        return;
       case "Trade":
         await this.handleTrade(log);
         return;
@@ -134,8 +137,10 @@ export class LaunchpadEventHandlers {
           target_zug,
           market_cap_zug,
           last_price_zug,
+          virtual_zug_reserve,
+          virtual_token_reserve,
           updated_at
-        ) VALUES ($1, $2, $3, $4, now())
+        ) VALUES ($1, $2, $3, $4, $5, $6, now())
         ON CONFLICT (token_address) DO UPDATE
         SET target_zug = EXCLUDED.target_zug,
             last_price_zug = COALESCE(NULLIF(bonding_states.last_price_zug, 0), EXCLUDED.last_price_zug),
@@ -146,6 +151,8 @@ export class LaunchpadEventHandlers {
         weiToDecimal(targetZug),
         startingMarketCapZug(),
         startingSpotPriceZug(),
+        weiToDecimal(defaultVirtualZugWei()),
+        weiToDecimal(defaultVirtualTokenWei()),
       ]
     );
 
@@ -166,6 +173,27 @@ export class LaunchpadEventHandlers {
       });
     }
     // KOTH only after trades — create has no real price discovery yet.
+  }
+
+  private async handleTokenRegistered(log: ParsedLaunchpadLog): Promise<void> {
+    const token = dbAddress(asString(log.args.token));
+    const virtualZugReserve = asBigInt(log.args.virtualZugReserve);
+    const virtualTokenReserve = asBigInt(log.args.virtualTokenReserve);
+
+    await this.context.launchpadPool.query(
+      `
+        UPDATE bonding_states
+        SET virtual_zug_reserve = $2,
+            virtual_token_reserve = $3,
+            updated_at = now()
+        WHERE token_address = $1
+      `,
+      [
+        token,
+        weiToDecimal(virtualZugReserve),
+        weiToDecimal(virtualTokenReserve),
+      ]
+    );
   }
 
   private async handleTrade(log: ParsedLaunchpadLog): Promise<void> {
@@ -206,6 +234,7 @@ export class LaunchpadEventHandlers {
               zug_amount,
               token_amount,
               price_zug,
+              spot_price_zug,
               fee_zug,
               creator_fee_zug,
               treasury_fee_zug,
@@ -214,7 +243,7 @@ export class LaunchpadEventHandlers {
               log_index,
               block_number,
               block_time
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
             ON CONFLICT (tx_hash, log_index) DO NOTHING
             RETURNING id
           )
@@ -228,6 +257,7 @@ export class LaunchpadEventHandlers {
           weiToDecimal(zugAmount),
           weiToDecimal(tokenAmount),
           executionPrice,
+          markPrice,
           weiToDecimal(feeZug),
           weiToDecimal(feeSplit.creatorFee),
           weiToDecimal(feeSplit.treasuryFee),
@@ -959,18 +989,26 @@ function unixToDate(seconds: bigint): Date {
 
 /** Marginal spot BNB/token after trade (matches chart + holders P/L). */
 function spotPriceBnbFromReserves(reserveZug: bigint, soldTokens: bigint): string {
-  const virtualZug = BigInt(process.env.BONDING_VIRTUAL_ZUG_RESERVE_WEI ?? `${5_000n * 10n ** 18n}`);
-  const virtualToken = 1_000_000_000n * 10n ** 18n;
+  const virtualZug = defaultVirtualZugWei();
+  const virtualToken = defaultVirtualTokenWei();
   const poolZug = virtualZug + reserveZug;
   const poolTokens = virtualToken - soldTokens;
   if (poolTokens <= 0n || poolZug <= 0n) return "0";
   return ratioWeiToDecimal(poolZug, poolTokens);
 }
 
+function defaultVirtualZugWei(): bigint {
+  return BigInt(process.env.BONDING_VIRTUAL_ZUG_RESERVE_WEI ?? `${5_000n * 10n ** 18n}`);
+}
+
+function defaultVirtualTokenWei(): bigint {
+  return 1_000_000_000n * 10n ** 18n;
+}
+
 /** Factory defaults: virtualZug / 1B token virtual → spot price per token. */
 function startingSpotPriceZug(): string {
-  const virtualZug = BigInt(process.env.BONDING_VIRTUAL_ZUG_RESERVE_WEI ?? `${5_000n * 10n ** 18n}`);
-  const virtualToken = 1_000_000_000n * 10n ** 18n;
+  const virtualZug = defaultVirtualZugWei();
+  const virtualToken = defaultVirtualTokenWei();
   return ratioWeiToDecimal(virtualZug, virtualToken);
 }
 
