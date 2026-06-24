@@ -8,7 +8,19 @@ import type { SessionBuyParams, SessionSellParams } from "@/hooks/useSessionTrad
 import { useWalletFunding } from "@/components/wallet/WalletFundingProvider";
 import { TradeConfirmModal } from "@/components/token/TradeConfirmModal";
 import { assertScwReadyForUserOp } from "@/lib/aa/scw-preflight";
-import { bufferCostWei, bufferedGasCostWei } from "@/lib/aa/gas-buffer";
+import {
+  buildOptimisticBuyPreview,
+  buildOptimisticSellPreview,
+  type OptimisticTradePreview,
+} from "@/lib/trade-optimistic-preview";
+import {
+  createOptimisticPendingId,
+  evaluateInstantTradeGate,
+  hardValidateInstantTrade,
+  type InstantTradeGateBuy,
+  type InstantTradeGateResult,
+  type InstantTradeGateSell,
+} from "@/lib/trade-optimistic-guard";
 import { loadTradeAutoConfirm, saveTradeAutoConfirm } from "@/lib/trade-confirm-storage";
 import {
   useAccount,
@@ -86,6 +98,10 @@ export type TradeSubmittedPayload = {
   side: "buy" | "sell";
 };
 
+export type TradeOptimisticPayload = OptimisticTradePreview & {
+  side: "buy" | "sell";
+};
+
 type TradePanelProps = {
   tokenAddress: `0x${string}`;
   symbol: string;
@@ -93,6 +109,8 @@ type TradePanelProps = {
   reserveBnb?: string;
   embedded?: boolean;
   prefill?: TradePrefillConfig | null;
+  onTradeOptimistic?: (payload: TradeOptimisticPayload) => void;
+  onTradeOptimisticRollback?: (payload: { pendingId: string }) => void;
   onTradeSubmitted?: (payload: TradeSubmittedPayload) => void;
   onTradeConfirmed?: (payload: TradeConfirmedPayload) => void;
   /** Live curve snapshot from token page — keeps quotes in sync with chart polling. */
@@ -213,6 +231,8 @@ export function TradePanel({
   status,
   embedded = false,
   prefill = null,
+  onTradeOptimistic,
+  onTradeOptimisticRollback,
   onTradeSubmitted,
   onTradeConfirmed,
   chainCurveSnapshot,
@@ -249,6 +269,7 @@ export function TradePanel({
   const [pendingAction, setPendingAction] = useState<"buy" | "sell" | "approve" | null>(null);
   /** Sync side for callbacks — setState(pendingAction) may lag behind userOp submitted. */
   const pendingTradeSideRef = useRef<"buy" | "sell" | null>(null);
+  const optimisticPendingRef = useRef<{ id: string; side: "buy" | "sell" } | null>(null);
   const pendingSellRef = useRef<{ amountWei: bigint; minBnbOut: bigint } | null>(null);
   const handledReceiptHashRef = useRef<`0x${string}` | null>(null);
   const pendingTradeReferrerRef = useRef<`0x${string}` | null>(null);
@@ -755,6 +776,54 @@ export function TradePanel({
       ? isConnected && bnbBalance === undefined && buyCostWei > 0n
       : isConnected && tokenBalance === undefined && sellTokenWei > 0n;
 
+  const sellUsesPermit = side === "sell" && needsApproval && sellSupportsPermit;
+  const allowanceSufficient =
+    side !== "sell" || !needsApproval
+      ? true
+      : allowance !== undefined && allowance >= sellTokenWei;
+
+  const instantTradeGate = useMemo((): InstantTradeGateResult => {
+    return evaluateInstantTradeGate({
+      side,
+      paused,
+      wrongChain,
+      balancePending,
+      gasLoading,
+      needsLegacyApproval,
+      sellUsesPermit,
+      allowanceSufficient,
+      bondingCurve,
+      protocolFeeBps,
+      buyCostWei,
+      sellTokenWei,
+      bnbBalance: bnbBalance?.value,
+      tokenBalance,
+      buyGasReserveWei,
+      sellGasReserveWei,
+      maxBuySpendWei,
+      gasPriceWei: gasPrice,
+    });
+  }, [
+    side,
+    paused,
+    wrongChain,
+    balancePending,
+    gasLoading,
+    needsLegacyApproval,
+    sellUsesPermit,
+    allowanceSufficient,
+    bondingCurve,
+    protocolFeeBps,
+    buyCostWei,
+    sellTokenWei,
+    bnbBalance?.value,
+    tokenBalance,
+    buyGasReserveWei,
+    sellGasReserveWei,
+    maxBuySpendWei,
+    gasPrice,
+  ]);
+
   const currencyLabel =
     activeInputMode === "usd"
       ? "USD"
@@ -1216,15 +1285,171 @@ export function TradePanel({
     })();
   }
 
+  function rollbackInstantOptimistic() {
+    const pending = optimisticPendingRef.current;
+    if (!pending) return;
+    tradeTraceStep("ux.optimistic.rollback", { pendingId: pending.id });
+    onTradeOptimisticRollback?.({ pendingId: pending.id });
+    optimisticPendingRef.current = null;
+    setSubmitSuccess(null);
+  }
+
+  function handleInstantTradeFailure(err: unknown) {
+    rollbackInstantOptimistic();
+    pendingTradeSideRef.current = null;
+    setPendingAction(null);
+    failTradeTrace("ux.instant_trade.failed", err);
+    setError(formatTradeError(err));
+  }
+
+  function applyInstantOptimisticUi(
+    preview: OptimisticTradePreview,
+    tradeSide: "buy" | "sell"
+  ) {
+    tradeTraceStep("ux.optimistic.instant", {
+      pendingId: preview.pendingId,
+      side: tradeSide,
+    });
+    setAmount("");
+    setLinkedBuySpendWei(null);
+    setLinkedSellTokenWei(null);
+    setError(null);
+    setSubmitSuccess(
+      tradeSide === "buy" ? `Bought ${symbol}` : `Sold ${symbol}`
+    );
+    onTradeOptimistic?.({ ...preview, side: tradeSide });
+    onTradeSubmitted?.({
+      userOpHash: preview.pendingTxHash,
+      side: tradeSide,
+    });
+  }
+
+  async function hardValidateBeforeSend(
+    tradeSide: "buy" | "sell",
+    callValueWei: bigint,
+    sellAmountWei?: bigint
+  ) {
+    if (!address || bnbBalance === undefined) {
+      throw new Error("Wallet balance not ready.");
+    }
+    const [bnbFresh, tokenFresh] = await Promise.all([
+      refetchBnbBalance(),
+      tradeSide === "sell" ? refetchBalance() : Promise.resolve(undefined),
+    ]);
+    const bnbWei = bnbFresh.data?.value ?? bnbBalance.value;
+    const tokenWei =
+      tradeSide === "sell" ? (tokenFresh?.data ?? tokenBalance) : tokenBalance;
+    const gasReserve =
+      tradeSide === "buy" ? buyGasReserveWei : sellGasReserveWei;
+
+    await hardValidateInstantTrade({
+      scwAddress: address,
+      side: tradeSide,
+      callValueWei,
+      bnbBalanceWei: bnbWei,
+      tokenBalanceWei: tokenWei,
+      sellTokenWei: sellAmountWei,
+      gasReserveWei: gasReserve,
+      publicClient: fastTradeConfirm ? createTradeHttpPublicClient() : undefined,
+    });
+  }
+
+  function dispatchInstantBuy(buyParams: SessionBuyParams, gate: InstantTradeGateBuy) {
+    if (!address || !bondingCurve) return;
+    const pendingId = createOptimisticPendingId();
+    optimisticPendingRef.current = { id: pendingId, side: "buy" };
+    const preview = buildOptimisticBuyPreview({
+      pendingId,
+      tokenAddress,
+      traderAddress: address,
+      submitValueWei: gate.submitValue,
+      tokenOutWei: gate.tokenOut,
+      feeZug: gate.feeZug,
+      curve: bondingCurve,
+    });
+    applyInstantOptimisticUi(preview, "buy");
+    queueMicrotask(() => {
+      void (async () => {
+        try {
+          await hardValidateBeforeSend("buy", buyParams.value);
+          await submitBuyWriteContract(buyParams);
+        } catch (err) {
+          handleInstantTradeFailure(err);
+        }
+      })();
+    });
+  }
+
+  function dispatchInstantSell(
+    sellParams: SessionSellParams,
+    gate: InstantTradeGateSell,
+    usePermit: boolean
+  ) {
+    if (!address || !bondingCurve) return;
+    const pendingId = createOptimisticPendingId();
+    optimisticPendingRef.current = { id: pendingId, side: "sell" };
+    const preview = buildOptimisticSellPreview({
+      pendingId,
+      tokenAddress,
+      traderAddress: address,
+      sellTokenWei: gate.sellTokenWei,
+      zugOutWei: gate.zugOut,
+      feeZug: gate.feeZug,
+      curve: bondingCurve,
+    });
+    applyInstantOptimisticUi(preview, "sell");
+    queueMicrotask(() => {
+      void (async () => {
+        try {
+          await hardValidateBeforeSend("sell", 0n, sellParams.amountWei);
+          await submitSellWriteContract(sellParams, usePermit);
+        } catch (err) {
+          handleInstantTradeFailure(err);
+        }
+      })();
+    });
+  }
+
+  function tryDispatchInstantTrade(
+    buyParams?: SessionBuyParams,
+    sellParams?: SessionSellParams,
+    usePermit = false
+  ): boolean {
+    if (!instantTradeGate.ok) {
+      tradeTraceStep("ux.optimistic.skipped", { reason: instantTradeGate.reason });
+      return false;
+    }
+    if (instantTradeGate.side === "buy" && buyParams) {
+      dispatchInstantBuy(buyParams, instantTradeGate);
+      return true;
+    }
+    if (instantTradeGate.side === "sell" && sellParams) {
+      dispatchInstantSell(sellParams, instantTradeGate, usePermit);
+      return true;
+    }
+    return false;
+  }
+
   function pumpTradeCallbacks(side: "buy" | "sell"): KernelTradeWriteCallbacks {
     return {
       onSubmitted: ({ userOpHash: submittedHash }) => {
-        unlockTradeFormAfterSubmit(side, submittedHash);
+        if (!optimisticPendingRef.current) {
+          unlockTradeFormAfterSubmit(side, submittedHash);
+        } else {
+          tradeTraceStep("ux.on_trade_submitted.background", {
+            userOpHash: submittedHash,
+            side,
+          });
+        }
       },
       onConfirmed: (result) => {
+        optimisticPendingRef.current = null;
         handleBuySellConfirmed(side, result);
       },
       onFailed: (err) => {
+        if (optimisticPendingRef.current) {
+          rollbackInstantOptimistic();
+        }
         setSubmitSuccess(null);
         setError(formatTradeError(err));
         pendingTradeSideRef.current = null;
@@ -1239,8 +1464,10 @@ export function TradePanel({
       value: buyParams.value.toString(),
       minTokenOut: buyParams.minTokenOut.toString(),
     });
-    pendingTradeSideRef.current = "buy";
-    setPendingAction("buy");
+    if (!optimisticPendingRef.current) {
+      pendingTradeSideRef.current = "buy";
+      setPendingAction("buy");
+    }
     tradeWrite({
       address: contracts.bondingCurveManager,
       abi: bondingCurveManagerAbi,
@@ -1260,8 +1487,10 @@ export function TradePanel({
     usePermit: boolean
   ) {
     const params = usePermit ? await buildSellParamsWithPermit(sellParams, true) : sellParams;
-    pendingTradeSideRef.current = "sell";
-    setPendingAction("sell");
+    if (!optimisticPendingRef.current) {
+      pendingTradeSideRef.current = "sell";
+      setPendingAction("sell");
+    }
     if (params.permit) {
       const { deadline, v, r, s } = params.permit;
       tradeWrite({
@@ -1433,6 +1662,8 @@ export function TradePanel({
           return;
         }
 
+        if (tryDispatchInstantTrade(buyParams)) return;
+
         await submitBuyWriteContract(buyParams);
         return;
       }
@@ -1492,6 +1723,9 @@ export function TradePanel({
 
       pendingTradeReferrerRef.current = tradeReferrer;
       quoteUsdAtSubmitRef.current = estimatedQuotePriceUsd;
+
+      if (tryDispatchInstantTrade(undefined, baseSellParams, usePermit)) return;
+
       await submitSellWriteContract(baseSellParams, usePermit);
     } catch (err) {
       setPendingAction(null);
@@ -1540,6 +1774,12 @@ export function TradePanel({
     tradeTraceStep("ux.confirm_modal.accepted", { side: pendingTrade.side });
     try {
       if (pendingTrade.side === "buy" && pendingTrade.buyParams) {
+        quoteUsdAtSubmitRef.current = estimatedQuotePriceUsd;
+        if (tryDispatchInstantTrade(pendingTrade.buyParams)) {
+          setTradeConfirmOpen(false);
+          setPendingTrade(null);
+          return;
+        }
         await submitBuyWriteContract(pendingTrade.buyParams);
       } else if (pendingTrade.side === "sell" && pendingTrade.sellParams) {
         const sellParams = pendingTrade.sellParams;
@@ -1561,6 +1801,17 @@ export function TradePanel({
         } else {
           pendingTradeReferrerRef.current = sellParams.referrer ?? null;
           quoteUsdAtSubmitRef.current = estimatedQuotePriceUsd;
+          if (
+            tryDispatchInstantTrade(
+              undefined,
+              sellParams,
+              pendingTrade.usePermit ?? false
+            )
+          ) {
+            setTradeConfirmOpen(false);
+            setPendingTrade(null);
+            return;
+          }
           await submitSellWriteContract(
             sellParams,
             pendingTrade.usePermit ?? false

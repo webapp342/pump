@@ -14,6 +14,8 @@ type TradeSheetProps = {
   status: string;
   reserveBnb?: string;
   prefill?: TradePrefillConfig | null;
+  onTradeOptimistic?: (payload: TradeOptimisticPayload) => void;
+  onTradeOptimisticRollback?: (payload: { pendingId: string }) => void;
   onTradeSubmitted?: (payload: TradeSubmittedPayload) => void;
   onTradeConfirmed?: (payload: TradeConfirmedPayload) => void;
   chainCurveSnapshot?: BondingCurveSnapshot;
@@ -29,6 +31,8 @@ export function TradeSheet({
   status,
   reserveBnb,
   prefill = null,
+  onTradeOptimistic,
+  onTradeOptimisticRollback,
   onTradeSubmitted,
   onTradeConfirmed,
   chainCurveSnapshot,
@@ -113,6 +117,8 @@ export function TradeSheet({
               status={status}
               reserveBnb={reserveBnb}
               prefill={prefill}
+              onTradeOptimistic={onTradeOptimistic}
+              onTradeOptimisticRollback={onTradeOptimisticRollback}
               onTradeSubmitted={onTradeSubmitted}
               onTradeConfirmed={onTradeConfirmed}
               chainCurveSnapshot={chainCurveSnapshot}

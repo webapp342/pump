@@ -31,7 +31,7 @@ import {
   pushOptimisticActivity,
 } from "@/lib/optimistic-activity";
 import { contracts, pumpChain, shortAddress } from "@/config/chain";
-import { TradePanel, type TradeConfirmedPayload, type TradeSubmittedPayload } from "@/components/token/TradePanel";
+import { TradePanel, type TradeConfirmedPayload, type TradeOptimisticPayload, type TradeSubmittedPayload } from "@/components/token/TradePanel";
 import { TradeSheet } from "@/components/token/TradeSheet";
 import {
   parseTradePrefillFromSearchParams,
@@ -228,6 +228,7 @@ export function TokenDetailLive({
   const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const optimisticRef = useRef<TradeItem[]>([]);
   optimisticRef.current = optimisticTrades;
+  const optimisticTokenSnapshotRef = useRef<TokenDetail | null>(null);
   const hydratedRef = useRef(false);
 
   useEffect(() => {
@@ -433,6 +434,37 @@ export function TokenDetailLive({
     [tokenAddress, refetchCurve]
   );
 
+  const handleTradeOptimistic = useCallback(
+    (payload: TradeOptimisticPayload) => {
+      burstUntilRef.current = Date.now() + BURST_DURATION_MS;
+      setIndexerSyncing(true);
+      optimisticTokenSnapshotRef.current = token;
+      setOptimisticTrades((prev) => [
+        payload.tradeItem,
+        ...prev.filter((t) => t.txHash !== payload.pendingTxHash),
+      ]);
+      setToken((prev) => applyTradeToToken(prev, payload.syntheticTrade));
+      void refetchCurve();
+    },
+    [token, refetchCurve]
+  );
+
+  const handleTradeOptimisticRollback = useCallback(
+    (payload: { pendingId: string }) => {
+      const pendingTxHash = `pending:${payload.pendingId}`;
+      setOptimisticTrades((prev) =>
+        prev.filter((t) => t.txHash.toLowerCase() !== pendingTxHash.toLowerCase())
+      );
+      if (optimisticTokenSnapshotRef.current) {
+        setToken(optimisticTokenSnapshotRef.current);
+        optimisticTokenSnapshotRef.current = null;
+      }
+      void refetchCurve();
+      void fetchLive();
+    },
+    [fetchLive, refetchCurve]
+  );
+
   const handleTradeSubmitted = useCallback(
     (_payload: TradeSubmittedPayload) => {
       burstUntilRef.current = Date.now() + BURST_DURATION_MS;
@@ -446,6 +478,10 @@ export function TokenDetailLive({
     async (payload: TradeConfirmedPayload) => {
       burstUntilRef.current = Date.now() + BURST_DURATION_MS;
       setIndexerSyncing(true);
+      optimisticTokenSnapshotRef.current = null;
+      setOptimisticTrades((prev) =>
+        prev.filter((t) => !t.txHash.toLowerCase().startsWith("pending:"))
+      );
 
       pushOptimisticActivity({
         txHash: payload.txHash,
@@ -735,6 +771,8 @@ export function TokenDetailLive({
               status={liveToken.status}
               reserveBnb={liveToken.reserveBnb}
               prefill={tradePrefill}
+              onTradeOptimistic={handleTradeOptimistic}
+              onTradeOptimisticRollback={handleTradeOptimisticRollback}
               onTradeSubmitted={handleTradeSubmitted}
               onTradeConfirmed={handleTradeConfirmed}
               chainCurveSnapshot={tradeCurveSnapshot}
@@ -786,6 +824,8 @@ export function TokenDetailLive({
         status={liveToken.status}
         reserveBnb={liveToken.reserveBnb}
         prefill={tradePrefill}
+        onTradeOptimistic={handleTradeOptimistic}
+        onTradeOptimisticRollback={handleTradeOptimisticRollback}
         onTradeSubmitted={handleTradeSubmitted}
         onTradeConfirmed={handleTradeConfirmed}
         chainCurveSnapshot={tradeCurveSnapshot}
