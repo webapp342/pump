@@ -8,6 +8,7 @@ import type { SessionBuyParams, SessionSellParams } from "@/hooks/useSessionTrad
 import { useWalletFunding } from "@/components/wallet/WalletFundingProvider";
 import { TradeConfirmModal } from "@/components/token/TradeConfirmModal";
 import { assertScwReadyForUserOp } from "@/lib/aa/scw-preflight";
+import { bufferCostWei, bufferedGasCostWei } from "@/lib/aa/gas-buffer";
 import {
   buildOptimisticBuyPreview,
   buildOptimisticSellPreview,
