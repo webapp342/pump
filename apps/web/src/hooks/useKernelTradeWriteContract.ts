@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import type { Abi, Address, Hash, TransactionReceipt } from "viem";
 import { encodeFunctionData } from "viem";
 import { usePumpWallet } from "@/components/wallet/PumpWalletProvider";
@@ -14,6 +14,13 @@ import {
 } from "@/lib/aa/send-kernel-transaction";
 import { failTradeTrace, tradeTraceStep } from "@/lib/trade-timing";
 
+export type KernelTradeWriteCallbacks = {
+  onSubmitted?: (payload: { userOpHash: Hash }) => void;
+  onIncluded?: (txHash: Hash) => void;
+  onConfirmed?: (result: KernelTransactionResult) => void;
+  onFailed?: (error: Error) => void;
+};
+
 export type KernelTradeWriteParams = {
   address: Address;
   abi: Abi;
@@ -21,6 +28,9 @@ export type KernelTradeWriteParams = {
   args?: readonly unknown[];
   value?: bigint;
   chainId?: number;
+  callbacks?: KernelTradeWriteCallbacks;
+  /** SCW balance check — parallel with send_user_op, not before it. */
+  preflight?: () => Promise<void>;
 };
 
 export type TradeWritePhase =
@@ -32,8 +42,7 @@ export type TradeWritePhase =
   | "failed";
 
 /**
- * Buy/sell only — trade HTTPS RPC for UserOp prepare + WSS Flashblocks confirm.
- * Exposes phased progress: submitted (userOpHash) before on-chain txHash.
+ * Buy/sell only — unlock UI at `submitted`; confirm runs in background (pump.fun style).
  */
 export function useKernelTradeWriteContract() {
   const { kernelClient } = usePumpWallet();
@@ -42,11 +51,11 @@ export function useKernelTradeWriteContract() {
   const [receipt, setReceipt] = useState<TransactionReceipt | undefined>();
   const [tradePhase, setTradePhase] = useState<TradeWritePhase>("idle");
   const [error, setError] = useState<Error | null>(null);
+  const writeGenerationRef = useRef(0);
 
-  const isPending =
-    tradePhase === "preparing" ||
-    tradePhase === "submitted" ||
-    tradePhase === "confirming";
+  const isSubmitting = tradePhase === "preparing";
+  const isBackgroundConfirming =
+    tradePhase === "submitted" || tradePhase === "confirming";
 
   const reset = useCallback(() => {
     setTxHash(undefined);
@@ -59,21 +68,27 @@ export function useKernelTradeWriteContract() {
   const tradeWrite = useCallback(
     (params: KernelTradeWriteParams) => {
       if (!kernelClient) {
-        setError(new Error("Sign in to trade."));
-        failTradeTrace("ux.kernel_client_missing", new Error("Sign in to trade."));
+        const err = new Error("Sign in to trade.");
+        setError(err);
+        params.callbacks?.onFailed?.(err);
+        failTradeTrace("ux.kernel_client_missing", err);
         return;
       }
+
+      const generation = ++writeGenerationRef.current;
+      const isCurrent = () => writeGenerationRef.current === generation;
 
       setTradePhase("preparing");
       setError(null);
       setReceipt(undefined);
       setUserOpHash(undefined);
       setTxHash(undefined);
-      tradeTraceStep("ux.isPending=true");
+      tradeTraceStep("ux.isSubmitting=true");
       tradeTraceStep("ux.trade_phase", { phase: "preparing" });
 
       void (async () => {
         const t0 = performance.now();
+        const { callbacks } = params;
         try {
           if (!kernelClient.account) {
             throw new Error("Smart account not ready.");
@@ -116,8 +131,11 @@ export function useKernelTradeWriteContract() {
           const submitResult = await submitKernelUserOperation(
             activeClient,
             publicClient,
-            call
+            call,
+            { preflight: params.preflight }
           );
+
+          if (!isCurrent()) return;
 
           setUserOpHash(submitResult.userOpHash);
           setTradePhase("submitted");
@@ -126,6 +144,9 @@ export function useKernelTradeWriteContract() {
             userOpHash: submitResult.userOpHash,
           });
           tradeTraceStep("ux.user_op_submitted", { userOpHash: submitResult.userOpHash });
+          tradeTraceStep("ux.button_unlock", { userOpHash: submitResult.userOpHash });
+          tradeTraceStep("ux.isSubmitting=false");
+          callbacks?.onSubmitted?.({ userOpHash: submitResult.userOpHash });
 
           setTradePhase("confirming");
           tradeTraceStep("ux.trade_phase", { phase: "confirming" });
@@ -138,11 +159,18 @@ export function useKernelTradeWriteContract() {
             {
               flashblocks,
               onIncluded: (includedTxHash) => {
+                if (!isCurrent()) return;
                 setTxHash(includedTxHash);
                 tradeTraceStep("ux.txHash_early", { txHash: includedTxHash });
+                callbacks?.onIncluded?.(includedTxHash);
               },
             }
           );
+
+          if (!isCurrent()) {
+            callbacks?.onConfirmed?.(result);
+            return;
+          }
 
           tradeTraceStep("chain.trade_write.returned", {
             txHash: result.hash,
@@ -166,18 +194,20 @@ export function useKernelTradeWriteContract() {
           }
           setTradePhase("confirmed");
           tradeTraceStep("ux.trade_phase", { phase: "confirmed", txHash: result.hash });
+          callbacks?.onConfirmed?.(result);
         } catch (err) {
-          const error = err instanceof Error ? err : new Error(String(err));
+          const caught = err instanceof Error ? err : new Error(String(err));
           tradeBundlerLog("tradeWrite failed", {
-            message: error.message,
+            message: caught.message,
             ms: Math.round(performance.now() - t0),
           });
-          failTradeTrace("chain.trade_write.failed", error);
-          setError(error);
-          setTradePhase("failed");
-          tradeTraceStep("ux.trade_phase", { phase: "failed", message: error.message });
-        } finally {
-          tradeTraceStep("ux.isPending=false");
+          failTradeTrace("chain.trade_write.failed", caught);
+          if (isCurrent()) {
+            setError(caught);
+            setTradePhase("failed");
+            tradeTraceStep("ux.trade_phase", { phase: "failed", message: caught.message });
+          }
+          callbacks?.onFailed?.(caught);
         }
       })();
     },
@@ -190,7 +220,10 @@ export function useKernelTradeWriteContract() {
     userOpHash,
     receipt,
     tradePhase,
-    isPending,
+    isSubmitting,
+    isBackgroundConfirming,
+    /** @deprecated Prefer isSubmitting — only blocks during prepare. */
+    isPending: isSubmitting,
     reset,
     error,
   };

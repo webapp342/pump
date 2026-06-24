@@ -25,10 +25,16 @@ export type KernelSubmitResult = {
   fromBlock: bigint;
 };
 
+export type KernelSubmitOptions = {
+  /** Runs in parallel with getBlockNumber + sendUserOperation (not serial). */
+  preflight?: () => Promise<void>;
+};
+
 export async function submitKernelUserOperation(
   client: KernelAccountClient,
   publicClient: PublicClient,
-  call: KernelTransactionCall
+  call: KernelTransactionCall,
+  options?: KernelSubmitOptions
 ): Promise<KernelSubmitResult> {
   const account = client.account;
   if (!account) {
@@ -41,14 +47,27 @@ export async function submitKernelUserOperation(
     value: call.value?.toString() ?? "0",
   });
   tradeTraceStep("chain.get_block_number.start");
+  if (options?.preflight) {
+    tradeTraceStep("ux.scw_preflight.start", { parallel: true });
+  }
 
-  const [fromBlock, userOpHash] = await Promise.all([
+  const preflightP = options?.preflight?.() ?? Promise.resolve();
+
+  const [fromBlock, , userOpHash] = await Promise.all([
     publicClient.getBlockNumber().then((block) => {
       tradeTraceStep("chain.get_block_number.done", {
         block: block.toString(),
         ms: Math.round(performance.now() - parallelT0),
       });
       return block;
+    }),
+    preflightP.then(() => {
+      if (options?.preflight) {
+        tradeTraceStep("ux.scw_preflight.done", {
+          parallel: true,
+          ms: Math.round(performance.now() - parallelT0),
+        });
+      }
     }),
     getAction(client, sendUserOperation, "sendUserOperation")({
       account,
