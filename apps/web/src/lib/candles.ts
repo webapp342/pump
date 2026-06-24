@@ -671,7 +671,87 @@ export function applyActorOptimisticCandleBucket(
     return { candles: nextCandles, volumes: nextVolumes };
   }
 
+  // Gap-filled tail can extend past the trade bucket — pin the live tail for the trader.
+  if (bucketSec < last.time) {
+    return applyActorOptimisticSpotToCandles(candles, volumes, after, actor.side);
+  }
+
   return { candles, volumes };
+}
+
+export function scaleCandleBars(candles: CandleBar[], scale: number): CandleBar[] {
+  if (scale === 1) return candles;
+  return candles.map((c) => ({
+    time: c.time,
+    open: c.open * scale,
+    high: c.high * scale,
+    low: c.low * scale,
+    close: c.close * scale,
+  }));
+}
+
+/**
+ * Correct decade-scale drift between stored candles and live bonding mark (e.g. 1000×).
+ * Only rescales when tail close is ~10^n off the header mark price.
+ */
+export function reconcileCandleSeriesToLiveMark(
+  candles: CandleBar[],
+  volumes: VolumeBar[],
+  liveMarkBnb: number
+): { candles: CandleBar[]; volumes: VolumeBar[] } {
+  if (candles.length === 0 || !Number.isFinite(liveMarkBnb) || liveMarkBnb <= 0) {
+    return { candles, volumes };
+  }
+
+  const tailClose = candles[candles.length - 1]!.close;
+  if (!Number.isFinite(tailClose) || tailClose <= 0) return { candles, volumes };
+
+  const ratio = tailClose / liveMarkBnb;
+  if (!Number.isFinite(ratio) || ratio <= 0) return { candles, volumes };
+
+  const log10 = Math.log10(ratio);
+  if (Math.abs(log10) < 1.5) return { candles, volumes };
+
+  const decade = Math.round(log10);
+  const factor = Math.pow(10, decade);
+  if (factor < 10 || factor > 1_000_000) return { candles, volumes };
+
+  const tolerance = Math.max(factor * 0.12, 1);
+  const matchesHigh = Math.abs(ratio - factor) <= tolerance;
+  const matchesLow = Math.abs(ratio - 1 / factor) <= tolerance / (factor * factor);
+  if (!matchesHigh && !matchesLow) return { candles, volumes };
+
+  const scale = ratio > 1 ? 1 / factor : factor;
+  return { candles: scaleCandleBars(candles, scale), volumes };
+}
+
+/** Keep the live interval bucket aligned with header / tape mark price. */
+export function pinTailCandleToLiveMark(
+  candles: CandleBar[],
+  volumes: VolumeBar[],
+  liveMarkBnb: number,
+  interval: CandleInterval,
+  endTimeMs: number
+): { candles: CandleBar[]; volumes: VolumeBar[] } {
+  if (candles.length === 0 || !Number.isFinite(liveMarkBnb) || liveMarkBnb <= 0) {
+    return { candles, volumes };
+  }
+
+  const intervalMs = CANDLE_INTERVALS.find((i) => i.id === interval)?.ms ?? 60_000;
+  const liveBucketSec = Math.floor(endTimeMs / intervalMs) * (intervalMs / 1000);
+  const liveIdx = candles.findIndex((c) => c.time === liveBucketSec);
+  const targetIdx = liveIdx >= 0 ? liveIdx : candles.length - 1;
+  const existing = candles[targetIdx];
+  if (!existing) return { candles, volumes };
+
+  const open = existing.open;
+  const close = liveMarkBnb;
+  const high = Math.max(existing.high, open, close);
+  const low = Math.min(existing.low, open, close);
+
+  const nextCandles = candles.slice();
+  nextCandles[targetIdx] = { time: existing.time, open, high, low, close };
+  return { candles: nextCandles, volumes };
 }
 
 /**

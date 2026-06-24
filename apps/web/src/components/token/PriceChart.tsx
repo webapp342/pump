@@ -21,7 +21,10 @@ import {
   fillGapsForStoredCandles,
   formatPumpSubscriptPrice,
   mergeWsCandleUpdate,
+  pinTailCandleToLiveMark,
+  reconcileCandleSeriesToLiveMark,
   resolveChartPriceFormat,
+  scaleCandleBars,
   type ActorOptimisticChartSpot,
   type CandleBar,
   type CandleInterval,
@@ -52,6 +55,8 @@ type PriceChartProps = {
   liveCandleUpdates?: CandleWsUpdate[];
   wsConnected?: boolean;
   bnbUsd?: number | null;
+  /** Bonding-curve spot mark — same source as header / tape mark. */
+  liveMarkPriceBnb?: number | null;
   currentPriceUsd?: number | null;
   currentMcapUsd?: number | null;
   volume24hBnb?: number;
@@ -143,17 +148,6 @@ function formatUtcMs(ms: number): string {
   return `${iso.slice(0, 10)} ${iso.slice(11, 19)} UTC`;
 }
 
-function scaleCandleBars(candles: CandleBar[], scale: number): CandleBar[] {
-  if (scale === 1) return candles;
-  return candles.map((c) => ({
-    time: c.time,
-    open: c.open * scale,
-    high: c.high * scale,
-    low: c.low * scale,
-    close: c.close * scale,
-  }));
-}
-
 function scaleVolumeBars(volumes: VolumeBar[], scale: number): VolumeBar[] {
   if (scale === 1) return volumes;
   return volumes.map((v) => ({ ...v, value: v.value * scale }));
@@ -198,6 +192,18 @@ function incrementalPatchStartIndex(prev: CandleBar[], next: CandleBar[]): numbe
   return Math.max(0, Math.min(prefix, prev.length) - 1);
 }
 
+/** Force setData when OHLC values jump (e.g. decade-scale reconcile). */
+function needsFullCandleResync(prev: CandleBar[], next: CandleBar[]): boolean {
+  const n = Math.min(prev.length, next.length);
+  for (let i = Math.max(0, n - 5); i < n; i++) {
+    const p = prev[i]!.close;
+    const q = next[i]!.close;
+    if (!Number.isFinite(p) || !Number.isFinite(q) || p <= 0 || q <= 0) continue;
+    if (Math.abs(Math.log10(q / p)) > 0.08) return true;
+  }
+  return false;
+}
+
 export function PriceChart({
   tokenAddress,
   symbol,
@@ -208,6 +214,7 @@ export function PriceChart({
   liveCandleUpdates = [],
   wsConnected = false,
   bnbUsd = null,
+  liveMarkPriceBnb = null,
   currentPriceUsd = null,
   currentMcapUsd = null,
   volume24hBnb = 0,
@@ -328,6 +335,25 @@ export function PriceChart({
       }
     }
 
+    if (liveMarkPriceBnb != null && liveMarkPriceBnb > 0 && baseCandles.length > 0) {
+      const reconciled = reconcileCandleSeriesToLiveMark(
+        baseCandles,
+        baseVolumes,
+        liveMarkPriceBnb
+      );
+      baseCandles = reconciled.candles;
+      baseVolumes = reconciled.volumes;
+      const pinned = pinTailCandleToLiveMark(
+        baseCandles,
+        baseVolumes,
+        liveMarkPriceBnb,
+        timeInterval,
+        chartEndTimeMs
+      );
+      baseCandles = pinned.candles;
+      baseVolumes = pinned.volumes;
+    }
+
     if (actorOptimisticSpot) {
       return applyActorOptimisticCandleBucket(
         baseCandles,
@@ -346,6 +372,7 @@ export function PriceChart({
     timeInterval,
     candleUnitScale,
     chartEndTimeMs,
+    liveMarkPriceBnb,
     actorOptimisticSpot,
   ]);
 
@@ -673,7 +700,8 @@ export function PriceChart({
       shouldFitViewportRef.current ||
       fingerprint !== renderedFingerprintRef.current ||
       prevCandles.length === 0 ||
-      !canIncrementalChartPatch(prevCandles, nextCandles);
+      !canIncrementalChartPatch(prevCandles, nextCandles) ||
+      needsFullCandleResync(prevCandles, nextCandles);
 
     if (needsFullSet) {
       applyFullSeries();
@@ -717,6 +745,22 @@ export function PriceChart({
     currency,
     candleUnitScale,
   ]);
+
+  // Trader optimistic: paint tail bucket before React batches the main series effect.
+  useLayoutEffect(() => {
+    if (!ready || !actorOptimisticSpot || candlesForChart.length === 0) return;
+    const candleSeries = candleSeriesRef.current;
+    const volumeSeries = volumeSeriesRef.current;
+    if (!candleSeries || !volumeSeries) return;
+
+    const last = candlesForChart[candlesForChart.length - 1]!;
+    const lastVol = volumesForChart[volumesForChart.length - 1];
+    candleSeries.update(candleToChartData(last));
+    if (lastVol) volumeSeries.update(volumeToChartData(lastVol));
+    renderedCandlesRef.current = candlesForChart;
+    renderedVolumesRef.current = volumesForChart;
+    chartRef.current?.timeScale().scrollToRealTime();
+  }, [actorOptimisticSpot, candlesForChart, volumesForChart, ready]);
 
   const summaryValue =
     currency === "usd"

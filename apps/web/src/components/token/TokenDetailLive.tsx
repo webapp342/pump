@@ -354,8 +354,10 @@ export function TokenDetailLive({
           setOptimisticTrades((prev) =>
             prev.filter((t) => t.txHash.toLowerCase() !== tradeItem.txHash.toLowerCase())
           );
-          setActorChartSpot(null);
-          setIndexerSyncing(false);
+          if (payload.candleUpdates?.length) {
+            setActorChartSpot(null);
+            setIndexerSyncing(false);
+          }
           setHoldersRefreshKey((k) => k + 1);
         }
         continue;
@@ -749,6 +751,7 @@ export function TokenDetailLive({
             liveCandleUpdates={liveCandleUpdates}
             wsConnected={wsConnected}
             bnbUsd={bnbUsd}
+            liveMarkPriceBnb={displayPrice}
             currentPriceUsd={priceUsd}
             currentMcapUsd={fdvUsd}
             volume24hBnb={volume24hBnb}
