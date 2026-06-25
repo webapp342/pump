@@ -3,6 +3,7 @@ import {
   extendSeriesToLiveBucket,
   fillGapsForStoredCandles,
   mergeWsCandleUpdate,
+  pinTailCandleToLiveMark,
   sanitizeTailCandleSeries,
   scaleCandleBars,
   type ActorOptimisticChartSpot,
@@ -103,18 +104,27 @@ export type DeriveChartSeriesInput = {
   displayInterval: CandleInterval;
   priceScale: number;
   endTimeMs: number;
+  /** Live bonding-curve spot from on-chain curves() — pins live bucket close. */
+  liveOnChainSpotBnb: number | null;
   actorOptimisticSpot: ActorOptimisticChartSpot | null;
 };
 
 /**
- * Authoritative chart view: native OHLC from DB/WS, extend live tail only.
- * USD conversion happens in PriceChart formatters (nativeUsd × OHLC).
+ * Native OHLC from DB/WS + live tail pinned to on-chain spot.
+ * USD = native × nativeUsd in chart formatters only.
  */
 export function deriveChartSeries(input: DeriveChartSeriesInput): {
   candles: CandleBar[];
   volumes: VolumeBar[];
 } {
-  const { state, displayInterval, priceScale, endTimeMs, actorOptimisticSpot } = input;
+  const {
+    state,
+    displayInterval,
+    priceScale,
+    endTimeMs,
+    liveOnChainSpotBnb,
+    actorOptimisticSpot,
+  } = input;
 
   if (state.interval !== displayInterval || state.candles.length === 0) {
     return { candles: [], volumes: [] };
@@ -141,6 +151,18 @@ export function deriveChartSeries(input: DeriveChartSeriesInput): {
     );
     candles = extended.candles;
     volumes = extended.volumes;
+  }
+
+  if (liveOnChainSpotBnb != null && liveOnChainSpotBnb > 0 && !actorOptimisticSpot) {
+    const pinned = pinTailCandleToLiveMark(
+      candles,
+      volumes,
+      liveOnChainSpotBnb * priceScale,
+      displayInterval,
+      endTimeMs
+    );
+    candles = pinned.candles;
+    volumes = pinned.volumes;
   }
 
   if (actorOptimisticSpot) {

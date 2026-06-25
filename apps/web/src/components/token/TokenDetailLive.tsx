@@ -59,13 +59,17 @@ import { useLiveChannel, resolveLivePollDelay } from "@/hooks/useLiveChannel";
 import { useRafMessageQueue } from "@/hooks/useRafMessageQueue";
 import { useBondingCurveMachine } from "@/hooks/useBondingCurveMachine";
 import {
+  machineFromSnapshot,
+  machineSpotPriceBnb,
+} from "@/lib/bonding-curve-state";
+import {
   patchTokenDetailFromWsTrade,
   prependTradeIfNew,
   wsPayloadToTradeItem,
   type TokenTradeWsPayload,
 } from "@/lib/token-live-delta";
 
-const CHAIN_SANITY_POLL_MS = 30_000;
+const CHAIN_LIVE_POLL_MS = 2_000;
 const BURST_POLL_MS = 1_500;
 const BURST_DURATION_MS = 60_000;
 
@@ -286,8 +290,8 @@ export function TokenDetailLive({
     args: [tokenAddress as `0x${string}`],
     chainId: pumpChain.id,
     query: {
-      refetchInterval: hasLivePending ? BURST_POLL_MS : CHAIN_SANITY_POLL_MS,
-      staleTime: 10_000,
+      refetchInterval: hasLivePending ? BURST_POLL_MS : CHAIN_LIVE_POLL_MS,
+      staleTime: 0,
     },
   });
 
@@ -311,6 +315,12 @@ export function TokenDetailLive({
   });
 
   const tradeCurveSnapshot = liveCurveSnapshot ?? chainCurveSnapshot;
+
+  const onChainSpotBnb = useMemo(() => {
+    if (!tradeCurveSnapshot) return null;
+    const spot = machineSpotPriceBnb(machineFromSnapshot(tradeCurveSnapshot));
+    return spot > 0 ? spot : null;
+  }, [tradeCurveSnapshot]);
 
   const fetchLive = useCallback(async () => {
     try {
@@ -576,11 +586,9 @@ export function TokenDetailLive({
     })();
   }, [applyOptimisticFromReceipt, fetchLive, tokenAddress]);
 
-  const displayPrice = resolveMarkPriceBnb(
-    liveToken,
-    trades,
-    chainCurve as CurveTuple | undefined
-  );
+  const displayPrice =
+    onChainSpotBnb ??
+    resolveMarkPriceBnb(liveToken, trades, chainCurve as CurveTuple | undefined);
   const priceUsd = tokenPriceUsd(displayPrice, bnbUsd);
   const fdvUsd = estimateFdvUsd(displayPrice, bnbUsd);
   const volume24hBnb = useMemo(() => {
@@ -784,6 +792,7 @@ export function TokenDetailLive({
             liveCandleUpdates={liveCandleUpdates}
             wsConnected={wsConnected}
             bnbUsd={bnbUsd}
+            liveOnChainSpotBnb={onChainSpotBnb}
             currentPriceUsd={priceUsd}
             currentMcapUsd={fdvUsd}
             volume24hBnb={volume24hBnb}

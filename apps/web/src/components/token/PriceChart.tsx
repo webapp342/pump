@@ -65,6 +65,8 @@ type PriceChartProps = {
   liveCandleUpdates?: CandleWsUpdate[];
   wsConnected?: boolean;
   bnbUsd?: number | null;
+  /** Live on-chain bonding spot (native) — chart tail + header USD. */
+  liveOnChainSpotBnb?: number | null;
   currentPriceUsd?: number | null;
   currentMcapUsd?: number | null;
   volume24hBnb?: number;
@@ -230,6 +232,7 @@ export function PriceChart({
   liveCandleUpdates = [],
   wsConnected = false,
   bnbUsd = null,
+  liveOnChainSpotBnb = null,
   currentPriceUsd = null,
   currentMcapUsd = null,
   volume24hBnb = 0,
@@ -448,6 +451,7 @@ export function PriceChart({
         displayInterval: timeInterval,
         priceScale: candleUnitScale,
         endTimeMs: chartEndTimeMs,
+        liveOnChainSpotBnb: liveOnChainSpotBnb,
         actorOptimisticSpot: actorOptimisticSpot,
       }),
     [
@@ -455,6 +459,7 @@ export function PriceChart({
       timeInterval,
       candleUnitScale,
       chartEndTimeMs,
+      liveOnChainSpotBnb,
       actorOptimisticSpot,
     ]
   );
