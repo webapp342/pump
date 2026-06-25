@@ -55,6 +55,7 @@ export type TradePublishPayload = {
     txHash: string;
     logIndex: number;
     blockTime: string;
+    nativeUsdRate?: string;
   };
   bonding: {
     reserveZug: string;

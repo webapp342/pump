@@ -51,7 +51,8 @@ export function tradeEventToItem(
   trade: ParsedTradeEvent,
   txHash: string,
   logIndex = 0,
-  blockTimeIso?: string
+  blockTimeIso?: string,
+  nativeUsdRate?: string
 ): TradeItem {
   const native = formatEther(trade.nativeAmount);
   const fee = formatEther(trade.feeBnb);
@@ -73,6 +74,7 @@ export function tradeEventToItem(
     priceBnb: price,
     txHash: txHash.toLowerCase(),
     blockTime: blockTimeIso ?? new Date().toISOString(),
+    nativeUsdRate,
   };
 }
 
@@ -80,11 +82,12 @@ export function resolveTradeItemsFromReceipt(
   receipt: TransactionReceipt,
   txHash: string,
   expectedToken?: Address,
-  blockTimeIso?: string
+  blockTimeIso?: string,
+  nativeUsdRate?: string
 ): { items: TradeItem[]; parsed: ParsedTradeEvent[] } {
   const parsed = parseTradesFromReceipt(receipt, expectedToken);
   const items = parsed.map((trade, index) =>
-    tradeEventToItem(trade, txHash, index, blockTimeIso)
+    tradeEventToItem(trade, txHash, index, blockTimeIso, nativeUsdRate)
   );
   return { items, parsed };
 }

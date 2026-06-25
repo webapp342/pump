@@ -974,6 +974,7 @@ CREATE TABLE public.trades (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     referrer_fee_zug numeric(78,18) DEFAULT 0 NOT NULL,
     spot_price_zug numeric(78,18),
+    native_usd_rate numeric(24,8),
     CONSTRAINT trades_creator_fee_zug_check CHECK ((creator_fee_zug >= (0)::numeric)),
     CONSTRAINT trades_fee_zug_check CHECK ((fee_zug >= (0)::numeric)),
     CONSTRAINT trades_price_zug_check CHECK ((price_zug >= (0)::numeric)),
@@ -990,6 +991,13 @@ CREATE TABLE public.trades (
 --
 
 COMMENT ON COLUMN public.trades.spot_price_zug IS 'Bonding-curve marginal spot after trade (BNB per token); price_zug remains execution fill';
+
+
+--
+-- Name: COLUMN trades.native_usd_rate; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.trades.native_usd_rate IS 'Native/USD (ETH or BNB) at indexer ingest time; freezes trade tape USD columns.';
 
 
 --

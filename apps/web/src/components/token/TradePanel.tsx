@@ -239,6 +239,8 @@ export function TradePanel({
     usePermit?: boolean;
   } | null>(null);
   const { bnbUsd } = useBnbUsdPrice();
+  const optimisticNativeUsdRate =
+    bnbUsd != null && bnbUsd > 0 ? String(bnbUsd) : undefined;
   const [side, setSide] = useState<Side>("buy");
   const [buyInputMode, setBuyInputMode] = useState<TradeInputMode>("usd");
   const [sellInputMode, setSellInputMode] = useState<TradeInputMode>("usd");
@@ -1395,6 +1397,7 @@ export function TradePanel({
       tokenOutWei: gate.tokenOut,
       feeZug: gate.feeZug,
       curve: bondingCurve,
+      nativeUsdRate: optimisticNativeUsdRate,
     });
     applyInstantOptimisticUi(preview, "buy");
     queueMicrotask(() => {
@@ -1425,6 +1428,7 @@ export function TradePanel({
       zugOutWei: gate.zugOut,
       feeZug: gate.feeZug,
       curve: bondingCurve,
+      nativeUsdRate: optimisticNativeUsdRate,
     });
     applyInstantOptimisticUi(preview, "sell");
     queueMicrotask(() => {
@@ -1458,6 +1462,7 @@ export function TradePanel({
       zugOutWei: gate.zugOut,
       feeZug: gate.feeZug,
       curve: bondingCurve,
+      nativeUsdRate: optimisticNativeUsdRate,
     });
     applyInstantOptimisticUi(preview, "sell");
     queueMicrotask(() => {

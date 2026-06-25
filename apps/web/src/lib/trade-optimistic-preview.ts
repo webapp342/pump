@@ -26,6 +26,7 @@ export function buildOptimisticBuyPreview(params: {
   tokenOutWei: bigint;
   feeZug: bigint;
   curve: BondingCurveState;
+  nativeUsdRate?: string;
 }): OptimisticTradePreview {
   const netZug = params.submitValueWei - params.feeZug;
   const reserveAfter = params.curve.reserveZug + netZug;
@@ -74,6 +75,7 @@ export function buildOptimisticBuyPreview(params: {
     priceBnb: price,
     txHash: pendingTxHash,
     blockTime: new Date().toISOString(),
+    nativeUsdRate: params.nativeUsdRate,
   };
 
   return {
@@ -94,6 +96,7 @@ export function buildOptimisticSellPreview(params: {
   zugOutWei: bigint;
   feeZug: bigint;
   curve: BondingCurveState;
+  nativeUsdRate?: string;
 }): OptimisticTradePreview {
   const grossZug = params.zugOutWei + params.feeZug;
   const reserveAfter =
@@ -148,6 +151,7 @@ export function buildOptimisticSellPreview(params: {
     priceBnb: price,
     txHash: pendingTxHash,
     blockTime: new Date().toISOString(),
+    nativeUsdRate: params.nativeUsdRate,
   };
 
   return {

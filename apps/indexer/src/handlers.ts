@@ -18,6 +18,7 @@ import {
   upsertBoardStatsAfterTrade,
 } from "./board-stats.js";
 import { upsertCandlesAfterTrade } from "./candles.js";
+import { fetchIndexerNativeUsdRate } from "./native-usd.js";
 import { invalidateArenaCaches } from "./redis-cache.js";
 import { FIRST_SMART_BUY_MIN_WEI, VOLUME_MONSTER_MIN_BNB } from "./mission-thresholds.js";
 
@@ -228,6 +229,8 @@ export class LaunchpadEventHandlers {
     const markPrice =
       Number(spotPriceStr) > 0 ? spotPriceStr : executionPrice;
 
+    const nativeUsdRate = await fetchIndexerNativeUsdRate();
+
     const tradeResult = await withTransaction(this.context.launchpadPool, async (client) => {
       const inserted = await client.query<{ id: string }>(
         `
@@ -248,8 +251,9 @@ export class LaunchpadEventHandlers {
               tx_hash,
               log_index,
               block_number,
-              block_time
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+              block_time,
+              native_usd_rate
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
             ON CONFLICT (tx_hash, log_index) DO NOTHING
             RETURNING id
           )
@@ -271,7 +275,8 @@ export class LaunchpadEventHandlers {
           txHash.toLowerCase(),
           logIndex,
           log.blockNumber.toString(),
-          blockTime
+          blockTime,
+          nativeUsdRate != null && nativeUsdRate > 0 ? nativeUsdRate : null,
         ]
       );
 
@@ -376,6 +381,7 @@ export class LaunchpadEventHandlers {
         tradeId: inserted.rows[0].id,
         bonding: b,
         candleUpdates,
+        nativeUsdRate,
       };
     });
 
@@ -421,6 +427,10 @@ export class LaunchpadEventHandlers {
         txHash: txHash.toLowerCase(),
         logIndex,
         blockTime: blockTime.toISOString(),
+        nativeUsdRate:
+          tradeResult.nativeUsdRate != null && tradeResult.nativeUsdRate > 0
+            ? String(tradeResult.nativeUsdRate)
+            : undefined,
       },
       bonding: {
         reserveZug: tradeResult.bonding.reserve_zug,
@@ -468,6 +478,10 @@ export class LaunchpadEventHandlers {
           txHash: txHash.toLowerCase(),
           logIndex,
           blockTime: blockTime.toISOString(),
+          nativeUsdRate:
+            tradeResult.nativeUsdRate != null && tradeResult.nativeUsdRate > 0
+              ? String(tradeResult.nativeUsdRate)
+              : undefined,
         },
         position: {
           tokenBalance: position.token_balance,

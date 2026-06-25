@@ -464,11 +464,15 @@ export function TokenDetailLive({
         // RPC hiccup — wall clock only as last resort.
       }
 
+      const snapshotUsdRate =
+        bnbUsd != null && bnbUsd > 0 ? String(bnbUsd) : undefined;
+
       const { items, parsed } = resolveTradeItemsFromReceipt(
         payload.receipt,
         payload.txHash,
         tokenAddress as `0x${string}`,
-        blockTimeIso
+        blockTimeIso,
+        snapshotUsdRate
       );
 
       if (parsed.length > 0) {
@@ -497,7 +501,7 @@ export function TokenDetailLive({
         }
       }
     },
-    [tokenAddress, refetchCurve]
+    [tokenAddress, refetchCurve, bnbUsd]
   );
 
   const handleTradeOptimistic = useCallback(
@@ -596,6 +600,9 @@ export function TokenDetailLive({
     setIndexerSyncing(true);
 
     void (async () => {
+      const snapshotUsdRate =
+        bnbUsd != null && bnbUsd > 0 ? String(bnbUsd) : undefined;
+
       const receipts = await Promise.all(
         pending.map(async (activity) => {
           try {
@@ -631,7 +638,8 @@ export function TokenDetailLive({
           row.receipt,
           row.activity.txHash,
           tokenAddress as `0x${string}`,
-          blockTimeIso
+          blockTimeIso,
+          snapshotUsdRate
         );
         batchItems.push(...items);
         parsedTrades.push(...parsed);
@@ -652,7 +660,7 @@ export function TokenDetailLive({
 
       void fetchLive();
     })();
-  }, [fetchLive, initialTrades, refetchCurve, tokenAddress]);
+  }, [bnbUsd, fetchLive, initialTrades, refetchCurve, tokenAddress]);
 
   const displayPrice =
     onChainSpotBnb ??

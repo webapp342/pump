@@ -121,13 +121,39 @@ export function tradeFillPriceBnb(
   return Number.isFinite(stored) && stored > 0 ? stored : null;
 }
 
+export function resolveTradeNativeUsdRate(
+  snapshotRate: string | number | null | undefined,
+  liveRate: number | null | undefined
+): number | null {
+  const snap =
+    snapshotRate != null && snapshotRate !== "" ? Number(snapshotRate) : Number.NaN;
+  if (Number.isFinite(snap) && snap > 0) return snap;
+  if (liveRate != null && Number.isFinite(liveRate) && liveRate > 0) return liveRate;
+  return null;
+}
+
+export function tradeNetUsdForDisplay(
+  trade: {
+    nativeAmount: string;
+    feeBnb?: string | null;
+    netBnb?: string | null;
+    nativeUsdRate?: string | null;
+  },
+  liveBnbUsd?: number | null
+): number | null {
+  const rate = resolveTradeNativeUsdRate(trade.nativeUsdRate, liveBnbUsd);
+  if (rate == null) return null;
+  return bnbToUsd(tradeNetBnbFromParts(trade.nativeAmount, trade.feeBnb, trade.netBnb), rate);
+}
+
 export function formatTradeFillPriceUsd(
   nativeAmount: string,
   tokenAmount: string,
   bnbUsd: number | null | undefined,
   feeBnb?: string | null,
   netBnb?: string | null,
-  storedPriceBnb?: string | null
+  storedPriceBnb?: string | null,
+  nativeUsdRate?: string | null
 ): string {
   const priceBnb = tradeFillPriceBnb(
     nativeAmount,
@@ -136,8 +162,9 @@ export function formatTradeFillPriceUsd(
     netBnb,
     storedPriceBnb
   );
-  if (priceBnb == null || bnbUsd == null) return "—";
-  return formatUsdReadable(priceBnb * bnbUsd, { compact: true });
+  const rate = resolveTradeNativeUsdRate(nativeUsdRate, bnbUsd);
+  if (priceBnb == null || rate == null) return "—";
+  return formatUsdReadable(priceBnb * rate, { compact: true });
 }
 
 export function formatBnbWithUsd(

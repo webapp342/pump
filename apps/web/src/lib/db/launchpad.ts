@@ -1031,6 +1031,8 @@ export type TradeItem = {
   priceBnb: string;
   /** Bonding-curve spot after trade when indexed. */
   spotPriceBnb?: string;
+  /** Native/USD at trade time (frozen tape USD). */
+  nativeUsdRate?: string;
   txHash: string;
   blockTime: string;
 };
@@ -1145,6 +1147,7 @@ export async function listTradesForToken(
     fee_zug: string;
     token_amount: string;
     price_zug: string;
+    native_usd_rate: string | null;
     tx_hash: string;
     block_time: Date;
   }>(
@@ -1157,6 +1160,7 @@ export async function listTradesForToken(
       fee_zug::text,
       token_amount::text,
       price_zug::text,
+      native_usd_rate::text,
       tx_hash,
       block_time
     FROM trades
@@ -1180,6 +1184,7 @@ export async function listTradesForToken(
       netBnb: String(net),
       tokenAmount: row.token_amount,
       priceBnb: row.price_zug,
+      nativeUsdRate: row.native_usd_rate ?? undefined,
       txHash: row.tx_hash,
       blockTime: row.block_time.toISOString(),
     };
@@ -1263,6 +1268,7 @@ export async function listTradesForChart(address: string, limit = 5000): Promise
     token_amount: string;
     price_zug: string;
     spot_price_zug: string | null;
+    native_usd_rate: string | null;
     tx_hash: string;
     block_time: Date;
   }>(
@@ -1276,6 +1282,7 @@ export async function listTradesForChart(address: string, limit = 5000): Promise
       recent.token_amount::text,
       recent.price_zug::text,
       recent.spot_price_zug::text,
+      recent.native_usd_rate::text,
       recent.tx_hash,
       recent.block_time
     FROM (
@@ -1288,6 +1295,7 @@ export async function listTradesForChart(address: string, limit = 5000): Promise
         token_amount,
         price_zug,
         spot_price_zug,
+        native_usd_rate,
         tx_hash,
         block_time,
         block_number,
@@ -1316,6 +1324,7 @@ export async function listTradesForChart(address: string, limit = 5000): Promise
       tokenAmount: row.token_amount,
       priceBnb: row.price_zug,
       spotPriceBnb: row.spot_price_zug ?? undefined,
+      nativeUsdRate: row.native_usd_rate ?? undefined,
       txHash: row.tx_hash,
       blockTime: row.block_time.toISOString(),
     };

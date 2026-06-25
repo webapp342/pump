@@ -20,6 +20,7 @@ export type TokenTradeWsPayload = {
     txHash: string;
     logIndex?: number;
     blockTime: string;
+    nativeUsdRate?: string;
   };
   bonding?: ArenaTradeWsPayload["bonding"];
 };
@@ -58,6 +59,7 @@ export function wsPayloadToTradeItem(payload: TokenTradeWsPayload): TradeItem | 
     priceBnb: fillPriceBnbFromWsTrade(trade),
     txHash: trade.txHash.toLowerCase(),
     blockTime: trade.blockTime,
+    nativeUsdRate: trade.nativeUsdRate,
   };
 }
 

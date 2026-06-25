@@ -8,7 +8,7 @@ import { SectionHeadingIcon } from "@/components/ui/IconLabel";
 import { PctChange } from "@/components/ui/PctChange";
 import { MetricIcons } from "@/lib/metric-icons";
 import { ACTIVITY_PAGE_SIZE } from "@/lib/activity-page-size";
-import { DEFAULT_TOKEN_TOTAL_SUPPLY, bnbToUsd, formatUsdReadable, formatTradeFillPriceUsd, tradeNetBnbFromParts } from "@/lib/format-usd";
+import { DEFAULT_TOKEN_TOTAL_SUPPLY, formatUsdReadable, formatTradeFillPriceUsd, tradeNetUsdForDisplay, tradeNetBnbFromParts } from "@/lib/format-usd";
 import {
   resolveVerifiedTokenBalance,
   scaleCostBasisForBalance,
@@ -474,7 +474,7 @@ export function TradeTape({
                 {displayedTrades.map((trade) => {
                   const isBuy = trade.side === "BUY";
                   const isOptimistic = trade.id.startsWith("optimistic:");
-                  const tradeNetUsd = bnbToUsd(tradeNetBnb(trade), bnbUsd);
+                  const tradeNetUsd = tradeNetUsdForDisplay(trade, bnbUsd);
                   return (
                     <tr
                       key={trade.id}
@@ -503,7 +503,8 @@ export function TradeTape({
                           bnbUsd,
                           trade.feeBnb,
                           trade.netBnb,
-                          trade.priceBnb
+                          trade.priceBnb,
+                          trade.nativeUsdRate
                         )}
                       </td>
                       <td className={`${cellClass} text-caption text-pump-muted whitespace-nowrap`}>
