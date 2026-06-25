@@ -314,11 +314,12 @@ export const ADMIN_COPY = {
     confirmLabel: "Type WIPE PUMP DATA to enable",
     button: "Wipe application data",
     running: "Wiping…",
-    success: "Application data wiped. Indexer restart scheduled to resync from chain.",
+    success:
+      "Application data wiped. Contract registry refreshed from .env; indexer restart scheduled to resync from chain.",
     successWithWarning:
       "Data wiped, but indexer restart could not be confirmed — run systemctl restart manually if needed.",
     finalConfirm:
-      "Last chance: wipe all application data except contract registry, missions, platform settings, and admin todos?",
+      "Last chance: wipe all application data (contract registry rows are re-synced from .env addresses after wipe)?",
     indexerNote: "",
   },
 } as const;

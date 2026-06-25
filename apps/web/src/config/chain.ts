@@ -1,12 +1,12 @@
 import { defineChain } from "viem";
 
-export const CHAIN_ID = Number(process.env.NEXT_PUBLIC_CHAIN_ID ?? 97);
+export const CHAIN_ID = Number(process.env.NEXT_PUBLIC_CHAIN_ID ?? 84532);
 
 const BASE_MAINNET_CHAIN_ID = 8453;
 const BASE_SEPOLIA_CHAIN_ID = 84532;
 
 export const rpcUrl =
-  process.env.NEXT_PUBLIC_RPC_URL ?? "https://data-seed-prebsc-1-s1.binance.org:8545";
+  process.env.NEXT_PUBLIC_RPC_URL ?? "https://sepolia.base.org";
 
 function chainMeta(chainId: number): {
   name: string;
@@ -34,11 +34,11 @@ function chainMeta(chainId: number): {
     };
   }
   return {
-    name: "BSC Testnet",
-    nativeName: "BNB",
-    nativeSymbol: "BNB",
-    explorerName: "BscScan",
-    explorerUrl: "https://testnet.bscscan.com",
+    name: `Chain ${chainId}`,
+    nativeName: "Ether",
+    nativeSymbol: "ETH",
+    explorerName: "Explorer",
+    explorerUrl: "https://sepolia.basescan.org",
   };
 }
 

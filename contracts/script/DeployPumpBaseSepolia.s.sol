@@ -11,14 +11,14 @@ import {LaunchpadTreasury} from "../src/LaunchpadTreasury.sol";
 import {MemeFactory} from "../src/MemeFactory.sol";
 import {UUPSDeploy} from "./UUPSDeploy.sol";
 
-/// @notice UUPS proxy deploy for BSC testnet pump stack.
-contract DeployPumpBsc is Script {
-    uint256 internal constant BSC_TESTNET_ID = 97;
+/// @notice Fresh UUPS deploy for Base Sepolia (chain 84532).
+contract DeployPumpBaseSepolia is Script {
+    uint256 internal constant BASE_SEPOLIA_CHAIN_ID = 84532;
     uint256 internal constant VIRTUAL_ETH_RESERVE = 5 ether;
     uint256 internal constant CREATE_FEE = 0.001 ether;
 
-    string internal constant DEPLOY_FILE = "deployments/bsc-testnet-pump.json";
-    string internal constant ABI_VERSION = "pump-bsc-uups-v1";
+    string internal constant DEPLOY_FILE = "deployments/base-sepolia-launchpad.json";
+    string internal constant ABI_VERSION = "pump-base-sepolia-uups-v1";
 
     struct Deployed {
         address owner;
@@ -36,7 +36,7 @@ contract DeployPumpBsc is Script {
     }
 
     function run() external returns (Deployed memory d) {
-        require(block.chainid == BSC_TESTNET_ID, "Wrong chainId, expected BSC testnet 97");
+        require(block.chainid == BASE_SEPOLIA_CHAIN_ID, "Wrong chainId, expected Base Sepolia 84532");
 
         uint256 privateKey = vm.envUint("DEPLOYER_PRIVATE_KEY");
         address owner = vm.envAddress("LAUNCHPAD_OWNER_ADDRESS");
@@ -114,7 +114,7 @@ contract DeployPumpBsc is Script {
 
         string memory key = "pump";
         vm.serializeUint(key, "chainId", block.chainid);
-        vm.serializeString(key, "rpcUrl", "https://data-seed-prebsc-1-s1.bnbchain.org:8545");
+        vm.serializeString(key, "rpcUrl", "https://sepolia.base.org");
         vm.serializeString(key, "abiVersion", ABI_VERSION);
         vm.serializeString(key, "proxyPattern", "UUPS");
         vm.serializeAddress(key, "owner", d.owner);
@@ -134,7 +134,7 @@ contract DeployPumpBsc is Script {
 
     function _printSummary(Deployed memory d) internal view {
         console2.log("========================================");
-        console2.log(" BSC TESTNET PUMP UUPS DEPLOY");
+        console2.log(" BASE SEPOLIA PUMP UUPS DEPLOY");
         console2.log(" chainId:", block.chainid);
         console2.log(" deployer:", d.deployer);
         console2.log(" owner:", d.owner);
@@ -145,7 +145,9 @@ contract DeployPumpBsc is Script {
         console2.log(" LaunchpadLens (proxy):", d.launchpadLens);
         console2.log(" Treasury (proxy):", d.launchpadTreasury);
         console2.log(" MemeToken impl (clone):", d.memeTokenImplementation);
+        console2.log(" Virtual ETH reserve:", VIRTUAL_ETH_RESERVE);
         console2.log(" Create fee:", CREATE_FEE);
+        console2.log(" JSON:", DEPLOY_FILE);
         console2.log("========================================");
     }
 }

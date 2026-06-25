@@ -1,7 +1,3 @@
-forge-std/=../../zugchain-configuration/latest-uniswap/lib/forge-std/src/
-@uniswap/v4-core/=../../zugchain-configuration/latest-uniswap/lib/v4-core/
-@uniswap/v4-periphery/=../../zugchain-configuration/latest-uniswap/lib/v4-periphery/
-permit2/=../../zugchain-configuration/latest-uniswap/lib/permit2/
+forge-std/=lib/forge-std/src/
 @openzeppelin/contracts/=lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/
 @openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/
-solmate/=../../zugchain-configuration/latest-uniswap/lib/v4-core/lib/solmate/

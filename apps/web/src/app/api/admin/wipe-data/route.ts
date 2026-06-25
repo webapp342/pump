@@ -7,6 +7,7 @@ import {
   WIPE_PRESERVED_TABLES,
   wipeLaunchpadAppData,
 } from "@/lib/db/admin-wipe";
+import { syncContractRegistryFromEnv } from "@/lib/db/contract-registry-seed";
 import { seedIndexerStateFromEnv } from "@/lib/db/indexer-env-seed";
 
 function scheduleIndexerRestart(): void {
@@ -32,9 +33,13 @@ export async function POST(request: NextRequest) {
     }
 
     const wipeResult = await wipeLaunchpadAppData();
+    const contractRegistrySeed = await syncContractRegistryFromEnv();
     const indexerSeed = await seedIndexerStateFromEnv();
     const warnings: string[] = [];
 
+    if (!contractRegistrySeed.ok) {
+      warnings.push(contractRegistrySeed.reason);
+    }
     if (!indexerSeed.ok) {
       warnings.push(indexerSeed.reason);
     }
@@ -47,6 +52,7 @@ export async function POST(request: NextRequest) {
         preserved: [...WIPE_PRESERVED_TABLES],
         wipedBy: admin,
         wipedAt: new Date().toISOString(),
+        contractRegistrySeed,
         indexerSeed,
         indexerRestart: { scheduled: true },
         warnings,

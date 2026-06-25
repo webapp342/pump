@@ -1,7 +1,7 @@
 const ASSETS_BASE =
   (typeof process !== "undefined" && process.env?.NEXT_PUBLIC_ASSETS_BASE_URL) ||
   (typeof process !== "undefined" && process.env?.NEXT_PUBLIC_ASSETS_CDN) ||
-  "https://cdn.zugchain.org";
+  "https://assets.example.com";
 
 const CACHE_BUST =
   (typeof process !== "undefined" && process.env?.NEXT_PUBLIC_ASSETS_CACHE_BUST) || "v=1";

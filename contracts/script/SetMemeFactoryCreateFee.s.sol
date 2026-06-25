@@ -9,11 +9,11 @@ import {MemeFactory} from "../src/MemeFactory.sol";
 /// @notice Sets MemeFactory.createFee while keeping all other config unchanged.
 /// @dev Signer must be MemeFactory owner (LAUNCHPAD_OWNER_ADDRESS at deploy time).
 contract SetMemeFactoryCreateFee is Script {
-    uint256 internal constant ZUGCHAIN_ID = 824642;
+    uint256 internal constant BASE_SEPOLIA_CHAIN_ID = 84532;
     uint256 internal constant CREATE_FEE = 5 ether;
 
     function run() external {
-        require(block.chainid == ZUGCHAIN_ID, "Wrong chainId, expected 824642");
+        require(block.chainid == BASE_SEPOLIA_CHAIN_ID, "Wrong chainId, expected Base Sepolia 84532");
 
         address factoryAddress = vm.envAddress("MEME_FACTORY_ADDRESS");
         uint256 privateKey = vm.envUint("DEPLOYER_PRIVATE_KEY");

@@ -52,12 +52,9 @@ function booleanFlag(name: string, fallback: boolean): boolean {
 }
 
 function rpcUrlsFromEnv(): string[] {
-  const raw =
-    optional("BSC_RPC_URL") ??
-    optional("ZUGCHAIN_RPC_URL") ??
-    optional("RPC_URL");
+  const raw = optional("RPC_URL") ?? optional("BASE_SEPOLIA_RPC_URL");
   if (!raw) {
-    throw new Error("BSC_RPC_URL or ZUGCHAIN_RPC_URL is required");
+    throw new Error("RPC_URL or BASE_SEPOLIA_RPC_URL is required");
   }
   return raw
     .split(",")
@@ -70,7 +67,7 @@ export const config: IndexerConfig = {
   vm1MainDatabaseUrl: optional("VM1_MAIN_DB_URL"),
   rpcUrl: rpcUrlsFromEnv()[0]!,
   rpcUrls: rpcUrlsFromEnv(),
-  chainId: integer("ZUGCHAIN_CHAIN_ID", 824642),
+  chainId: integer("CHAIN_ID", 84532),
   startBlock: BigInt(integer("INDEXER_START_BLOCK", 0)),
   confirmations: BigInt(integer("INDEXER_CONFIRMATIONS", 2)),
   chunkSize: BigInt(integer("INDEXER_CHUNK_SIZE", 1_000)),
@@ -81,5 +78,5 @@ export const config: IndexerConfig = {
   redisPublishEnabled: booleanFlag("REDIS_PUBLISH_ENABLED", false),
   redisUrl: optional("REDIS_URL"),
   useWsBlocks: booleanFlag("INDEXER_USE_WS_BLOCKS", false),
-  wsRpcUrl: optional("BSC_WS_URL") ?? optional("ZUGCHAIN_WS_URL"),
+  wsRpcUrl: optional("WS_RPC_URL") ?? optional("BASE_SEPOLIA_WS_URL"),
 };

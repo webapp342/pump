@@ -49,6 +49,8 @@ RESTART IDENTITY CASCADE;
 REFRESH MATERIALIZED VIEW public.mv_token_trade_stats;
 REFRESH MATERIALIZED VIEW public.mv_token_price_anchors;
 
--- indexer_state boş kalır; Admin wipe veya INDEXER_START_BLOCK ile manuel seed
+-- indexer_state boş kalır.
+-- contract_registry: Admin wipe API re-syncs from .env (NEXT_PUBLIC_* contract addresses).
+-- Indexer cursor: set INDEXER_START_BLOCK in Indexer .env, then Admin → Wipe (seeds indexer_state).
 
 COMMIT;

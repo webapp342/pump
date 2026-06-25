@@ -7,7 +7,6 @@ script = "script"
 auto_detect_remappings = false
 solc_version = "0.8.26"
 evm_version = "cancun"
-allow_paths = ["../../zugchain-configuration/latest-uniswap/lib"]
 fs_permissions = [{ access = "read-write", path = "./" }]
 optimizer = true
 optimizer_runs = 30000

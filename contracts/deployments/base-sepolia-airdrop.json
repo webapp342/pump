@@ -1,0 +1,14 @@
+{
+  "abiVersion": "pump-airdrop-base-sepolia-v1",
+  "chainId": 84532,
+  "deployer": "0x11Ea71d1BEb04Aece4d06a585D9dbc6F58836880",
+  "deploymentBlock": 43317335,
+  "keeper": "0x11Ea71d1BEb04Aece4d06a585D9dbc6F58836880",
+  "launchpadTreasury": "0xA28A49856dE40A0418b6cF06266cbE2A0971Fc20",
+  "memeFactory": "0xaA3AC8559417D1101FfF43cF4fDdF50279C2e594",
+  "owner": "0x11Ea71d1BEb04Aece4d06a585D9dbc6F58836880",
+  "proxyPattern": "UUPS",
+  "pumpAirdropManager": "0x91E499D95835915b54e12e82df04167D52F17A49",
+  "pumpAirdropManagerImpl": "0xC8D6c527E350914dC3CE7148f34f3d970172C41f",
+  "rpcUrl": "https://sepolia.base.org"
+}

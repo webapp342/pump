@@ -544,7 +544,7 @@ export function CreateMemeForm() {
       return;
     }
     if (wrongChain) {
-      setError("Switch to BSC Testnet.");
+      setError("Switch to Base Sepolia.");
       return;
     }
     if (!name.trim() || !symbol.trim()) {
@@ -604,7 +604,7 @@ export function CreateMemeForm() {
   const submitLabel = !isConnected
     ? "Connect wallet"
     : wrongChain
-      ? "Switch to BSC Testnet"
+      ? "Switch to Base Sepolia"
       : needsBnbFunding
         ? "Add BNB to launch"
         : isBusy
@@ -968,7 +968,7 @@ export function CreateMemeForm() {
           </button>
 
           {wrongChain ? (
-            <p className="mt-3 field-hint text-pump-warning">Switch to BSC Testnet to launch.</p>
+            <p className="mt-3 field-hint text-pump-warning">Switch to Base Sepolia to launch.</p>
           ) : null}
         </section>
       </aside>

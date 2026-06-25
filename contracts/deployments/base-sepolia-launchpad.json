@@ -1,0 +1,18 @@
+{
+  "abiVersion": "pump-base-sepolia-uups-v1",
+  "bondingCurveManager": "0x0f8b0052F7750e6d481DBb447FD4b7b45ac3b615",
+  "bondingCurveManagerImpl": "0x92aCC5c7D0cdD79d0ba054bC237D6ECd10404676",
+  "chainId": 84532,
+  "deployer": "0x11Ea71d1BEb04Aece4d06a585D9dbc6F58836880",
+  "deploymentBlock": 43317245,
+  "launchpadLens": "0xd6E2a9A1a5A39947bF3a53d17F76BE8D888f2bD4",
+  "launchpadLensImpl": "0x1b5Df49232810079eC41056327c7438B06e1deD3",
+  "launchpadTreasury": "0xA28A49856dE40A0418b6cF06266cbE2A0971Fc20",
+  "launchpadTreasuryImpl": "0xb587EeCA5DB909B366bc8c60e01388783E4004D1",
+  "memeFactory": "0xaA3AC8559417D1101FfF43cF4fDdF50279C2e594",
+  "memeFactoryImpl": "0x703585eDaC0E97687f2fEdB9b0499416540902D6",
+  "memeTokenImplementation": "0x287E8EB8Fd65407CEa628721Dea5778a441ed623",
+  "owner": "0x11Ea71d1BEb04Aece4d06a585D9dbc6F58836880",
+  "proxyPattern": "UUPS",
+  "rpcUrl": "https://sepolia.base.org"
+}

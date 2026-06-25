@@ -6,7 +6,7 @@ const CACHE_MS = 30_000;
 let cache: { rate: number; fetchedAt: number; pair: string } | null = null;
 
 function nativeUsdPair(): string {
-  const chainId = Number(process.env.ZUGCHAIN_CHAIN_ID ?? process.env.CHAIN_ID ?? 97);
+  const chainId = Number(process.env.CHAIN_ID ?? 84532);
   if (chainId === 8453 || chainId === 84532) return "ETHUSDT";
   return "BNBUSDT";
 }

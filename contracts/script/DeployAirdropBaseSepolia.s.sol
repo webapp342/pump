@@ -7,14 +7,14 @@ import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.s
 
 import {PumpAirdropManager} from "../src/PumpAirdropManager.sol";
 
-/// @notice UUPS deploy for PumpAirdropManager (requires pump core deploy json).
-contract DeployAirdropBsc is Script {
-    uint256 internal constant BSC_TESTNET_ID = 97;
+/// @notice UUPS deploy for PumpAirdropManager on Base Sepolia (requires pump deploy json).
+contract DeployAirdropBaseSepolia is Script {
+    uint256 internal constant BASE_SEPOLIA_CHAIN_ID = 84532;
     uint256 internal constant CREATE_FEE = 0.001 ether;
 
-    string internal constant PUMP_DEPLOY_FILE = "deployments/bsc-testnet-pump.json";
-    string internal constant AIRDROP_DEPLOY_FILE = "deployments/bsc-testnet-airdrop.json";
-    string internal constant ABI_VERSION = "pump-airdrop-uups-v1";
+    string internal constant PUMP_DEPLOY_FILE = "deployments/base-sepolia-launchpad.json";
+    string internal constant AIRDROP_DEPLOY_FILE = "deployments/base-sepolia-airdrop.json";
+    string internal constant ABI_VERSION = "pump-airdrop-base-sepolia-v1";
 
     struct Deployed {
         address owner;
@@ -28,8 +28,8 @@ contract DeployAirdropBsc is Script {
     }
 
     function run() external returns (Deployed memory d) {
-        require(block.chainid == BSC_TESTNET_ID, "Wrong chainId, expected BSC testnet 97");
-        require(vm.exists(PUMP_DEPLOY_FILE), "Missing bsc-testnet-pump.json - deploy pump first");
+        require(block.chainid == BASE_SEPOLIA_CHAIN_ID, "Wrong chainId, expected Base Sepolia 84532");
+        require(vm.exists(PUMP_DEPLOY_FILE), "Missing base-sepolia-launchpad.json - deploy pump first");
 
         string memory pumpJson = vm.readFile(PUMP_DEPLOY_FILE);
         d.launchpadTreasury = vm.parseJsonAddress(pumpJson, ".launchpadTreasury");
@@ -67,7 +67,7 @@ contract DeployAirdropBsc is Script {
 
         string memory key = "airdrop";
         vm.serializeUint(key, "chainId", block.chainid);
-        vm.serializeString(key, "rpcUrl", "https://data-seed-prebsc-1-s1.bnbchain.org:8545");
+        vm.serializeString(key, "rpcUrl", "https://sepolia.base.org");
         vm.serializeString(key, "abiVersion", ABI_VERSION);
         vm.serializeString(key, "proxyPattern", "UUPS");
         vm.serializeAddress(key, "owner", d.owner);
@@ -83,7 +83,7 @@ contract DeployAirdropBsc is Script {
 
     function _printSummary(Deployed memory d) internal view {
         console2.log("========================================");
-        console2.log(" BSC TESTNET AIRDROP UUPS DEPLOY");
+        console2.log(" BASE SEPOLIA AIRDROP UUPS DEPLOY");
         console2.log(" chainId:", block.chainid);
         console2.log(" deployer:", d.deployer);
         console2.log(" owner/admin:", d.owner);
@@ -91,7 +91,7 @@ contract DeployAirdropBsc is Script {
         console2.log(" deploymentBlock:", d.deploymentBlock);
         console2.log("========================================");
         console2.log(" PumpAirdropManager (proxy):", d.pumpAirdropManager);
-        console2.log(" Create fee:", CREATE_FEE);
+        console2.log(" JSON:", AIRDROP_DEPLOY_FILE);
         console2.log("========================================");
     }
 }

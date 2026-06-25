@@ -121,7 +121,7 @@ export class LaunchpadEventHandlers {
       `,
       [
         token,
-        Number(process.env.ZUGCHAIN_CHAIN_ID ?? 824642),
+        Number(process.env.CHAIN_ID ?? 84532),
         creator,
         asString(log.args.name),
         asString(log.args.symbol),
