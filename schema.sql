@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict WzcLHPa4fRxXUOfw5IWhGa89LruO3oghrsyYT62I9glPgVJwezE0lyKjA40i9Kt
+\restrict XF05QzCGgcAXJESMjhUBkYiBlH6xUfdWGh3YIYFZaLXLs1MuA5YVCCdIBqP0G5A
 
 -- Dumped from database version 16.14 (Ubuntu 16.14-0ubuntu0.24.04.1)
 -- Dumped by pg_dump version 16.14 (Ubuntu 16.14-0ubuntu0.24.04.1)
@@ -590,7 +590,7 @@ CREATE TABLE public.bonding_states (
     holder_count integer DEFAULT 0 NOT NULL,
     trade_count integer DEFAULT 0 NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    virtual_zug_reserve numeric(78,18) DEFAULT 5 NOT NULL,
+    virtual_zug_reserve numeric(78,18) DEFAULT 5000 NOT NULL,
     virtual_token_reserve numeric(78,18) DEFAULT 1000000000 NOT NULL,
     CONSTRAINT bonding_states_progress_bps_check CHECK (((progress_bps >= 0) AND (progress_bps <= 10000)))
 );
@@ -1210,15 +1210,29 @@ CREATE TABLE public.token_candles (
     volume_zug numeric DEFAULT 0 NOT NULL,
     buy_volume_zug numeric DEFAULT 0 NOT NULL,
     trade_count integer DEFAULT 0 NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
     close_usd numeric(38,18),
     native_usd_rate numeric(24,8),
-    updated_at timestamp with time zone DEFAULT now() NOT NULL,
     CONSTRAINT token_candles_address_check CHECK ((token_address = lower(token_address))),
     CONSTRAINT token_candles_interval_check CHECK ((candle_interval = ANY (ARRAY['15s'::text, '1m'::text, '5m'::text, '15m'::text, '1h'::text, '4h'::text]))),
     CONSTRAINT token_candles_ohlc_check CHECK (((open_zug >= (0)::numeric) AND (high_zug >= (0)::numeric) AND (low_zug >= (0)::numeric) AND (close_zug >= (0)::numeric) AND (high_zug >= low_zug))),
     CONSTRAINT token_candles_trade_count_check CHECK ((trade_count >= 0)),
     CONSTRAINT token_candles_volume_check CHECK (((volume_zug >= (0)::numeric) AND (buy_volume_zug >= (0)::numeric) AND (buy_volume_zug <= volume_zug)))
 );
+
+
+--
+-- Name: COLUMN token_candles.close_usd; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.token_candles.close_usd IS 'USD spot close at last trade in bucket (close_zug * native_usd_rate). Gap bars: compute at read time.';
+
+
+--
+-- Name: COLUMN token_candles.native_usd_rate; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.token_candles.native_usd_rate IS 'BNB/ETH USDT rate when bucket was last updated by indexer';
 
 
 --
@@ -2403,5 +2417,5 @@ ALTER TABLE ONLY public.user_positions
 -- PostgreSQL database dump complete
 --
 
-\unrestrict WzcLHPa4fRxXUOfw5IWhGa89LruO3oghrsyYT62I9glPgVJwezE0lyKjA40i9Kt
+\unrestrict XF05QzCGgcAXJESMjhUBkYiBlH6xUfdWGh3YIYFZaLXLs1MuA5YVCCdIBqP0G5A
 

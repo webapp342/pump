@@ -23,16 +23,18 @@ import {
 import { useBnbUsdPrice } from "@/hooks/useBnbUsdPrice";
 import {
   applyTradeToToken,
-  parseTradesFromReceipt,
+  blockTimeIsoFromUnixSeconds,
+  resolveTradeItemsFromReceipt,
   tokenFromCurve,
-  tradeEventToItem,
   type CurveTuple,
+  type ParsedTradeEvent,
 } from "@/lib/launchpad-events";
 import {
   mergeTrades,
   MISSION_KEYS,
   listRecentOptimisticActivities,
   pushOptimisticActivity,
+  removeOptimisticActivities,
 } from "@/lib/optimistic-activity";
 import { contracts, pumpChain, shortAddress } from "@/config/chain";
 import { TradePanel, type TradeConfirmedPayload, type TradeOptimisticPayload, type TradeSubmittedPayload } from "@/components/token/TradePanel";
@@ -281,6 +283,12 @@ export function TokenDetailLive({
     [dbTrades, optimisticTrades]
   );
 
+  /** Chart history from DB when indexed; optimistic only while indexer lags. */
+  const chartFallbackTrades = useMemo(
+    () => (dbTrades.length > 0 ? dbTrades : trades),
+    [dbTrades, trades]
+  );
+
   const hasLivePending = optimisticTrades.length > 0 || indexerSyncing;
 
   const { data: chainCurve, refetch: refetchCurve } = useReadContract({
@@ -335,6 +343,8 @@ export function TokenDetailLive({
       const stillPending = optimisticRef.current.some(
         (t) => !dbHashes.has(t.txHash.toLowerCase())
       );
+
+      removeOptimisticActivities(body.data.trades.map((t) => t.txHash));
 
       setDbTrades(body.data.trades);
       setOptimisticTrades((prev) =>
@@ -444,15 +454,24 @@ export function TokenDetailLive({
 
   const applyOptimisticFromReceipt = useCallback(
     async (payload: TradeConfirmedPayload) => {
-      const parsed = parseTradesFromReceipt(
+      let blockTimeIso: string | undefined;
+      try {
+        const block = await publicClient.getBlock({
+          blockNumber: payload.receipt.blockNumber,
+        });
+        blockTimeIso = blockTimeIsoFromUnixSeconds(block.timestamp);
+      } catch {
+        // RPC hiccup — wall clock only as last resort.
+      }
+
+      const { items, parsed } = resolveTradeItemsFromReceipt(
         payload.receipt,
-        tokenAddress as `0x${string}`
+        payload.txHash,
+        tokenAddress as `0x${string}`,
+        blockTimeIso
       );
 
       if (parsed.length > 0) {
-        const items = parsed.map((trade, index) =>
-          tradeEventToItem(trade, payload.txHash, index)
-        );
         setOptimisticTrades((prev) => {
           const without = prev.filter(
             (t) => t.txHash.toLowerCase() !== payload.txHash.toLowerCase()
@@ -556,10 +575,19 @@ export function TokenDetailLive({
     if (hydratedRef.current) return;
     hydratedRef.current = true;
 
+    if (initialTrades.length > 0) {
+      removeOptimisticActivities(initialTrades.map((t) => t.txHash));
+    }
+
+    const knownHashes = new Set(
+      initialTrades.map((t) => t.txHash.toLowerCase())
+    );
+
     const pending = listRecentOptimisticActivities().filter(
       (activity) =>
         activity.tokenAddress?.toLowerCase() === tokenAddress.toLowerCase() &&
-        (activity.type === "create" || activity.type === "buy" || activity.type === "sell")
+        (activity.type === "create" || activity.type === "buy" || activity.type === "sell") &&
+        !knownHashes.has(activity.txHash.toLowerCase())
     );
 
     if (pending.length === 0) return;
@@ -568,23 +596,63 @@ export function TokenDetailLive({
     setIndexerSyncing(true);
 
     void (async () => {
-      for (const activity of pending) {
+      const receipts = await Promise.all(
+        pending.map(async (activity) => {
+          try {
+            const receipt = await publicClient.getTransactionReceipt({
+              hash: activity.txHash as `0x${string}`,
+            });
+            return { activity, receipt };
+          } catch {
+            return null;
+          }
+        })
+      );
+
+      const batchItems: TradeItem[] = [];
+      const parsedTrades: ParsedTradeEvent[] = [];
+      const dropHashes = new Set<string>();
+
+      for (const row of receipts) {
+        if (!row) continue;
+        dropHashes.add(row.activity.txHash.toLowerCase());
+
+        let blockTimeIso: string | undefined;
         try {
-          const receipt = await publicClient.getTransactionReceipt({
-            hash: activity.txHash as `0x${string}`,
+          const block = await publicClient.getBlock({
+            blockNumber: row.receipt.blockNumber,
           });
-          await applyOptimisticFromReceipt({
-            txHash: activity.txHash,
-            side: activity.type === "sell" ? "sell" : "buy",
-            receipt,
-          });
+          blockTimeIso = blockTimeIsoFromUnixSeconds(block.timestamp);
         } catch {
-          // DB polling will catch up.
+          // wall clock fallback inside tradeEventToItem
         }
+
+        const { items, parsed } = resolveTradeItemsFromReceipt(
+          row.receipt,
+          row.activity.txHash,
+          tokenAddress as `0x${string}`,
+          blockTimeIso
+        );
+        batchItems.push(...items);
+        parsedTrades.push(...parsed);
       }
+
+      if (batchItems.length > 0) {
+        setOptimisticTrades((prev) => {
+          const without = prev.filter(
+            (t) => !dropHashes.has(t.txHash.toLowerCase())
+          );
+          return [...batchItems, ...without];
+        });
+        setToken((prev) =>
+          parsedTrades.reduce((next, trade) => applyTradeToToken(next, trade), prev)
+        );
+        void refetchCurve();
+      }
+
       void fetchLive();
     })();
-  }, [applyOptimisticFromReceipt, fetchLive, tokenAddress]);
+  }, [fetchLive, initialTrades, refetchCurve, tokenAddress]);
 
   const displayPrice =
     onChainSpotBnb ??
@@ -790,7 +858,7 @@ export function TokenDetailLive({
             actorOptimisticSpot={actorChartSpot}
             curveSnapshot={tradeCurveSnapshot}
             liveCandleUpdates={liveCandleUpdates}
-            fallbackTrades={trades}
+            fallbackTrades={chartFallbackTrades}
             wsConnected={wsConnected}
             bnbUsd={bnbUsd}
             liveOnChainSpotBnb={onChainSpotBnb}

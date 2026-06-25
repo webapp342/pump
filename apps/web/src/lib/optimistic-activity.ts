@@ -57,6 +57,15 @@ export function listRecentOptimisticActivities(maxAgeMs = MAX_AGE_MS): Optimisti
   return readAll().filter((item) => new Date(item.at).getTime() >= cutoff);
 }
 
+/** Drop activities once indexer / DB has the trade (stops refresh re-hydrate). */
+export function removeOptimisticActivities(txHashes: string[]): void {
+  if (txHashes.length === 0) return;
+  const drop = new Set(txHashes.map((h) => h.toLowerCase()));
+  const next = readAll().filter((item) => !drop.has(item.txHash.toLowerCase()));
+  if (next.length === readAll().length) return;
+  writeAll(next);
+}
+
 export function listPendingMissionKeys(): string[] {
   const keys = new Set<string>();
   for (const activity of listRecentOptimisticActivities()) {
