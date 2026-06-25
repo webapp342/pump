@@ -69,3 +69,10 @@ Tape after confirm: $0.103   ← fill (can differ within slippage bps)
 
 - WS `bonding.marketCapZug` **kullanma** — `spot × 1B supply` hesapla (`arena-live-delta.ts`).
 - DB `last_price_zug` = spot (indexer); execution `price_zug` sadece `trades` tablosunda.
+
+## Chart USD
+
+- Mumlar **native** (token/ETH veya token/BNB) saklanır; USD sadece formatter (`ohlc × nativeUsd`).
+- ETH/USD oracle değişince işlem olmasa bile USD chart yukarı/aşağı kayar — doğru davranış.
+- Kontrata idle poll **yapma**; native spot trade dışında değişmez.
+- Gap mumları: SQL `gap_fill_candles` + client `extendSeriesToLiveBucket` only.

@@ -483,7 +483,7 @@ export function fillGapsForStoredCandles(
       continue;
     }
     if (lastClose == null) continue;
-    // Always carry forward last close — pump.fun flat line. Live mark sync is pinTail only.
+    // Always carry forward last close — pump.fun flat line between trades.
     const flat = coherentGapClose(lastClose, anchorPrice);
     nextCandles.push({
       time: t,
@@ -498,6 +498,46 @@ export function fillGapsForStoredCandles(
       color: volumeBarColor(0, 0),
     });
     lastClose = flat;
+  }
+
+  return { candles: nextCandles, volumes: nextVolumes };
+}
+
+/**
+ * Append flat native buckets from the last candle through the live interval bucket.
+ * Lightweight alternative to full gap-fill when SQL/API already delivered a dense series.
+ */
+export function extendSeriesToLiveBucket(
+  candles: CandleBar[],
+  volumes: VolumeBar[],
+  interval: CandleInterval,
+  endTimeMs: number
+): { candles: CandleBar[]; volumes: VolumeBar[] } {
+  if (candles.length === 0) return { candles, volumes };
+
+  const intervalMs = CANDLE_INTERVALS.find((i) => i.id === interval)?.ms ?? 60_000;
+  const intervalSec = intervalMs / 1000;
+  const liveBucketSec = Math.floor(endTimeMs / intervalMs) * (intervalMs / 1000);
+  const last = candles[candles.length - 1]!;
+  if (last.time >= liveBucketSec) return { candles, volumes };
+
+  const lastClose = last.close;
+  const nextCandles = candles.slice();
+  const nextVolumes = volumes.slice();
+
+  for (let t = last.time + intervalSec; t <= liveBucketSec; t += intervalSec) {
+    nextCandles.push({
+      time: t,
+      open: lastClose,
+      high: lastClose,
+      low: lastClose,
+      close: lastClose,
+    });
+    nextVolumes.push({
+      time: t,
+      value: 0,
+      color: volumeBarColor(0, 0),
+    });
   }
 
   return { candles: nextCandles, volumes: nextVolumes };
@@ -911,11 +951,6 @@ export function pinTailCandleToLiveMark(
   if (!existing) return { candles, volumes };
 
   const bucketVolume = volumes[targetIdx]?.value ?? 0;
-  if (bucketVolume <= 0) {
-    // Gap-fill already carried last trade close forward — do not jump to live mark.
-    return { candles, volumes };
-  }
-
   const isLiveBucket = existing.time === liveBucketSec;
   if (!isLiveBucket) {
     return { candles, volumes };
@@ -923,7 +958,9 @@ export function pinTailCandleToLiveMark(
 
   const priorClose = targetIdx > 0 ? candles[targetIdx - 1]!.close : undefined;
   const close = liveMarkBnb;
-  const open = coherentOpenForBar(existing.open, close, priorClose);
+  const openSeed =
+    bucketVolume > 0 ? existing.open : (priorClose ?? existing.open);
+  const open = coherentOpenForBar(openSeed, close, priorClose);
   const nextCandles = candles.slice();
   nextCandles[targetIdx] = sanitizeCandleOhlc(
     {

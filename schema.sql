@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict HscpKehgjhtqttQXp9YN3FNTkOopte5EKf1TCtfC10fEsJyWQfmhHy0Nvyq7aeK
+\restrict WzcLHPa4fRxXUOfw5IWhGa89LruO3oghrsyYT62I9glPgVJwezE0lyKjA40i9Kt
 
 -- Dumped from database version 16.14 (Ubuntu 16.14-0ubuntu0.24.04.1)
 -- Dumped by pg_dump version 16.14 (Ubuntu 16.14-0ubuntu0.24.04.1)
@@ -1210,6 +1210,8 @@ CREATE TABLE public.token_candles (
     volume_zug numeric DEFAULT 0 NOT NULL,
     buy_volume_zug numeric DEFAULT 0 NOT NULL,
     trade_count integer DEFAULT 0 NOT NULL,
+    close_usd numeric(38,18),
+    native_usd_rate numeric(24,8),
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     CONSTRAINT token_candles_address_check CHECK ((token_address = lower(token_address))),
     CONSTRAINT token_candles_interval_check CHECK ((candle_interval = ANY (ARRAY['15s'::text, '1m'::text, '5m'::text, '15m'::text, '1h'::text, '4h'::text]))),
@@ -2401,5 +2403,5 @@ ALTER TABLE ONLY public.user_positions
 -- PostgreSQL database dump complete
 --
 
-\unrestrict HscpKehgjhtqttQXp9YN3FNTkOopte5EKf1TCtfC10fEsJyWQfmhHy0Nvyq7aeK
+\unrestrict WzcLHPa4fRxXUOfw5IWhGa89LruO3oghrsyYT62I9glPgVJwezE0lyKjA40i9Kt
 

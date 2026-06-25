@@ -15,6 +15,7 @@ import {
   listTokenCandlesGapFilledFromDb,
   listTradesForChart,
 } from "@/lib/db/launchpad";
+import { readCandleCache, writeCandleCache } from "@/lib/redis/candle-cache";
 
 type RouteContext = { params: Promise<{ address: string }> };
 
@@ -37,6 +38,30 @@ export async function GET(request: NextRequest, context: RouteContext) {
     const token = await getTokenByAddress(address);
     if (!token) {
       return NextResponse.json({ error: "Token not found" }, { status: 404 });
+    }
+
+    const cached = await readCandleCache(address, interval);
+    if (cached && Date.now() - cached.cachedAt < 5_000) {
+      return NextResponse.json(
+        {
+          data: {
+            candles: cached.candles,
+            volumes: cached.volumes,
+            interval: cached.interval,
+            source: cached.source,
+            gapFilled: cached.gapFilled,
+            gapFill: cached.gapFill,
+            cached: true,
+            frozen: false,
+            status: token.status,
+          },
+        },
+        {
+          headers: {
+            "Cache-Control": "private, max-age=2, stale-while-revalidate=5",
+          },
+        }
+      );
     }
 
     const stored = await listTokenCandlesFromDb(address, interval, limit);
@@ -70,20 +95,29 @@ export async function GET(request: NextRequest, context: RouteContext) {
         gapFill = "ts";
       }
 
+      const payload = {
+        candles,
+        volumes,
+        interval,
+        source: "db" as const,
+        gapFilled: true,
+        gapFill,
+        bucketCount: stored.length,
+        frozen: false,
+        status: token.status,
+      };
+
+      void writeCandleCache(address, interval, {
+        candles,
+        volumes,
+        interval,
+        source: "db",
+        gapFilled: true,
+        gapFill,
+      });
+
       return NextResponse.json(
-        {
-          data: {
-            candles,
-            volumes,
-            interval,
-            source: "db" as const,
-            gapFilled: true,
-            gapFill,
-            bucketCount: stored.length,
-            frozen: false,
-            status: token.status,
-          },
-        },
+        { data: payload },
         {
           headers: {
             "Cache-Control": "private, max-age=2, stale-while-revalidate=5",

@@ -21,7 +21,7 @@ type CachedNativeUsd = {
   fetchedAt: number;
 };
 
-const CACHE_MS = 30_000;
+const CACHE_MS = 2_000;
 let cache: CachedNativeUsd | null = null;
 
 /** Resolve Binance spot pair for the configured chain's native currency. */

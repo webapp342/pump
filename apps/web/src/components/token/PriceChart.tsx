@@ -65,8 +65,6 @@ type PriceChartProps = {
   liveCandleUpdates?: CandleWsUpdate[];
   wsConnected?: boolean;
   bnbUsd?: number | null;
-  /** Bonding-curve spot mark — same source as header / tape mark. */
-  liveMarkPriceBnb?: number | null;
   currentPriceUsd?: number | null;
   currentMcapUsd?: number | null;
   volume24hBnb?: number;
@@ -232,7 +230,6 @@ export function PriceChart({
   liveCandleUpdates = [],
   wsConnected = false,
   bnbUsd = null,
-  liveMarkPriceBnb = null,
   currentPriceUsd = null,
   currentMcapUsd = null,
   volume24hBnb = 0,
@@ -413,7 +410,7 @@ export function PriceChart({
 
   useEffect(() => {
     if (frozen) return;
-    const tickMs = actorOptimisticSpot ? 1_000 : 15_000;
+    const tickMs = actorOptimisticSpot ? 1_000 : 2_000;
     const timer = setInterval(() => setNowMs(Date.now()), tickMs);
     return () => clearInterval(timer);
   }, [frozen, actorOptimisticSpot]);
@@ -451,7 +448,6 @@ export function PriceChart({
         displayInterval: timeInterval,
         priceScale: candleUnitScale,
         endTimeMs: chartEndTimeMs,
-        liveMarkPriceBnb: liveMarkPriceBnb,
         actorOptimisticSpot: actorOptimisticSpot,
       }),
     [
@@ -459,7 +455,6 @@ export function PriceChart({
       timeInterval,
       candleUnitScale,
       chartEndTimeMs,
-      liveMarkPriceBnb,
       actorOptimisticSpot,
     ]
   );

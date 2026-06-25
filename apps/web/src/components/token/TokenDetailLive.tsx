@@ -65,7 +65,7 @@ import {
   type TokenTradeWsPayload,
 } from "@/lib/token-live-delta";
 
-const POLL_MS = 4_000;
+const CHAIN_SANITY_POLL_MS = 30_000;
 const BURST_POLL_MS = 1_500;
 const BURST_DURATION_MS = 60_000;
 
@@ -286,7 +286,8 @@ export function TokenDetailLive({
     args: [tokenAddress as `0x${string}`],
     chainId: pumpChain.id,
     query: {
-      refetchInterval: hasLivePending ? BURST_POLL_MS : POLL_MS,
+      refetchInterval: hasLivePending ? BURST_POLL_MS : CHAIN_SANITY_POLL_MS,
+      staleTime: 10_000,
     },
   });
 
@@ -783,7 +784,6 @@ export function TokenDetailLive({
             liveCandleUpdates={liveCandleUpdates}
             wsConnected={wsConnected}
             bnbUsd={bnbUsd}
-            liveMarkPriceBnb={displayPrice}
             currentPriceUsd={priceUsd}
             currentMcapUsd={fdvUsd}
             volume24hBnb={volume24hBnb}

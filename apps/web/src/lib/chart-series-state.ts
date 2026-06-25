@@ -1,10 +1,8 @@
 import {
   applyActorOptimisticCandleBucket,
+  extendSeriesToLiveBucket,
   fillGapsForStoredCandles,
   mergeWsCandleUpdate,
-  pinTailCandleToLiveMark,
-  reconcileCandleSeriesToLiveMark,
-  sanitizeCandleSeries,
   sanitizeTailCandleSeries,
   scaleCandleBars,
   type ActorOptimisticChartSpot,
@@ -20,7 +18,7 @@ export type ChartSeriesState = {
   volumes: VolumeBar[];
   source: StoredCandleSource;
   interval: CandleInterval | null;
-  /** API already ran gap-fill (db path) — skip client regap. */
+  /** API/SQL already gap-filled — client must not regap. */
   gapFilledByApi: boolean;
 };
 
@@ -48,35 +46,11 @@ export type ChartSeriesAction =
       priceScale: number;
     }
   | {
-      type: "apply_live";
-      liveMarkBnb: number;
-      interval: CandleInterval;
-      endTimeMs: number;
-      priceScale: number;
-    }
-  | {
       type: "apply_actor";
       actor: ActorOptimisticChartSpot;
       interval: CandleInterval;
       priceScale: number;
     };
-
-function gapFillChartSeries(
-  candles: CandleBar[],
-  volumes: VolumeBar[],
-  interval: CandleInterval,
-  endTimeMs: number,
-  _gapFilledByApi: boolean,
-  anchorPrice?: number
-): { candles: CandleBar[]; volumes: VolumeBar[] } {
-  if (candles.length === 0) return { candles, volumes };
-  // Always regap on derive — WS tail merges can reintroduce temporal holes even when
-  // the REST payload was marked gapFilled.
-  return fillGapsForStoredCandles(candles, volumes, interval, {
-    endTimeMs,
-    anchorPrice,
-  });
-}
 
 export function chartSeriesReducer(
   state: ChartSeriesState,
@@ -85,21 +59,14 @@ export function chartSeriesReducer(
   switch (action.type) {
     case "reset":
       return initialChartSeriesState;
-    case "set_fetched": {
-      const gapFilled = fillGapsForStoredCandles(
-        action.candles,
-        action.volumes,
-        action.interval,
-        { endTimeMs: Date.now() }
-      );
+    case "set_fetched":
       return {
-        candles: gapFilled.candles,
-        volumes: gapFilled.volumes,
+        candles: action.candles,
+        volumes: action.volumes,
         source: action.source,
         interval: action.interval,
-        gapFilledByApi: true,
+        gapFilledByApi: action.gapFilledByApi ?? action.source === "db",
       };
-    }
     case "merge_ws": {
       if (state.source !== "db" || state.candles.length === 0) return state;
       const merged = mergeWsCandleUpdate(
@@ -108,42 +75,7 @@ export function chartSeriesReducer(
         action.update,
         action.priceScale
       );
-      const gapFilled = fillGapsForStoredCandles(
-        merged.candles,
-        merged.volumes,
-        action.update.interval,
-        { endTimeMs: Date.now() }
-      );
-      return {
-        ...state,
-        candles: gapFilled.candles,
-        volumes: gapFilled.volumes,
-      };
-    }
-    case "apply_live": {
-      if (state.candles.length === 0) return state;
-      const gapFilled = gapFillChartSeries(
-        state.candles,
-        state.volumes,
-        action.interval,
-        action.endTimeMs,
-        state.gapFilledByApi
-      );
-      const pinned = pinTailCandleToLiveMark(
-        gapFilled.candles,
-        gapFilled.volumes,
-        action.liveMarkBnb,
-        action.interval,
-        action.endTimeMs
-      );
-      return {
-        ...state,
-        candles: sanitizeTailCandleSeries(
-          pinned.candles,
-          action.liveMarkBnb * action.priceScale
-        ),
-        volumes: pinned.volumes,
-      };
+      return { ...state, candles: merged.candles, volumes: merged.volumes };
     }
     case "apply_actor": {
       if (state.candles.length === 0) return state;
@@ -157,7 +89,7 @@ export function chartSeriesReducer(
       const anchor = action.actor.spotAfterBnb * action.priceScale;
       return {
         ...state,
-        candles: sanitizeCandleSeries(patched.candles, anchor),
+        candles: sanitizeTailCandleSeries(patched.candles, anchor),
         volumes: patched.volumes,
       };
     }
@@ -171,23 +103,18 @@ export type DeriveChartSeriesInput = {
   displayInterval: CandleInterval;
   priceScale: number;
   endTimeMs: number;
-  liveMarkPriceBnb: number | null;
   actorOptimisticSpot: ActorOptimisticChartSpot | null;
 };
 
-/** Scale + live mark + actor optimistic — single derived view for the chart. */
+/**
+ * Authoritative chart view: native OHLC from DB/WS, extend live tail only.
+ * USD conversion happens in PriceChart formatters (nativeUsd × OHLC).
+ */
 export function deriveChartSeries(input: DeriveChartSeriesInput): {
   candles: CandleBar[];
   volumes: VolumeBar[];
 } {
-  const {
-    state,
-    displayInterval,
-    priceScale,
-    endTimeMs,
-    liveMarkPriceBnb,
-    actorOptimisticSpot,
-  } = input;
+  const { state, displayInterval, priceScale, endTimeMs, actorOptimisticSpot } = input;
 
   if (state.interval !== displayInterval || state.candles.length === 0) {
     return { candles: [], volumes: [] };
@@ -199,38 +126,21 @@ export function deriveChartSeries(input: DeriveChartSeriesInput): {
       ? state.volumes
       : state.volumes.map((v) => ({ ...v, value: v.value * priceScale }));
 
-  const scaledMark =
-    liveMarkPriceBnb != null && liveMarkPriceBnb > 0
-      ? liveMarkPriceBnb * priceScale
-      : null;
-
-  // Gap-fill first — continuous flat line at last trade close through now.
-  const gapFilled = gapFillChartSeries(
-    candles,
-    volumes,
-    displayInterval,
-    endTimeMs,
-    state.gapFilledByApi
-  );
-  candles = gapFilled.candles;
-  volumes = gapFilled.volumes;
-
-  if (scaledMark != null) {
-    const reconciled = reconcileCandleSeriesToLiveMark(candles, volumes, scaledMark);
-    candles = reconciled.candles;
-    volumes = reconciled.volumes;
-  }
-
-  if (liveMarkPriceBnb != null && liveMarkPriceBnb > 0) {
-    const pinned = pinTailCandleToLiveMark(
+  if (!state.gapFilledByApi && state.source === "trades") {
+    const filled = fillGapsForStoredCandles(candles, volumes, displayInterval, {
+      endTimeMs,
+    });
+    candles = filled.candles;
+    volumes = filled.volumes;
+  } else {
+    const extended = extendSeriesToLiveBucket(
       candles,
       volumes,
-      liveMarkPriceBnb * priceScale,
       displayInterval,
       endTimeMs
     );
-    candles = pinned.candles;
-    volumes = pinned.volumes;
+    candles = extended.candles;
+    volumes = extended.volumes;
   }
 
   if (actorOptimisticSpot) {
@@ -243,18 +153,8 @@ export function deriveChartSeries(input: DeriveChartSeriesInput): {
     );
     const anchor = actorOptimisticSpot.spotAfterBnb * priceScale;
     return {
-      candles:
-        scaledMark != null
-          ? sanitizeCandleSeries(patched.candles, anchor)
-          : sanitizeTailCandleSeries(patched.candles, anchor),
+      candles: sanitizeTailCandleSeries(patched.candles, anchor),
       volumes: patched.volumes,
-    };
-  }
-
-  if (scaledMark != null) {
-    return {
-      candles: sanitizeTailCandleSeries(candles, scaledMark),
-      volumes,
     };
   }
 
@@ -279,14 +179,13 @@ export function canSafeIncrementalUpdate(prev: CandleBar[], next: CandleBar[]): 
   return prev.length === 1 || prev[prev.length - 2]!.time === next[next.length - 2]!.time;
 }
 
-/** Force setData when OHLC values jump (e.g. decade-scale reconcile). */
+/** Force setData when consecutive buckets skip interval steps. */
 export function needsFullCandleResync(prev: CandleBar[], next: CandleBar[]): boolean {
+  if (prev.length === 0 || next.length === 0) return true;
+  if (next.length < prev.length) return true;
   const n = Math.min(prev.length, next.length);
-  for (let i = Math.max(0, n - 5); i < n; i++) {
-    const p = prev[i]!.close;
-    const q = next[i]!.close;
-    if (!Number.isFinite(p) || !Number.isFinite(q) || p <= 0 || q <= 0) continue;
-    if (Math.abs(Math.log10(q / p)) > 0.08) return true;
+  for (let i = 1; i < n; i++) {
+    if (prev[i]!.time !== next[i]!.time) return true;
   }
   return false;
 }
