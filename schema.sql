@@ -590,7 +590,7 @@ CREATE TABLE public.bonding_states (
     holder_count integer DEFAULT 0 NOT NULL,
     trade_count integer DEFAULT 0 NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    virtual_zug_reserve numeric(78,18) DEFAULT 5000 NOT NULL,
+    virtual_zug_reserve numeric(78,18) DEFAULT 5 NOT NULL,
     virtual_token_reserve numeric(78,18) DEFAULT 1000000000 NOT NULL,
     CONSTRAINT bonding_states_progress_bps_check CHECK (((progress_bps >= 0) AND (progress_bps <= 10000)))
 );

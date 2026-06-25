@@ -23,8 +23,7 @@ contract SetMemeFactoryCreateFee is Script {
         address treasury = factory.treasury();
         address bondingCurveManager = address(factory.bondingCurveManager());
         uint256 defaultTotalSupply = factory.defaultTotalSupply();
-        uint256 defaultTargetZug = factory.defaultTargetZug();
-        uint256 defaultVirtualZugReserve = factory.defaultVirtualZugReserve();
+        uint256 defaultVirtualEthReserve = factory.defaultVirtualEthReserve();
         uint256 defaultVirtualTokenReserve = factory.defaultVirtualTokenReserve();
         uint256 currentFee = factory.createFee();
 
@@ -41,8 +40,7 @@ contract SetMemeFactoryCreateFee is Script {
             bondingCurveManager,
             CREATE_FEE,
             defaultTotalSupply,
-            defaultTargetZug,
-            defaultVirtualZugReserve,
+            defaultVirtualEthReserve,
             defaultVirtualTokenReserve
         );
 

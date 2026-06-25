@@ -9,7 +9,7 @@ import {MemeTokenImplementation} from "../src/MemeTokenImplementation.sol";
 import {UUPSDeploy} from "../script/UUPSDeploy.sol";
 
 contract LaunchpadUnitTest is Test {
-    uint256 internal constant MAX_TARGET_ZUG = type(uint256).max;
+    uint256 internal constant VIRTUAL_ETH_RESERVE = 5 ether;
 
     address internal owner = address(0xA11CE);
     address internal creator = address(0xC0FFEE);
@@ -34,10 +34,9 @@ contract LaunchpadUnitTest is Test {
             address(treasury),
             address(bonding),
             0,
-            1_000_000 ether,
-            MAX_TARGET_ZUG,
-            10 ether,
-            1_000_000 ether
+            1_000_000_000 ether,
+            VIRTUAL_ETH_RESERVE,
+            1_000_000_000 ether
         );
         vm.stopPrank();
 
@@ -63,10 +62,9 @@ contract LaunchpadUnitTest is Test {
             address(treasury),
             address(bonding),
             0.01 ether,
-            1_000_000 ether,
-            MAX_TARGET_ZUG,
-            10 ether,
-            1_000_000 ether
+            1_000_000_000 ether,
+            VIRTUAL_ETH_RESERVE,
+            1_000_000_000 ether
         );
         vm.prank(owner);
         factory.setMinInitialBuyWei(0.05 ether);
@@ -86,10 +84,9 @@ contract LaunchpadUnitTest is Test {
             address(treasury),
             address(bonding),
             0.01 ether,
-            1_000_000 ether,
-            MAX_TARGET_ZUG,
-            10 ether,
-            1_000_000 ether
+            1_000_000_000 ether,
+            VIRTUAL_ETH_RESERVE,
+            1_000_000_000 ether
         );
         vm.prank(owner);
         factory.setFeeExempt(creator, true);
@@ -103,7 +100,7 @@ contract LaunchpadUnitTest is Test {
 
     function testSetReferrerFeeSplitAndClaim() public {
         vm.prank(creator);
-        address token = factory.createMeme("Zug Ref", "ZREF", "ipfs://zug-ref", 0);
+        address token = factory.createMeme("Eth Ref", "EREF", "ipfs://eth-ref", 0);
 
         vm.prank(trader);
         bonding.setReferrer(referrer);
@@ -182,17 +179,32 @@ contract LaunchpadUnitTest is Test {
 
     function testCreateMemeDeploysFullTokenAndRegistersCurve() public {
         vm.prank(creator);
-        address token = factory.createMeme("Zug Dog", "ZDOG", "ipfs://zug-dog", 0);
+        address token = factory.createMeme("Eth Dog", "EDOG", "ipfs://eth-dog", 0);
 
         assertTrue(factory.isLaunchpadToken(token));
         assertEq(factory.creatorTokenCount(creator), 1);
         assertEq(MemeTokenImplementation(token).creator(), creator);
-        assertEq(MemeTokenImplementation(token).balanceOf(address(bonding)), 1_000_000 ether);
+        assertEq(MemeTokenImplementation(token).balanceOf(address(bonding)), 1_000_000_000 ether);
 
-        (address curveToken, address curveCreator,,,,,, bool paused) = bonding.curves(token);
+        (address curveToken, address curveCreator,,,, uint256 virtualEthReserve,, bool paused) = bonding.curves(token);
         assertEq(curveToken, token);
         assertEq(curveCreator, creator);
+        assertEq(virtualEthReserve, VIRTUAL_ETH_RESERVE);
         assertFalse(paused);
+    }
+
+    function testSpotPriceWeiMatchesReserves() public {
+        vm.prank(creator);
+        address token = factory.createMeme("Spot", "SPT", "ipfs://spot", 0);
+
+        uint256 spotBefore = bonding.spotPriceWei(token);
+        assertEq(spotBefore, (VIRTUAL_ETH_RESERVE * 1e18) / (1_000_000_000 ether));
+
+        vm.prank(trader);
+        bonding.buy{value: 1 ether}(token, 1);
+
+        uint256 spotAfter = bonding.spotPriceWei(token);
+        assertGt(spotAfter, spotBefore);
     }
 
     function testSellWithPermitWithoutPriorApprove() public {
@@ -228,13 +240,13 @@ contract LaunchpadUnitTest is Test {
         assertEq(MemeTokenImplementation(token).allowance(permitTrader, address(bonding)), 0);
 
         vm.prank(permitTrader);
-        uint256 zugOut = bonding.sellWithPermit(token, sellAmount, 1, deadline, v, r, s);
-        assertGt(zugOut, 0);
+        uint256 ethOut = bonding.sellWithPermit(token, sellAmount, 1, deadline, v, r, s);
+        assertGt(ethOut, 0);
         assertEq(MemeTokenImplementation(token).allowance(permitTrader, address(bonding)), type(uint256).max);
 
         vm.prank(permitTrader);
-        uint256 zugOut2 = bonding.sell(token, bought / 4, 1);
-        assertGt(zugOut2, 0);
+        uint256 ethOut2 = bonding.sell(token, bought / 4, 1);
+        assertGt(ethOut2, 0);
     }
 
     function testSellBatch() public {
@@ -252,8 +264,8 @@ contract LaunchpadUnitTest is Test {
         MemeTokenImplementation(tokenB).approve(address(bonding), boughtB);
 
         BondingCurveManager.SellInput[] memory sells = new BondingCurveManager.SellInput[](2);
-        sells[0] = BondingCurveManager.SellInput({token: tokenA, tokenIn: boughtA / 2, minZugOut: 1});
-        sells[1] = BondingCurveManager.SellInput({token: tokenB, tokenIn: boughtB / 2, minZugOut: 1});
+        sells[0] = BondingCurveManager.SellInput({token: tokenA, tokenIn: boughtA / 2, minEthOut: 1});
+        sells[1] = BondingCurveManager.SellInput({token: tokenB, tokenIn: boughtB / 2, minEthOut: 1});
 
         uint256[] memory outs = bonding.sellBatch(sells);
         vm.stopPrank();
@@ -264,7 +276,7 @@ contract LaunchpadUnitTest is Test {
 
     function testBuySellAndCreatorFeeClaim() public {
         vm.prank(creator);
-        address token = factory.createMeme("Zug Cat", "ZCAT", "ipfs://zug-cat", 0);
+        address token = factory.createMeme("Eth Cat", "ECAT", "ipfs://eth-cat", 0);
 
         vm.prank(trader);
         uint256 bought = bonding.buy{value: 1 ether}(token, 1);
@@ -273,9 +285,9 @@ contract LaunchpadUnitTest is Test {
 
         vm.startPrank(trader);
         MemeTokenImplementation(token).approve(address(bonding), bought / 2);
-        uint256 zugOut = bonding.sell(token, bought / 2, 1);
+        uint256 ethOut = bonding.sell(token, bought / 2, 1);
         vm.stopPrank();
-        assertGt(zugOut, 0);
+        assertGt(ethOut, 0);
 
         uint256 creatorBalanceBefore = creator.balance;
         vm.prank(creator);
@@ -286,7 +298,7 @@ contract LaunchpadUnitTest is Test {
 
     function testLargeBuyDoesNotPauseCurve() public {
         vm.prank(creator);
-        address token = factory.createMeme("Zug Bull", "ZBULL", "ipfs://zug-bull", 0);
+        address token = factory.createMeme("Eth Bull", "EBULL", "ipfs://eth-bull", 0);
 
         vm.prank(trader);
         bonding.buy{value: 11 ether}(token, 1);
@@ -301,7 +313,7 @@ contract LaunchpadUnitTest is Test {
         factory.createMeme{value: 1 ether}("No Slippage", "NOSLIP", "ipfs://noslip", 0);
     }
 
-    function testEmergencySweepAllBnbHaltsTrading() public {
+    function testEmergencySweepAllEthHaltsTrading() public {
         vm.prank(creator);
         address token = factory.createMeme("Sweep", "SWP", "ipfs://sweep", 0);
 
@@ -313,7 +325,7 @@ contract LaunchpadUnitTest is Test {
         assertGt(curveBalance, 0);
 
         vm.prank(owner);
-        bonding.emergencySweepAllBnb(safe);
+        bonding.emergencySweepAllEth(safe);
 
         assertEq(address(bonding).balance, 0);
         assertEq(safe.balance, curveBalance);
@@ -327,7 +339,7 @@ contract LaunchpadUnitTest is Test {
     function testEmergencySweepRevertsForNonOwner() public {
         vm.prank(trader);
         vm.expectRevert();
-        bonding.emergencySweepAllBnb(trader);
+        bonding.emergencySweepAllEth(trader);
     }
 
     function testOwnershipTransferLocksOldAdmin() public {
@@ -354,10 +366,9 @@ contract LaunchpadUnitTest is Test {
             address(treasury),
             address(bonding),
             0,
-            1_000_000 ether,
-            MAX_TARGET_ZUG,
-            10 ether,
-            1_000_000 ether
+            1_000_000_000 ether,
+            VIRTUAL_ETH_RESERVE,
+            1_000_000_000 ether
         );
     }
 }

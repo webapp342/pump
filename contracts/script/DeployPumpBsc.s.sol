@@ -14,8 +14,7 @@ import {UUPSDeploy} from "./UUPSDeploy.sol";
 /// @notice UUPS proxy deploy for BSC testnet pump stack.
 contract DeployPumpBsc is Script {
     uint256 internal constant BSC_TESTNET_ID = 97;
-    uint256 internal constant MAX_TARGET_ZUG = type(uint256).max;
-    uint256 internal constant VIRTUAL_ZUG_RESERVE = 5 ether;
+    uint256 internal constant VIRTUAL_ETH_RESERVE = 5 ether;
     uint256 internal constant CREATE_FEE = 0.001 ether;
 
     string internal constant DEPLOY_FILE = "deployments/bsc-testnet-pump.json";
@@ -99,8 +98,7 @@ contract DeployPumpBsc is Script {
             d.bondingCurveManager,
             CREATE_FEE,
             factory.defaultTotalSupply(),
-            MAX_TARGET_ZUG,
-            VIRTUAL_ZUG_RESERVE,
+            VIRTUAL_ETH_RESERVE,
             factory.defaultVirtualTokenReserve()
         );
 

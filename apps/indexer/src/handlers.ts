@@ -93,7 +93,9 @@ export class LaunchpadEventHandlers {
     const blockTime = await this.getBlockTime(log.blockNumber);
     const token = dbAddress(asString(log.args.token));
     const creator = dbAddress(asString(log.args.creator));
-    const targetZug = asBigInt(log.args.targetZug);
+    const virtualEthReserve = asBigInt(
+      log.args.virtualEthReserve ?? log.args.virtualZugReserve ?? defaultVirtualEthWei()
+    );
 
     await this.context.launchpadPool.query(
       `
@@ -142,16 +144,16 @@ export class LaunchpadEventHandlers {
           updated_at
         ) VALUES ($1, $2, $3, $4, $5, $6, now())
         ON CONFLICT (token_address) DO UPDATE
-        SET target_zug = EXCLUDED.target_zug,
+        SET virtual_zug_reserve = EXCLUDED.virtual_zug_reserve,
             last_price_zug = COALESCE(NULLIF(bonding_states.last_price_zug, 0), EXCLUDED.last_price_zug),
             updated_at = now()
       `,
       [
         token,
-        weiToDecimal(targetZug),
-        startingMarketCapZug(),
-        startingSpotPriceZug(),
-        weiToDecimal(defaultVirtualZugWei()),
+        "0",
+        startingMarketCapZug(virtualEthReserve),
+        startingSpotPriceZug(virtualEthReserve),
+        weiToDecimal(virtualEthReserve),
         weiToDecimal(defaultVirtualTokenWei()),
       ]
     );
@@ -168,8 +170,8 @@ export class LaunchpadEventHandlers {
     if (incrementalBoardStatsEnabled()) {
       await seedBoardStatsOnTokenCreated(this.context.launchpadPool, {
         tokenAddress: token,
-        marketCapZug: startingMarketCapZug(),
-        spotPriceZug: startingSpotPriceZug(),
+        marketCapZug: startingMarketCapZug(virtualEthReserve),
+        spotPriceZug: startingSpotPriceZug(virtualEthReserve),
       });
     }
     // KOTH only after trades — create has no real price discovery yet.
@@ -177,7 +179,7 @@ export class LaunchpadEventHandlers {
 
   private async handleTokenRegistered(log: ParsedLaunchpadLog): Promise<void> {
     const token = dbAddress(asString(log.args.token));
-    const virtualZugReserve = asBigInt(log.args.virtualZugReserve);
+    const virtualEthReserve = asBigInt(log.args.virtualEthReserve ?? log.args.virtualZugReserve);
     const virtualTokenReserve = asBigInt(log.args.virtualTokenReserve);
 
     await this.context.launchpadPool.query(
@@ -190,7 +192,7 @@ export class LaunchpadEventHandlers {
       `,
       [
         token,
-        weiToDecimal(virtualZugReserve),
+        weiToDecimal(virtualEthReserve),
         weiToDecimal(virtualTokenReserve),
       ]
     );
@@ -203,11 +205,12 @@ export class LaunchpadEventHandlers {
     const token = dbAddress(asString(log.args.token));
     const trader = dbAddress(asString(log.args.trader));
     const isBuy = Boolean(log.args.isBuy);
-    const zugAmount = asBigInt(log.args.zugAmount);
+    const zugAmount = asBigInt(log.args.ethAmount ?? log.args.zugAmount);
     const tokenAmount = asBigInt(log.args.tokenAmount);
-    const reserveZug = asBigInt(log.args.reserveZug);
+    const reserveZug = asBigInt(log.args.reserveEth ?? log.args.reserveZug);
     const soldTokens = asBigInt(log.args.soldTokens);
-    const feeZug = asBigInt(log.args.feeZug);
+    const feeZug = asBigInt(log.args.feeEth ?? log.args.feeZug);
+    const spotPriceWeiArg = log.args.spotPriceWei != null ? asBigInt(log.args.spotPriceWei) : null;
     const feeSplit = this.pendingFeeSplits.get(feeSplitKey(txHash, token)) ?? {
       creatorFee: 0n,
       referrerFee: 0n,
@@ -218,7 +221,10 @@ export class LaunchpadEventHandlers {
     const tradeEventId = eventId(txHash, logIndex);
     const side = isBuy ? "BUY" : "SELL";
     const executionPrice = ratioWeiToDecimal(zugAmount, tokenAmount);
-    const spotPriceStr = spotPriceBnbFromReserves(reserveZug, soldTokens);
+    const spotPriceStr =
+      spotPriceWeiArg != null && spotPriceWeiArg > 0n
+        ? ratioWeiToDecimal(spotPriceWeiArg, 10n ** 18n)
+        : spotPriceBnbFromReserves(reserveZug, soldTokens);
     const markPrice =
       Number(spotPriceStr) > 0 ? spotPriceStr : executionPrice;
 
@@ -997,22 +1003,25 @@ function spotPriceBnbFromReserves(reserveZug: bigint, soldTokens: bigint): strin
   return ratioWeiToDecimal(poolZug, poolTokens);
 }
 
+function defaultVirtualEthWei(): bigint {
+  return BigInt(process.env.BONDING_VIRTUAL_ETH_RESERVE_WEI ?? process.env.BONDING_VIRTUAL_ZUG_RESERVE_WEI ?? `${5n * 10n ** 18n}`);
+}
+
 function defaultVirtualZugWei(): bigint {
-  return BigInt(process.env.BONDING_VIRTUAL_ZUG_RESERVE_WEI ?? `${5_000n * 10n ** 18n}`);
+  return defaultVirtualEthWei();
 }
 
 function defaultVirtualTokenWei(): bigint {
   return 1_000_000_000n * 10n ** 18n;
 }
 
-/** Factory defaults: virtualZug / 1B token virtual → spot price per token. */
-function startingSpotPriceZug(): string {
-  const virtualZug = defaultVirtualZugWei();
+/** Factory defaults: virtualEth / 1B token virtual → spot price per token. */
+function startingSpotPriceZug(virtualEthWei: bigint = defaultVirtualEthWei()): string {
   const virtualToken = defaultVirtualTokenWei();
-  return ratioWeiToDecimal(virtualZug, virtualToken);
+  return ratioWeiToDecimal(virtualEthWei, virtualToken);
 }
 
-function startingMarketCapZug(): string {
-  const price = Number(startingSpotPriceZug());
+function startingMarketCapZug(virtualEthWei: bigint = defaultVirtualEthWei()): string {
+  const price = Number(startingSpotPriceZug(virtualEthWei));
   return (price * 1_000_000_000).toString();
 }

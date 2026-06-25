@@ -8,11 +8,12 @@ export const bondingCurveManagerAbi = [
       { name: "token", type: "address", indexed: true },
       { name: "trader", type: "address", indexed: true },
       { name: "isBuy", type: "bool", indexed: true },
-      { name: "zugAmount", type: "uint256", indexed: false },
+      { name: "ethAmount", type: "uint256", indexed: false },
       { name: "tokenAmount", type: "uint256", indexed: false },
-      { name: "feeZug", type: "uint256", indexed: false },
-      { name: "reserveZug", type: "uint256", indexed: false },
+      { name: "feeEth", type: "uint256", indexed: false },
+      { name: "reserveEth", type: "uint256", indexed: false },
       { name: "soldTokens", type: "uint256", indexed: false },
+      { name: "spotPriceWei", type: "uint256", indexed: false },
     ],
   },
   {
@@ -121,10 +122,10 @@ export const bondingCurveManagerAbi = [
     outputs: [
       { name: "token", type: "address" },
       { name: "creator", type: "address" },
-      { name: "reserveZug", type: "uint256" },
+      { name: "reserveEth", type: "uint256" },
       { name: "soldTokens", type: "uint256" },
-      { name: "targetZug", type: "uint256" },
-      { name: "virtualZugReserve", type: "uint256" },
+      { name: "progressGoalEth", type: "uint256" },
+      { name: "virtualEthReserve", type: "uint256" },
       { name: "virtualTokenReserve", type: "uint256" },
       { name: "paused", type: "bool" },
     ],
@@ -135,11 +136,11 @@ export const bondingCurveManagerAbi = [
     name: "quoteBuy",
     inputs: [
       { name: "token", type: "address" },
-      { name: "zugIn", type: "uint256" },
+      { name: "ethIn", type: "uint256" },
     ],
     outputs: [
       { name: "tokenOut", type: "uint256" },
-      { name: "feeZug", type: "uint256" },
+      { name: "feeEth", type: "uint256" },
     ],
     stateMutability: "view",
   },
@@ -151,8 +152,8 @@ export const bondingCurveManagerAbi = [
       { name: "tokenIn", type: "uint256" },
     ],
     outputs: [
-      { name: "zugOut", type: "uint256" },
-      { name: "feeZug", type: "uint256" },
+      { name: "ethOut", type: "uint256" },
+      { name: "feeEth", type: "uint256" },
     ],
     stateMutability: "view",
   },
@@ -183,9 +184,9 @@ export const bondingCurveManagerAbi = [
     inputs: [
       { name: "token", type: "address" },
       { name: "tokenIn", type: "uint256" },
-      { name: "minZugOut", type: "uint256" },
+      { name: "minEthOut", type: "uint256" },
     ],
-    outputs: [{ name: "zugOut", type: "uint256" }],
+    outputs: [{ name: "ethOut", type: "uint256" }],
     stateMutability: "nonpayable",
   },
   {
@@ -194,13 +195,13 @@ export const bondingCurveManagerAbi = [
     inputs: [
       { name: "token", type: "address" },
       { name: "tokenIn", type: "uint256" },
-      { name: "minZugOut", type: "uint256" },
+      { name: "minEthOut", type: "uint256" },
       { name: "deadline", type: "uint256" },
       { name: "v", type: "uint8" },
       { name: "r", type: "bytes32" },
       { name: "s", type: "bytes32" },
     ],
-    outputs: [{ name: "zugOut", type: "uint256" }],
+    outputs: [{ name: "ethOut", type: "uint256" }],
     stateMutability: "nonpayable",
   },
   {
@@ -209,10 +210,10 @@ export const bondingCurveManagerAbi = [
     inputs: [
       { name: "token", type: "address" },
       { name: "tokenIn", type: "uint256" },
-      { name: "minZugOut", type: "uint256" },
+      { name: "minEthOut", type: "uint256" },
       { name: "referrer", type: "address" },
     ],
-    outputs: [{ name: "zugOut", type: "uint256" }],
+    outputs: [{ name: "ethOut", type: "uint256" }],
     stateMutability: "nonpayable",
   },
   {
@@ -221,14 +222,14 @@ export const bondingCurveManagerAbi = [
     inputs: [
       { name: "token", type: "address" },
       { name: "tokenIn", type: "uint256" },
-      { name: "minZugOut", type: "uint256" },
+      { name: "minEthOut", type: "uint256" },
       { name: "deadline", type: "uint256" },
       { name: "v", type: "uint8" },
       { name: "r", type: "bytes32" },
       { name: "s", type: "bytes32" },
       { name: "referrer", type: "address" },
     ],
-    outputs: [{ name: "zugOut", type: "uint256" }],
+    outputs: [{ name: "ethOut", type: "uint256" }],
     stateMutability: "nonpayable",
   },
   {
@@ -241,11 +242,11 @@ export const bondingCurveManagerAbi = [
         components: [
           { name: "token", type: "address" },
           { name: "tokenIn", type: "uint256" },
-          { name: "minZugOut", type: "uint256" },
+          { name: "minEthOut", type: "uint256" },
         ],
       },
     ],
-    outputs: [{ name: "zugOuts", type: "uint256[]" }],
+    outputs: [{ name: "ethOuts", type: "uint256[]" }],
     stateMutability: "nonpayable",
   },
   {
@@ -258,7 +259,7 @@ export const bondingCurveManagerAbi = [
         components: [
           { name: "token", type: "address" },
           { name: "tokenIn", type: "uint256" },
-          { name: "minZugOut", type: "uint256" },
+          { name: "minEthOut", type: "uint256" },
           { name: "deadline", type: "uint256" },
           { name: "v", type: "uint8" },
           { name: "r", type: "bytes32" },
@@ -266,7 +267,7 @@ export const bondingCurveManagerAbi = [
         ],
       },
     ],
-    outputs: [{ name: "zugOuts", type: "uint256[]" }],
+    outputs: [{ name: "ethOuts", type: "uint256[]" }],
     stateMutability: "nonpayable",
   },
   {
@@ -306,7 +307,7 @@ export const bondingCurveManagerAbi = [
   },
   {
     type: "event",
-    name: "EmergencyBnbSwept",
+    name: "EmergencyEthSwept",
     inputs: [
       { name: "to", type: "address", indexed: true },
       { name: "amount", type: "uint256", indexed: false },
@@ -333,10 +334,17 @@ export const bondingCurveManagerAbi = [
   },
   {
     type: "function",
-    name: "emergencySweepAllBnb",
+    name: "emergencySweepAllEth",
     inputs: [{ name: "to", type: "address" }],
     outputs: [],
     stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "spotPriceWei",
+    inputs: [{ name: "token", type: "address" }],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
   },
   {
     type: "function",
@@ -432,8 +440,8 @@ export const DEFAULT_STARTING_SPOT_PRICE_BNB = freshSpotPriceZug(
 export const DEFAULT_STARTING_SPOT_PRICE_ZUG = DEFAULT_STARTING_SPOT_PRICE_BNB;
 
 /** Human-unit bonding constants (DB stores reserve_zug / token_sold as decimals). */
-/** Matches MemeFactory `defaultVirtualZugReserve = 5_000 ether` (not 5 BNB). */
-export const BONDING_VIRTUAL_BNB_HUMAN = 5_000;
+/** Matches MemeFactory `defaultVirtualEthReserve = 5 ether`. */
+export const BONDING_VIRTUAL_BNB_HUMAN = 5;
 export const BONDING_TOKEN_SUPPLY_HUMAN = 1_000_000_000;
 
 /** Marginal spot BNB/token from indexer DB bonding_state decimals (chart / holders mark). */
@@ -559,12 +567,12 @@ export function quoteSellFromCurveState(
   curve: BondingCurveState,
   protocolFeeBps: bigint,
   tokenIn: bigint
-): { zugOut: bigint; feeZug: bigint } {
-  if (tokenIn <= 0n) return { zugOut: 0n, feeZug: 0n };
+): { ethOut: bigint; feeZug: bigint } {
+  if (tokenIn <= 0n) return { ethOut: 0n, feeZug: 0n };
 
   const x0 = curve.virtualZugReserve + curve.reserveZug;
   const y0 = curve.virtualTokenReserve - curve.soldTokens;
-  if (y0 === 0n) return { zugOut: 0n, feeZug: 0n };
+  if (y0 === 0n) return { ethOut: 0n, feeZug: 0n };
 
   const k = x0 * y0;
   const x1 = k / (y0 + tokenIn);
@@ -572,7 +580,7 @@ export function quoteSellFromCurveState(
   if (grossZugOut > curve.reserveZug) grossZugOut = curve.reserveZug;
 
   const feeZug = (grossZugOut * protocolFeeBps) / BPS;
-  return { zugOut: grossZugOut - feeZug, feeZug };
+  return { ethOut: grossZugOut - feeZug, feeZug };
 }
 
 /**
@@ -638,8 +646,8 @@ export function resolveTokenInForBnbOut(
   if (tokenIn <= 0n) return null;
 
   for (let i = 0; i < 8; i++) {
-    const { zugOut } = quoteSellFromCurveState(curve, protocolFeeBps, tokenIn);
-    if (zugOut >= targetZugOut) return tokenIn;
+    const { ethOut } = quoteSellFromCurveState(curve, protocolFeeBps, tokenIn);
+    if (ethOut >= targetZugOut) return tokenIn;
     tokenIn += 1n;
   }
 

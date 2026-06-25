@@ -18,8 +18,9 @@ contract MemeFactory is Initializable, UUPSUpgradeable, OwnableUpgradeable {
     uint256 public createFee;
     uint256 public minInitialBuyWei;
     uint256 public defaultTotalSupply;
-    uint256 public defaultTargetZug;
-    uint256 public defaultVirtualZugReserve;
+    /// @dev Legacy graduation-goal slot (`defaultTargetZug`). Unused; kept for UUPS layout.
+    uint256 private _deprecatedProgressGoalEth;
+    uint256 public defaultVirtualEthReserve;
     uint256 public defaultVirtualTokenReserve;
 
     uint256 public constant MAX_NAME_LENGTH = 64;
@@ -37,14 +38,14 @@ contract MemeFactory is Initializable, UUPSUpgradeable, OwnableUpgradeable {
         string symbol,
         string metadataURI,
         uint256 totalSupply,
-        uint256 targetZug,
+        uint256 virtualEthReserve,
         uint256 createdAt
     );
     event ConfigUpdated(
         address indexed treasury,
         address indexed bondingCurveManager,
         uint256 createFee,
-        uint256 defaultTargetZug
+        uint256 defaultVirtualEthReserve
     );
     event MinInitialBuyUpdated(uint256 previousMinWei, uint256 newMinWei);
     event FeeExemptUpdated(address indexed account, bool exempt);
@@ -79,13 +80,12 @@ contract MemeFactory is Initializable, UUPSUpgradeable, OwnableUpgradeable {
         memeTokenImplementation = memeTokenImplementation_;
 
         defaultTotalSupply = 1_000_000_000 ether;
-        defaultTargetZug = 20_000 ether;
-        defaultVirtualZugReserve = 5_000 ether;
+        defaultVirtualEthReserve = 5 ether;
         defaultVirtualTokenReserve = 1_000_000_000 ether;
 
         feeExempt[owner_] = true;
         emit FeeExemptUpdated(owner_, true);
-        emit ConfigUpdated(treasury_, bondingCurveManager_, createFee, defaultTargetZug);
+        emit ConfigUpdated(treasury_, bondingCurveManager_, createFee, defaultVirtualEthReserve);
     }
 
     function _authorizeUpgrade(address) internal override onlyOwner {}
@@ -138,8 +138,7 @@ contract MemeFactory is Initializable, UUPSUpgradeable, OwnableUpgradeable {
             token,
             msg.sender,
             defaultTotalSupply,
-            defaultTargetZug,
-            defaultVirtualZugReserve,
+            defaultVirtualEthReserve,
             defaultVirtualTokenReserve
         );
 
@@ -153,7 +152,7 @@ contract MemeFactory is Initializable, UUPSUpgradeable, OwnableUpgradeable {
             symbol,
             metadataURI,
             defaultTotalSupply,
-            defaultTargetZug,
+            defaultVirtualEthReserve,
             block.timestamp
         );
 
@@ -167,15 +166,13 @@ contract MemeFactory is Initializable, UUPSUpgradeable, OwnableUpgradeable {
         address bondingCurveManager_,
         uint256 createFee_,
         uint256 defaultTotalSupply_,
-        uint256 defaultTargetZug_,
-        uint256 defaultVirtualZugReserve_,
+        uint256 defaultVirtualEthReserve_,
         uint256 defaultVirtualTokenReserve_
     ) external onlyOwner {
         if (treasury_ == address(0) || bondingCurveManager_ == address(0)) revert ZeroAddress();
         if (
             defaultTotalSupply_ == 0 ||
-            defaultTargetZug_ == 0 ||
-            defaultVirtualZugReserve_ == 0 ||
+            defaultVirtualEthReserve_ == 0 ||
             defaultVirtualTokenReserve_ == 0 ||
             defaultVirtualTokenReserve_ != defaultTotalSupply_
         ) revert InvalidInput();
@@ -184,11 +181,10 @@ contract MemeFactory is Initializable, UUPSUpgradeable, OwnableUpgradeable {
         bondingCurveManager = IBondingCurveManager(bondingCurveManager_);
         createFee = createFee_;
         defaultTotalSupply = defaultTotalSupply_;
-        defaultTargetZug = defaultTargetZug_;
-        defaultVirtualZugReserve = defaultVirtualZugReserve_;
+        defaultVirtualEthReserve = defaultVirtualEthReserve_;
         defaultVirtualTokenReserve = defaultVirtualTokenReserve_;
 
-        emit ConfigUpdated(treasury_, bondingCurveManager_, createFee_, defaultTargetZug_);
+        emit ConfigUpdated(treasury_, bondingCurveManager_, createFee_, defaultVirtualEthReserve_);
     }
 
     function creatorTokenCount(address creator) external view returns (uint256) {
@@ -205,5 +201,5 @@ contract MemeFactory is Initializable, UUPSUpgradeable, OwnableUpgradeable {
         if (!ok) revert TransferFailed();
     }
 
-    uint256[40] private __gap;
+    uint256[41] private __gap;
 }

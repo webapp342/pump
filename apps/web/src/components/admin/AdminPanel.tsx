@@ -421,7 +421,7 @@ export function AdminPanel() {
     writeContract({
       address: contracts.bondingCurveManager,
       abi: bondingCurveManagerAbi,
-      functionName: "emergencySweepAllBnb",
+      functionName: "emergencySweepAllEth",
       args: [to as `0x${string}`],
       chainId: pumpChain.id,
     });

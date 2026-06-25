@@ -9,15 +9,16 @@ import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/ut
 import {IERC20Minimal} from "./interfaces/ILaunchpad.sol";
 import {IERC20Permit} from "./interfaces/IERC20Permit.sol";
 
-/// @notice UUPS-upgradeable native BNB <-> meme token bonding-curve trading.
+/// @notice UUPS-upgradeable native ETH <-> meme token bonding-curve trading (no graduation).
 contract BondingCurveManager is Initializable, UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
     struct CurveState {
         address token;
         address creator;
-        uint256 reserveZug;
+        uint256 reserveEth;
         uint256 soldTokens;
-        uint256 targetZug;
-        uint256 virtualZugReserve;
+        /// @dev Legacy storage slot (was graduation target). Always zero for new tokens.
+        uint256 progressGoalEth;
+        uint256 virtualEthReserve;
         uint256 virtualTokenReserve;
         bool paused;
     }
@@ -25,13 +26,13 @@ contract BondingCurveManager is Initializable, UUPSUpgradeable, OwnableUpgradeab
     struct SellInput {
         address token;
         uint256 tokenIn;
-        uint256 minZugOut;
+        uint256 minEthOut;
     }
 
     struct SellPermitInput {
         address token;
         uint256 tokenIn;
-        uint256 minZugOut;
+        uint256 minEthOut;
         uint256 deadline;
         uint8 v;
         bytes32 r;
@@ -59,19 +60,19 @@ contract BondingCurveManager is Initializable, UUPSUpgradeable, OwnableUpgradeab
         address indexed token,
         address indexed creator,
         uint256 totalSupply,
-        uint256 targetZug,
-        uint256 virtualZugReserve,
+        uint256 virtualEthReserve,
         uint256 virtualTokenReserve
     );
     event Trade(
         address indexed token,
         address indexed trader,
         bool indexed isBuy,
-        uint256 zugAmount,
+        uint256 ethAmount,
         uint256 tokenAmount,
-        uint256 feeZug,
-        uint256 reserveZug,
-        uint256 soldTokens
+        uint256 feeEth,
+        uint256 reserveEth,
+        uint256 soldTokens,
+        uint256 spotPriceWei
     );
     event FeeSplit(
         address indexed token,
@@ -85,7 +86,7 @@ contract BondingCurveManager is Initializable, UUPSUpgradeable, OwnableUpgradeab
     event ReferrerSet(address indexed trader, address indexed referrer);
     event ReferrerFeeClaimed(address indexed referrer, uint256 amount);
     event EmergencyHaltSet(bool halted);
-    event EmergencyBnbSwept(address indexed to, uint256 amount);
+    event EmergencyEthSwept(address indexed to, uint256 amount);
 
     error NotFactory();
     error ZeroAddress();
@@ -174,24 +175,23 @@ contract BondingCurveManager is Initializable, UUPSUpgradeable, OwnableUpgradeab
     function sellWithReferrer(
         address token,
         uint256 tokenIn,
-        uint256 minZugOut,
+        uint256 minEthOut,
         address referrer
-    ) external nonReentrant returns (uint256 zugOut) {
+    ) external nonReentrant returns (uint256 ethOut) {
         _bindReferrerIfEligible(msg.sender, referrer);
-        zugOut = _sell(token, msg.sender, tokenIn, minZugOut);
+        ethOut = _sell(token, msg.sender, tokenIn, minEthOut);
     }
 
     function registerToken(
         address token,
         address creator,
         uint256 totalSupply,
-        uint256 targetZug,
-        uint256 virtualZugReserve,
+        uint256 virtualEthReserve,
         uint256 virtualTokenReserve
     ) external onlyFactory {
         if (token == address(0) || creator == address(0)) revert ZeroAddress();
         if (curves[token].token != address(0)) revert InvalidConfig();
-        if (totalSupply == 0 || targetZug == 0 || virtualZugReserve == 0 || virtualTokenReserve == 0) {
+        if (totalSupply == 0 || virtualEthReserve == 0 || virtualTokenReserve == 0) {
             revert InvalidConfig();
         }
         if (virtualTokenReserve != totalSupply) revert InvalidConfig();
@@ -200,44 +200,49 @@ contract BondingCurveManager is Initializable, UUPSUpgradeable, OwnableUpgradeab
         curves[token] = CurveState({
             token: token,
             creator: creator,
-            reserveZug: 0,
+            reserveEth: 0,
             soldTokens: 0,
-            targetZug: targetZug,
-            virtualZugReserve: virtualZugReserve,
+            progressGoalEth: 0,
+            virtualEthReserve: virtualEthReserve,
             virtualTokenReserve: virtualTokenReserve,
             paused: false
         });
 
-        emit TokenRegistered(token, creator, totalSupply, targetZug, virtualZugReserve, virtualTokenReserve);
+        emit TokenRegistered(token, creator, totalSupply, virtualEthReserve, virtualTokenReserve);
     }
 
-    function quoteBuy(address token, uint256 zugIn) public view returns (uint256 tokenOut, uint256 feeZug) {
+    /// @notice ETH per 1 full token (1e18 token wei) from constant-product reserves.
+    function spotPriceWei(address token) public view returns (uint256) {
+        return _spotPriceWei(curves[token]);
+    }
+
+    function quoteBuy(address token, uint256 ethIn) public view returns (uint256 tokenOut, uint256 feeEth) {
         CurveState memory c = curves[token];
         if (c.token == address(0)) revert UnknownToken();
 
-        feeZug = (zugIn * protocolFeeBps) / BPS;
-        uint256 netZug = zugIn - feeZug;
+        feeEth = (ethIn * protocolFeeBps) / BPS;
+        uint256 netEth = ethIn - feeEth;
 
-        uint256 x0 = c.virtualZugReserve + c.reserveZug;
+        uint256 x0 = c.virtualEthReserve + c.reserveEth;
         uint256 y0 = c.virtualTokenReserve - c.soldTokens;
         uint256 k = x0 * y0;
-        uint256 y1 = k / (x0 + netZug);
+        uint256 y1 = k / (x0 + netEth);
         tokenOut = y0 - y1;
     }
 
-    function quoteSell(address token, uint256 tokenIn) public view returns (uint256 zugOut, uint256 feeZug) {
+    function quoteSell(address token, uint256 tokenIn) public view returns (uint256 ethOut, uint256 feeEth) {
         CurveState memory c = curves[token];
         if (c.token == address(0)) revert UnknownToken();
 
-        uint256 x0 = c.virtualZugReserve + c.reserveZug;
+        uint256 x0 = c.virtualEthReserve + c.reserveEth;
         uint256 y0 = c.virtualTokenReserve - c.soldTokens;
         uint256 k = x0 * y0;
         uint256 x1 = k / (y0 + tokenIn);
-        uint256 grossZugOut = x0 - x1;
+        uint256 grossEthOut = x0 - x1;
 
-        if (grossZugOut > c.reserveZug) grossZugOut = c.reserveZug;
-        feeZug = (grossZugOut * protocolFeeBps) / BPS;
-        zugOut = grossZugOut - feeZug;
+        if (grossEthOut > c.reserveEth) grossEthOut = c.reserveEth;
+        feeEth = (grossEthOut * protocolFeeBps) / BPS;
+        ethOut = grossEthOut - feeEth;
     }
 
     function buy(address token, uint256 minTokenOut) external payable nonReentrant returns (uint256 tokenOut) {
@@ -253,64 +258,64 @@ contract BondingCurveManager is Initializable, UUPSUpgradeable, OwnableUpgradeab
         tokenOut = _buy(token, recipient, minTokenOut);
     }
 
-    function sell(address token, uint256 tokenIn, uint256 minZugOut) external nonReentrant returns (uint256 zugOut) {
-        zugOut = _sell(token, msg.sender, tokenIn, minZugOut);
+    function sell(address token, uint256 tokenIn, uint256 minEthOut) external nonReentrant returns (uint256 ethOut) {
+        ethOut = _sell(token, msg.sender, tokenIn, minEthOut);
     }
 
     function sellWithPermit(
         address token,
         uint256 tokenIn,
-        uint256 minZugOut,
+        uint256 minEthOut,
         uint256 deadline,
         uint8 v,
         bytes32 r,
         bytes32 s
-    ) external nonReentrant returns (uint256 zugOut) {
+    ) external nonReentrant returns (uint256 ethOut) {
         IERC20Permit(token).permit(msg.sender, address(this), PERMIT_ALLOWANCE_MAX, deadline, v, r, s);
-        zugOut = _sell(token, msg.sender, tokenIn, minZugOut);
+        ethOut = _sell(token, msg.sender, tokenIn, minEthOut);
     }
 
     function sellWithReferrerAndPermit(
         address token,
         uint256 tokenIn,
-        uint256 minZugOut,
+        uint256 minEthOut,
         uint256 deadline,
         uint8 v,
         bytes32 r,
         bytes32 s,
         address referrer
-    ) external nonReentrant returns (uint256 zugOut) {
+    ) external nonReentrant returns (uint256 ethOut) {
         _bindReferrerIfEligible(msg.sender, referrer);
         IERC20Permit(token).permit(msg.sender, address(this), PERMIT_ALLOWANCE_MAX, deadline, v, r, s);
-        zugOut = _sell(token, msg.sender, tokenIn, minZugOut);
+        ethOut = _sell(token, msg.sender, tokenIn, minEthOut);
     }
 
-    function sellBatch(SellInput[] calldata sells) external nonReentrant returns (uint256[] memory zugOuts) {
+    function sellBatch(SellInput[] calldata sells) external nonReentrant returns (uint256[] memory ethOuts) {
         uint256 length = sells.length;
         if (length == 0 || length > MAX_SELL_BATCH) revert InvalidBatch();
 
         address trader = msg.sender;
-        zugOuts = new uint256[](length);
+        ethOuts = new uint256[](length);
         for (uint256 i = 0; i < length; i++) {
             SellInput calldata input = sells[i];
-            zugOuts[i] = _sell(input.token, trader, input.tokenIn, input.minZugOut);
+            ethOuts[i] = _sell(input.token, trader, input.tokenIn, input.minEthOut);
         }
     }
 
     function sellBatchWithPermit(SellPermitInput[] calldata sells)
         external
         nonReentrant
-        returns (uint256[] memory zugOuts)
+        returns (uint256[] memory ethOuts)
     {
         uint256 length = sells.length;
         if (length == 0 || length > MAX_SELL_BATCH) revert InvalidBatch();
 
         address trader = msg.sender;
-        zugOuts = new uint256[](length);
+        ethOuts = new uint256[](length);
         for (uint256 i = 0; i < length; i++) {
             SellPermitInput calldata input = sells[i];
             IERC20Permit(input.token).permit(trader, address(this), PERMIT_ALLOWANCE_MAX, input.deadline, input.v, input.r, input.s);
-            zugOuts[i] = _sell(input.token, trader, input.tokenIn, input.minZugOut);
+            ethOuts[i] = _sell(input.token, trader, input.tokenIn, input.minEthOut);
         }
     }
 
@@ -325,7 +330,7 @@ contract BondingCurveManager is Initializable, UUPSUpgradeable, OwnableUpgradeab
     }
 
     /// @notice Drains the full native balance to `to` and halts all trading (hack / incident response).
-    function emergencySweepAllBnb(address to) external onlyOwner nonReentrant {
+    function emergencySweepAllEth(address to) external onlyOwner nonReentrant {
         if (to == address(0)) revert ZeroAddress();
 
         uint256 amount = address(this).balance;
@@ -335,7 +340,7 @@ contract BondingCurveManager is Initializable, UUPSUpgradeable, OwnableUpgradeab
         emit EmergencyHaltSet(true);
 
         _sendNative(payable(to), amount);
-        emit EmergencyBnbSwept(to, amount);
+        emit EmergencyEthSwept(to, amount);
     }
 
     function claimCreatorFees() external nonReentrant returns (uint256 amount) {
@@ -352,6 +357,13 @@ contract BondingCurveManager is Initializable, UUPSUpgradeable, OwnableUpgradeab
         emit ReferrerFeeClaimed(msg.sender, amount);
     }
 
+    function _spotPriceWei(CurveState memory c) internal pure returns (uint256) {
+        uint256 y = c.virtualTokenReserve - c.soldTokens;
+        if (y == 0) return 0;
+        uint256 x = c.virtualEthReserve + c.reserveEth;
+        return (x * 1e18) / y;
+    }
+
     function _buy(address token, address recipient, uint256 minTokenOut) internal returns (uint256 tokenOut) {
         if (emergencyHalt) revert EmergencyHalted();
 
@@ -359,19 +371,29 @@ contract BondingCurveManager is Initializable, UUPSUpgradeable, OwnableUpgradeab
         if (c.token == address(0)) revert UnknownToken();
         if (c.paused) revert Paused();
 
-        uint256 feeZug;
-        (tokenOut, feeZug) = quoteBuy(token, msg.value);
+        uint256 feeEth;
+        (tokenOut, feeEth) = quoteBuy(token, msg.value);
         if (tokenOut < minTokenOut) revert Slippage();
         if (tokenOut == 0) revert InsufficientOutput();
 
-        c.reserveZug += (msg.value - feeZug);
+        c.reserveEth += (msg.value - feeEth);
         c.soldTokens += tokenOut;
 
         if (!IERC20Minimal(token).transfer(recipient, tokenOut)) revert TransferFailed();
         hasTraded[recipient] = true;
-        _distributeFee(token, c.creator, recipient, feeZug);
+        _distributeFee(token, c.creator, recipient, feeEth);
 
-        emit Trade(token, recipient, true, msg.value, tokenOut, feeZug, c.reserveZug, c.soldTokens);
+        emit Trade(
+            token,
+            recipient,
+            true,
+            msg.value,
+            tokenOut,
+            feeEth,
+            c.reserveEth,
+            c.soldTokens,
+            _spotPriceWei(c)
+        );
     }
 
     function _bindReferrerIfEligible(address trader, address referrer) internal {
@@ -387,29 +409,39 @@ contract BondingCurveManager is Initializable, UUPSUpgradeable, OwnableUpgradeab
         address token,
         address trader,
         uint256 tokenIn,
-        uint256 minZugOut
-    ) internal returns (uint256 zugOut) {
+        uint256 minEthOut
+    ) internal returns (uint256 ethOut) {
         if (emergencyHalt) revert EmergencyHalted();
 
         CurveState storage c = curves[token];
         if (c.token == address(0)) revert UnknownToken();
         if (c.paused) revert Paused();
 
-        uint256 feeZug;
-        (zugOut, feeZug) = quoteSell(token, tokenIn);
-        if (zugOut < minZugOut) revert Slippage();
-        if (zugOut == 0) revert InsufficientOutput();
+        uint256 feeEth;
+        (ethOut, feeEth) = quoteSell(token, tokenIn);
+        if (ethOut < minEthOut) revert Slippage();
+        if (ethOut == 0) revert InsufficientOutput();
 
         if (!IERC20Minimal(token).transferFrom(trader, address(this), tokenIn)) revert TransferFailed();
 
-        c.reserveZug -= (zugOut + feeZug);
+        c.reserveEth -= (ethOut + feeEth);
         c.soldTokens -= tokenIn;
 
-        _sendNative(payable(trader), zugOut);
+        _sendNative(payable(trader), ethOut);
         hasTraded[trader] = true;
-        _distributeFee(token, c.creator, trader, feeZug);
+        _distributeFee(token, c.creator, trader, feeEth);
 
-        emit Trade(token, trader, false, zugOut + feeZug, tokenIn, feeZug, c.reserveZug, c.soldTokens);
+        emit Trade(
+            token,
+            trader,
+            false,
+            ethOut + feeEth,
+            tokenIn,
+            feeEth,
+            c.reserveEth,
+            c.soldTokens,
+            _spotPriceWei(c)
+        );
     }
 
     function _sendNative(address payable to, uint256 amount) internal {
@@ -418,13 +450,13 @@ contract BondingCurveManager is Initializable, UUPSUpgradeable, OwnableUpgradeab
         if (!ok) revert TransferFailed();
     }
 
-    function _distributeFee(address token, address creator, address trader, uint256 feeZug) internal {
-        if (feeZug == 0) return;
+    function _distributeFee(address token, address creator, address trader, uint256 feeEth) internal {
+        if (feeEth == 0) return;
 
-        uint256 creatorFee = (feeZug * creatorFeeShareBps) / BPS;
+        uint256 creatorFee = (feeEth * creatorFeeShareBps) / BPS;
         address referrer = traderReferrer[trader];
-        uint256 referrerFee = referrer != address(0) ? (feeZug * referrerShareBps) / BPS : 0;
-        uint256 treasuryFee = feeZug - creatorFee - referrerFee;
+        uint256 referrerFee = referrer != address(0) ? (feeEth * referrerShareBps) / BPS : 0;
+        uint256 treasuryFee = feeEth - creatorFee - referrerFee;
 
         pendingCreatorFees[creator] += creatorFee;
         if (referrerFee > 0) {

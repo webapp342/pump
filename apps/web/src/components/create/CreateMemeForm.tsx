@@ -251,7 +251,7 @@ export function CreateMemeForm() {
   const { data: virtualBnbReserveOnChain } = useReadContract({
     address: contracts.memeFactory,
     abi: memeFactoryAbi,
-    functionName: "defaultVirtualZugReserve",
+    functionName: "defaultVirtualEthReserve",
     chainId: pumpChain.id,
   });
 

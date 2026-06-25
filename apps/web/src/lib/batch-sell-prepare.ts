@@ -137,8 +137,8 @@ export async function prepareBatchSellTargets(
       }
 
       const curve = bondingCurveStateFromTuple(curveTuple);
-      const { zugOut } = quoteSellFromCurveState(curve, protocolFeeBps, tokenIn);
-      if (zugOut <= 0n) {
+      const { ethOut } = quoteSellFromCurveState(curve, protocolFeeBps, tokenIn);
+      if (ethOut <= 0n) {
         skipped += 1;
         return;
       }
@@ -158,8 +158,8 @@ export async function prepareBatchSellTargets(
         ...holding,
         tokenAddress: holding.tokenAddress.toLowerCase(),
         tokenIn: tokenIn.toString(),
-        minZugOut: minOutWithSlippage(zugOut).toString(),
-        estimatedZugOut: zugOut.toString(),
+        minZugOut: minOutWithSlippage(ethOut).toString(),
+        estimatedZugOut: ethOut.toString(),
         hasAllowance,
         supportsPermit,
         tokenName: nameResult?.status === "success" ? nameResult.result : undefined,

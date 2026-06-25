@@ -57,13 +57,7 @@ export function AdminMemeCreateFeeModal({
       {
         address: contracts.memeFactory,
         abi: memeFactoryAbi,
-        functionName: "defaultTargetZug",
-        chainId: pumpChain.id,
-      },
-      {
-        address: contracts.memeFactory,
-        abi: memeFactoryAbi,
-        functionName: "defaultVirtualZugReserve",
+        functionName: "defaultVirtualEthReserve",
         chainId: pumpChain.id,
       },
       {
@@ -114,16 +108,14 @@ export function AdminMemeCreateFeeModal({
     const treasury = configReads?.[0]?.result;
     const bondingCurveManager = configReads?.[1]?.result;
     const defaultTotalSupply = configReads?.[2]?.result;
-    const defaultTargetZug = configReads?.[3]?.result;
-    const defaultVirtualZugReserve = configReads?.[4]?.result;
-    const defaultVirtualTokenReserve = configReads?.[5]?.result;
+    const defaultVirtualEthReserve = configReads?.[3]?.result;
+    const defaultVirtualTokenReserve = configReads?.[4]?.result;
 
     if (
       treasury == null ||
       bondingCurveManager == null ||
       defaultTotalSupply == null ||
-      defaultTargetZug == null ||
-      defaultVirtualZugReserve == null ||
+      defaultVirtualEthReserve == null ||
       defaultVirtualTokenReserve == null
     ) {
       setLocalError("Loading factory config — try again in a moment");
@@ -139,8 +131,7 @@ export function AdminMemeCreateFeeModal({
         bondingCurveManager,
         newFeeWei,
         defaultTotalSupply,
-        defaultTargetZug,
-        defaultVirtualZugReserve,
+        defaultVirtualEthReserve,
         defaultVirtualTokenReserve,
       ],
       chainId: pumpChain.id,

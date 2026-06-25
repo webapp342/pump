@@ -59,7 +59,7 @@ export type TradeCandleInput = {
 };
 
 function virtualReserves(): { virtualZug: bigint; virtualToken: bigint } {
-  const virtualZug = BigInt(process.env.BONDING_VIRTUAL_ZUG_RESERVE_WEI ?? `${5_000n * 10n ** 18n}`);
+  const virtualZug = BigInt(process.env.BONDING_VIRTUAL_ETH_RESERVE_WEI ?? process.env.BONDING_VIRTUAL_ZUG_RESERVE_WEI ?? `${5n * 10n ** 18n}`);
   const virtualToken = 1_000_000_000n * 10n ** 18n;
   return { virtualZug, virtualToken };
 }
@@ -141,7 +141,7 @@ async function readBondingVirtualReserves(
   if (!row) return defaults;
 
   try {
-    const virtualZug = parseUnits(row.virtual_zug_reserve || "5000", 18);
+    const virtualZug = parseUnits(row.virtual_zug_reserve || "5", 18);
     const virtualToken = parseUnits(row.virtual_token_reserve || "1000000000", 18);
     return {
       virtualZug: virtualZug > 0n ? virtualZug : defaults.virtualZug,

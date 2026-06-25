@@ -482,7 +482,7 @@ export function TradePanel({
     ) {
       return null;
     }
-    return quoteSellFromCurveState(bondingCurve, protocolFeeBps, targetTokenWei).zugOut;
+    return quoteSellFromCurveState(bondingCurve, protocolFeeBps, targetTokenWei).ethOut;
   }, [side, targetTokenWei, bondingCurve, protocolFeeBps]);
 
   const buyQuoteOut = localBuyQuoteOut;
@@ -635,7 +635,7 @@ export function TradePanel({
       bondingCurve,
       protocolFeeBps,
       gasProbeSellTokenWei
-    ).zugOut;
+    ).ethOut;
     return quoted > 0n ? quoted : undefined;
   }, [side, bondingCurve, protocolFeeBps, sellQuoteOut, gasProbeSellTokenWei]);
 
@@ -1148,9 +1148,9 @@ export function TradePanel({
       return;
     }
 
-    const { zugOut } = quoteSellFromCurveState(bondingCurve, protocolFeeBps, tokenWei);
-    if (zugOut === 0n) return;
-    setAmount(formatAmountFromWei(zugOut));
+    const { ethOut } = quoteSellFromCurveState(bondingCurve, protocolFeeBps, tokenWei);
+    if (ethOut === 0n) return;
+    setAmount(formatAmountFromWei(ethOut));
     setError(null);
   }
 

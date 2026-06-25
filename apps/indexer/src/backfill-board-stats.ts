@@ -4,7 +4,7 @@ import { loadIndexerEnv } from "./load-env.js";
 
 loadIndexerEnv();
 
-const BONDING_VIRTUAL_BNB = 5_000;
+const BONDING_VIRTUAL_BNB = 5;
 const TOKEN_SUPPLY = 1_000_000_000;
 
 async function main(): Promise<void> {

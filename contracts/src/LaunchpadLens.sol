@@ -14,13 +14,12 @@ contract LaunchpadLens is Initializable, UUPSUpgradeable, OwnableUpgradeable {
     struct CurveView {
         address token;
         address creator;
-        uint256 reserveZug;
+        uint256 reserveEth;
         uint256 soldTokens;
-        uint256 targetZug;
-        uint256 virtualZugReserve;
+        uint256 virtualEthReserve;
         uint256 virtualTokenReserve;
         bool paused;
-        uint256 progressBps;
+        uint256 spotPriceWei;
     }
 
     event BondingCurveManagerUpdated(address indexed previousManager, address indexed newManager);
@@ -52,27 +51,23 @@ contract LaunchpadLens is Initializable, UUPSUpgradeable, OwnableUpgradeable {
         (
             address curveToken,
             address creator,
-            uint256 reserveZug,
+            uint256 reserveEth,
             uint256 soldTokens,
-            uint256 targetZug,
-            uint256 virtualZugReserve,
+            ,
+            uint256 virtualEthReserve,
             uint256 virtualTokenReserve,
             bool paused
         ) = bondingCurveManager.curves(token);
 
-        uint256 progressBps = targetZug == 0 ? 0 : (reserveZug * 10_000) / targetZug;
-        if (progressBps > 10_000) progressBps = 10_000;
-
         view_ = CurveView({
             token: curveToken,
             creator: creator,
-            reserveZug: reserveZug,
+            reserveEth: reserveEth,
             soldTokens: soldTokens,
-            targetZug: targetZug,
-            virtualZugReserve: virtualZugReserve,
+            virtualEthReserve: virtualEthReserve,
             virtualTokenReserve: virtualTokenReserve,
             paused: paused,
-            progressBps: progressBps
+            spotPriceWei: bondingCurveManager.spotPriceWei(token)
         });
     }
 
@@ -83,11 +78,11 @@ contract LaunchpadLens is Initializable, UUPSUpgradeable, OwnableUpgradeable {
         }
     }
 
-    function quoteBuy(address token, uint256 zugIn) external view returns (uint256 tokenOut, uint256 feeZug) {
-        return bondingCurveManager.quoteBuy(token, zugIn);
+    function quoteBuy(address token, uint256 ethIn) external view returns (uint256 tokenOut, uint256 feeEth) {
+        return bondingCurveManager.quoteBuy(token, ethIn);
     }
 
-    function quoteSell(address token, uint256 tokenIn) external view returns (uint256 zugOut, uint256 feeZug) {
+    function quoteSell(address token, uint256 tokenIn) external view returns (uint256 ethOut, uint256 feeEth) {
         return bondingCurveManager.quoteSell(token, tokenIn);
     }
 

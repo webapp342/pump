@@ -23,8 +23,7 @@ interface IBondingCurveManager {
         address token,
         address creator,
         uint256 totalSupply,
-        uint256 targetZug,
-        uint256 virtualZugReserve,
+        uint256 virtualEthReserve,
         uint256 virtualTokenReserve
     ) external;
 

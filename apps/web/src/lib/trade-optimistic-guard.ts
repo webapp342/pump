@@ -144,18 +144,18 @@ export function evaluateInstantTradeGate(
     return { ok: false, reason: "allowance" };
   }
 
-  const { zugOut, feeZug } = quoteSellFromCurveState(
+  const { ethOut, feeZug } = quoteSellFromCurveState(
     input.bondingCurve,
     input.protocolFeeBps,
     input.sellTokenWei
   );
-  if (zugOut <= 0n) return { ok: false, reason: "quote_zero" };
+  if (ethOut <= 0n) return { ok: false, reason: "quote_zero" };
 
   return {
     ok: true,
     side: "sell",
     sellTokenWei: input.sellTokenWei,
-    zugOut,
+    zugOut: ethOut,
     feeZug,
   };
 }

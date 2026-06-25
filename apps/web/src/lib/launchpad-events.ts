@@ -31,10 +31,10 @@ export function parseTradesFromReceipt(
       token: event.args.token as Address,
       trader: event.args.trader as Address,
       isBuy: Boolean(event.args.isBuy),
-      nativeAmount: event.args.zugAmount as bigint,
+      nativeAmount: event.args.ethAmount as bigint,
       tokenAmount: event.args.tokenAmount as bigint,
-      feeBnb: event.args.feeZug as bigint,
-      reserveBnb: event.args.reserveZug as bigint,
+      feeBnb: event.args.feeEth as bigint,
+      reserveBnb: event.args.reserveEth as bigint,
       soldTokens: event.args.soldTokens as bigint,
     }))
     .filter(
