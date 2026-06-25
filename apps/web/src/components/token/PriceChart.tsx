@@ -850,17 +850,15 @@ export function PriceChart({
   ]);
 
   const summaryValue =
-    currency === "usd"
-      ? (currentPriceUsd != null && currentPriceUsd > 0
+    lastCandle != null
+      ? formatOhlc(lastCandle.close, currency, bnbUsd)
+      : currency === "usd"
+        ? currentPriceUsd != null && currentPriceUsd > 0
           ? formatPumpSubscriptPrice(currentPriceUsd, "$")
-          : lastCandle != null && bnbUsd != null && bnbUsd > 0
-            ? formatPumpSubscriptPrice(lastCandle.close * bnbUsd, "$")
-            : "—")
-      : (currentMcapUsd != null && currentMcapUsd > 0
+          : "—"
+        : currentMcapUsd != null && currentMcapUsd > 0
           ? formatUsd(currentMcapUsd, { compact: true }) ?? "—"
-          : lastCandle != null && bnbUsd != null && bnbUsd > 0
-            ? formatUsd(lastCandle.close * bnbUsd, { compact: true }) ?? "—"
-            : "—");
+          : "—";
   const summaryDeltaPct = price24hChangePct;
 
   const volumeUsd = bnbToUsd(volume24hBnb, bnbUsd);
