@@ -16,14 +16,12 @@ type ArenaWatchlistPanelProps = {
   tokens: TokenListItem[];
   bnbUsd: number | null;
   flashes: Record<string, FlashTone>;
-  animatedCaps: Record<string, number>;
 };
 
 export function ArenaWatchlistPanel({
   tokens,
   bnbUsd,
   flashes,
-  animatedCaps,
 }: ArenaWatchlistPanelProps) {
   const [collapsed, setCollapsed] = useState(false);
   const watchlistTokens = useWatchlistTokens(tokens);
@@ -76,7 +74,6 @@ export function ArenaWatchlistPanel({
               tokens={tokens}
               bnbUsd={bnbUsd}
               flashes={flashes}
-              animatedCaps={animatedCaps}
             />
           </div>
         ) : (

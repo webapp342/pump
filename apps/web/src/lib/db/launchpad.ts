@@ -567,21 +567,14 @@ export async function listArenaBoardTokens(
     filter,
     airdropAddresses
   );
-  const sql = `
-    SELECT *
-    FROM (
-      ${buildTokenListSelectSql(ARENA_TOKEN_BASE_INNER)}
-    ) arena_list
-    ${filterClause}
-    ${arenaBoardOrderClause(sortKey, sortDir)}
-    LIMIT $1 OFFSET $2
-  `;
-
-  const db = getLaunchpadReadPool();
   const queryParams =
-    filterParams.length > 0 ? [limit, offset, filterParams] : [limit, offset];
-  const result = await db.query<TokenListQueryRow>(sql, queryParams);
-  return result.rows.map(mapTokenListRow);
+    filterParams.length > 0 ? [limit, offset, ...filterParams] : [limit, offset];
+
+  return queryTokenBoardRows(
+    ARENA_TOKEN_BASE_INNER,
+    `${filterClause} ${arenaBoardOrderClause(sortKey, sortDir)} LIMIT $1 OFFSET $2`,
+    queryParams
+  );
 }
 
 export async function listTokenListItemsByAddresses(
@@ -611,10 +604,7 @@ export async function listTokenListItemsByAddresses(
         AND LOWER(t.address) = ANY($1::text[])
     `;
 
-  const db = getLaunchpadReadPool();
-  const sql = `${buildTokenListSelectSql(baseInner)} ORDER BY bt.created_at DESC`;
-  const result = await db.query<TokenListQueryRow>(sql, [normalized]);
-  return result.rows.map(mapTokenListRow);
+  return queryTokenBoardRows(baseInner, "ORDER BY created_at DESC", [normalized]);
 }
 
 async function countKothContenders(): Promise<number> {
@@ -675,6 +665,45 @@ const ARENA_TOKEN_BASE_INNER = `
       WHERE t.is_hidden = false
     `;
 
+/** Portfolio + arena board rows — one SQL envelope, one mapTokenListRow. */
+async function queryTokenBoardRows(
+  baseTokensInner: string,
+  tailSql: string,
+  params: unknown[] = []
+): Promise<TokenListItem[]> {
+  const db = getLaunchpadReadPool();
+  const sql = `
+    SELECT *
+    FROM (
+      ${buildTokenListSelectSql(baseTokensInner)}
+    ) board_rows
+    ${tailSql}
+  `;
+  const result = await db.query<TokenListQueryRow>(sql, params);
+  return result.rows.map(mapTokenListRow);
+}
+
+/**
+ * Re-load metrics via listTokenListItemsByAddresses — same path as portfolio
+ * `/api/portfolio/created-tokens` (listTokensByCreator inner query).
+ */
+export async function hydrateTokenBoardList(
+  items: TokenListItem[]
+): Promise<TokenListItem[]> {
+  if (items.length === 0) return [];
+
+  const canonical = await listTokenListItemsByAddresses(
+    items.map((token) => token.address)
+  );
+  const byAddress = new Map(
+    canonical.map((token) => [token.address.toLowerCase(), token])
+  );
+
+  return items.map(
+    (token) => byAddress.get(token.address.toLowerCase()) ?? token
+  );
+}
+
 function arenaListOrderBy(sort: ArenaListSort): string {
   if (sort === "age") {
     return "ORDER BY created_at DESC";
@@ -691,18 +720,12 @@ export async function listTokensPaginated(
   const limit = options.limit ?? 50;
   const offset = options.offset ?? 0;
   const sort = options.sort ?? "age";
-  const db = getLaunchpadReadPool();
-  const sql = `
-    SELECT *
-    FROM (
-      ${buildTokenListSelectSql(ARENA_TOKEN_BASE_INNER)}
-    ) board_rows
-    ${arenaListOrderBy(sort)}
-    LIMIT $1 OFFSET $2
-  `;
-  const result = await db.query<TokenListQueryRow>(sql, [limit, offset]);
 
-  return result.rows.map(mapTokenListRow);
+  return queryTokenBoardRows(
+    ARENA_TOKEN_BASE_INNER,
+    `${arenaListOrderBy(sort)} LIMIT $1 OFFSET $2`,
+    [limit, offset]
+  );
 }
 
 export async function listTokens(limit = 50): Promise<TokenListItem[]> {
@@ -836,21 +859,8 @@ export async function listTokensByCreator(
   limit?: number,
   offset = 0
 ): Promise<TokenListItem[]> {
-  const db = getLaunchpadReadPool();
   const normalized = creatorAddress.toLowerCase();
-  let orderBy = limit ? "ORDER BY bt.created_at DESC LIMIT $2" : "ORDER BY bt.created_at DESC";
-  const params: (string | number)[] = [normalized];
-
-  if (limit) {
-    params.push(limit);
-    if (offset > 0) {
-      orderBy += " OFFSET $3";
-      params.push(offset);
-    }
-  }
-
-  const sql = buildTokenListSql(
-    `
+  const baseInner = `
       SELECT
         t.address,
         t.symbol,
@@ -863,13 +873,21 @@ export async function listTokensByCreator(
       FROM tokens t
       WHERE t.creator_address = $1
         AND t.is_hidden = false
-      ORDER BY t.created_at DESC
-    `,
-    orderBy
-  );
-  const result = await db.query<TokenListQueryRow>(sql, params);
+    `;
 
-  return result.rows.map(mapTokenListRow);
+  let tail = "ORDER BY created_at DESC";
+  const params: (string | number)[] = [normalized];
+
+  if (limit) {
+    tail += " LIMIT $2";
+    params.push(limit);
+    if (offset > 0) {
+      tail += " OFFSET $3";
+      params.push(offset);
+    }
+  }
+
+  return queryTokenBoardRows(baseInner, tail, params);
 }
 
 export async function countTokensByCreator(creatorAddress: string): Promise<number> {

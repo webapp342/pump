@@ -40,3 +40,27 @@ export function sortTokensByMcap(tokens: TokenListItem[]): TokenListItem[] {
     (a, b) => Number(b.marketCapBnb ?? 0) - Number(a.marketCapBnb ?? 0)
   );
 }
+
+/** Main board rows override strip/ticker duplicates — portfolio metrics win. */
+export function buildTokenBoardCatalog(
+  primary: TokenListItem[],
+  ...fallbackLists: TokenListItem[][]
+): Map<string, TokenListItem> {
+  const map = new Map<string, TokenListItem>();
+  for (const list of fallbackLists) {
+    for (const token of list) {
+      map.set(token.address.toLowerCase(), token);
+    }
+  }
+  for (const token of primary) {
+    map.set(token.address.toLowerCase(), token);
+  }
+  return map;
+}
+
+export function tokenFromBoardCatalog(
+  catalog: Map<string, TokenListItem>,
+  address: string
+): TokenListItem | undefined {
+  return catalog.get(address.toLowerCase());
+}
