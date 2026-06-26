@@ -3,11 +3,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { getActiveToasts, subscribeToasts, toast, type ToastItem } from "@/lib/toast";
 
-const MAX_VISIBLE = 5;
-const TRADE_ORDER_PREFIX = "trade-order-";
+const MAX_VISIBLE = 4;
+const TRADE_ACTIVITY_ID = "trade-activity";
 
 function toastPriority(item: ToastItem): number {
-  if (item.id.startsWith(TRADE_ORDER_PREFIX) && item.tone === "loading") return 100;
+  if (item.id === TRADE_ACTIVITY_ID && item.tone === "loading") return 100;
   if (item.tone === "loading") return 80;
   if (item.tone === "error") return 60;
   return 40;
