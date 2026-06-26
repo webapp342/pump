@@ -81,9 +81,7 @@ export function WatchlistContent({
     <ul className="toolbar-sheet-list">
       {watchlistTokens.map((token) => {
         const addressKey = token.address.toLowerCase();
-        const mcapUsd =
-          animatedCaps[`${addressKey}:cap:mcap`] ??
-          bnbToUsd(Number(token.marketCapBnb), bnbUsd);
+        const mcapUsd = bnbToUsd(Number(token.marketCapBnb), bnbUsd);
         const symbolLabel = `$${token.symbol}`;
 
         return (

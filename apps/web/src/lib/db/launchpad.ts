@@ -8,6 +8,10 @@ import {
   BONDING_VIRTUAL_BNB_HUMAN,
   spotPriceBnbFromBondingDecimals,
 } from "@/lib/bonding-curve";
+import {
+  resolveBondingListAthMarketCapBnb,
+  resolveBondingListMarketCapBnb,
+} from "@/lib/bonding-list-metrics";
 
 /** SQL: marginal spot from bonding_state reserves (human units). */
 const SQL_BONDING_MARK_PRICE_ZUG = `
@@ -21,6 +25,12 @@ const SQL_BONDING_MARK_PRICE_ZUG = `
 
 /** SQL: FDV / market cap from bonding mark price × 1B supply. */
 const SQL_BONDING_MARK_CAP_ZUG = `((${SQL_BONDING_MARK_PRICE_ZUG}) * ${BONDING_TOKEN_SUPPLY_HUMAN})`;
+
+/** Bonding snapshot columns for TS mark-cap normalization (portfolio + arena). */
+const SQL_BONDING_LIST_SNAPSHOT = `
+      COALESCE(b.token_sold, 0)::text AS token_sold,
+      COALESCE(b.virtual_zug_reserve, ${BONDING_VIRTUAL_BNB_HUMAN})::text AS virtual_zug_reserve,
+      COALESCE(b.virtual_token_reserve, ${BONDING_TOKEN_SUPPLY_HUMAN})::text AS virtual_token_reserve`;
 
 function resolvePositionMarkPriceBnb(
   reserveZug: string | null | undefined,
@@ -132,6 +142,9 @@ type TokenListQueryRow = {
   logo_url: string | null;
   progress_bps: number;
   reserve_zug: string;
+  token_sold: string;
+  virtual_zug_reserve: string;
+  virtual_token_reserve: string;
   market_cap_zug: string;
   ath_market_cap_zug: string;
   trade_count: number;
@@ -156,6 +169,12 @@ function mapTokenListRow(row: TokenListQueryRow): TokenListItem {
   const change24hTxnsPct =
     tradeCount24hAgo > 0 ? ((tradeCount - tradeCount24hAgo) / tradeCount24hAgo) * 100 : null;
 
+  const marketCapBnb = resolveBondingListMarketCapBnb(row);
+  const athMarketCapBnb = resolveBondingListAthMarketCapBnb(
+    marketCapBnb,
+    row.ath_market_cap_zug
+  );
+
   return {
     address: row.address,
     symbol: row.symbol,
@@ -166,8 +185,8 @@ function mapTokenListRow(row: TokenListQueryRow): TokenListItem {
     launchBlockNumber: row.launch_block_number,
     progressBps: row.progress_bps,
     reserveBnb: row.reserve_zug,
-    marketCapBnb: row.market_cap_zug,
-    athMarketCapBnb: row.ath_market_cap_zug,
+    marketCapBnb,
+    athMarketCapBnb,
     tradeCount,
     volume24hBnb: row.volume_24h_zug,
     traders24h: row.traders_24h,
@@ -193,6 +212,7 @@ const TOKEN_LIST_SELECT = `
       bt.logo_url,
       COALESCE(b.progress_bps, 0) AS progress_bps,
       COALESCE(b.reserve_zug, 0)::text AS reserve_zug,
+      ${SQL_BONDING_LIST_SNAPSHOT},
       (${SQL_BONDING_MARK_CAP_ZUG})::text AS market_cap_zug,
       COALESCE(
         ts.ath_price_zug * 1000000000,
@@ -273,6 +293,7 @@ const TOKEN_LIST_SELECT_BONDING = `
       bt.logo_url,
       COALESCE(b.progress_bps, 0) AS progress_bps,
       COALESCE(b.reserve_zug, 0)::text AS reserve_zug,
+      ${SQL_BONDING_LIST_SNAPSHOT},
       (${SQL_BONDING_MARK_CAP_ZUG})::text AS market_cap_zug,
       COALESCE(
         ts.ath_price_zug * 1000000000,
@@ -353,6 +374,7 @@ const TOKEN_LIST_SELECT_MV = `
       bt.logo_url,
       COALESCE(b.progress_bps, 0) AS progress_bps,
       COALESCE(b.reserve_zug, 0)::text AS reserve_zug,
+      ${SQL_BONDING_LIST_SNAPSHOT},
       (${SQL_BONDING_MARK_CAP_ZUG})::text AS market_cap_zug,
       COALESCE(
         mts.ath_price_zug * 1000000000,
@@ -403,6 +425,7 @@ const TOKEN_LIST_SELECT_BOARD_STATS = `
       bt.logo_url,
       COALESCE(b.progress_bps, 0) AS progress_bps,
       COALESCE(b.reserve_zug, 0)::text AS reserve_zug,
+      ${SQL_BONDING_LIST_SNAPSHOT},
       (${SQL_BONDING_MARK_CAP_ZUG})::text AS market_cap_zug,
       COALESCE(
         mts.ath_price_zug * 1000000000,
@@ -1066,10 +1089,12 @@ export async function getTokenByAddress(address: string): Promise<TokenDetail | 
     launch_tx_hash: string;
     progress_bps: number;
     reserve_zug: string;
+    token_sold: string;
+    virtual_zug_reserve: string;
+    virtual_token_reserve: string;
     market_cap_zug: string;
     holder_count: number;
     target_zug: string;
-    token_sold: string;
     trade_count: number;
     last_price_zug: string;
     creator_follower_count: number;
@@ -1089,10 +1114,10 @@ export async function getTokenByAddress(address: string): Promise<TokenDetail | 
       t.launch_tx_hash,
       COALESCE(b.progress_bps, 0) AS progress_bps,
       COALESCE(b.reserve_zug, 0)::text AS reserve_zug,
-      COALESCE(b.market_cap_zug, 0)::text AS market_cap_zug,
+      ${SQL_BONDING_LIST_SNAPSHOT},
+      (${SQL_BONDING_MARK_CAP_ZUG})::text AS market_cap_zug,
       COALESCE(b.holder_count, 0) AS holder_count,
       COALESCE(b.target_zug, 0)::text AS target_zug,
-      COALESCE(b.token_sold, 0)::text AS token_sold,
       COALESCE(b.trade_count, 0) AS trade_count,
       COALESCE((${SQL_BONDING_MARK_PRICE_ZUG}), 0)::text AS last_price_zug,
       COALESCE((
@@ -1110,6 +1135,15 @@ export async function getTokenByAddress(address: string): Promise<TokenDetail | 
   const row = result.rows[0];
   if (!row) return null;
 
+  const marketCapBnb = resolveBondingListMarketCapBnb({
+    reserve_zug: row.reserve_zug,
+    token_sold: row.token_sold,
+    virtual_zug_reserve: row.virtual_zug_reserve,
+    virtual_token_reserve: row.virtual_token_reserve,
+    market_cap_zug: row.market_cap_zug,
+    ath_market_cap_zug: row.market_cap_zug,
+  });
+
   return {
     address: row.address,
     symbol: row.symbol,
@@ -1125,7 +1159,7 @@ export async function getTokenByAddress(address: string): Promise<TokenDetail | 
     creatorFollowerCount: row.creator_follower_count,
     progressBps: row.progress_bps,
     reserveBnb: row.reserve_zug,
-    marketCapBnb: row.market_cap_zug,
+    marketCapBnb,
     holderCount: row.holder_count,
     targetBnb: row.target_zug,
     tokenSold: row.token_sold,

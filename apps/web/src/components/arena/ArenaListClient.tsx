@@ -776,6 +776,7 @@ export function ArenaListClient({
         const nextTop = sortTokensByMcap(
           mergeBoardTokenLists(body.topByMcap ?? [], nextTokens)
         );
+        setAnimatedCaps({});
         setTopByMcap(nextTop);
         setKothSummary(body.koth ?? null);
         setServerFilterCounts(body.meta?.filterCounts ?? null);
@@ -1004,40 +1005,6 @@ export function ArenaListClient({
       capAnimFrameRef.current = {};
     };
   }, []);
-
-  useEffect(() => {
-    if (!tokens) return;
-
-    for (const token of tokens) {
-      const address = token.address.toLowerCase();
-      const mcapTarget = bnbToUsd(Number(token.marketCapBnb), effectiveBnbUsd);
-      const athTarget = bnbToUsd(Number(token.athMarketCapBnb ?? token.marketCapBnb), effectiveBnbUsd);
-      const vol24hTarget = bnbToUsd(Number(token.volume24hBnb ?? 0), effectiveBnbUsd);
-
-      if (mcapTarget != null && Number.isFinite(mcapTarget)) {
-        const key = `${address}:cap:mcap`;
-        if (animatedCapsRef.current[key] == null) setAnimatedCap(key, mcapTarget);
-        else animateCap(key, mcapTarget);
-      }
-      if (athTarget != null && Number.isFinite(athTarget)) {
-        const key = `${address}:cap:ath`;
-        if (animatedCapsRef.current[key] == null) setAnimatedCap(key, athTarget);
-        else animateCap(key, athTarget);
-      }
-      if (vol24hTarget != null && Number.isFinite(vol24hTarget)) {
-        const key = `${address}:cap:vol24h`;
-        if (animatedCapsRef.current[key] == null) setAnimatedCap(key, vol24hTarget);
-        else animateCap(key, vol24hTarget);
-      }
-
-      const priceTarget = listTokenPriceUsd(token.marketCapBnb, effectiveBnbUsd);
-      if (priceTarget != null && Number.isFinite(priceTarget)) {
-        const key = `${address}:cap:price`;
-        if (animatedCapsRef.current[key] == null) setAnimatedCap(key, priceTarget);
-        else animateCap(key, priceTarget);
-      }
-    }
-  }, [tokens, effectiveBnbUsd, animateCap, setAnimatedCap]);
 
   const resolvedTokens = tokens ?? [];
   const arenaTokenPool = useMemo(() => {
@@ -1618,9 +1585,7 @@ export function ArenaListClient({
           >
             {cardsTokens.map((token) => {
               const addressKey = token.address.toLowerCase();
-              const mcapUsd =
-                animatedCaps[`${addressKey}:cap:mcap`] ??
-                bnbToUsd(Number(token.marketCapBnb), effectiveBnbUsd);
+              const mcapUsd = bnbToUsd(Number(token.marketCapBnb), effectiveBnbUsd);
               const isKoth = kothToken?.address.toLowerCase() === addressKey;
 
               return (
@@ -1649,12 +1614,8 @@ export function ArenaListClient({
         <div className="arena-explore-list lg:hidden">
           {exploreBoardTokens.map((token, index) => {
             const addressKey = token.address.toLowerCase();
-            const mcapUsd =
-              animatedCaps[`${addressKey}:cap:mcap`] ??
-              bnbToUsd(Number(token.marketCapBnb), effectiveBnbUsd);
-            const priceUsd =
-              animatedCaps[`${addressKey}:cap:price`] ??
-              listTokenPriceUsd(token.marketCapBnb, effectiveBnbUsd);
+            const mcapUsd = bnbToUsd(Number(token.marketCapBnb), effectiveBnbUsd);
+            const priceUsd = listTokenPriceUsd(token.marketCapBnb, effectiveBnbUsd);
             return (
               <HoldingSwipeRow
                 key={token.address}
@@ -1707,15 +1668,12 @@ export function ArenaListClient({
           <tbody>
             {exploreBoardTokens.map((token, index) => {
               const addressKey = token.address.toLowerCase();
-              const mcapUsd =
-                animatedCaps[`${addressKey}:cap:mcap`] ??
-                bnbToUsd(Number(token.marketCapBnb), effectiveBnbUsd);
-              const athMcapUsd =
-                animatedCaps[`${addressKey}:cap:ath`] ??
-                bnbToUsd(Number(token.athMarketCapBnb ?? token.marketCapBnb), effectiveBnbUsd);
-              const vol24hUsd =
-                animatedCaps[`${addressKey}:cap:vol24h`] ??
-                bnbToUsd(Number(token.volume24hBnb ?? 0), effectiveBnbUsd);
+              const mcapUsd = bnbToUsd(Number(token.marketCapBnb), effectiveBnbUsd);
+              const athMcapUsd = bnbToUsd(
+                Number(token.athMarketCapBnb ?? token.marketCapBnb),
+                effectiveBnbUsd
+              );
+              const vol24hUsd = bnbToUsd(Number(token.volume24hBnb ?? 0), effectiveBnbUsd);
               return (
                 <tr
                   key={token.address}
