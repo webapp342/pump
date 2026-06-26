@@ -9,7 +9,6 @@ import {
 import {
   getArenaFilterCounts,
   getKothSummary,
-  hydrateTokenBoardList,
   listArenaBoardTokens,
   listTopTokensByMcap,
   type ArenaBoardFilter,
@@ -21,7 +20,6 @@ import {
   type TokenListItem,
 } from "@/lib/db/launchpad";
 import { RECENT_STRIP_DESKTOP } from "@/lib/recent-strip-limits";
-import { sortTokensByMcap } from "@/lib/arena-board-merge";
 
 export const ARENA_HOME_LIMIT = 50;
 const TOP_MCAP_LIMIT = 20;
@@ -76,7 +74,7 @@ export async function loadArenaHomePayloadFromDb(
   const filter = options.filter ?? "new";
   const airdropAddresses = options.airdropAddresses ?? [];
 
-  const [rawBoard, rawTop, koth, filterCounts, bnbPrice] = await Promise.all([
+  const [tokens, topByMcapFromDb, koth, filterCounts, bnbPrice] = await Promise.all([
     listArenaBoardTokens({
       limit,
       offset: 0,
@@ -91,16 +89,11 @@ export async function loadArenaHomePayloadFromDb(
     fetchBnbUsdPrice(),
   ]);
 
-  const [data, topByMcap] = await Promise.all([
-    hydrateTokenBoardList(rawBoard),
-    hydrateTokenBoardList(rawTop).then((tokens) => sortTokensByMcap(tokens)),
-  ]);
-
   const filteredTotal = filterCounts[filterCountKey(filter)];
 
   return {
-    data,
-    topByMcap,
+    data: tokens,
+    topByMcap: topByMcapFromDb,
     koth,
     meta: {
       total: filterCounts.all,

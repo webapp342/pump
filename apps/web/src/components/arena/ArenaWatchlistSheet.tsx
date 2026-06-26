@@ -15,12 +15,14 @@ type ArenaWatchlistSheetProps = {
   tokens: TokenListItem[];
   bnbUsd: number | null;
   flashes: Record<string, FlashTone>;
+  animatedCaps: Record<string, number>;
 };
 
 export function ArenaWatchlistSheet({
   tokens,
   bnbUsd,
   flashes,
+  animatedCaps,
 }: ArenaWatchlistSheetProps) {
   const [open, setOpen] = useState(false);
   const { isConnected } = useAccount();
@@ -70,6 +72,7 @@ export function ArenaWatchlistSheet({
           tokens={tokens}
           bnbUsd={bnbUsd}
           flashes={flashes}
+          animatedCaps={animatedCaps}
         />
       </ToolbarSheet>
     </>

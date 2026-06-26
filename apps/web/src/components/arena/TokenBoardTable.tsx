@@ -3,8 +3,7 @@ import type { TokenListItem } from "@/lib/db/launchpad";
 import { TokenAvatar } from "@/components/token/TokenAvatar";
 import { TableHeaderLabel } from "@/components/ui/IconLabel";
 import { MetricIcons } from "@/lib/metric-icons";
-import { formatUsdReadable } from "@/lib/format-usd";
-import { tokenBoardMetricsUsd } from "@/lib/token-board-metrics";
+import { bnbToUsd, formatUsdReadable } from "@/lib/format-usd";
 import { PctChange } from "@/components/ui/PctChange";
 import {
   formatAge,
@@ -81,10 +80,12 @@ export function TokenBoardTable({
         </thead>
         <tbody>
           {tokens.map((token, index) => {
-            const { mcapUsd, athUsd: athMcapUsd, vol24hUsd } = tokenBoardMetricsUsd(
-              token,
+            const mcapUsd = bnbToUsd(Number(token.marketCapBnb), bnbUsd);
+            const athMcapUsd = bnbToUsd(
+              Number(token.athMarketCapBnb ?? token.marketCapBnb),
               bnbUsd
             );
+            const vol24hUsd = bnbToUsd(Number(token.volume24hBnb ?? 0), bnbUsd);
             const trendPoints = [
               token.change24hPct ?? 0,
               token.change6hPct ?? 0,

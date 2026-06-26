@@ -8,10 +8,6 @@ import {
   BONDING_VIRTUAL_BNB_HUMAN,
   spotPriceBnbFromBondingDecimals,
 } from "@/lib/bonding-curve";
-import {
-  resolveBondingListAthMarketCapBnb,
-  resolveBondingListMarketCapBnb,
-} from "@/lib/bonding-list-metrics";
 
 /** SQL: marginal spot from bonding_state reserves (human units). */
 const SQL_BONDING_MARK_PRICE_ZUG = `
@@ -25,12 +21,6 @@ const SQL_BONDING_MARK_PRICE_ZUG = `
 
 /** SQL: FDV / market cap from bonding mark price × 1B supply. */
 const SQL_BONDING_MARK_CAP_ZUG = `((${SQL_BONDING_MARK_PRICE_ZUG}) * ${BONDING_TOKEN_SUPPLY_HUMAN})`;
-
-/** Bonding snapshot columns for TS mark-cap normalization (portfolio + arena). */
-const SQL_BONDING_LIST_SNAPSHOT = `
-      COALESCE(b.token_sold, 0)::text AS token_sold,
-      COALESCE(b.virtual_zug_reserve, ${BONDING_VIRTUAL_BNB_HUMAN})::text AS virtual_zug_reserve,
-      COALESCE(b.virtual_token_reserve, ${BONDING_TOKEN_SUPPLY_HUMAN})::text AS virtual_token_reserve`;
 
 function resolvePositionMarkPriceBnb(
   reserveZug: string | null | undefined,
@@ -142,9 +132,6 @@ type TokenListQueryRow = {
   logo_url: string | null;
   progress_bps: number;
   reserve_zug: string;
-  token_sold: string;
-  virtual_zug_reserve: string;
-  virtual_token_reserve: string;
   market_cap_zug: string;
   ath_market_cap_zug: string;
   trade_count: number;
@@ -169,12 +156,6 @@ function mapTokenListRow(row: TokenListQueryRow): TokenListItem {
   const change24hTxnsPct =
     tradeCount24hAgo > 0 ? ((tradeCount - tradeCount24hAgo) / tradeCount24hAgo) * 100 : null;
 
-  const marketCapBnb = resolveBondingListMarketCapBnb(row);
-  const athMarketCapBnb = resolveBondingListAthMarketCapBnb(
-    marketCapBnb,
-    row.ath_market_cap_zug
-  );
-
   return {
     address: row.address,
     symbol: row.symbol,
@@ -185,8 +166,8 @@ function mapTokenListRow(row: TokenListQueryRow): TokenListItem {
     launchBlockNumber: row.launch_block_number,
     progressBps: row.progress_bps,
     reserveBnb: row.reserve_zug,
-    marketCapBnb,
-    athMarketCapBnb,
+    marketCapBnb: row.market_cap_zug,
+    athMarketCapBnb: row.ath_market_cap_zug,
     tradeCount,
     volume24hBnb: row.volume_24h_zug,
     traders24h: row.traders_24h,
@@ -212,7 +193,6 @@ const TOKEN_LIST_SELECT = `
       bt.logo_url,
       COALESCE(b.progress_bps, 0) AS progress_bps,
       COALESCE(b.reserve_zug, 0)::text AS reserve_zug,
-      ${SQL_BONDING_LIST_SNAPSHOT},
       (${SQL_BONDING_MARK_CAP_ZUG})::text AS market_cap_zug,
       COALESCE(
         ts.ath_price_zug * 1000000000,
@@ -293,7 +273,6 @@ const TOKEN_LIST_SELECT_BONDING = `
       bt.logo_url,
       COALESCE(b.progress_bps, 0) AS progress_bps,
       COALESCE(b.reserve_zug, 0)::text AS reserve_zug,
-      ${SQL_BONDING_LIST_SNAPSHOT},
       (${SQL_BONDING_MARK_CAP_ZUG})::text AS market_cap_zug,
       COALESCE(
         ts.ath_price_zug * 1000000000,
@@ -374,7 +353,6 @@ const TOKEN_LIST_SELECT_MV = `
       bt.logo_url,
       COALESCE(b.progress_bps, 0) AS progress_bps,
       COALESCE(b.reserve_zug, 0)::text AS reserve_zug,
-      ${SQL_BONDING_LIST_SNAPSHOT},
       (${SQL_BONDING_MARK_CAP_ZUG})::text AS market_cap_zug,
       COALESCE(
         mts.ath_price_zug * 1000000000,
@@ -423,20 +401,22 @@ const TOKEN_LIST_SELECT_BOARD_STATS = `
       bt.created_at,
       bt.launch_block_number,
       bt.logo_url,
-      COALESCE(b.progress_bps, 0) AS progress_bps,
-      COALESCE(b.reserve_zug, 0)::text AS reserve_zug,
-      ${SQL_BONDING_LIST_SNAPSHOT},
-      (${SQL_BONDING_MARK_CAP_ZUG})::text AS market_cap_zug,
+      COALESCE(tbs.progress_bps, b.progress_bps, 0) AS progress_bps,
+      COALESCE(b.reserve_zug, tbs.reserve_zug, 0)::text AS reserve_zug,
+      COALESCE((${SQL_BONDING_MARK_CAP_ZUG}), 0)::text AS market_cap_zug,
       COALESCE(
-        mts.ath_price_zug * 1000000000,
+        GREATEST(
+          (${SQL_BONDING_MARK_CAP_ZUG}),
+          COALESCE(mts.ath_price_zug * 1000000000, 0)
+        ),
         (${SQL_BONDING_MARK_CAP_ZUG}),
         0
       )::text AS ath_market_cap_zug,
-      COALESCE(mts.trade_count, COALESCE(b.trade_count, 0)) AS trade_count,
-      COALESCE(mts.volume_24h_zug, '0') AS volume_24h_zug,
-      COALESCE(mts.volume_24h_prev_zug, '0') AS volume_24h_prev_zug,
-      COALESCE(mts.trade_count_24h_ago, 0) AS trade_count_24h_ago,
-      COALESCE(mts.traders_24h, 0) AS traders_24h,
+      COALESCE(mts.trade_count, COALESCE(tbs.trade_count, b.trade_count, 0)) AS trade_count,
+      COALESCE(mts.volume_24h_zug, tbs.volume_24h_zug, 0)::text AS volume_24h_zug,
+      COALESCE(mts.volume_24h_prev_zug, tbs.volume_24h_prev_zug, 0)::text AS volume_24h_prev_zug,
+      COALESCE(mts.trade_count_24h_ago, tbs.trade_count_24h_ago, 0) AS trade_count_24h_ago,
+      COALESCE(mts.traders_24h, tbs.traders_24h, 0) AS traders_24h,
       CASE
         WHEN mpa.price_1h_ago IS NOT NULL AND mpa.price_1h_ago > 0
           THEN ((((${SQL_BONDING_MARK_PRICE_ZUG}) - mpa.price_1h_ago) / mpa.price_1h_ago) * 100)::text
@@ -460,22 +440,26 @@ const TOKEN_LIST_SELECT_BOARD_STATS = `
       COALESCE(tbs.holder_count, b.holder_count, 0) AS holder_count
     FROM base_tokens bt
     LEFT JOIN bonding_states b ON b.token_address = bt.address
+    LEFT JOIN token_board_stats tbs ON tbs.token_address = bt.address
     LEFT JOIN mv_token_trade_stats mts ON mts.token_address = bt.address
     LEFT JOIN mv_token_price_anchors mpa ON mpa.token_address = bt.address
-    LEFT JOIN token_board_stats tbs ON tbs.token_address = bt.address
 `;
 
 function buildTokenListSelectSql(baseTokensInner: string): string {
-  // Portfolio + arena share the same metrics SELECT (bonding spot × supply + MV stats).
-  if (useTokenBoardStats() || useMvTokenStats()) {
-    const select = useTokenBoardStats()
-      ? TOKEN_LIST_SELECT_BOARD_STATS
-      : TOKEN_LIST_SELECT_MV;
+  if (useTokenBoardStats()) {
     return `
     WITH base_tokens AS (
       ${baseTokensInner}
     )
-    ${select}`;
+    ${TOKEN_LIST_SELECT_BOARD_STATS}`;
+  }
+
+  if (useMvTokenStats()) {
+    return `
+    WITH base_tokens AS (
+      ${baseTokensInner}
+    )
+    ${TOKEN_LIST_SELECT_MV}`;
   }
 
   const select = useBondingStateCounts() ? TOKEN_LIST_SELECT_BONDING : TOKEN_LIST_SELECT;
@@ -567,14 +551,21 @@ export async function listArenaBoardTokens(
     filter,
     airdropAddresses
   );
-  const queryParams =
-    filterParams.length > 0 ? [limit, offset, ...filterParams] : [limit, offset];
+  const sql = `
+    SELECT *
+    FROM (
+      ${buildTokenListSelectSql(ARENA_TOKEN_BASE_INNER)}
+    ) arena_list
+    ${filterClause}
+    ${arenaBoardOrderClause(sortKey, sortDir)}
+    LIMIT $1 OFFSET $2
+  `;
 
-  return queryTokenBoardRows(
-    ARENA_TOKEN_BASE_INNER,
-    `${filterClause} ${arenaBoardOrderClause(sortKey, sortDir)} LIMIT $1 OFFSET $2`,
-    queryParams
-  );
+  const db = getLaunchpadReadPool();
+  const queryParams =
+    filterParams.length > 0 ? [limit, offset, filterParams] : [limit, offset];
+  const result = await db.query<TokenListQueryRow>(sql, queryParams);
+  return result.rows.map(mapTokenListRow);
 }
 
 export async function listTokenListItemsByAddresses(
@@ -604,7 +595,10 @@ export async function listTokenListItemsByAddresses(
         AND LOWER(t.address) = ANY($1::text[])
     `;
 
-  return queryTokenBoardRows(baseInner, "ORDER BY created_at DESC", [normalized]);
+  const db = getLaunchpadReadPool();
+  const sql = `${buildTokenListSelectSql(baseInner)} ORDER BY bt.created_at DESC`;
+  const result = await db.query<TokenListQueryRow>(sql, [normalized]);
+  return result.rows.map(mapTokenListRow);
 }
 
 async function countKothContenders(): Promise<number> {
@@ -665,53 +659,11 @@ const ARENA_TOKEN_BASE_INNER = `
       WHERE t.is_hidden = false
     `;
 
-/** Portfolio + arena board rows — one SQL envelope, one mapTokenListRow. */
-async function queryTokenBoardRows(
-  baseTokensInner: string,
-  tailSql: string,
-  params: unknown[] = []
-): Promise<TokenListItem[]> {
-  const db = getLaunchpadReadPool();
-  const sql = `
-    SELECT *
-    FROM (
-      ${buildTokenListSelectSql(baseTokensInner)}
-    ) board_rows
-    ${tailSql}
-  `;
-  const result = await db.query<TokenListQueryRow>(sql, params);
-  return result.rows.map(mapTokenListRow);
-}
-
-/**
- * Re-load metrics via listTokenListItemsByAddresses — same path as portfolio
- * `/api/portfolio/created-tokens` (listTokensByCreator inner query).
- */
-export async function hydrateTokenBoardList(
-  items: TokenListItem[]
-): Promise<TokenListItem[]> {
-  if (items.length === 0) return [];
-
-  const canonical = await listTokenListItemsByAddresses(
-    items.map((token) => token.address)
-  );
-  const byAddress = new Map(
-    canonical.map((token) => [token.address.toLowerCase(), token])
-  );
-
-  return items.map(
-    (token) => byAddress.get(token.address.toLowerCase()) ?? token
-  );
-}
-
 function arenaListOrderBy(sort: ArenaListSort): string {
   if (sort === "age") {
-    return "ORDER BY created_at DESC";
+    return "ORDER BY bt.created_at DESC";
   }
-  if (sort === "mcap") {
-    return "ORDER BY market_cap_zug::numeric DESC NULLS LAST, created_at DESC";
-  }
-  return "ORDER BY market_cap_zug::numeric DESC NULLS LAST, created_at DESC";
+  return "ORDER BY COALESCE(b.market_cap_zug, 0) DESC, bt.created_at DESC";
 }
 
 export async function listTokensPaginated(
@@ -720,12 +672,14 @@ export async function listTokensPaginated(
   const limit = options.limit ?? 50;
   const offset = options.offset ?? 0;
   const sort = options.sort ?? "age";
-
-  return queryTokenBoardRows(
+  const db = getLaunchpadReadPool();
+  const sql = buildTokenListSql(
     ARENA_TOKEN_BASE_INNER,
-    `${arenaListOrderBy(sort)} LIMIT $1 OFFSET $2`,
-    [limit, offset]
+    `${arenaListOrderBy(sort)} LIMIT $1 OFFSET $2`
   );
+  const result = await db.query<TokenListQueryRow>(sql, [limit, offset]);
+
+  return result.rows.map(mapTokenListRow);
 }
 
 export async function listTokens(limit = 50): Promise<TokenListItem[]> {
@@ -859,8 +813,21 @@ export async function listTokensByCreator(
   limit?: number,
   offset = 0
 ): Promise<TokenListItem[]> {
+  const db = getLaunchpadReadPool();
   const normalized = creatorAddress.toLowerCase();
-  const baseInner = `
+  let orderBy = limit ? "ORDER BY bt.created_at DESC LIMIT $2" : "ORDER BY bt.created_at DESC";
+  const params: (string | number)[] = [normalized];
+
+  if (limit) {
+    params.push(limit);
+    if (offset > 0) {
+      orderBy += " OFFSET $3";
+      params.push(offset);
+    }
+  }
+
+  const sql = buildTokenListSql(
+    `
       SELECT
         t.address,
         t.symbol,
@@ -873,21 +840,13 @@ export async function listTokensByCreator(
       FROM tokens t
       WHERE t.creator_address = $1
         AND t.is_hidden = false
-    `;
+      ORDER BY t.created_at DESC
+    `,
+    orderBy
+  );
+  const result = await db.query<TokenListQueryRow>(sql, params);
 
-  let tail = "ORDER BY created_at DESC";
-  const params: (string | number)[] = [normalized];
-
-  if (limit) {
-    tail += " LIMIT $2";
-    params.push(limit);
-    if (offset > 0) {
-      tail += " OFFSET $3";
-      params.push(offset);
-    }
-  }
-
-  return queryTokenBoardRows(baseInner, tail, params);
+  return result.rows.map(mapTokenListRow);
 }
 
 export async function countTokensByCreator(creatorAddress: string): Promise<number> {
@@ -1107,12 +1066,10 @@ export async function getTokenByAddress(address: string): Promise<TokenDetail | 
     launch_tx_hash: string;
     progress_bps: number;
     reserve_zug: string;
-    token_sold: string;
-    virtual_zug_reserve: string;
-    virtual_token_reserve: string;
     market_cap_zug: string;
     holder_count: number;
     target_zug: string;
+    token_sold: string;
     trade_count: number;
     last_price_zug: string;
     creator_follower_count: number;
@@ -1132,10 +1089,10 @@ export async function getTokenByAddress(address: string): Promise<TokenDetail | 
       t.launch_tx_hash,
       COALESCE(b.progress_bps, 0) AS progress_bps,
       COALESCE(b.reserve_zug, 0)::text AS reserve_zug,
-      ${SQL_BONDING_LIST_SNAPSHOT},
-      (${SQL_BONDING_MARK_CAP_ZUG})::text AS market_cap_zug,
+      COALESCE(b.market_cap_zug, 0)::text AS market_cap_zug,
       COALESCE(b.holder_count, 0) AS holder_count,
       COALESCE(b.target_zug, 0)::text AS target_zug,
+      COALESCE(b.token_sold, 0)::text AS token_sold,
       COALESCE(b.trade_count, 0) AS trade_count,
       COALESCE((${SQL_BONDING_MARK_PRICE_ZUG}), 0)::text AS last_price_zug,
       COALESCE((
@@ -1153,15 +1110,6 @@ export async function getTokenByAddress(address: string): Promise<TokenDetail | 
   const row = result.rows[0];
   if (!row) return null;
 
-  const marketCapBnb = resolveBondingListMarketCapBnb({
-    reserve_zug: row.reserve_zug,
-    token_sold: row.token_sold,
-    virtual_zug_reserve: row.virtual_zug_reserve,
-    virtual_token_reserve: row.virtual_token_reserve,
-    market_cap_zug: row.market_cap_zug,
-    ath_market_cap_zug: row.market_cap_zug,
-  });
-
   return {
     address: row.address,
     symbol: row.symbol,
@@ -1177,7 +1125,7 @@ export async function getTokenByAddress(address: string): Promise<TokenDetail | 
     creatorFollowerCount: row.creator_follower_count,
     progressBps: row.progress_bps,
     reserveBnb: row.reserve_zug,
-    marketCapBnb,
+    marketCapBnb: row.market_cap_zug,
     holderCount: row.holder_count,
     targetBnb: row.target_zug,
     tokenSold: row.token_sold,

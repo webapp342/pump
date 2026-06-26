@@ -7,7 +7,7 @@ import { useOpenConnectModal } from "@/hooks/useOpenConnectModal";
 import type { TokenListItem } from "@/lib/db/launchpad";
 import { TokenAvatar } from "@/components/token/TokenAvatar";
 import { useFavorites } from "@/components/favorites/FavoritesProvider";
-import { tokenBoardMetricsUsd } from "@/lib/token-board-metrics";
+import { bnbToUsd } from "@/lib/format-usd";
 import { PctChange } from "@/components/ui/PctChange";
 import { formatCapForBoard } from "@/lib/arena-board-format";
 import { ICON_STROKE } from "@/lib/icons";
@@ -24,6 +24,7 @@ export type WatchlistContentProps = {
   tokens: TokenListItem[];
   bnbUsd: number | null;
   flashes: Record<string, FlashTone>;
+  animatedCaps: Record<string, number>;
 };
 
 export function useWatchlistTokens(tokens: TokenListItem[]) {
@@ -38,6 +39,7 @@ export function WatchlistContent({
   tokens,
   bnbUsd,
   flashes,
+  animatedCaps,
 }: WatchlistContentProps) {
   const { toggleFavorite, loading } = useFavorites();
   const { isConnected } = useAccount();
@@ -79,7 +81,9 @@ export function WatchlistContent({
     <ul className="toolbar-sheet-list">
       {watchlistTokens.map((token) => {
         const addressKey = token.address.toLowerCase();
-        const { mcapUsd } = tokenBoardMetricsUsd(token, bnbUsd);
+        const mcapUsd =
+          animatedCaps[`${addressKey}:cap:mcap`] ??
+          bnbToUsd(Number(token.marketCapBnb), bnbUsd);
         const symbolLabel = `$${token.symbol}`;
 
         return (

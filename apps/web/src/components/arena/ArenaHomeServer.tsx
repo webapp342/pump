@@ -8,7 +8,7 @@ export async function ArenaHomeServer() {
 
   let initialPayload = null;
   try {
-    initialPayload = await loadArenaHomePayloadFromDb({
+    initialPayload = await fetchArenaHomePayload({
       filter: "new",
       sortKey: "age",
       sortDir: "desc",
