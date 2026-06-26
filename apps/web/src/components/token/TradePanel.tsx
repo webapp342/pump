@@ -1471,6 +1471,10 @@ export function TradePanel({
       tokenBalanceWei: tokenWei,
       sellTokenWei: sellAmountWei,
       gasReserveWei: gasReserve,
+      gasPriceWei: gasPrice,
+      needsLegacyApproval: tradeSide === "sell" && needsLegacyApproval,
+      legacyApproveGasReserveWei:
+        tradeSide === "sell" ? legacyApproveGasReserveWei : undefined,
       publicClient: fastTradeConfirm ? createTradeHttpPublicClient() : undefined,
     });
   }

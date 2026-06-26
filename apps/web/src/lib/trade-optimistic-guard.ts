@@ -92,25 +92,61 @@ function conservativeGasReserve(
   return gasReserveWithHeadroom(base);
 }
 
+function stubGateInput(
+  partial: Pick<
+    InstantTradeGateInput,
+    "side" | "buyGasReserveWei" | "sellGasReserveWei" | "gasPriceWei"
+  > &
+    Partial<
+      Pick<InstantTradeGateInput, "needsLegacyApproval" | "legacyApproveGasReserveWei">
+    >
+): InstantTradeGateInput {
+  return {
+    side: partial.side,
+    paused: false,
+    wrongChain: false,
+    needsLegacyApproval: partial.needsLegacyApproval ?? false,
+    sellUsesPermit: false,
+    allowanceSufficient: true,
+    buyCostWei: partial.side === "buy" ? 1n : 0n,
+    sellTokenWei: partial.side === "sell" ? 1n : 0n,
+    buyGasReserveWei: partial.buyGasReserveWei,
+    sellGasReserveWei: partial.sellGasReserveWei,
+    legacyApproveGasReserveWei: partial.legacyApproveGasReserveWei,
+    maxBuySpendWei: 0n,
+    gasPriceWei: partial.gasPriceWei,
+  };
+}
+
 /** Gas headroom used by the instant gate — Max buy must reserve the same amount. */
 export function computeConservativeBuyGasReserve(
   buyGasReserveWei: bigint,
   gasPriceWei?: bigint
 ): bigint {
-  return conservativeGasReserve("buy", {
-    side: "buy",
-    paused: false,
-    wrongChain: false,
-    needsLegacyApproval: false,
-    sellUsesPermit: false,
-    allowanceSufficient: true,
-    buyCostWei: 1n,
-    sellTokenWei: 0n,
-    buyGasReserveWei,
-    sellGasReserveWei: 0n,
-    maxBuySpendWei: 0n,
-    gasPriceWei,
-  });
+  return conservativeGasReserve(
+    "buy",
+    stubGateInput({ side: "buy", buyGasReserveWei, sellGasReserveWei: 0n, gasPriceWei })
+  );
+}
+
+/** Same conservative gas reserve as the instant gate for sells. */
+export function computeConservativeSellGasReserve(
+  sellGasReserveWei: bigint,
+  gasPriceWei?: bigint,
+  legacyApproveGasReserveWei?: bigint,
+  needsLegacyApproval = false
+): bigint {
+  return conservativeGasReserve(
+    "sell",
+    stubGateInput({
+      side: "sell",
+      buyGasReserveWei: 0n,
+      sellGasReserveWei,
+      gasPriceWei,
+      legacyApproveGasReserveWei,
+      needsLegacyApproval,
+    })
+  );
 }
 
 /** Max ETH spend for buy that still passes the instant gate (balance − conservative gas). */
@@ -205,7 +241,11 @@ export type HardValidateInstantTradeInput = {
   bnbBalanceWei: bigint;
   tokenBalanceWei?: bigint;
   sellTokenWei?: bigint;
+  /** Panel gas estimate (pre-buffer) — paired with gasPriceWei for conservative reserve. */
   gasReserveWei: bigint;
+  gasPriceWei?: bigint;
+  needsLegacyApproval?: boolean;
+  legacyApproveGasReserveWei?: bigint;
   publicClient?: PublicClient;
 };
 
@@ -213,11 +253,15 @@ export type HardValidateInstantTradeInput = {
 export async function hardValidateInstantTrade(
   input: HardValidateInstantTradeInput
 ): Promise<void> {
-  const gasReserve = gasReserveWithHeadroom(
-    input.gasReserveWei > scwGasFloor()
-      ? input.gasReserveWei
-      : scwGasFloor()
-  );
+  const gasReserve =
+    input.side === "buy"
+      ? computeConservativeBuyGasReserve(input.gasReserveWei, input.gasPriceWei)
+      : computeConservativeSellGasReserve(
+          input.gasReserveWei,
+          input.gasPriceWei,
+          input.legacyApproveGasReserveWei,
+          input.needsLegacyApproval
+        );
 
   if (input.side === "buy") {
     if (input.callValueWei + gasReserve > input.bnbBalanceWei) {
@@ -237,7 +281,8 @@ export async function hardValidateInstantTrade(
   await assertScwReadyForUserOp(
     input.scwAddress,
     input.side === "buy" ? input.callValueWei : 0n,
-    input.publicClient
+    input.publicClient,
+    gasReserve
   );
 }
 

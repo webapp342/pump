@@ -16,12 +16,16 @@ export async function getScwNativeBalance(
 export async function assertScwReadyForUserOp(
   scwAddress: Address,
   callValueWei: bigint,
-  publicClient?: PublicClient
+  publicClient?: PublicClient,
+  /** Precomputed conservative gas reserve (from instant gate / hardValidate). */
+  gasReserveWei?: bigint
 ): Promise<void> {
   const client = publicClient ?? createPumpPublicClient();
   const balance = await getScwNativeBalance(scwAddress, client);
-  const gasPrice = await client.getGasPrice();
-  const gasReserve = bufferedGasCostWei(MIN_USER_OP_GAS_UNITS, gasPrice);
+  const gasReserve =
+    gasReserveWei != null && gasReserveWei > 0n
+      ? gasReserveWei
+      : bufferedGasCostWei(MIN_USER_OP_GAS_UNITS, await client.getGasPrice());
   const required = callValueWei + gasReserve;
 
   if (balance < required) {
