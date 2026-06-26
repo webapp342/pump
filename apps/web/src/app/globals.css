@@ -953,9 +953,9 @@ code,
     opacity: 0.92;
   }
 
+  /* Dark canvases only — slate is light; invert would wash the logo out on stone bg */
   [data-theme="dark"] .native-logo,
-  [data-theme="navy"] .native-logo,
-  [data-theme="slate"] .native-logo {
+  [data-theme="navy"] .native-logo {
     filter: brightness(0) invert(1);
   }
 
