@@ -78,6 +78,40 @@ async function fetchFlashblocksReceipt(
   return receipt;
 }
 
+/** Flashblocks when enabled; otherwise chain RPC via the trade public client. */
+async function resolveTransactionReceipt(
+  publicClient: PublicClient,
+  txHash: Hash,
+  deadline: number,
+  options?: UserOpConfirmationOptions
+): Promise<TransactionReceipt | undefined> {
+  const flashblocksReceipt = await fetchFlashblocksReceipt(txHash, deadline, options);
+  if (flashblocksReceipt) return flashblocksReceipt;
+
+  const remaining = deadline - Date.now();
+  if (remaining <= 0) return undefined;
+
+  try {
+    const instant = await publicClient.getTransactionReceipt({ hash: txHash });
+    if (instant) {
+      tradeTraceStep("chain.receipt_http.instant", {
+        txHash,
+        blockNumber: instant.blockNumber.toString(),
+      });
+      return instant;
+    }
+  } catch {
+    // not yet on RPC
+  }
+
+  tradeTraceStep("chain.receipt_wait.start", { txHash });
+  return publicClient.waitForTransactionReceipt({
+    hash: txHash,
+    pollingInterval: LEGACY_POLL_MS,
+    timeout: Math.min(remaining, CONFIRM_TIMEOUT_MS),
+  });
+}
+
 /**
  * Flashblocks trade path: WSS newHeads + fast bundler poll until UserOp is included,
  * then single deduped receipt fetch (HTTP instant → WSS).
@@ -196,6 +230,7 @@ async function waitViaFlashblocksTradeConfirm(
 
 async function waitViaBundlerReceipt(
   client: KernelAccountClient,
+  publicClient: PublicClient,
   userOpHash: Hash,
   deadline: number,
   options?: UserOpConfirmationOptions
@@ -231,8 +266,16 @@ async function waitViaBundlerReceipt(
       }
 
       const txHash = receipt.receipt.transactionHash;
-      const fbReceipt = await fetchFlashblocksReceipt(txHash, deadline, options);
-      return { txHash, receipt: fbReceipt, confirmPath: "bundler-receipt" };
+      tradeTraceStep("bundler.user_op_included", { userOpHash, txHash });
+      options?.onIncluded?.(txHash);
+
+      const chainReceipt = await resolveTransactionReceipt(
+        publicClient,
+        txHash,
+        deadline,
+        options
+      );
+      return { txHash, receipt: chainReceipt, confirmPath: "bundler-receipt" };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       const lower = message.toLowerCase();
@@ -260,7 +303,6 @@ export async function waitForUserOpConfirmation(
   fromBlock: bigint,
   options?: UserOpConfirmationOptions
 ): Promise<UserOpConfirmationResult> {
-  void publicClient;
   void fromBlock;
 
   const deadline = Date.now() + CONFIRM_TIMEOUT_MS;
@@ -274,5 +316,5 @@ export async function waitForUserOpConfirmation(
     return waitViaFlashblocksTradeConfirm(client, userOpHash, deadline, options);
   }
 
-  return waitViaBundlerReceipt(client, userOpHash, deadline, options);
+  return waitViaBundlerReceipt(client, publicClient, userOpHash, deadline, options);
 }

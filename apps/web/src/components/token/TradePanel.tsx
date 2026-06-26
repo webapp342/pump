@@ -260,6 +260,8 @@ export function TradePanel({
   const [pendingAction, setPendingAction] = useState<"buy" | "sell" | "approve" | null>(null);
   /** Sync side for callbacks — setState(pendingAction) may lag behind userOp submitted. */
   const pendingTradeSideRef = useRef<"buy" | "sell" | null>(null);
+  /** Persists until trade confirm completes — fallback receipt hook uses this when kernel omits receipt. */
+  const awaitingConfirmSideRef = useRef<"buy" | "sell" | null>(null);
   const optimisticPendingRef = useRef<{ id: string; side: "buy" | "sell" } | null>(null);
   const legacyApproveChainRef = useRef(false);
   const pendingSellRef = useRef<{ amountWei: bigint; minBnbOut: bigint } | null>(null);
@@ -556,6 +558,15 @@ export function TradePanel({
       });
     }
   }, [fallbackReceipt, kernelReceipt]);
+
+  useEffect(() => {
+    if (!fallbackReceipt || kernelReceipt || !txHash) return;
+    if (fallbackReceipt.transactionHash.toLowerCase() !== txHash.toLowerCase()) return;
+    if (handledReceiptHashRef.current?.toLowerCase() === txHash.toLowerCase()) return;
+    const side = awaitingConfirmSideRef.current;
+    if (!side) return;
+    handleBuySellConfirmed(side, { hash: txHash, receipt: fallbackReceipt });
+  }, [fallbackReceipt, kernelReceipt, txHash]);
 
   useEffect(() => {
     if (!writeError) return;
@@ -1294,6 +1305,7 @@ export function TradePanel({
 
     endTradeInFlight();
     setSubmitSuccess(null);
+    awaitingConfirmSideRef.current = null;
     void (async () => {
       const t0 = performance.now();
       tradeTraceStep("ux.refetch_balances.start");
@@ -1518,6 +1530,7 @@ export function TradePanel({
   }
 
   function pumpTradeCallbacks(side: "buy" | "sell"): KernelTradeWriteCallbacks {
+    awaitingConfirmSideRef.current = side;
     return {
       onSubmitted: ({ userOpHash: submittedHash }) => {
         if (!optimisticPendingRef.current) {
