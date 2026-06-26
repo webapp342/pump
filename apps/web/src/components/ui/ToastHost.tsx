@@ -3,7 +3,21 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { subscribeToasts, type ToastItem } from "@/lib/toast";
 
-const MAX_VISIBLE = 6;
+const MAX_VISIBLE = 8;
+const TRADE_ORDER_PREFIX = "trade-order-";
+
+function toastPriority(item: ToastItem): number {
+  if (item.id.startsWith(TRADE_ORDER_PREFIX) && item.tone === "loading") return 100;
+  if (item.tone === "loading") return 80;
+  if (item.tone === "error") return 60;
+  return 40;
+}
+
+function trimVisible(items: ToastItem[]): ToastItem[] {
+  if (items.length <= MAX_VISIBLE) return items;
+  const ranked = [...items].sort((a, b) => toastPriority(b) - toastPriority(a));
+  return ranked.slice(0, MAX_VISIBLE);
+}
 
 export function ToastHost() {
   const [items, setItems] = useState<ToastItem[]>([]);
@@ -35,7 +49,7 @@ export function ToastHost() {
       if (event.type === "push") {
         setItems((prev) => {
           const next = [event.item, ...prev.filter((t) => t.id !== event.item.id)];
-          return next.slice(0, MAX_VISIBLE);
+          return trimVisible(next);
         });
         scheduleDismiss(event.item);
         return;
@@ -57,10 +71,10 @@ export function ToastHost() {
                 action: event.patch.action,
               };
           mergedForTimer = merged;
-          if (existing) {
-            return prev.map((t) => (t.id === event.id ? merged : t));
-          }
-          return [merged, ...prev].slice(0, MAX_VISIBLE);
+          const next = existing
+            ? prev.map((t) => (t.id === event.id ? merged : t))
+            : [merged, ...prev];
+          return trimVisible(next);
         });
         if (mergedForTimer) scheduleDismiss(mergedForTimer);
         return;

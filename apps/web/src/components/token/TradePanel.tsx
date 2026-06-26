@@ -25,12 +25,19 @@ import {
 import { loadTradeAutoConfirm, saveTradeAutoConfirm } from "@/lib/trade-confirm-storage";
 import { instantTradeGateMessage } from "@/lib/trade-instant-copy";
 import {
+  isTradeOrderSettled,
+  resolvePendingIdFromTxHash,
   trackTradeOrderConfirmed,
   trackTradeOrderFailed,
   trackTradeOrderIncluded,
   trackTradeOrderPending,
   trackTradeOrderSubmitted,
 } from "@/lib/trade-order-toast";
+import {
+  startPendingTradeConfirmationWatch,
+  stopPendingTradeConfirmationWatch,
+  trySettleFromTxReceipt,
+} from "@/lib/trade-pending-confirm-watch";
 import { toast } from "@/lib/toast";
 import {
   addPendingReservation,
@@ -575,14 +582,17 @@ export function TradePanel({
   }, [fallbackReceipt, kernelReceipt]);
 
   useEffect(() => {
-    if (!fallbackReceipt || kernelReceipt || !txHash) return;
-    if (fallbackReceipt.transactionHash.toLowerCase() !== txHash.toLowerCase()) return;
-    if (handledReceiptHashRef.current?.toLowerCase() === txHash.toLowerCase()) return;
-    const side = awaitingConfirmSideRef.current;
-    const pendingId = awaitingConfirmPendingIdRef.current;
-    if (!side || !pendingId) return;
-    handleBuySellConfirmed(pendingId, side, { hash: txHash, receipt: fallbackReceipt });
-  }, [fallbackReceipt, kernelReceipt, txHash]);
+    if (!fallbackReceipt) return;
+    const txHash = fallbackReceipt.transactionHash;
+    const pendingId = resolvePendingIdFromTxHash(txHash);
+    if (!pendingId || isTradeOrderSettled(pendingId)) return;
+    const side = pendingTradesRef.current.get(pendingId)?.side ?? awaitingConfirmSideRef.current;
+    if (!side) return;
+    void trySettleFromTxReceipt(pendingId, txHash, fallbackReceipt, {
+      onConfirmed: (result) => handleBuySellConfirmed(pendingId, side, result),
+      onFailed: (err) => handleInstantTradeFailure(pendingId, err),
+    });
+  }, [fallbackReceipt]);
 
   useEffect(() => {
     if (!writeError) return;
@@ -1311,14 +1321,16 @@ export function TradePanel({
     side: "buy" | "sell",
     result: KernelTransactionResult
   ) {
+    if (isTradeOrderSettled(pendingId)) return;
+
     const txHash = result.receipt?.transactionHash ?? result.hash;
     if (!txHash) return;
-    if (handledReceiptHashRef.current?.toLowerCase() === txHash.toLowerCase()) return;
+
+    stopPendingTradeConfirmationWatch(pendingId);
 
     const activeReceipt = result.receipt;
 
     if (activeReceipt && activeReceipt.status !== "success") {
-      handledReceiptHashRef.current = activeReceipt.transactionHash;
       failTradeTrace("chain.receipt_reverted", new Error("Transaction reverted on-chain"));
       rollbackInstantOptimistic(pendingId);
       trackTradeOrderFailed(
@@ -1331,7 +1343,6 @@ export function TradePanel({
       return;
     }
 
-    handledReceiptHashRef.current = txHash;
     releasePendingReservation(pendingId);
     if (pendingTradeReferrerRef.current) {
       clearStoredReferrer();
@@ -1402,6 +1413,7 @@ export function TradePanel({
   }
 
   function handleInstantTradeFailure(pendingId: string, err: unknown) {
+    stopPendingTradeConfirmationWatch(pendingId);
     rollbackInstantOptimistic(pendingId);
     pendingTradeSideRef.current = null;
     setPendingAction(null);
@@ -1621,7 +1633,13 @@ export function TradePanel({
     awaitingConfirmPendingIdRef.current = pendingId;
     return {
       onSubmitted: ({ userOpHash: submittedHash }) => {
-        trackTradeOrderSubmitted(pendingId, side, symbol);
+        trackTradeOrderSubmitted(pendingId, side, symbol, submittedHash);
+        if (kernelClient) {
+          startPendingTradeConfirmationWatch(kernelClient, pendingId, submittedHash, {
+            onConfirmed: (result) => handleBuySellConfirmed(pendingId, side, result),
+            onFailed: (err) => handleInstantTradeFailure(pendingId, err),
+          });
+        }
         tradeTraceStep("ux.on_trade_submitted.background", {
           userOpHash: submittedHash,
           side,
@@ -1632,9 +1650,11 @@ export function TradePanel({
         trackTradeOrderIncluded(pendingId, txHash);
       },
       onConfirmed: (result) => {
+        stopPendingTradeConfirmationWatch(pendingId);
         handleBuySellConfirmed(pendingId, side, result);
       },
       onFailed: (err) => {
+        stopPendingTradeConfirmationWatch(pendingId);
         handleInstantTradeFailure(pendingId, err);
       },
     };
