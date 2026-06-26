@@ -95,19 +95,12 @@ export function useTradeGasEstimate(params: UseTradeGasEstimateParams) {
         }
 
         if (params.side === "buy") {
-          const buyValue =
-            params.buyInputMode === "token"
-              ? params.resolvedBuyBnbWei ?? params.buySpendWei
-              : params.buySpendWei;
-
+          const buyValue = params.buySpendWei;
           if (buyValue === 0n) {
             throw new Error("missing buy amount");
           }
 
-          const minTokenOut =
-            params.buyInputMode === "token"
-              ? minOutWithSlippage(params.targetTokenWei)
-              : minOutWithSlippage(params.buyQuoteOut ?? 1n);
+          const minTokenOut = minOutWithSlippage(params.buyQuoteOut ?? 1n);
 
           const buyData = encodeFunctionData({
             abi: bondingCurveManagerAbi,
@@ -211,8 +204,18 @@ export function useTradeGasEstimate(params: UseTradeGasEstimateParams) {
           setGasCostWei(totalPrefund);
         }
       } catch {
-        if (!cancelled) {
-          setGasCostWei(null);
+        if (!cancelled && gasCostWeiRef.current == null) {
+          try {
+            const gasPrice = await publicClient.getGasPrice();
+            const maxFeePerGas = await resolveMaxFeePerGas(() => Promise.resolve(gasPrice));
+            const callGas =
+              params.side === "buy"
+                ? DEFAULT_BUY_CALL_GAS
+                : DEFAULT_APPROVE_CALL_GAS + DEFAULT_SELL_CALL_GAS;
+            setGasCostWei(userOpPrefundFromCallGasEstimate(callGas, maxFeePerGas));
+          } catch {
+            /* keep prior stale value if any */
+          }
         }
       } finally {
         if (!cancelled) {
@@ -231,11 +234,9 @@ export function useTradeGasEstimate(params: UseTradeGasEstimateParams) {
     params.enabled,
     params.address,
     params.side,
-    params.buyInputMode,
     params.tokenAddress,
     params.targetTokenWei,
     params.buySpendWei,
-    params.resolvedBuyBnbWei,
     params.buyQuoteOut,
     params.sellQuoteOut,
     params.needsApproval,

@@ -692,6 +692,27 @@ export function TradePanel({
     return GAS_PROBE_BNB_WEI;
   }, [side, buyCostWei, bnbBalance, probeGasReserveWei]);
 
+  /** Fixed probe for UserOp gas overhead — stable Max / deposit / button (not amount-dependent). */
+  const buyGasReserveProbeSpendWei = GAS_PROBE_BNB_WEI;
+
+  const buyGasReserveProbeQuoteOut = useMemo(() => {
+    if (side !== "buy" || !bondingCurve || protocolFeeBps === undefined) return 1n;
+    const { tokenOut } = quoteBuyFromCurveState(
+      bondingCurve,
+      protocolFeeBps,
+      buyGasReserveProbeSpendWei
+    );
+    return tokenOut > 0n ? tokenOut : 1n;
+  }, [side, bondingCurve, protocolFeeBps]);
+
+  const sellGasReserveProbeTokenWei = useMemo(() => {
+    if (side !== "sell") return GAS_PROBE_TOKEN_WEI;
+    if (tokenBalance != null && tokenBalance > 0n && tokenBalance < GAS_PROBE_TOKEN_WEI) {
+      return tokenBalance;
+    }
+    return GAS_PROBE_TOKEN_WEI;
+  }, [side, tokenBalance]);
+
   const gasProbeTokenOut = useMemo(() => {
     if (side !== "buy" || !bondingCurve || protocolFeeBps === undefined) return 1n;
     if (buyInputMode === "token" && effectiveBuyTokenWei > 0n) return effectiveBuyTokenWei;
@@ -719,17 +740,14 @@ export function TradePanel({
     buyInputMode,
     tokenAddress,
     targetTokenWei:
-      side === "buy" && buyInputMode === "token" && buyTargetTokenWei === 0n
-        ? GAS_PROBE_TOKEN_WEI
-        : side === "sell" && sellTokenWei === 0n
-          ? gasProbeSellTokenWei
+      side === "sell"
+        ? sellGasReserveProbeTokenWei
+        : side === "buy" && buyInputMode === "token" && buyTargetTokenWei === 0n
+          ? GAS_PROBE_TOKEN_WEI
           : targetTokenWei,
-    buySpendWei: side === "buy" ? gasProbeBuySpendWei : buySpendWei,
-    resolvedBuyBnbWei:
-      side === "buy" && buyInputMode === "token"
-        ? linkedBuySpendWei ?? resolvedBuyBnbWei ?? gasProbeBuySpendWei
-        : resolvedBuyBnbWei,
-    buyQuoteOut: side === "buy" ? gasProbeTokenOut : buyQuoteOut ?? undefined,
+    buySpendWei: side === "buy" ? buyGasReserveProbeSpendWei : buySpendWei,
+    resolvedBuyBnbWei: side === "buy" ? buyGasReserveProbeSpendWei : resolvedBuyBnbWei,
+    buyQuoteOut: side === "buy" ? buyGasReserveProbeQuoteOut : buyQuoteOut ?? undefined,
     sellQuoteOut: side === "sell" ? gasProbeSellQuoteOut : sellQuoteOut ?? undefined,
     needsApproval: needsLegacyApproval,
   });
@@ -775,29 +793,45 @@ export function TradePanel({
     isConnected &&
     sellTokenWei > 0n &&
     bnbBalance !== undefined &&
+    sellGasReserveWei > 0n &&
     bnbBalance.value < sellGasReserveWei;
 
   const insufficientSellBalance = insufficientSellTokenBalance || insufficientSellGas;
 
-  const insufficientBuyBalance =
+  const effectiveNativeWei = useMemo(() => {
+    if (!isConnected || bnbBalance === undefined) return undefined;
+    return effectiveNativeBalance(pendingLedgerRef.current, bnbBalance.value);
+  }, [isConnected, bnbBalance, pendingReservationTick]);
+
+  const hasSubmitAmount = side === "buy" ? buyCostWei > 0n : sellTokenWei > 0n;
+
+  const needsBuyEthFunding =
     side === "buy" &&
+    hasSubmitAmount &&
     isConnected &&
-    bnbBalance !== undefined &&
-    buyCostWei > 0n &&
-    buyCostWei > maxBuySpendWei;
+    effectiveNativeWei !== undefined &&
+    buyGasReserveWei > 0n &&
+    buyCostWei + buyGasReserveWei > effectiveNativeWei;
+
+  const needsSellEthFunding =
+    side === "sell" &&
+    hasSubmitAmount &&
+    isConnected &&
+    effectiveNativeWei !== undefined &&
+    sellGasReserveWei > 0n &&
+    effectiveNativeWei < sellGasReserveWei &&
+    !insufficientSellTokenBalance;
+
+  const showDepositCta =
+    isConnected && !wrongChain && (needsBuyEthFunding || needsSellEthFunding);
+
+  const insufficientBuyBalance = needsBuyEthFunding;
 
   const insufficientBalance =
     side === "buy" ? insufficientBuyBalance : insufficientSellBalance;
 
   const insufficientTokenOnly =
     side === "sell" && insufficientSellTokenBalance && !insufficientSellGas;
-
-  const needsBnbFunding =
-    isConnected &&
-    !wrongChain &&
-    (insufficientBuyBalance || (side === "sell" && insufficientSellGas && !insufficientSellTokenBalance));
-
-  const showDepositCta = needsBnbFunding && isConnected && !wrongChain;
 
   const showInsufficientTokenBalance =
     side === "sell" &&
@@ -1973,13 +2007,24 @@ export function TradePanel({
     void submitTrade();
   }, [side, sellTokenWei, sellQuoteOut, buyCostWei, balancePending]);
 
-  const hasSubmitAmount = side === "buy" ? buyCostWei > 0n : sellTokenWei > 0n;
+  const gasEstimatePending =
+    isConnected && !wrongChain && hasSubmitAmount && userOpPrefundWei === 0n;
+
+  const walletDataPending =
+    isConnected &&
+    hasSubmitAmount &&
+    (side === "buy" ? bnbBalance === undefined : tokenBalance === undefined);
+
+  const tradeSubmitPending =
+    hasSubmitAmount && isConnected && !wrongChain && (walletDataPending || gasEstimatePending);
 
   const buyGateBlocked =
     side === "buy" &&
     isConnected &&
     !wrongChain &&
     hasSubmitAmount &&
+    !tradeSubmitPending &&
+    !needsBuyEthFunding &&
     !instantTradeGate.ok &&
     !isTransientInstantGateReason(instantTradeGate.reason);
 
@@ -1988,6 +2033,7 @@ export function TradePanel({
     if (wrongChain) return "Switch to Base Sepolia";
     if (paused) return "Trading paused";
     if (!hasSubmitAmount) return "Enter amount";
+    if (tradeSubmitPending) return side === "buy" ? `Buy ${symbol}` : `Sell ${symbol}`;
     if (showInsufficientTokenBalance) return "Insufficient balance";
     if (showDepositCta) return `Deposit ${NATIVE_SYMBOL}`;
     if (buyGateBlocked) return `Not enough ${NATIVE_SYMBOL}`;
@@ -2003,7 +2049,10 @@ export function TradePanel({
     if (!isConnected) return false;
     if (wrongChain || paused) return true;
     if (!hasSubmitAmount) return true;
-    if (showInsufficientTokenBalance || buyGateBlocked) return true;
+    if (tradeSubmitPending) return true;
+    if (showInsufficientTokenBalance) return true;
+    if (showDepositCta) return false;
+    if (buyGateBlocked) return true;
     return false;
   })();
 
