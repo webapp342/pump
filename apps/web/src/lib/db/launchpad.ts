@@ -401,22 +401,19 @@ const TOKEN_LIST_SELECT_BOARD_STATS = `
       bt.created_at,
       bt.launch_block_number,
       bt.logo_url,
-      COALESCE(tbs.progress_bps, b.progress_bps, 0) AS progress_bps,
-      COALESCE(b.reserve_zug, tbs.reserve_zug, 0)::text AS reserve_zug,
-      COALESCE((${SQL_BONDING_MARK_CAP_ZUG}), 0)::text AS market_cap_zug,
+      COALESCE(b.progress_bps, 0) AS progress_bps,
+      COALESCE(b.reserve_zug, 0)::text AS reserve_zug,
+      (${SQL_BONDING_MARK_CAP_ZUG})::text AS market_cap_zug,
       COALESCE(
-        GREATEST(
-          (${SQL_BONDING_MARK_CAP_ZUG}),
-          COALESCE(mts.ath_price_zug * 1000000000, 0)
-        ),
+        mts.ath_price_zug * 1000000000,
         (${SQL_BONDING_MARK_CAP_ZUG}),
         0
       )::text AS ath_market_cap_zug,
-      COALESCE(mts.trade_count, COALESCE(tbs.trade_count, b.trade_count, 0)) AS trade_count,
-      COALESCE(mts.volume_24h_zug, tbs.volume_24h_zug::text, '0') AS volume_24h_zug,
-      COALESCE(mts.volume_24h_prev_zug, tbs.volume_24h_prev_zug::text, '0') AS volume_24h_prev_zug,
-      COALESCE(mts.trade_count_24h_ago, tbs.trade_count_24h_ago, 0) AS trade_count_24h_ago,
-      COALESCE(mts.traders_24h, tbs.traders_24h, 0) AS traders_24h,
+      COALESCE(mts.trade_count, COALESCE(b.trade_count, 0)) AS trade_count,
+      COALESCE(mts.volume_24h_zug, '0') AS volume_24h_zug,
+      COALESCE(mts.volume_24h_prev_zug, '0') AS volume_24h_prev_zug,
+      COALESCE(mts.trade_count_24h_ago, 0) AS trade_count_24h_ago,
+      COALESCE(mts.traders_24h, 0) AS traders_24h,
       CASE
         WHEN mpa.price_1h_ago IS NOT NULL AND mpa.price_1h_ago > 0
           THEN ((((${SQL_BONDING_MARK_PRICE_ZUG}) - mpa.price_1h_ago) / mpa.price_1h_ago) * 100)::text
@@ -440,26 +437,22 @@ const TOKEN_LIST_SELECT_BOARD_STATS = `
       COALESCE(tbs.holder_count, b.holder_count, 0) AS holder_count
     FROM base_tokens bt
     LEFT JOIN bonding_states b ON b.token_address = bt.address
-    LEFT JOIN token_board_stats tbs ON tbs.token_address = bt.address
     LEFT JOIN mv_token_trade_stats mts ON mts.token_address = bt.address
     LEFT JOIN mv_token_price_anchors mpa ON mpa.token_address = bt.address
+    LEFT JOIN token_board_stats tbs ON tbs.token_address = bt.address
 `;
 
 function buildTokenListSelectSql(baseTokensInner: string): string {
-  if (useTokenBoardStats()) {
+  // Portfolio + arena share the same metrics SELECT (bonding spot × supply + MV stats).
+  if (useTokenBoardStats() || useMvTokenStats()) {
+    const select = useTokenBoardStats()
+      ? TOKEN_LIST_SELECT_BOARD_STATS
+      : TOKEN_LIST_SELECT_MV;
     return `
     WITH base_tokens AS (
       ${baseTokensInner}
     )
-    ${TOKEN_LIST_SELECT_BOARD_STATS}`;
-  }
-
-  if (useMvTokenStats()) {
-    return `
-    WITH base_tokens AS (
-      ${baseTokensInner}
-    )
-    ${TOKEN_LIST_SELECT_MV}`;
+    ${select}`;
   }
 
   const select = useBondingStateCounts() ? TOKEN_LIST_SELECT_BONDING : TOKEN_LIST_SELECT;
@@ -661,9 +654,12 @@ const ARENA_TOKEN_BASE_INNER = `
 
 function arenaListOrderBy(sort: ArenaListSort): string {
   if (sort === "age") {
-    return "ORDER BY bt.created_at DESC";
+    return "ORDER BY created_at DESC";
   }
-  return "ORDER BY COALESCE(b.market_cap_zug, 0) DESC, bt.created_at DESC";
+  if (sort === "mcap") {
+    return "ORDER BY market_cap_zug::numeric DESC NULLS LAST, created_at DESC";
+  }
+  return "ORDER BY market_cap_zug::numeric DESC NULLS LAST, created_at DESC";
 }
 
 export async function listTokensPaginated(
@@ -673,10 +669,14 @@ export async function listTokensPaginated(
   const offset = options.offset ?? 0;
   const sort = options.sort ?? "age";
   const db = getLaunchpadReadPool();
-  const sql = buildTokenListSql(
-    ARENA_TOKEN_BASE_INNER,
-    `${arenaListOrderBy(sort)} LIMIT $1 OFFSET $2`
-  );
+  const sql = `
+    SELECT *
+    FROM (
+      ${buildTokenListSelectSql(ARENA_TOKEN_BASE_INNER)}
+    ) board_rows
+    ${arenaListOrderBy(sort)}
+    LIMIT $1 OFFSET $2
+  `;
   const result = await db.query<TokenListQueryRow>(sql, [limit, offset]);
 
   return result.rows.map(mapTokenListRow);

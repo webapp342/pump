@@ -71,6 +71,11 @@ import {
   type ArenaBoardQueryParams,
 } from "@/lib/arena-client-api";
 import type { ArenaHomePayload } from "@/lib/arena-server";
+import {
+  findBoardToken,
+  mergeBoardTokenLists,
+  sortTokensByMcap,
+} from "@/lib/arena-board-merge";
 
 const ARENA_FILTER_ITEMS = [
   ["new", "New", "Newest"],
@@ -368,9 +373,12 @@ export function ArenaListClient({
     ? boardCacheKey("new", "age", "desc", "")
     : "";
   const filterCacheRef = useRef(new Map<string, BoardCacheEntry>());
+  const initialTopByMcap = initialPayload
+    ? sortTokensByMcap(mergeBoardTokenLists(initialPayload.topByMcap, initialPayload.data))
+    : [];
   const [tokens, setTokens] = useState<TokenListItem[] | null>(initialPayload?.data ?? null);
   const [loadedBoardKey, setLoadedBoardKey] = useState(initialBoardKey);
-  const [topByMcap, setTopByMcap] = useState<TokenListItem[]>(initialPayload?.topByMcap ?? []);
+  const [topByMcap, setTopByMcap] = useState<TokenListItem[]>(initialTopByMcap);
   const [kothSummary, setKothSummary] = useState<KothSummary | null>(initialPayload?.koth ?? null);
   const [serverFilterCounts, setServerFilterCounts] = useState<ArenaFilterCounts | null>(
     initialPayload?.meta?.filterCounts ?? null
@@ -715,14 +723,21 @@ export function ArenaListClient({
 
   useEffect(() => {
     if (!initialPayload || filterCacheRef.current.has(initialBoardKey)) return;
+    const mergedTop = sortTokensByMcap(
+      mergeBoardTokenLists(initialPayload.topByMcap, initialPayload.data)
+    );
     filterCacheRef.current.set(initialBoardKey, {
       tokens: initialPayload.data,
-      topByMcap: initialPayload.topByMcap,
+      topByMcap: mergedTop,
       koth: initialPayload.koth,
       hasMore: initialPayload.meta.hasMore,
       serverFilterCounts: initialPayload.meta.filterCounts,
     });
   }, [initialPayload, initialBoardKey]);
+
+  useEffect(() => {
+    void queryClient.invalidateQueries({ queryKey: ["arena-board"] });
+  }, [queryClient]);
 
   const load = useCallback(
     async (
@@ -749,7 +764,8 @@ export function ArenaListClient({
         const body = await queryClient.fetchQuery({
           queryKey: arenaBoardQueryKey(boardParams),
           queryFn: () => fetchArenaBoard(boardParams),
-          staleTime: 2_000,
+          staleTime: 0,
+          gcTime: 0,
         });
 
         if (requestBoardKey !== currentBoardKeyRef.current) {
@@ -757,7 +773,10 @@ export function ArenaListClient({
         }
 
         const nextTokens = body.data ?? [];
-        setTopByMcap(body.topByMcap ?? []);
+        const nextTop = sortTokensByMcap(
+          mergeBoardTokenLists(body.topByMcap ?? [], nextTokens)
+        );
+        setTopByMcap(nextTop);
         setKothSummary(body.koth ?? null);
         setServerFilterCounts(body.meta?.filterCounts ?? null);
         setHasMore(body.meta?.hasMore ?? false);
@@ -793,7 +812,7 @@ export function ArenaListClient({
         });
         filterCacheRef.current.set(requestBoardKey, {
           tokens: nextTokens,
-          topByMcap: body.topByMcap ?? [],
+          topByMcap: nextTop,
           koth: body.koth ?? null,
           hasMore: body.meta?.hasMore ?? false,
           serverFilterCounts: body.meta?.filterCounts ?? null,
@@ -1035,20 +1054,13 @@ export function ArenaListClient({
     return [...byAddress.values()];
   }, [topByMcap, resolvedTokens, favoriteListTokens]);
   const mcapRankedTokens = useMemo(
-    () =>
-      topByMcap.length > 0
-        ? topByMcap
-        : [...resolvedTokens].sort(
-            (a, b) => Number(b.marketCapBnb ?? 0) - Number(a.marketCapBnb ?? 0)
-          ),
+    () => sortTokensByMcap(mergeBoardTokenLists(topByMcap, resolvedTokens)),
     [topByMcap, resolvedTokens]
   );
   const kothToken = useMemo(() => {
     const active = kothSummary?.activeTokenAddress?.toLowerCase();
     if (active) {
-      const fromList =
-        topByMcap.find((token) => token.address.toLowerCase() === active) ??
-        resolvedTokens.find((token) => token.address.toLowerCase() === active);
+      const fromList = findBoardToken(active, resolvedTokens, topByMcap);
       if (fromList) return fromList;
     }
     return mcapRankedTokens[0] ?? null;
@@ -1079,16 +1091,10 @@ export function ArenaListClient({
     [kothCrownedAt]
   );
 
-  const highlightPool = useMemo(() => {
-    const byAddress = new Map<string, TokenListItem>();
-    for (const token of topByMcap) {
-      byAddress.set(token.address.toLowerCase(), token);
-    }
-    for (const token of resolvedTokens) {
-      byAddress.set(token.address.toLowerCase(), token);
-    }
-    return [...byAddress.values()];
-  }, [topByMcap, resolvedTokens]);
+  const highlightPool = useMemo(
+    () => mergeBoardTokenLists(topByMcap, resolvedTokens),
+    [topByMcap, resolvedTokens]
+  );
 
   const topGainer24h = useMemo(
     () =>
