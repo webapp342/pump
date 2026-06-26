@@ -530,13 +530,15 @@ export function TokenDetailLive({
     (payload: { pendingId: string }) => {
       const pendingTxHash = `pending:${payload.pendingId}`;
       setActorChartSpot(null);
-      setOptimisticTrades((prev) =>
-        prev.filter((t) => t.txHash.toLowerCase() !== pendingTxHash.toLowerCase())
-      );
-      if (optimisticTokenSnapshotRef.current) {
-        setToken(optimisticTokenSnapshotRef.current);
-        optimisticTokenSnapshotRef.current = null;
-      }
+      setOptimisticTrades((prev) => {
+        const next = prev.filter(
+          (t) => t.txHash.toLowerCase() !== pendingTxHash.toLowerCase()
+        );
+        if (next.length === 0) {
+          optimisticTokenSnapshotRef.current = null;
+        }
+        return next;
+      });
       void refetchCurve();
       void fetchLive();
     },

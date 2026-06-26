@@ -135,21 +135,23 @@ export function useKernelTradeWriteContract() {
             { preflight: params.preflight }
           );
 
-          if (!isCurrent()) return;
-
-          setUserOpHash(submitResult.userOpHash);
-          setTradePhase("submitted");
-          tradeTraceStep("ux.trade_phase", {
-            phase: "submitted",
-            userOpHash: submitResult.userOpHash,
-          });
+          if (isCurrent()) {
+            setUserOpHash(submitResult.userOpHash);
+            setTradePhase("submitted");
+            tradeTraceStep("ux.trade_phase", {
+              phase: "submitted",
+              userOpHash: submitResult.userOpHash,
+            });
+            tradeTraceStep("ux.isSubmitting=false");
+          }
           tradeTraceStep("ux.user_op_submitted", { userOpHash: submitResult.userOpHash });
           tradeTraceStep("ux.button_unlock", { userOpHash: submitResult.userOpHash });
-          tradeTraceStep("ux.isSubmitting=false");
           callbacks?.onSubmitted?.({ userOpHash: submitResult.userOpHash });
 
-          setTradePhase("confirming");
-          tradeTraceStep("ux.trade_phase", { phase: "confirming" });
+          if (isCurrent()) {
+            setTradePhase("confirming");
+            tradeTraceStep("ux.trade_phase", { phase: "confirming" });
+          }
 
           const result: KernelTransactionResult = await confirmKernelUserOperation(
             activeClient,
@@ -159,18 +161,14 @@ export function useKernelTradeWriteContract() {
             {
               flashblocks,
               onIncluded: (includedTxHash) => {
-                if (!isCurrent()) return;
-                setTxHash(includedTxHash);
-                tradeTraceStep("ux.txHash_early", { txHash: includedTxHash });
+                if (isCurrent()) {
+                  setTxHash(includedTxHash);
+                  tradeTraceStep("ux.txHash_early", { txHash: includedTxHash });
+                }
                 callbacks?.onIncluded?.(includedTxHash);
               },
             }
           );
-
-          if (!isCurrent()) {
-            callbacks?.onConfirmed?.(result);
-            return;
-          }
 
           tradeTraceStep("chain.trade_write.returned", {
             txHash: result.hash,
@@ -184,16 +182,18 @@ export function useKernelTradeWriteContract() {
             ms: Math.round(performance.now() - t0),
           });
 
-          setTxHash(result.hash);
-          tradeTraceStep("ux.txHash_set", { txHash: result.hash });
-          if (result.receipt) {
-            setReceipt(result.receipt);
-            tradeTraceStep("ux.kernel_receipt_set", {
-              blockNumber: result.receipt.blockNumber.toString(),
-            });
+          if (isCurrent()) {
+            setTxHash(result.hash);
+            tradeTraceStep("ux.txHash_set", { txHash: result.hash });
+            if (result.receipt) {
+              setReceipt(result.receipt);
+              tradeTraceStep("ux.kernel_receipt_set", {
+                blockNumber: result.receipt.blockNumber.toString(),
+              });
+            }
+            setTradePhase("confirmed");
+            tradeTraceStep("ux.trade_phase", { phase: "confirmed", txHash: result.hash });
           }
-          setTradePhase("confirmed");
-          tradeTraceStep("ux.trade_phase", { phase: "confirmed", txHash: result.hash });
           callbacks?.onConfirmed?.(result);
         } catch (err) {
           const caught = err instanceof Error ? err : new Error(String(err));

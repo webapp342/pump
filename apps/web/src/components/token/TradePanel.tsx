@@ -23,6 +23,18 @@ import {
   type InstantTradeGateSell,
 } from "@/lib/trade-optimistic-guard";
 import { loadTradeAutoConfirm, saveTradeAutoConfirm } from "@/lib/trade-confirm-storage";
+import { instantTradeGateMessage } from "@/lib/trade-instant-copy";
+import { toast } from "@/lib/toast";
+import {
+  addPendingReservation,
+  availableNativeExcluding,
+  availableTokenExcluding,
+  createTradePendingLedger,
+  effectiveNativeBalance,
+  effectiveTokenBalance,
+  pendingTradeCount,
+  removePendingReservation,
+} from "@/lib/trade-pending-ledger";
 import {
   useAccount,
   useBalance,
@@ -254,14 +266,16 @@ export function TradePanel({
   const autoSubmitTriggeredRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const [receiveExpanded, setReceiveExpanded] = useState(false);
-  const [tradeInFlight, setTradeInFlight] = useState(false);
-  const tradeInFlightRef = useRef(false);
+  const [pendingReservationTick, setPendingReservationTick] = useState(0);
+  const pendingLedgerRef = useRef(createTradePendingLedger());
+  const pendingTradesRef = useRef<Map<string, { side: "buy" | "sell" }>>(new Map());
+  const bumpPendingLedger = () => setPendingReservationTick((n) => n + 1);
   const [pendingAction, setPendingAction] = useState<"buy" | "sell" | "approve" | null>(null);
   /** Sync side for callbacks — setState(pendingAction) may lag behind userOp submitted. */
   const pendingTradeSideRef = useRef<"buy" | "sell" | null>(null);
   /** Persists until trade confirm completes — fallback receipt hook uses this when kernel omits receipt. */
   const awaitingConfirmSideRef = useRef<"buy" | "sell" | null>(null);
-  const optimisticPendingRef = useRef<{ id: string; side: "buy" | "sell" } | null>(null);
+  const legacyPendingIdRef = useRef<string | null>(null);
   const legacyApproveChainRef = useRef(false);
   const pendingSellRef = useRef<{ amountWei: bigint; minBnbOut: bigint } | null>(null);
   const handledReceiptHashRef = useRef<`0x${string}` | null>(null);
@@ -558,25 +572,19 @@ export function TradePanel({
     if (handledReceiptHashRef.current?.toLowerCase() === txHash.toLowerCase()) return;
     const side = awaitingConfirmSideRef.current;
     if (!side) return;
-    handleBuySellConfirmed(side, { hash: txHash, receipt: fallbackReceipt });
+    handleBuySellConfirmed("fallback", side, { hash: txHash, receipt: fallbackReceipt });
   }, [fallbackReceipt, kernelReceipt, txHash]);
 
   useEffect(() => {
     if (!writeError) return;
+    if (pendingTradeCount(pendingLedgerRef.current) > 0) return;
     legacyApproveChainRef.current = false;
-    if (optimisticPendingRef.current) {
-      rollbackInstantOptimistic();
-      pendingSellRef.current = null;
-    } else if (isBackgroundConfirming) {
-      return;
-    }
     pendingTradeSideRef.current = null;
     setPendingAction(null);
     handledReceiptHashRef.current = null;
-    endTradeInFlight();
-    setError(formatTradeError(writeError));
+    toast.error("Order failed", formatTradeError(writeError));
     failTradeTrace("ux.write_error", writeError);
-  }, [writeError, isBackgroundConfirming]);
+  }, [writeError]);
 
   const paused =
     chainCurveSnapshot?.paused ?? localCurveState?.[7] ?? status === "PAUSED";
@@ -729,18 +737,18 @@ export function TradePanel({
   }, [needsLegacyApproval, gasPrice]);
 
   const maxBuySpendWei = useMemo(() => {
-    if (!isConnected || bnbBalance === undefined || bnbBalance.value <= buyGasReserveWei) {
-      return 0n;
-    }
-    return bnbBalance.value - buyGasReserveWei;
-  }, [isConnected, bnbBalance, buyGasReserveWei]);
+    if (!isConnected || bnbBalance === undefined) return 0n;
+    const effective = effectiveNativeBalance(pendingLedgerRef.current, bnbBalance.value);
+    if (effective <= buyGasReserveWei) return 0n;
+    return effective - buyGasReserveWei;
+  }, [isConnected, bnbBalance, buyGasReserveWei, pendingReservationTick]);
 
   const maxSellTokenWei = useMemo(() => {
     if (!isConnected || tokenBalance === undefined || tokenBalance === 0n) {
       return 0n;
     }
-    return tokenBalance;
-  }, [isConnected, tokenBalance]);
+    return effectiveTokenBalance(pendingLedgerRef.current, tokenBalance);
+  }, [isConnected, tokenBalance, pendingReservationTick]);
 
   const insufficientSellTokenBalance =
     side === "sell" &&
@@ -763,7 +771,7 @@ export function TradePanel({
     isConnected &&
     bnbBalance !== undefined &&
     buyCostWei > 0n &&
-    (buyCostWei > maxBuySpendWei || buyCostWei + buyGasReserveWei > bnbBalance.value);
+    buyCostWei > maxBuySpendWei;
 
   const insufficientBalance =
     side === "buy" ? insufficientBuyBalance : insufficientSellBalance;
@@ -776,6 +784,8 @@ export function TradePanel({
     !wrongChain &&
     (insufficientBuyBalance || (side === "sell" && insufficientSellGas && !insufficientSellTokenBalance));
 
+  const showDepositCta = needsBnbFunding && isConnected && !wrongChain;
+
   const balancePending =
     side === "buy"
       ? isConnected && bnbBalance === undefined && buyCostWei > 0n
@@ -787,7 +797,20 @@ export function TradePanel({
       ? true
       : allowance !== undefined && allowance >= sellTokenWei;
 
-  const instantTradeGate = useMemo((): InstantTradeGateResult => {
+  const evaluateLiveInstantGate = (): InstantTradeGateResult => {
+    const availableNative =
+      bnbBalance !== undefined
+        ? effectiveNativeBalance(pendingLedgerRef.current, bnbBalance.value)
+        : undefined;
+    const availableToken =
+      tokenBalance !== undefined
+        ? effectiveTokenBalance(pendingLedgerRef.current, tokenBalance)
+        : undefined;
+    const liveMaxBuy =
+      availableNative !== undefined && availableNative > buyGasReserveWei
+        ? availableNative - buyGasReserveWei
+        : 0n;
+
     return evaluateInstantTradeGate({
       side,
       paused,
@@ -803,12 +826,18 @@ export function TradePanel({
       sellTokenWei,
       bnbBalance: bnbBalance?.value,
       tokenBalance,
+      availableBnbBalance: availableNative,
+      availableTokenBalance: availableToken,
       buyGasReserveWei,
       sellGasReserveWei,
       legacyApproveGasReserveWei,
-      maxBuySpendWei,
+      maxBuySpendWei: liveMaxBuy,
       gasPriceWei: gasPrice,
     });
+  };
+
+  const instantTradeGate = useMemo((): InstantTradeGateResult => {
+    return evaluateLiveInstantGate();
   }, [
     side,
     paused,
@@ -827,8 +856,8 @@ export function TradePanel({
     buyGasReserveWei,
     sellGasReserveWei,
     legacyApproveGasReserveWei,
-    maxBuySpendWei,
     gasPrice,
+    pendingReservationTick,
   ]);
 
   const currencyLabel =
@@ -1010,10 +1039,14 @@ export function TradePanel({
       handledReceiptHashRef.current = txHash;
       legacyApproveChainRef.current = false;
       failTradeTrace("chain.receipt_reverted", new Error("Transaction reverted on-chain"));
-      if (optimisticPendingRef.current) {
-        rollbackInstantOptimistic();
+      if (legacyPendingIdRef.current) {
+        rollbackInstantOptimistic(legacyPendingIdRef.current);
+        legacyPendingIdRef.current = null;
       }
-      setError("Transaction reverted on-chain. Check wallet balance, token status, and amount.");
+      toast.error(
+        "Order failed",
+        "Approval reverted on-chain. Check balance and token status."
+      );
       setPendingAction(null);
       pendingSellRef.current = null;
       pendingTradeReferrerRef.current = null;
@@ -1037,15 +1070,19 @@ export function TradePanel({
         return;
       }
 
+      const pendingId = legacyPendingIdRef.current;
+      if (!pendingId) {
+        setPendingAction(null);
+        pendingSellRef.current = null;
+        reset();
+        return;
+      }
+
       const tradeReferrer = resolvePendingTradeReferrer();
       pendingTradeReferrerRef.current = tradeReferrer;
       quoteUsdAtSubmitRef.current = estimatedQuotePriceUsd;
       handledReceiptHashRef.current = null;
       reset();
-      if (!optimisticPendingRef.current) {
-        pendingTradeSideRef.current = "sell";
-        setPendingAction("sell");
-      }
       tradeTraceStep("ui.approve_complete.starting_sell");
       tradeWrite({
         address: contracts.bondingCurveManager,
@@ -1056,8 +1093,9 @@ export function TradePanel({
           : [tokenAddress, pendingSell.amountWei, pendingSell.minBnbOut],
         chainId: pumpChain.id,
         preflight: scwPreflightForTrade(0n),
-        callbacks: pumpTradeCallbacks("sell"),
+        callbacks: pumpTradeCallbacks(pendingId, "sell"),
       });
+      legacyPendingIdRef.current = null;
     })();
   }, [
     activeReceipt,
@@ -1219,13 +1257,33 @@ export function TradePanel({
   }
 
   function beginTradeInFlight() {
-    tradeInFlightRef.current = true;
-    setTradeInFlight(true);
+    /* Rapid-trade mode: UI stays unlocked; ledger tracks in-flight reservations. */
   }
 
   function endTradeInFlight() {
-    tradeInFlightRef.current = false;
-    setTradeInFlight(false);
+    /* no-op */
+  }
+
+  function commitPendingReservation(
+    pendingId: string,
+    tradeSide: "buy" | "sell",
+    nativeReservedWei: bigint,
+    tokenReservedWei: bigint
+  ) {
+    addPendingReservation(pendingLedgerRef.current, {
+      id: pendingId,
+      side: tradeSide,
+      nativeReservedWei,
+      tokenReservedWei,
+    });
+    pendingTradesRef.current.set(pendingId, { side: tradeSide });
+    bumpPendingLedger();
+  }
+
+  function releasePendingReservation(pendingId: string) {
+    removePendingReservation(pendingLedgerRef.current, pendingId);
+    pendingTradesRef.current.delete(pendingId);
+    bumpPendingLedger();
   }
 
   function unlockTradeFormAfterSubmit(side: "buy" | "sell", submittedUserOpHash: string) {
@@ -1239,7 +1297,11 @@ export function TradePanel({
     onTradeSubmitted?.({ userOpHash: submittedUserOpHash, side });
   }
 
-  function handleBuySellConfirmed(side: "buy" | "sell", result: KernelTransactionResult) {
+  function handleBuySellConfirmed(
+    pendingId: string,
+    side: "buy" | "sell",
+    result: KernelTransactionResult
+  ) {
     const activeReceipt = result.receipt;
     if (!activeReceipt?.transactionHash) return;
     if (handledReceiptHashRef.current === activeReceipt.transactionHash) return;
@@ -1247,12 +1309,19 @@ export function TradePanel({
     if (activeReceipt.status !== "success") {
       handledReceiptHashRef.current = activeReceipt.transactionHash;
       failTradeTrace("chain.receipt_reverted", new Error("Transaction reverted on-chain"));
-      setError("Transaction reverted on-chain. Check wallet balance, token status, and amount.");
-      reset();
+      rollbackInstantOptimistic(pendingId);
+      toast.error(
+        "Order failed",
+        "Transaction reverted on-chain. Check balance and token status."
+      );
+      if (pendingTradeCount(pendingLedgerRef.current) === 0) reset();
       return;
     }
 
     handledReceiptHashRef.current = activeReceipt.transactionHash;
+    if (pendingId !== "fallback") {
+      releasePendingReservation(pendingId);
+    }
     if (pendingTradeReferrerRef.current) {
       clearStoredReferrer();
       pendingTradeReferrerRef.current = null;
@@ -1287,13 +1356,17 @@ export function TradePanel({
       }
     }
 
+    toast.success(
+      side === "buy" ? "Buy confirmed" : "Sell confirmed",
+      "Balances and chart will update shortly."
+    );
+
     onTradeConfirmed?.({
       txHash: activeReceipt.transactionHash,
       side,
       receipt: activeReceipt,
     });
 
-    endTradeInFlight();
     awaitingConfirmSideRef.current = null;
     void (async () => {
       const t0 = performance.now();
@@ -1307,26 +1380,24 @@ export function TradePanel({
         txHash: activeReceipt.transactionHash,
         blockNumber: activeReceipt.blockNumber.toString(),
       });
-      reset();
+      if (pendingTradeCount(pendingLedgerRef.current) === 0) reset();
     })();
   }
 
-  function rollbackInstantOptimistic() {
-    const pending = optimisticPendingRef.current;
-    if (!pending) return;
-    tradeTraceStep("ux.optimistic.rollback", { pendingId: pending.id });
-    onTradeOptimisticRollback?.({ pendingId: pending.id });
-    optimisticPendingRef.current = null;
+  function rollbackInstantOptimistic(pendingId: string) {
+    if (!pendingTradesRef.current.has(pendingId)) return;
+    tradeTraceStep("ux.optimistic.rollback", { pendingId });
+    onTradeOptimisticRollback?.({ pendingId });
+    releasePendingReservation(pendingId);
     legacyApproveChainRef.current = false;
-    endTradeInFlight();
   }
 
-  function handleInstantTradeFailure(err: unknown) {
-    rollbackInstantOptimistic();
+  function handleInstantTradeFailure(pendingId: string, err: unknown) {
+    rollbackInstantOptimistic(pendingId);
     pendingTradeSideRef.current = null;
     setPendingAction(null);
     failTradeTrace("ux.instant_trade.failed", err);
-    setError(formatTradeError(err));
+    toast.error("Order failed", formatTradeError(err));
   }
 
   function applyInstantOptimisticUi(
@@ -1337,21 +1408,20 @@ export function TradePanel({
       pendingId: preview.pendingId,
       side: tradeSide,
     });
-    setAmount("");
-    setLinkedBuySpendWei(null);
-    setLinkedSellTokenWei(null);
     setError(null);
-    beginTradeInFlight();
-    setPendingAction(null);
-    pendingTradeSideRef.current = null;
     onTradeOptimistic?.({ ...preview, side: tradeSide });
     onTradeSubmitted?.({
       userOpHash: preview.pendingTxHash,
       side: tradeSide,
     });
+    toast.info(
+      tradeSide === "buy" ? "Buy submitted" : "Sell submitted",
+      "Confirming on-chain in the background."
+    );
   }
 
   async function hardValidateBeforeSend(
+    pendingId: string,
     tradeSide: "buy" | "sell",
     callValueWei: bigint,
     sellAmountWei?: bigint,
@@ -1360,13 +1430,15 @@ export function TradePanel({
     if (!address || bnbBalance === undefined) {
       throw new Error("Wallet balance not ready.");
     }
-    const [bnbFresh, tokenFresh] = await Promise.all([
-      refetchBnbBalance(),
-      tradeSide === "sell" ? refetchBalance() : Promise.resolve(undefined),
-    ]);
-    const bnbWei = bnbFresh.data?.value ?? bnbBalance.value;
+    const bnbWei = availableNativeExcluding(
+      pendingLedgerRef.current,
+      bnbBalance.value,
+      pendingId
+    );
     const tokenWei =
-      tradeSide === "sell" ? (tokenFresh?.data ?? tokenBalance) : tokenBalance;
+      tradeSide === "sell" && tokenBalance !== undefined
+        ? availableTokenExcluding(pendingLedgerRef.current, tokenBalance, pendingId)
+        : tokenBalance;
     const gasReserve =
       (tradeSide === "buy" ? buyGasReserveWei : sellGasReserveWei) + extraGasReserveWei;
 
@@ -1385,7 +1457,12 @@ export function TradePanel({
   function dispatchInstantBuy(buyParams: SessionBuyParams, gate: InstantTradeGateBuy) {
     if (!address || !bondingCurve) return;
     const pendingId = createOptimisticPendingId();
-    optimisticPendingRef.current = { id: pendingId, side: "buy" };
+    commitPendingReservation(
+      pendingId,
+      "buy",
+      gate.submitValue + buyGasReserveWei,
+      0n
+    );
     const preview = buildOptimisticBuyPreview({
       pendingId,
       tokenAddress,
@@ -1400,10 +1477,10 @@ export function TradePanel({
     queueMicrotask(() => {
       void (async () => {
         try {
-          await hardValidateBeforeSend("buy", buyParams.value);
-          await submitBuyWriteContract(buyParams);
+          await hardValidateBeforeSend(pendingId, "buy", buyParams.value);
+          await submitBuyWriteContract(pendingId, buyParams);
         } catch (err) {
-          handleInstantTradeFailure(err);
+          handleInstantTradeFailure(pendingId, err);
         }
       })();
     });
@@ -1416,7 +1493,12 @@ export function TradePanel({
   ) {
     if (!address || !bondingCurve) return;
     const pendingId = createOptimisticPendingId();
-    optimisticPendingRef.current = { id: pendingId, side: "sell" };
+    commitPendingReservation(
+      pendingId,
+      "sell",
+      sellGasReserveWei,
+      gate.sellTokenWei
+    );
     const preview = buildOptimisticSellPreview({
       pendingId,
       tokenAddress,
@@ -1431,10 +1513,10 @@ export function TradePanel({
     queueMicrotask(() => {
       void (async () => {
         try {
-          await hardValidateBeforeSend("sell", 0n, sellParams.amountWei);
-          await submitSellWriteContract(sellParams, usePermit);
+          await hardValidateBeforeSend(pendingId, "sell", 0n, sellParams.amountWei);
+          await submitSellWriteContract(pendingId, sellParams, usePermit);
         } catch (err) {
-          handleInstantTradeFailure(err);
+          handleInstantTradeFailure(pendingId, err);
         }
       })();
     });
@@ -1446,7 +1528,12 @@ export function TradePanel({
   ) {
     if (!address || !bondingCurve) return;
     const pendingId = createOptimisticPendingId();
-    optimisticPendingRef.current = { id: pendingId, side: "sell" };
+    commitPendingReservation(
+      pendingId,
+      "sell",
+      sellGasReserveWei + legacyApproveGasReserveWei,
+      gate.sellTokenWei
+    );
     pendingSellRef.current = {
       amountWei: sellParams.amountWei,
       minBnbOut: sellParams.minBnbOut,
@@ -1461,11 +1548,13 @@ export function TradePanel({
       curve: bondingCurve,
       nativeUsdRate: optimisticNativeUsdRate,
     });
+    legacyPendingIdRef.current = pendingId;
     applyInstantOptimisticUi(preview, "sell");
     queueMicrotask(() => {
       void (async () => {
         try {
           await hardValidateBeforeSend(
+            pendingId,
             "sell",
             0n,
             sellParams.amountWei,
@@ -1484,7 +1573,7 @@ export function TradePanel({
           legacyApproveChainRef.current = false;
           pendingSellRef.current = null;
           setPendingAction(null);
-          handleInstantTradeFailure(err);
+          handleInstantTradeFailure(pendingId, err);
         }
       })();
     });
@@ -1495,66 +1584,55 @@ export function TradePanel({
     sellParams?: SessionSellParams,
     usePermit = false
   ): boolean {
-    if (!instantTradeGate.ok) {
-      tradeTraceStep("ux.optimistic.skipped", { reason: instantTradeGate.reason });
+    const gate = evaluateLiveInstantGate();
+    if (!gate.ok) {
+      tradeTraceStep("ux.optimistic.skipped", { reason: gate.reason });
+      toast.error("Order not sent", instantTradeGateMessage(gate.reason));
       return false;
     }
-    if (instantTradeGate.side === "buy" && buyParams) {
-      dispatchInstantBuy(buyParams, instantTradeGate);
+    if (gate.side === "buy" && buyParams) {
+      dispatchInstantBuy(buyParams, gate);
       return true;
     }
-    if (instantTradeGate.side === "sell" && sellParams) {
+    if (gate.side === "sell" && sellParams) {
       if (needsLegacyApproval) {
-        dispatchInstantLegacyApproveSell(sellParams, instantTradeGate);
+        dispatchInstantLegacyApproveSell(sellParams, gate);
       } else {
-        dispatchInstantSell(sellParams, instantTradeGate, usePermit);
+        dispatchInstantSell(sellParams, gate, usePermit);
       }
       return true;
     }
     return false;
   }
 
-  function pumpTradeCallbacks(side: "buy" | "sell"): KernelTradeWriteCallbacks {
+  function pumpTradeCallbacks(
+    pendingId: string,
+    side: "buy" | "sell"
+  ): KernelTradeWriteCallbacks {
     awaitingConfirmSideRef.current = side;
     return {
       onSubmitted: ({ userOpHash: submittedHash }) => {
-        if (!optimisticPendingRef.current) {
-          unlockTradeFormAfterSubmit(side, submittedHash);
-        } else {
-          tradeTraceStep("ux.on_trade_submitted.background", {
-            userOpHash: submittedHash,
-            side,
-          });
-        }
+        tradeTraceStep("ux.on_trade_submitted.background", {
+          userOpHash: submittedHash,
+          side,
+          pendingId,
+        });
       },
       onConfirmed: (result) => {
-        optimisticPendingRef.current = null;
-        handleBuySellConfirmed(side, result);
+        handleBuySellConfirmed(pendingId, side, result);
       },
       onFailed: (err) => {
-        if (optimisticPendingRef.current) {
-          rollbackInstantOptimistic();
-        } else {
-          endTradeInFlight();
-        }
-        setError(formatTradeError(err));
-        pendingTradeSideRef.current = null;
-        setPendingAction(null);
-        failTradeTrace("ux.write_error", err);
+        handleInstantTradeFailure(pendingId, err);
       },
     };
   }
 
-  async function submitBuyWriteContract(buyParams: SessionBuyParams) {
+  async function submitBuyWriteContract(pendingId: string, buyParams: SessionBuyParams) {
     tradeTraceStep("ux.submit_buy.start", {
       value: buyParams.value.toString(),
       minTokenOut: buyParams.minTokenOut.toString(),
+      pendingId,
     });
-    if (!optimisticPendingRef.current) {
-      beginTradeInFlight();
-      pendingTradeSideRef.current = "buy";
-      setPendingAction("buy");
-    }
     tradeWrite({
       address: contracts.bondingCurveManager,
       abi: bondingCurveManagerAbi,
@@ -1565,20 +1643,16 @@ export function TradePanel({
       value: buyParams.value,
       chainId: pumpChain.id,
       preflight: scwPreflightForTrade(buyParams.value),
-      callbacks: pumpTradeCallbacks("buy"),
+      callbacks: pumpTradeCallbacks(pendingId, "buy"),
     });
   }
 
   async function submitSellWriteContract(
+    pendingId: string,
     sellParams: SessionSellParams,
     usePermit: boolean
   ) {
     const params = usePermit ? await buildSellParamsWithPermit(sellParams, true) : sellParams;
-    if (!optimisticPendingRef.current) {
-      beginTradeInFlight();
-      pendingTradeSideRef.current = "sell";
-      setPendingAction("sell");
-    }
     if (params.permit) {
       const { deadline, v, r, s } = params.permit;
       tradeWrite({
@@ -1599,7 +1673,7 @@ export function TradePanel({
           : [params.tokenAddress, params.amountWei, params.minBnbOut, deadline, v, r, s],
         chainId: pumpChain.id,
         preflight: scwPreflightForTrade(0n),
-        callbacks: pumpTradeCallbacks("sell"),
+        callbacks: pumpTradeCallbacks(pendingId, "sell"),
       });
       return;
     }
@@ -1612,7 +1686,7 @@ export function TradePanel({
         : [params.tokenAddress, params.amountWei, params.minBnbOut],
       chainId: pumpChain.id,
       preflight: scwPreflightForTrade(0n),
-      callbacks: pumpTradeCallbacks("sell"),
+      callbacks: pumpTradeCallbacks(pendingId, "sell"),
     });
   }
 
@@ -1662,65 +1736,52 @@ export function TradePanel({
   }
 
   async function submitTrade() {
-    setError(null);
-    if (tradeInFlightRef.current || optimisticPendingRef.current || legacyApproveChainRef.current) {
-      return;
-    }
     tradeTraceStep("ux.submit_trade.start", { side });
 
     if (!isConnected || !address) {
-      tradeTraceStep("ux.submit_trade.blocked", { reason: "not_connected" });
       openConnectModal?.();
       return;
     }
+    if (showDepositCta) {
+      openFundChoice({
+        title: `Add ${NATIVE_SYMBOL} to trade`,
+        message:
+          side === "buy"
+            ? `You need more ${NATIVE_SYMBOL} on Base to complete this buy, including network fees.`
+            : `You need a small ${NATIVE_SYMBOL} balance to pay network fees for this sell.`,
+      });
+      return;
+    }
     if (wrongChain) {
-      tradeTraceStep("ux.submit_trade.blocked", { reason: "wrong_chain" });
-      setError("Switch to BSC Testnet.");
+      toast.error("Wrong network", "Switch to Base Sepolia to trade.");
       return;
     }
     if (paused) {
-      tradeTraceStep("ux.submit_trade.blocked", { reason: "paused" });
-      setError("Trading is paused for this token.");
+      toast.error("Trading paused", "This bonding curve is not accepting trades.");
       return;
     }
-    if (side === "buy") {
-      if (buyCostWei === 0n) {
-        setError("Enter a valid amount.");
-        return;
-      }
-    } else if (sellTokenWei === 0n) {
-      setError("Enter a valid amount.");
+    if (side === "buy" && buyCostWei === 0n) {
+      toast.error("Enter amount", instantTradeGateMessage("zero_amount"));
+      return;
+    }
+    if (side === "sell" && sellTokenWei === 0n) {
+      toast.error("Enter amount", instantTradeGateMessage("zero_amount"));
       return;
     }
 
     try {
       if (side === "buy") {
-        const submitValue = capSpendToBalance(
-          buyCostWei,
-          bnbBalance?.value,
-          buyGasReserveWei
-        );
-        if (submitValue === 0n) {
-          setError(`Insufficient ${NATIVE_SYMBOL} for trade and gas.`);
-          return;
-        }
-        if (bnbBalance !== undefined && submitValue + buyGasReserveWei > bnbBalance.value) {
-          setError(`Insufficient ${NATIVE_SYMBOL} for trade and gas.`);
-          return;
-        }
-
         if (!bondingCurve || protocolFeeBps === undefined) {
-          setError("Could not quote buy.");
+          toast.error("Quote unavailable", instantTradeGateMessage("curve_unavailable"));
           return;
         }
 
-        const { tokenOut } = quoteBuyFromCurveState(
-          bondingCurve,
-          protocolFeeBps,
-          submitValue
-        );
-        if (tokenOut === 0n) {
-          setError("Could not quote buy. Try a smaller amount.");
+        const gate = evaluateLiveInstantGate();
+        if (!gate.ok || gate.side !== "buy") {
+          toast.error(
+            "Order not sent",
+            instantTradeGateMessage(!gate.ok ? gate.reason : "quote_zero")
+          );
           return;
         }
 
@@ -1730,45 +1791,17 @@ export function TradePanel({
 
         const buyParams: SessionBuyParams = {
           tokenAddress,
-          minTokenOut: minOutWithSlippage(tokenOut),
-          value: submitValue,
+          minTokenOut: minOutWithSlippage(gate.tokenOut),
+          value: gate.submitValue,
           referrer: tradeReferrer ?? undefined,
         };
 
-        tradeTraceStep("ux.buy_params.ready", {
-          submitValue: submitValue.toString(),
-          tokenOut: tokenOut.toString(),
-        });
-
-        if (!loadTradeAutoConfirm()) {
-          tradeTraceStep("ux.confirm_modal.open");
-          setPendingTrade({
-            side: "buy",
-            spendLabel: `${formatBnbReadable(Number(formatEther(submitValue)))} ${NATIVE_SYMBOL}`,
-            receiveLabel: `${formatReceiveAmount(formatUnits(tokenOut, 18))} ${symbol}`,
-            buyParams,
-          });
-          setTradeConfirmError(null);
-          setTradeConfirmOpen(true);
-          return;
-        }
-
-        if (tryDispatchInstantTrade(buyParams)) return;
-
-        await submitBuyWriteContract(buyParams);
+        tryDispatchInstantTrade(buyParams);
         return;
       }
 
       if (!sellQuoteOut) {
-        setError("Could not quote sell. Try a smaller amount.");
-        return;
-      }
-      if (tokenBalance !== undefined && sellTokenWei > tokenBalance) {
-        setError("Insufficient token balance.");
-        return;
-      }
-      if (bnbBalance !== undefined && bnbBalance.value < sellGasReserveWei) {
-        setError(`Insufficient ${NATIVE_SYMBOL} for gas.`);
+        toast.error("Quote unavailable", "Could not quote sell. Try a smaller amount.");
         return;
       }
 
@@ -1782,68 +1815,13 @@ export function TradePanel({
       };
       const usePermit = needsApproval && sellSupportsPermit;
 
-      if (needsLegacyApproval) {
-        pendingSellRef.current = {
-          amountWei: sellTokenWei,
-          minBnbOut,
-        };
-        pendingTradeReferrerRef.current = tradeReferrer;
-        quoteUsdAtSubmitRef.current = estimatedQuotePriceUsd;
-
-        if (!loadTradeAutoConfirm()) {
-          tradeTraceStep("ux.confirm_modal.open");
-          setPendingTrade({
-            side: "sell",
-            spendLabel: `${formatReceiveAmount(formatUnits(sellTokenWei, 18))} ${symbol}`,
-            receiveLabel: `${formatBnbReadable(Number(formatEther(sellQuoteOut)))} ${NATIVE_SYMBOL}`,
-            sellParams: baseSellParams,
-            usePermit: false,
-          });
-          setTradeConfirmError(null);
-          setTradeConfirmOpen(true);
-          return;
-        }
-
-        if (tryDispatchInstantTrade(undefined, baseSellParams, false)) return;
-
-        beginTradeInFlight();
-        legacyApproveChainRef.current = true;
-        setPendingAction("approve");
-        tradeWrite({
-          address: tokenAddress,
-          abi: erc20Abi,
-          functionName: "approve",
-          args: [contracts.bondingCurveManager, maxUint256],
-          chainId: pumpChain.id,
-        });
-        return;
-      }
-
-      if (!loadTradeAutoConfirm()) {
-        tradeTraceStep("ux.confirm_modal.open");
-        setPendingTrade({
-          side: "sell",
-          spendLabel: `${formatReceiveAmount(formatUnits(sellTokenWei, 18))} ${symbol}`,
-          receiveLabel: `${formatBnbReadable(Number(formatEther(sellQuoteOut)))} ${NATIVE_SYMBOL}`,
-          sellParams: baseSellParams,
-          usePermit,
-        });
-        setTradeConfirmError(null);
-        setTradeConfirmOpen(true);
-        return;
-      }
-
       pendingTradeReferrerRef.current = tradeReferrer;
       quoteUsdAtSubmitRef.current = estimatedQuotePriceUsd;
-
-      if (tryDispatchInstantTrade(undefined, baseSellParams, usePermit)) return;
-
-      await submitSellWriteContract(baseSellParams, usePermit);
+      tryDispatchInstantTrade(undefined, baseSellParams, usePermit);
     } catch (err) {
-      setPendingAction(null);
       pendingSellRef.current = null;
       failTradeTrace("ux.submit_trade.failed", err);
-      setError(formatTradeError(err));
+      toast.error("Order failed", formatTradeError(err));
     }
   }
 
@@ -1874,10 +1852,10 @@ export function TradePanel({
   useEffect(() => {
     if (side !== "sell" || tokenBalance === undefined || sellTokenWei <= 0n) return;
     if (sellTokenWei <= tokenBalance) return;
-    if (pendingAction !== null || isSubmitting || isConfirming || tradeInFlight) return;
+    if (pendingAction !== null) return;
     applySellTokenWei(tokenBalance);
-    setError("Amount adjusted to your current token balance.");
-  }, [side, tokenBalance, sellTokenWei, pendingAction, isSubmitting, isConfirming, tradeInFlight]);
+    toast.info("Amount adjusted", "Set to your current token balance.");
+  }, [side, tokenBalance, sellTokenWei, pendingAction]);
 
   async function confirmPendingTrade(rememberAutoConfirm: boolean) {
     if (!pendingTrade) return;
@@ -1887,55 +1865,15 @@ export function TradePanel({
     try {
       if (pendingTrade.side === "buy" && pendingTrade.buyParams) {
         quoteUsdAtSubmitRef.current = estimatedQuotePriceUsd;
-        if (tryDispatchInstantTrade(pendingTrade.buyParams)) {
-          setTradeConfirmOpen(false);
-          setPendingTrade(null);
-          return;
-        }
-        await submitBuyWriteContract(pendingTrade.buyParams);
+        tryDispatchInstantTrade(pendingTrade.buyParams);
       } else if (pendingTrade.side === "sell" && pendingTrade.sellParams) {
-        const sellParams = pendingTrade.sellParams;
-        if (needsLegacyApproval) {
-          pendingSellRef.current = {
-            amountWei: sellParams.amountWei,
-            minBnbOut: sellParams.minBnbOut,
-          };
-          pendingTradeReferrerRef.current = sellParams.referrer ?? null;
-          quoteUsdAtSubmitRef.current = estimatedQuotePriceUsd;
-          if (tryDispatchInstantTrade(undefined, sellParams, false)) {
-            setTradeConfirmOpen(false);
-            setPendingTrade(null);
-            return;
-          }
-          beginTradeInFlight();
-          setPendingAction("approve");
-          legacyApproveChainRef.current = true;
-          tradeWrite({
-            address: tokenAddress,
-            abi: erc20Abi,
-            functionName: "approve",
-            args: [contracts.bondingCurveManager, maxUint256],
-            chainId: pumpChain.id,
-          });
-        } else {
-          pendingTradeReferrerRef.current = sellParams.referrer ?? null;
-          quoteUsdAtSubmitRef.current = estimatedQuotePriceUsd;
-          if (
-            tryDispatchInstantTrade(
-              undefined,
-              sellParams,
-              pendingTrade.usePermit ?? false
-            )
-          ) {
-            setTradeConfirmOpen(false);
-            setPendingTrade(null);
-            return;
-          }
-          await submitSellWriteContract(
-            sellParams,
-            pendingTrade.usePermit ?? false
-          );
-        }
+        pendingTradeReferrerRef.current = pendingTrade.sellParams.referrer ?? null;
+        quoteUsdAtSubmitRef.current = estimatedQuotePriceUsd;
+        tryDispatchInstantTrade(
+          undefined,
+          pendingTrade.sellParams,
+          pendingTrade.usePermit ?? false
+        );
       }
       setTradeConfirmOpen(false);
       setPendingTrade(null);
@@ -1947,19 +1885,7 @@ export function TradePanel({
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (tradeInFlightRef.current) return;
-    if (needsBnbFunding) {
-      openFundChoice({
-        title: `Add ${NATIVE_SYMBOL} to trade`,
-        message:
-          side === "buy"
-            ? `You need more ${NATIVE_SYMBOL} on Base to complete this buy, including network fees.`
-            : `You need a small ${NATIVE_SYMBOL} balance to pay network fees for this sell.`,
-      });
-      return;
-    }
-    const traceSide =
-      side === "buy" ? "buy" : pendingAction === "approve" ? "approve" : "sell";
+    const traceSide = side === "buy" ? "buy" : "sell";
     startTradeTrace(traceSide, {
       tokenAddress,
       side,
@@ -1967,25 +1893,12 @@ export function TradePanel({
       sellTokenWei: side === "sell" ? sellTokenWei.toString() : undefined,
       flashblocks: fastTradeConfirm,
     });
-    await submitTrade();
+    void submitTrade();
   }
-
-  const stealthSubmitLocked =
-    tradeInFlight || isSubmitting || pendingAction !== null;
-
-  const isApprovePending = pendingAction === "approve";
-  const tradeSubmitPhase =
-    isSubmitting || isApprovePending
-      ? "submitting"
-      : isBackgroundConfirming || isConfirming || tradeInFlight
-        ? "confirming"
-        : "idle";
-
-  const tradeSubmitPending = tradeSubmitPhase !== "idle";
 
   useEffect(() => {
     if (!autoSubmitPendingRef.current || autoSubmitTriggeredRef.current) return;
-    if (balancePending || stealthSubmitLocked) return;
+    if (balancePending) return;
     if (side === "sell") {
       if (sellTokenWei === 0n || !sellQuoteOut) return;
     } else if (side === "buy") {
@@ -1996,52 +1909,25 @@ export function TradePanel({
     autoSubmitPendingRef.current = false;
     autoSubmitTriggeredRef.current = true;
     void submitTrade();
-  }, [side, sellTokenWei, sellQuoteOut, buyCostWei, balancePending, stealthSubmitLocked]);
+  }, [side, sellTokenWei, sellQuoteOut, buyCostWei, balancePending]);
 
   const submitActionLabel = !isConnected
     ? "Sign in to trade"
     : wrongChain
-      ? "Switch to BSC Testnet"
-      : needsBnbFunding
-        ? side === "buy"
-          ? `Add ${NATIVE_SYMBOL} to buy`
-          : `Add ${NATIVE_SYMBOL} for gas`
-        : insufficientBalance
-          ? insufficientTokenOnly
-            ? "Insufficient token balance"
-            : "Insufficient balance"
-          : side === "buy"
-            ? "Buy"
-            : "Sell";
+      ? "Switch to Base Sepolia"
+      : showDepositCta
+        ? `Deposit ${NATIVE_SYMBOL}`
+        : side === "buy"
+          ? "Buy"
+          : "Sell";
 
-  const submitButtonLabel =
-    tradeSubmitPhase === "submitting"
-      ? isApprovePending
-        ? "Approving"
-        : "Processing"
-      : tradeSubmitPhase === "confirming"
-        ? "Confirming"
-        : submitActionLabel;
-
-  const tradeStatusDetail =
-    tradeSubmitPhase === "submitting"
-      ? isApprovePending
-        ? "Authorizing token spend on your wallet"
-        : "Signing and submitting your order"
-      : tradeSubmitPhase === "confirming"
-        ? "Awaiting on-chain settlement"
-        : null;
-
-  const hardSubmitDisabled =
-    isConnected &&
-    (wrongChain ||
-      paused ||
-      balancePending ||
-      (insufficientBalance && !needsBnbFunding));
-  const submitButtonClass =
-    side === "sell" ? "trade-submit-button--sell" : "trade-submit-button--buy";
-  const submitButtonLoading = tradeSubmitPending && !hardSubmitDisabled;
-  const submitDisabled = hardSubmitDisabled || tradeSubmitPending;
+  const hardSubmitDisabled = isConnected && (wrongChain || paused);
+  const submitButtonClass = showDepositCta
+    ? "trade-submit-button--buy"
+    : side === "sell"
+      ? "trade-submit-button--sell"
+      : "trade-submit-button--buy";
+  const submitDisabled = hardSubmitDisabled;
 
   const canUseMaxBuy =
     side === "buy" &&
@@ -2063,7 +1949,7 @@ export function TradePanel({
       className={embedded ? "trade-panel-embedded overflow-hidden p-0" : "panel-surface overflow-hidden p-0"}
     >
       <form onSubmit={onSubmit}>
-        <div className={`trade-side-group${tradeSubmitPending ? " trade-side-group--locked" : ""}`}>
+        <div className="trade-side-group">
           <button
             type="button"
             onClick={() => {
@@ -2073,7 +1959,6 @@ export function TradePanel({
               setLinkedSellTokenWei(null);
               setError(null);
             }}
-            disabled={tradeSubmitPending}
             className={side === "buy" ? "trade-side-button-active-buy" : "trade-side-button"}
           >
             Buy
@@ -2087,7 +1972,6 @@ export function TradePanel({
               setLinkedSellTokenWei(null);
               setError(null);
             }}
-            disabled={tradeSubmitPending}
             className={side === "sell" ? "trade-side-button-active-sell" : "trade-side-button"}
           >
             Sell
@@ -2248,42 +2132,12 @@ export function TradePanel({
         ) : null}
 
         <div className="trade-action-zone">
-          {tradeSubmitPending && tradeStatusDetail ? (
-            <div className="trade-execution-status" role="status" aria-live="polite">
-              <span className="trade-execution-status__label">Order status</span>
-              <div className="trade-execution-steps" aria-hidden>
-                <div
-                  className={`trade-execution-step${
-                    tradeSubmitPhase === "submitting"
-                      ? " trade-execution-step--active"
-                      : tradeSubmitPhase === "confirming"
-                        ? " trade-execution-step--done"
-                        : ""
-                  }`}
-                />
-                <div
-                  className={`trade-execution-step${
-                    tradeSubmitPhase === "confirming" ? " trade-execution-step--active" : ""
-                  }`}
-                />
-              </div>
-              <p className="trade-execution-status__detail">{tradeStatusDetail}</p>
-            </div>
-          ) : null}
           <button
             type="submit"
             disabled={submitDisabled}
-            aria-busy={tradeSubmitPending}
-            className={`trade-submit-button ${submitButtonClass}${submitButtonLoading ? " trade-submit-button--loading" : ""}`}
+            className={`trade-submit-button ${submitButtonClass}`}
           >
-            {submitButtonLoading ? (
-              <>
-                <span className="trade-submit-spinner" aria-hidden />
-                <span>{submitButtonLabel}</span>
-              </>
-            ) : (
-              submitButtonLabel
-            )}
+            {submitActionLabel}
           </button>
         </div>
       </form>

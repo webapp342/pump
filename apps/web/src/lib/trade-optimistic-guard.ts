@@ -30,6 +30,10 @@ export type InstantTradeGateInput = {
   sellTokenWei: bigint;
   bnbBalance?: bigint;
   tokenBalance?: bigint;
+  /** Spendable native balance after in-flight trade reservations. */
+  availableBnbBalance?: bigint;
+  /** Spendable token balance after in-flight trade reservations. */
+  availableTokenBalance?: bigint;
   buyGasReserveWei: bigint;
   sellGasReserveWei: bigint;
   /** Extra gas when sell requires a separate ERC20 approve tx (SCW path). */
@@ -101,7 +105,9 @@ export function evaluateInstantTradeGate(
   if (input.paused) return { ok: false, reason: "paused" };
   if (input.balancePending) return { ok: false, reason: "balance_pending" };
   if (input.gasLoading) return { ok: false, reason: "gas_loading" };
-  if (input.bnbBalance === undefined) return { ok: false, reason: "bnb_unknown" };
+  if (input.bnbBalance === undefined && input.availableBnbBalance === undefined) {
+    return { ok: false, reason: "bnb_unknown" };
+  }
   if (!input.bondingCurve || input.protocolFeeBps === undefined) {
     return { ok: false, reason: "curve_unavailable" };
   }
@@ -109,12 +115,15 @@ export function evaluateInstantTradeGate(
   const gasReserve = conservativeGasReserve(input.side, input);
   if (gasReserve <= 0n) return { ok: false, reason: "gas_reserve_unknown" };
 
+  const nativeBalance = input.availableBnbBalance ?? input.bnbBalance!;
+  const tokenBalance = input.availableTokenBalance ?? input.tokenBalance;
+
   if (input.side === "buy") {
     if (input.buyCostWei <= 0n) return { ok: false, reason: "zero_amount" };
     const submitValue =
       input.buyCostWei > input.maxBuySpendWei ? input.maxBuySpendWei : input.buyCostWei;
     if (submitValue <= 0n) return { ok: false, reason: "insufficient_bnb" };
-    if (submitValue + gasReserve > input.bnbBalance) {
+    if (submitValue + gasReserve > nativeBalance) {
       return { ok: false, reason: "insufficient_bnb_gas" };
     }
 
@@ -129,11 +138,11 @@ export function evaluateInstantTradeGate(
   }
 
   if (input.sellTokenWei <= 0n) return { ok: false, reason: "zero_amount" };
-  if (input.tokenBalance === undefined) return { ok: false, reason: "token_unknown" };
-  if (input.sellTokenWei > input.tokenBalance) {
+  if (tokenBalance === undefined) return { ok: false, reason: "token_unknown" };
+  if (input.sellTokenWei > tokenBalance) {
     return { ok: false, reason: "insufficient_token" };
   }
-  if (input.bnbBalance < gasReserve) {
+  if (nativeBalance < gasReserve) {
     return { ok: false, reason: "insufficient_gas" };
   }
 
