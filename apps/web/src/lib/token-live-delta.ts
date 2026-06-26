@@ -3,7 +3,7 @@ import {
 } from "@/lib/bonding-curve";
 import type { TokenDetail, TradeItem } from "@/lib/db/launchpad";
 import type { CandleWsUpdate } from "@/lib/candles";
-import { arenaWsSpotPriceBnb, type ArenaTradeWsPayload } from "@/lib/arena-live-delta";
+import { arenaWsSpotPriceBnb, bondingMarkCapBnbFromWs, type ArenaTradeWsPayload } from "@/lib/arena-live-delta";
 
 export type TokenTradeWsPayload = {
   type?: string;
@@ -77,12 +77,23 @@ export function patchTokenDetailFromWsTrade(
   if (!addr || token.address.toLowerCase() !== addr) return null;
 
   const bonding = payload.bonding;
-  const spot = bonding ? arenaWsSpotPriceBnb(bonding) : 0;
+  const mcapBnb = bonding
+    ? bondingMarkCapBnbFromWs(bonding, token.marketCapBnb) ?? token.marketCapBnb
+    : token.marketCapBnb;
+  const spotPublished = bonding
+    ? Number(bonding.spotPriceZug ?? bonding.lastPriceZug)
+    : 0;
+  const spotFromMcap =
+    Number(mcapBnb) > 0 ? Number(mcapBnb) / BONDING_TOKEN_SUPPLY_HUMAN : 0;
+  const spot =
+    spotPublished > 0
+      ? spotPublished
+      : spotFromMcap > 0
+        ? spotFromMcap
+        : bonding
+          ? arenaWsSpotPriceBnb(bonding)
+          : 0;
   const spotStr = spot > 0 ? String(spot) : token.lastPriceBnb;
-  const mcapBnb =
-    spot > 0
-      ? String(spot * BONDING_TOKEN_SUPPLY_HUMAN)
-      : bonding?.marketCapZug ?? token.marketCapBnb;
 
   return {
     ...token,
@@ -96,11 +107,15 @@ export function patchTokenDetailFromWsTrade(
   };
 }
 
-/** Spot from bonding for portfolio mark (same as arena). */
+/** Spot from bonding WS — prefer indexer fields over default-virtual reserve replay. */
 export function wsBondingSpotPriceBnb(
-  bonding: { reserveZug?: string; tokenSold?: string; lastPriceZug?: string; marketCapZug?: string } | undefined
+  bonding: { reserveZug?: string; tokenSold?: string; lastPriceZug?: string; marketCapZug?: string; spotPriceZug?: string } | undefined
 ): number {
   if (!bonding) return 0;
+  const spotPublished = Number(bonding.spotPriceZug ?? bonding.lastPriceZug);
+  if (Number.isFinite(spotPublished) && spotPublished > 0) return spotPublished;
+  const mcap = Number(bonding.marketCapZug);
+  if (Number.isFinite(mcap) && mcap > 0) return mcap / BONDING_TOKEN_SUPPLY_HUMAN;
   return arenaWsSpotPriceBnb(bonding);
 }
 

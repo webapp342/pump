@@ -49,25 +49,36 @@ export function arenaWsSpotPriceBnb(
 }
 
 /**
- * Same mark-cap as API SQL (`spot × 1B supply`).
- * Never uses reserve-only with implicit sold=0 — that understates spot and caused MCAP dip-then-rise.
+ * Same mark-cap as API SQL / portfolio launched tokens.
+ * Prefer indexer-published marketCapZug (DB bonding_states) over client reserve replay —
+ * replay uses default virtual reserves and can understate MCAP vs SQL.
  */
 export function bondingMarkCapBnbFromWs(
   bonding: NonNullable<ArenaTradeWsPayload["bonding"]>,
   previousMarketCapBnb?: string | number | null
 ): string | null {
-  const spot = arenaWsSpotPriceBnb(bonding);
-  if (spot > 0) {
-    const mcap = String(spot * BONDING_TOKEN_SUPPLY_HUMAN);
-    const prev = Number(previousMarketCapBnb);
-    if (isMcapJumpSane(prev, Number(mcap))) return mcap;
-    if (!Number.isFinite(prev) || prev <= 0) return mcap;
-  }
+  const prev = Number(previousMarketCapBnb);
 
   const mcapCol = Number(bonding.marketCapZug);
   if (Number.isFinite(mcapCol) && mcapCol > 0) {
-    const prev = Number(previousMarketCapBnb);
     if (isMcapJumpSane(prev, mcapCol)) return String(mcapCol);
+  }
+
+  const spotPublished = Number(bonding.spotPriceZug ?? bonding.lastPriceZug);
+  if (Number.isFinite(spotPublished) && spotPublished > 0) {
+    const mcap = spotPublished * BONDING_TOKEN_SUPPLY_HUMAN;
+    if (isMcapJumpSane(prev, mcap)) return String(mcap);
+  }
+
+  const spot = arenaWsSpotPriceBnb(bonding);
+  if (spot > 0) {
+    const mcap = spot * BONDING_TOKEN_SUPPLY_HUMAN;
+    if (isMcapJumpSane(prev, mcap)) return String(mcap);
+    if (!Number.isFinite(prev) || prev <= 0) return String(mcap);
+  }
+
+  if (Number.isFinite(mcapCol) && mcapCol > 0 && isMcapJumpSane(prev, mcapCol)) {
+    return String(mcapCol);
   }
 
   return null;
@@ -94,11 +105,19 @@ export function patchTokenFromArenaTrade(
   const nextMcap =
     bondingMarkCapBnbFromWs(bonding, token.marketCapBnb) ?? token.marketCapBnb;
 
+  const nextMcapNum = Number(nextMcap);
+  const prevAth = Number(token.athMarketCapBnb ?? token.marketCapBnb ?? 0);
+  const nextAth =
+    Number.isFinite(nextMcapNum) && nextMcapNum > 0 && nextMcapNum > prevAth
+      ? String(nextMcapNum)
+      : token.athMarketCapBnb;
+
   return {
     ...token,
     progressBps: bonding.progressBps ?? token.progressBps,
     reserveBnb: bonding.reserveZug ?? token.reserveBnb,
     marketCapBnb: nextMcap,
+    athMarketCapBnb: nextAth,
     tradeCount: bonding.tradeCount ?? token.tradeCount,
     holderCount: bonding.holderCount ?? token.holderCount,
     volume24hBnb: bonding.volume24hZug ?? token.volume24hBnb,
