@@ -1223,10 +1223,6 @@ export function TradePanel({
       }
       return;
     }
-    if (bnbBalance !== undefined && bnbBalance.value < sellGasReserveWei) {
-      setError(`Not enough ${NATIVE_SYMBOL} for gas.`);
-      return;
-    }
 
     const clamped = Math.max(0, Math.min(100, pct));
     if (clamped === 0) {
@@ -1975,36 +1971,39 @@ export function TradePanel({
     void submitTrade();
   }, [side, sellTokenWei, sellQuoteOut, buyCostWei, balancePending]);
 
+  const hasSubmitAmount = side === "buy" ? buyCostWei > 0n : sellTokenWei > 0n;
+
   const buyGateBlocked =
     side === "buy" &&
     isConnected &&
     !wrongChain &&
-    buyCostWei > 0n &&
+    hasSubmitAmount &&
     !instantTradeGate.ok &&
     !isTransientInstantGateReason(instantTradeGate.reason);
 
-  const submitActionLabel = !isConnected
-    ? "Sign in to trade"
-    : wrongChain
-      ? "Switch to Base Sepolia"
-      : showInsufficientTokenBalance
-        ? "Insufficient balance"
-        : buyGateBlocked
-          ? `Not enough ${NATIVE_SYMBOL}`
-          : showDepositCta
-            ? `Deposit ${NATIVE_SYMBOL}`
-            : side === "buy"
-              ? "Buy"
-              : "Sell";
+  const submitActionLabel = (() => {
+    if (!isConnected) return "Sign in to trade";
+    if (wrongChain) return "Switch to Base Sepolia";
+    if (paused) return "Trading paused";
+    if (!hasSubmitAmount) return "Enter amount";
+    if (showInsufficientTokenBalance) return "Insufficient balance";
+    if (showDepositCta) return `Deposit ${NATIVE_SYMBOL}`;
+    if (buyGateBlocked) return `Not enough ${NATIVE_SYMBOL}`;
+    return side === "buy" ? `Buy ${symbol}` : `Sell ${symbol}`;
+  })();
 
-  const hardSubmitDisabled = isConnected && (wrongChain || paused);
-  const submitButtonClass = showDepositCta
-    ? "trade-submit-button--buy"
-    : side === "sell"
-      ? "trade-submit-button--sell"
-      : "trade-submit-button--buy";
-  const submitDisabled =
-    hardSubmitDisabled || showInsufficientTokenBalance || buyGateBlocked;
+  const submitButtonClass =
+    showDepositCta || side === "buy"
+      ? "trade-submit-button--buy"
+      : "trade-submit-button--sell";
+
+  const submitDisabled = (() => {
+    if (!isConnected) return false;
+    if (wrongChain || paused) return true;
+    if (!hasSubmitAmount) return true;
+    if (showInsufficientTokenBalance || buyGateBlocked) return true;
+    return false;
+  })();
 
   const canUseMaxBuy =
     side === "buy" &&
