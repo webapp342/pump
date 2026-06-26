@@ -413,8 +413,8 @@ const TOKEN_LIST_SELECT_BOARD_STATS = `
         0
       )::text AS ath_market_cap_zug,
       COALESCE(mts.trade_count, COALESCE(tbs.trade_count, b.trade_count, 0)) AS trade_count,
-      COALESCE(mts.volume_24h_zug, tbs.volume_24h_zug, 0)::text AS volume_24h_zug,
-      COALESCE(mts.volume_24h_prev_zug, tbs.volume_24h_prev_zug, 0)::text AS volume_24h_prev_zug,
+      COALESCE(mts.volume_24h_zug, tbs.volume_24h_zug::text, '0') AS volume_24h_zug,
+      COALESCE(mts.volume_24h_prev_zug, tbs.volume_24h_prev_zug::text, '0') AS volume_24h_prev_zug,
       COALESCE(mts.trade_count_24h_ago, tbs.trade_count_24h_ago, 0) AS trade_count_24h_ago,
       COALESCE(mts.traders_24h, tbs.traders_24h, 0) AS traders_24h,
       CASE

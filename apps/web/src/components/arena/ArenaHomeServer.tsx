@@ -1,6 +1,6 @@
 import { connection } from "next/server";
 import { ArenaListClient } from "@/components/arena/ArenaListClient";
-import { loadArenaHomePayloadFromDb } from "@/lib/arena-server";
+import { fetchArenaHomePayload } from "@/lib/arena-server";
 
 /** Dynamic server island — arena SSR payload (use cache inside fetch). */
 export async function ArenaHomeServer() {
