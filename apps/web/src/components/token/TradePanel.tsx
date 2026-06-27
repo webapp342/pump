@@ -103,7 +103,7 @@ import {
   resolveTradeReferrer,
 } from "@/lib/referral-storage";
 import { bnbToUsd, formatUsdReadable } from "@/lib/format-usd";
-import { formatEstimatedPriceUsd, quoteFillPriceBnb, quoteFillDeviationBps, isPriceAccuracyViolation, logPriceAccuracyViolation } from "@/lib/price-semantics";
+import { quoteFillPriceBnb, quoteFillDeviationBps, isPriceAccuracyViolation, logPriceAccuracyViolation } from "@/lib/price-semantics";
 import { tradeFillPriceBnb } from "@/lib/format-usd";
 import { parseTradesFromReceipt } from "@/lib/launchpad-events";
 import { useBnbUsdPrice } from "@/hooks/useBnbUsdPrice";
@@ -955,25 +955,29 @@ export function TradePanel({
         : symbol;
 
   const conversionParts: string[] = [];
-  if (side === "buy") {
-    if (buyInputMode === "token") {
-      if (buyCostWei > 0n) {
-        conversionParts.push(
-          `≈ ${formatBnbReadable(Number(formatEther(buyCostWei)))} ${NATIVE_SYMBOL}`
-        );
-      }
-      if (amountUsdLabel) {
-        conversionParts.push(`≈ ${amountUsdLabel}`);
-      }
-    } else if (Number(amount) > 0) {
-      if (buyInputMode === "usd") {
+  const hasInputValue =
+    displayInputValue.trim() !== "" &&
+    displayInputValue !== "0" &&
+    Number.isFinite(Number(displayInputValue.replace(/,/g, "."))) &&
+    Number(displayInputValue.replace(/,/g, ".")) > 0;
+
+  if (hasInputValue) {
+    if (side === "buy") {
+      if (buyInputMode === "token") {
+        if (buyCostWei > 0n) {
+          conversionParts.push(
+            `≈ ${formatBnbReadable(Number(formatEther(buyCostWei)))} ${NATIVE_SYMBOL}`
+          );
+        }
+        if (amountUsdLabel) {
+          conversionParts.push(`≈ ${amountUsdLabel}`);
+        }
+      } else if (buyInputMode === "usd") {
         conversionParts.push(`≈ ${formatBnbReadable(Number(amount))} ${NATIVE_SYMBOL}`);
       } else if (amountUsdLabel) {
         conversionParts.push(`≈ ${amountUsdLabel}`);
       }
-    }
-  } else if (sellTokenWei > 0n) {
-    if (sellInputMode === "token") {
+    } else if (sellInputMode === "token") {
       if (estimatedOut > 0n) {
         conversionParts.push(
           `≈ ${formatBnbReadable(Number(formatEther(estimatedOut)))} ${NATIVE_SYMBOL}`
@@ -982,14 +986,53 @@ export function TradePanel({
       if (amountUsdLabel) {
         conversionParts.push(`≈ ${amountUsdLabel}`);
       }
-    } else if (Number(amount) > 0) {
-      if (sellInputMode === "usd") {
-        conversionParts.push(`≈ ${formatBnbReadable(Number(amount))} ${NATIVE_SYMBOL}`);
-      } else if (amountUsdLabel) {
-        conversionParts.push(`≈ ${amountUsdLabel}`);
-      }
+    } else if (sellInputMode === "usd") {
+      conversionParts.push(`≈ ${formatBnbReadable(Number(amount))} ${NATIVE_SYMBOL}`);
+    } else if (amountUsdLabel) {
+      conversionParts.push(`≈ ${amountUsdLabel}`);
     }
   }
+
+  const inputChipLabel = useMemo(() => {
+    if (!hasInputValue) return null;
+    if (activeInputMode === "usd") {
+      const usd = Number(displayInputValue.replace(/,/g, "."));
+      return Number.isFinite(usd) && usd > 0 ? formatUsdReadable(usd) : null;
+    }
+    if (activeInputMode === "bnb") {
+      const bnb = Number(amount);
+      return Number.isFinite(bnb) && bnb > 0
+        ? `${formatBnbReadable(bnb)} ${NATIVE_SYMBOL}`
+        : null;
+    }
+    if (side === "buy" && effectiveBuyTokenWei > 0n) {
+      return `${formatReceiveAmount(formatUnits(effectiveBuyTokenWei, 18))} ${symbol}`;
+    }
+    if (side === "sell" && sellTokenWei > 0n) {
+      return `${formatReceiveAmount(formatUnits(sellTokenWei, 18))} ${symbol}`;
+    }
+    return null;
+  }, [
+    hasInputValue,
+    activeInputMode,
+    displayInputValue,
+    amount,
+    side,
+    effectiveBuyTokenWei,
+    sellTokenWei,
+    symbol,
+  ]);
+
+  const metaLeftLine = (() => {
+    if (!hasInputValue) return null;
+    const parts: string[] = [];
+    if (inputChipLabel && activeInputMode !== "token") {
+      parts.push(inputChipLabel);
+    }
+    parts.push(...conversionParts);
+    if (parts.length > 0) return parts.join(" · ");
+    return inputChipLabel;
+  })();
 
   const availableLabel = useMemo(() => {
     if (!isConnected) return null;
@@ -1137,11 +1180,6 @@ export function TradePanel({
     }
     return null;
   }, [side, estimatedOut, buyCostWei, sellTokenWei, bnbUsd]);
-
-  const estimatedQuotePriceLabel = formatEstimatedPriceUsd(
-    estimatedQuotePriceUsd,
-    (value) => formatUsdReadable(value)
-  );
 
   useEffect(() => {
     if (side !== "buy" || linkedBuySpendWei == null || maxBuySpendWei === 0n) return;
@@ -2295,9 +2333,9 @@ export function TradePanel({
               <ChevronDownSmall />
             </button>
 
-            {conversionParts.length > 0 ? (
+            {metaLeftLine ? (
               <p className="trade-conversion-line trade-input-layout__conversion text-left text-caption leading-snug text-pump-muted">
-                {conversionParts.join(" · ")}
+                {metaLeftLine}
               </p>
             ) : (
               <span className="trade-input-layout__conversion" aria-hidden />
@@ -2305,7 +2343,7 @@ export function TradePanel({
 
             {availableLabel ? (
               <p className="trade-available-line trade-input-layout__available text-right text-caption leading-snug text-pump-muted">
-                Avlbl{" "}
+                Available{" "}
                 <span className="financial-value text-pump-text">{availableLabel}</span>
               </p>
             ) : (
@@ -2391,14 +2429,6 @@ export function TradePanel({
             </button>
             {receiveExpanded ? (
               <div className="trade-detail-grid">
-                {estimatedQuotePriceLabel ? (
-                  <div className="trade-detail-row">
-                    <span className="trade-detail-row__label">Est. price</span>
-                    <span className="trade-detail-row__value financial-value">
-                      {estimatedQuotePriceLabel}
-                    </span>
-                  </div>
-                ) : null}
                 <div className="trade-detail-row">
                   <span className="trade-detail-row__label">Est. gas</span>
                   <span className="trade-detail-row__value financial-value">{gasCostLabel}</span>
