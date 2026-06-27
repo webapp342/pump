@@ -2239,68 +2239,51 @@ export function TradePanel({
         ) : null}
 
         <div className="trade-panel-input-zone">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0 flex-1">
-              <div
-                className={
-                  activeInputMode === "usd"
-                    ? "relative inline-flex max-w-full items-baseline pl-3.5 md:pl-4"
-                    : "inline-flex max-w-full items-baseline"
-                }
-              >
-                {activeInputMode === "usd" ? (
-                  <span
-                    className="financial-value absolute bottom-[0.22em] left-0 text-body-sm font-medium leading-none text-pump-muted md:text-body"
-                    aria-hidden
-                  >
-                    $
-                  </span>
-                ) : null}
-                <input
-                  id="trade-amount"
-                  name="trade-amount"
-                  type="text"
-                  inputMode="decimal"
-                  autoComplete="off"
-                  autoCorrect="off"
-                  spellCheck={false}
-                  value={displayInputValue}
-                  onChange={(e) => onDisplayInputChange(e.target.value)}
-                  placeholder="0"
-                  style={{
-                    width: `${Math.min(Math.max(displayInputValue.length || 1, 1), 10)}ch`,
-                  }}
-                  className="trade-amount-input financial-value min-w-[1ch] max-w-full bg-transparent p-0 text-left text-[2.5rem] leading-none text-pump-text outline-none placeholder:text-pump-muted/45 md:text-[2.75rem]"
-                  aria-label={
-                    side === "buy"
-                      ? "Trade amount"
-                      : sellInputMode === "token"
-                        ? `Amount in ${symbol}`
-                        : "Expected receive amount"
-                  }
-                />
-              </div>
-              {conversionParts.length > 0 || availableLabel ? (
-                <div className="mt-1.5 space-y-0.5">
-                  {conversionParts.length > 0 ? (
-                    <p className="trade-conversion-line text-left text-caption leading-snug text-pump-muted">
-                      {conversionParts.join(" · ")}
-                    </p>
-                  ) : null}
-                  {availableLabel ? (
-                    <p className="trade-available-line text-left text-caption leading-snug text-pump-muted">
-                      Avlbl{" "}
-                      <span className="financial-value text-pump-text">{availableLabel}</span>
-                    </p>
-                  ) : null}
-                </div>
+          <div className="trade-input-layout">
+            <div
+              className={
+                activeInputMode === "usd"
+                  ? "trade-input-layout__amount relative inline-flex max-w-full items-baseline pl-3.5 md:pl-4"
+                  : "trade-input-layout__amount inline-flex max-w-full items-baseline"
+              }
+            >
+              {activeInputMode === "usd" ? (
+                <span
+                  className="financial-value absolute bottom-[0.22em] left-0 text-body-sm font-medium leading-none text-pump-muted md:text-body"
+                  aria-hidden
+                >
+                  $
+                </span>
               ) : null}
+              <input
+                id="trade-amount"
+                name="trade-amount"
+                type="text"
+                inputMode="decimal"
+                autoComplete="off"
+                autoCorrect="off"
+                spellCheck={false}
+                value={displayInputValue}
+                onChange={(e) => onDisplayInputChange(e.target.value)}
+                placeholder="0"
+                style={{
+                  width: `${Math.min(Math.max(displayInputValue.length || 1, 1), 10)}ch`,
+                }}
+                className="trade-amount-input financial-value min-w-[1ch] max-w-full bg-transparent p-0 text-left text-[2.5rem] leading-none text-pump-text outline-none placeholder:text-pump-muted/45 md:text-[2.75rem]"
+                aria-label={
+                  side === "buy"
+                    ? "Trade amount"
+                    : sellInputMode === "token"
+                      ? `Amount in ${symbol}`
+                      : "Expected receive amount"
+                }
+              />
             </div>
 
             <button
               type="button"
               onClick={toggleInputMode}
-              className="trade-currency-chip shrink-0 self-start"
+              className="trade-currency-chip trade-input-layout__chip shrink-0 self-start justify-self-end"
               aria-label="Toggle input currency"
             >
               <TradeInputModeIcon
@@ -2311,6 +2294,23 @@ export function TradePanel({
               <span className="text-body-sm font-medium text-pump-text">{currencyLabel}</span>
               <ChevronDownSmall />
             </button>
+
+            {conversionParts.length > 0 ? (
+              <p className="trade-conversion-line trade-input-layout__conversion text-left text-caption leading-snug text-pump-muted">
+                {conversionParts.join(" · ")}
+              </p>
+            ) : (
+              <span className="trade-input-layout__conversion" aria-hidden />
+            )}
+
+            {availableLabel ? (
+              <p className="trade-available-line trade-input-layout__available text-right text-caption leading-snug text-pump-muted">
+                Avlbl{" "}
+                <span className="financial-value text-pump-text">{availableLabel}</span>
+              </p>
+            ) : (
+              <span className="trade-input-layout__available" aria-hidden />
+            )}
           </div>
 
           <div className={`trade-teeth-slider trade-teeth-slider--${side} mt-5`}>

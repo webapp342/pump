@@ -720,6 +720,37 @@ code,
     letter-spacing: -0.02em;
   }
 
+  .trade-input-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    column-gap: 0.75rem;
+    row-gap: 0.375rem;
+    align-items: start;
+  }
+
+  .trade-input-layout__amount {
+    grid-column: 1;
+    grid-row: 1;
+    min-width: 0;
+  }
+
+  .trade-input-layout__chip {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .trade-input-layout__conversion {
+    grid-column: 1;
+    grid-row: 2;
+    min-width: 0;
+  }
+
+  .trade-input-layout__available {
+    grid-column: 2;
+    grid-row: 2;
+    white-space: nowrap;
+  }
+
   .trade-conversion-line {
     font-variant-numeric: tabular-nums;
   }
