@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { encodeFunctionData, formatEther, formatUnits, parseEther, parseSignature, parseUnits } from "viem";
 import type { Address, TransactionReceipt } from "viem";
 import { useOpenConnectModal } from "@/hooks/useOpenConnectModal";
@@ -2146,9 +2146,6 @@ export function TradePanel({
   const canUseSlider = side === "buy" ? canUseMaxBuy : canUseMaxSell;
   const applySliderPercent = side === "buy" ? applyBuySliderPercent : applySellSliderPercent;
   const sliderPctIndicatorLeft = sliderPct <= 5 ? 5 : sliderPct >= 95 ? 95 : sliderPct;
-  const sliderTrackStyle = {
-    "--slider-pct": `${sliderPct}%`,
-  } as CSSProperties;
 
   return (
     <section
@@ -2255,8 +2252,23 @@ export function TradePanel({
             </button>
           </div>
 
-          <div className={`trade-ruler-slider trade-ruler-slider--${side} mt-5 pb-1`}>
-            <div className="trade-ruler-track-wrap">
+          <div className={`trade-teeth-slider trade-teeth-slider--${side} mt-5`}>
+            <div className="trade-teeth-slider__frame">
+              <div className="trade-teeth-row" aria-hidden>
+                {Array.from({ length: TRADE_RULER_TICK_COUNT }, (_, index) => {
+                  const tickPct = (index * 100) / (TRADE_RULER_TICK_COUNT - 1);
+                  const active = sliderPct >= tickPct;
+                  const isMajor = index % 5 === 0;
+                  return (
+                    <span
+                      key={index}
+                      className={`trade-teeth-tick${
+                        isMajor ? " trade-teeth-tick--major" : " trade-teeth-tick--minor"
+                      }${active ? ` trade-teeth-tick--active-${side}` : " trade-teeth-tick--idle"}`}
+                    />
+                  );
+                })}
+              </div>
               <input
                 type="range"
                 min={0}
@@ -2265,10 +2277,7 @@ export function TradePanel({
                 value={sliderPct}
                 onChange={(e) => applySliderPercent(Number(e.target.value))}
                 disabled={!canUseSlider}
-                style={sliderTrackStyle}
-                className={`trade-ruler-slider__input trade-amount-slider w-full disabled:opacity-40 ${
-                  side === "sell" ? "trade-amount-slider--sell" : "trade-amount-slider--buy"
-                }`}
+                className="trade-teeth-slider__input"
                 aria-label={side === "buy" ? "Buy amount slider" : "Sell amount slider"}
                 aria-valuetext={
                   amountOverMax
@@ -2278,33 +2287,8 @@ export function TradePanel({
                       : `${sliderPct}% of ${side === "buy" ? "wallet balance" : "token balance"}`
                 }
               />
-              <div className="trade-ruler-ticks-row" aria-hidden>
-                <div className="trade-ruler-ticks trade-ruler-ticks--base">
-                  {Array.from({ length: TRADE_RULER_TICK_COUNT }, (_, index) => (
-                    <span
-                      key={`base-${index}`}
-                      className={`trade-ruler-tick trade-ruler-tick--base${
-                        index % 5 === 0 ? " trade-ruler-tick--major" : " trade-ruler-tick--minor"
-                      }`}
-                    />
-                  ))}
-                </div>
-                <div
-                  className={`trade-ruler-ticks trade-ruler-ticks--fill trade-ruler-ticks--fill-${side}`}
-                  style={{ clipPath: `inset(0 ${100 - sliderPct}% 0 0)` }}
-                >
-                  {Array.from({ length: TRADE_RULER_TICK_COUNT }, (_, index) => (
-                    <span
-                      key={`fill-${index}`}
-                      className={`trade-ruler-tick trade-ruler-tick--fill trade-ruler-tick--fill-${side}${
-                        index % 5 === 0 ? " trade-ruler-tick--major" : " trade-ruler-tick--minor"
-                      }`}
-                    />
-                  ))}
-                </div>
-              </div>
               <span
-                className={`trade-ruler-pct-indicator trade-ruler-pct-indicator--${side}`}
+                className={`trade-teeth-pct trade-teeth-pct--${side}`}
                 style={{ left: `${sliderPctIndicatorLeft}%` }}
                 aria-hidden
               >
