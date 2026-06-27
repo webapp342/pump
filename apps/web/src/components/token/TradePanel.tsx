@@ -2333,22 +2333,18 @@ export function TradePanel({
               <ChevronDownSmall />
             </button>
 
-            {metaLeftLine ? (
+            {hasInputValue && metaLeftLine ? (
               <p className="trade-conversion-line trade-input-layout__conversion text-left text-caption leading-snug text-pump-muted">
                 {metaLeftLine}
               </p>
-            ) : (
-              <span className="trade-input-layout__conversion" aria-hidden />
-            )}
+            ) : null}
 
-            {availableLabel ? (
+            {hasInputValue && availableLabel ? (
               <p className="trade-available-line trade-input-layout__available text-right text-caption leading-snug text-pump-muted">
                 Available{" "}
                 <span className="financial-value text-pump-text">{availableLabel}</span>
               </p>
-            ) : (
-              <span className="trade-input-layout__available" aria-hidden />
-            )}
+            ) : null}
           </div>
 
           <div className={`trade-teeth-slider trade-teeth-slider--${side} mt-5`}>
