@@ -2257,20 +2257,6 @@ export function TradePanel({
 
           <div className={`trade-ruler-slider trade-ruler-slider--${side} mt-5 pb-1`}>
             <div className="trade-ruler-track-wrap">
-              <div className="trade-ruler-ticks" aria-hidden>
-                {Array.from({ length: TRADE_RULER_TICK_COUNT }, (_, index) => {
-                  const tickPct = (index * 100) / (TRADE_RULER_TICK_COUNT - 1);
-                  const passed = sliderPct >= tickPct;
-                  return (
-                    <span
-                      key={index}
-                      className={`trade-ruler-tick${
-                        index % 5 === 0 ? " trade-ruler-tick--major" : " trade-ruler-tick--minor"
-                      }${passed ? ` trade-ruler-tick--passed-${side}` : ""}`}
-                    />
-                  );
-                })}
-              </div>
               <input
                 type="range"
                 min={0}
@@ -2292,6 +2278,31 @@ export function TradePanel({
                       : `${sliderPct}% of ${side === "buy" ? "wallet balance" : "token balance"}`
                 }
               />
+              <div className="trade-ruler-ticks-row" aria-hidden>
+                <div className="trade-ruler-ticks trade-ruler-ticks--base">
+                  {Array.from({ length: TRADE_RULER_TICK_COUNT }, (_, index) => (
+                    <span
+                      key={`base-${index}`}
+                      className={`trade-ruler-tick trade-ruler-tick--base${
+                        index % 5 === 0 ? " trade-ruler-tick--major" : " trade-ruler-tick--minor"
+                      }`}
+                    />
+                  ))}
+                </div>
+                <div
+                  className={`trade-ruler-ticks trade-ruler-ticks--fill trade-ruler-ticks--fill-${side}`}
+                  style={{ clipPath: `inset(0 ${100 - sliderPct}% 0 0)` }}
+                >
+                  {Array.from({ length: TRADE_RULER_TICK_COUNT }, (_, index) => (
+                    <span
+                      key={`fill-${index}`}
+                      className={`trade-ruler-tick trade-ruler-tick--fill trade-ruler-tick--fill-${side}${
+                        index % 5 === 0 ? " trade-ruler-tick--major" : " trade-ruler-tick--minor"
+                      }`}
+                    />
+                  ))}
+                </div>
+              </div>
               <span
                 className={`trade-ruler-pct-indicator trade-ruler-pct-indicator--${side}`}
                 style={{ left: `${sliderPctIndicatorLeft}%` }}
