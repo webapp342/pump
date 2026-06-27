@@ -922,17 +922,24 @@ code,
   @media (min-width: 1024px) {
     .token-page-grid {
       grid-template-columns: 280px minmax(0, 1fr) 340px;
+      grid-template-rows: auto minmax(0, 1fr);
+    }
+
+    .token-page-toolbar-slot {
+      grid-column: 2;
+      grid-row: 1;
+      min-width: 0;
     }
 
     .token-page-stack--sidebar {
       grid-column: 1;
-      grid-row: 1 / -1;
+      grid-row: 2 / -1;
       min-height: 0;
     }
 
     .token-page-stack--main {
       grid-column: 2;
-      grid-row: 1 / -1;
+      grid-row: 2 / -1;
     }
 
     .token-page-stack--aside {

@@ -25,6 +25,8 @@ export function TokenDetailBodySkeleton() {
   return (
     <div className="token-page" aria-busy="true" aria-label="Loading token">
       <div className="token-page-grid">
+        <div className="token-page-toolbar-slot hidden lg:block">{toolbarSkeleton}</div>
+
         <div className="token-page-stack token-page-stack--sidebar hidden lg:flex">
           <section className="token-market-sidebar panel-surface">
             <div className="token-market-sidebar__toolbar">
@@ -44,7 +46,7 @@ export function TokenDetailBodySkeleton() {
         </div>
 
         <div className="token-page-stack token-page-stack--main">
-          <div className="shrink-0">{toolbarSkeleton}</div>
+          <div className="shrink-0 lg:hidden">{toolbarSkeleton}</div>
           <div className="token-page-chart-slot">
             <SkeletonChartPanel />
           </div>

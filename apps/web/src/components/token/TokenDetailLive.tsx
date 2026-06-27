@@ -808,12 +808,14 @@ export function TokenDetailLive({
   return (
     <div className="token-page">
       <div className="token-page-grid">
+        <div className="token-page-toolbar-slot hidden lg:block">{tokenToolbar}</div>
+
         <div className="token-page-stack token-page-stack--sidebar hidden lg:flex">
           <TokenMarketListPlaceholder />
         </div>
 
         <div className="token-page-stack token-page-stack--main">
-          <div className="shrink-0">{tokenToolbar}</div>
+          <div className="shrink-0 lg:hidden">{tokenToolbar}</div>
           <div className="token-page-chart-slot">
             <PriceChart
               fillContainer
