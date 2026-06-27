@@ -116,6 +116,7 @@ import {
 import type { TradePrefillConfig } from "@/lib/token-trade-prefill";
 
 type Side = "buy" | "sell";
+type TradeMode = "market" | "limit";
 type TradeInputMode = "usd" | "token";
 
 function normalizeTradeInputMode(mode?: string): TradeInputMode {
@@ -314,6 +315,7 @@ export function TradePanel({
   const optimisticNativeUsdRate =
     bnbUsd != null && bnbUsd > 0 ? String(bnbUsd) : undefined;
   const [side, setSide] = useState<Side>("buy");
+  const [tradeMode, setTradeMode] = useState<TradeMode>("market");
   const [buyInputMode, setBuyInputMode] = useState<TradeInputMode>("usd");
   const [sellInputMode, setSellInputMode] = useState<TradeInputMode>("usd");
   const [amount, setAmount] = useState("");
@@ -2189,6 +2191,41 @@ export function TradePanel({
       className={embedded ? "trade-panel-embedded overflow-hidden p-0" : "panel-surface overflow-hidden p-0"}
     >
       <form onSubmit={onSubmit}>
+        <div className="trade-panel-mode-tabs" role="tablist" aria-label="Order type">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tradeMode === "market"}
+            className={
+              tradeMode === "market"
+                ? "trade-panel-mode-tab trade-panel-mode-tab--active"
+                : "trade-panel-mode-tab"
+            }
+            onClick={() => {
+              setTradeMode("market");
+              setAssetMenuOpen(false);
+            }}
+          >
+            Market
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tradeMode === "limit"}
+            className={
+              tradeMode === "limit"
+                ? "trade-panel-mode-tab trade-panel-mode-tab--active"
+                : "trade-panel-mode-tab"
+            }
+            onClick={() => {
+              setTradeMode("limit");
+              setAssetMenuOpen(false);
+            }}
+          >
+            Limit
+          </button>
+        </div>
+
         <div className="trade-panel-tabs">
           <div className="trade-side-group">
             <button
@@ -2222,6 +2259,8 @@ export function TradePanel({
           </div>
         </div>
 
+        {tradeMode === "market" ? (
+          <>
         {paused ? (
           <p className="notice-warning mx-4 mt-2 text-caption">Trading is paused on this curve.</p>
         ) : null}
@@ -2360,38 +2399,32 @@ export function TradePanel({
           </div>
         </div>
 
-        <div className="trade-panel-details-zone">
-          <div className="trade-detail-row trade-order-value-row">
-            <span className="trade-detail-row__label">Order value</span>
-            <div className="trade-order-value-row__values">
-              {orderValuePrimary ? (
-                <span className="trade-order-value-asset">
-                  {side === "buy" ? (
-                    <TokenAvatar
-                      address={tokenAddress}
-                      symbol={symbol}
-                      size={16}
-                      className="!ring-0"
-                    />
-                  ) : (
-                    <NativeLogo size={16} />
-                  )}
-                  <span className="trade-detail-row__value financial-value text-pump-text">
-                    {orderValuePrimary}
-                  </span>
-                </span>
+        <div className="trade-panel-details-zone trade-panel-details-grid">
+          <span className="trade-detail-row__label">Order value</span>
+          {orderValuePrimary ? (
+            <div className="trade-order-value-primary">
+              {side === "buy" ? (
+                <TokenAvatar
+                  address={tokenAddress}
+                  symbol={symbol}
+                  size={16}
+                  className="!ring-0"
+                />
               ) : (
-                <span className="trade-detail-row__value financial-value text-pump-text">—</span>
+                <NativeLogo size={16} />
               )}
-              <span className="trade-detail-row__value financial-value text-pump-muted">
-                {orderValueUsd ?? "—"}
-              </span>
+              <span className="financial-value text-pump-text">{orderValuePrimary}</span>
             </div>
-          </div>
-          <div className="trade-detail-row">
-            <span className="trade-detail-row__label">Est. gas</span>
-            <span className="trade-detail-row__value financial-value">{gasCostLabel}</span>
-          </div>
+          ) : (
+            <span className="trade-order-value-primary financial-value text-pump-text">—</span>
+          )}
+          <span className="trade-order-value-usd financial-value text-pump-muted">
+            {orderValueUsd ?? "—"}
+          </span>
+          <span className="trade-detail-row__label">Est. gas</span>
+          <span className="trade-detail-row__value trade-detail-row__value--wide financial-value">
+            {gasCostLabel}
+          </span>
         </div>
 
         {error ? (
@@ -2409,6 +2442,12 @@ export function TradePanel({
             {submitActionLabel}
           </button>
         </div>
+          </>
+        ) : (
+          <div className="trade-limit-placeholder">
+            <p className="text-body-sm text-pump-muted">Limit orders are not available yet.</p>
+          </div>
+        )}
       </form>
 
       <TradeConfirmModal
