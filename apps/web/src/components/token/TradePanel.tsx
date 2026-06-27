@@ -2353,6 +2353,7 @@ export function TradePanel({
                 }
               />
             </div>
+            </div>
           </div>
         </div>
 
