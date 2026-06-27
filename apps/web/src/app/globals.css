@@ -1176,6 +1176,13 @@ code,
     -webkit-backdrop-filter: blur(12px);
   }
 
+  .app-header--card {
+    background: rgb(var(--pump-card));
+    border-bottom-color: rgb(var(--pump-border) / 0.38);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
   .app-header-inner {
     display: flex;
     align-items: center;

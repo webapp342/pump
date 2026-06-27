@@ -32,8 +32,9 @@ export function TokenDetailBodySkeleton() {
           </div>
           <div className="token-page-tape-slot">
             <section className="panel-surface token-trade-tape overflow-hidden">
-              <div className="shrink-0 border-b border-pump-border/15 px-3 py-2">
-                <Skeleton className="h-7 w-32 rounded-md" />
+              <div className="trade-panel-mode-tabs shrink-0">
+                <Skeleton className="h-4 w-14" />
+                <Skeleton className="h-4 w-16" />
               </div>
               <div className="token-trade-tape__scroll">
                 <div className="sheet-list">

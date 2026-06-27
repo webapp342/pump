@@ -2,8 +2,8 @@
 export const shellMaxWidthClass = "max-w-[1600px]";
 export const shellWideMaxWidthClass = "max-w-[1920px]";
 export const shellPaddingXClass = "px-3 sm:px-4 md:px-5 lg:px-6";
-/** Token detail shell inset — 2× prior 2px; top flush to header (pt-0). */
-export const shellTokenPagePaddingClass = "px-1 pb-1 pt-0";
+/** Token detail shell inset — equal on all sides (matches --token-page-gutter). */
+export const shellTokenPagePaddingClass = "p-1";
 export const shellTokenPagePaddingXClass = "px-1";
 /** Matches --token-page-gutter in globals.css (0.25rem / 4px). */
 export const shellTokenPageGutterClass = "gap-1";

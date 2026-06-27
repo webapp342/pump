@@ -14,8 +14,9 @@ function navLinkClass(active: boolean): string {
 }
 
 export function AppHeaderView({ pathname }: { pathname: string }) {
+  const onTokenPage = pathname.startsWith("/token/");
   return (
-    <header className="app-header">
+    <header className={onTokenPage ? "app-header app-header--card" : "app-header"}>
       <div className={`app-header-inner ${shellInnerClassForPath(pathname)}`}>
         <div className="app-header-start">
           <Link href="/" className="app-header-brand">

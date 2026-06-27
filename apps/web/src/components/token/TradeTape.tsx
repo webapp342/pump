@@ -32,9 +32,8 @@ type PagedMeta = {
 const activityTableScrollClass =
   "min-w-0 overflow-x-auto overscroll-x-contain [-webkit-overflow-scrolling:touch]";
 const cellClass = "px-2.5 py-2.5 sm:px-3 lg:px-4 lg:py-3";
-const accountCellClass = `${cellClass} max-w-[9.5rem] whitespace-nowrap !pr-0 lg:min-w-[9rem] lg:max-w-none lg:!pr-4`;
-const sideCellClass = `${cellClass} w-px whitespace-nowrap !px-1 !pl-0 lg:!px-3 lg:!pl-4`;
-const amountCellClass = `${cellClass} whitespace-nowrap !pl-1 financial-value text-pump-text lg:!pl-3`;
+const accountCellClass = `${cellClass} max-w-[9.5rem] whitespace-nowrap lg:min-w-[9rem] lg:max-w-none`;
+const amountCellClass = `${cellClass} whitespace-nowrap financial-value font-medium`;
 
 function formatRelativeTime(iso: string): string {
   const diffMs = Date.now() - new Date(iso).getTime();
@@ -157,14 +156,6 @@ function IdentityPill({
       <span className="truncate font-medium">{label}</span>
       {showCreatorBadge ? <CreatorBadge /> : null}
     </button>
-  );
-}
-
-function TradeSideLabel({ isBuy }: { isBuy: boolean }) {
-  return (
-    <span className={`text-caption font-medium ${isBuy ? "text-pump-success" : "text-pump-danger"}`}>
-      {isBuy ? "Buy" : "Sell"}
-    </span>
   );
 }
 
@@ -350,27 +341,33 @@ export function TradeTape({
 
   return (
     <section className="panel-surface token-trade-tape overflow-hidden">
-      <div className="shrink-0 border-b border-pump-border/15 px-3 py-2">
-        <div className="segment-control w-fit" role="tablist" aria-label="Trades and holders">
-          <button
-            type="button"
-            role="tab"
-            aria-selected={tab === "trades"}
-            onClick={() => setTab("trades")}
-            className={tab === "trades" ? "chip-button chip-button-active" : "chip-button"}
-          >
-            Trades
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={tab === "holders"}
-            onClick={() => setTab("holders")}
-            className={tab === "holders" ? "chip-button chip-button-active" : "chip-button"}
-          >
-            Holders
-          </button>
-        </div>
+      <div className="trade-panel-mode-tabs shrink-0" role="tablist" aria-label="Trades and holders">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === "trades"}
+          onClick={() => setTab("trades")}
+          className={
+            tab === "trades"
+              ? "trade-panel-mode-tab trade-panel-mode-tab--active"
+              : "trade-panel-mode-tab"
+          }
+        >
+          Trades
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === "holders"}
+          onClick={() => setTab("holders")}
+          className={
+            tab === "holders"
+              ? "trade-panel-mode-tab trade-panel-mode-tab--active"
+              : "trade-panel-mode-tab"
+          }
+        >
+          Holders
+        </button>
       </div>
 
       <div className="token-trade-tape__scroll">
@@ -463,12 +460,11 @@ export function TradeTape({
           <p className="px-4 py-6 text-body-sm text-pump-muted">No trades yet.</p>
         ) : (
           <div className={activityTableScrollClass}>
-            <table className="sheet-grid w-max min-w-[680px] lg:w-full lg:min-w-[860px]">
+            <table className="sheet-grid w-max min-w-[600px] lg:w-full lg:min-w-[720px]">
               <thead>
                 <tr>
-                  <th className="whitespace-nowrap !pr-0 lg:!pr-3">Account</th>
-                  <th className={`${sideCellClass} !py-2.5 font-semibold`}>Side</th>
-                  <th className="!pl-1 lg:!pl-3">Amount</th>
+                  <th className="whitespace-nowrap">Account</th>
+                  <th>Amount</th>
                   <th>${symbol}</th>
                   <th>Price</th>
                   <th>Time</th>
@@ -492,10 +488,11 @@ export function TradeTape({
                           onAddressClick={onAddressClick}
                         />
                       </td>
-                      <td className={sideCellClass}>
-                        <TradeSideLabel isBuy={isBuy} />
-                      </td>
-                      <td className={amountCellClass}>
+                      <td
+                        className={`${amountCellClass} ${
+                          isBuy ? "text-pump-success" : "text-pump-danger"
+                        }`}
+                      >
                         {formatUsdReadable(tradeNetUsd)}
                       </td>
                       <td className={`${cellClass} financial-value text-pump-text`}>
