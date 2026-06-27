@@ -56,7 +56,7 @@ import { UserAvatarForAddress } from "@/components/user/UserAvatarForAddress";
 import { hasSocialLinks } from "@/lib/token-social";
 import { copyToClipboard } from "@/lib/copy-to-clipboard";
 import { tokenSharePayload } from "@/lib/share-links";
-import { shellPaddingXClass } from "@/components/layout/layout-shell";
+import { shellTokenPagePaddingXClass } from "@/components/layout/layout-shell";
 import { useLiveChannel, resolveLivePollDelay } from "@/hooks/useLiveChannel";
 import { useRafMessageQueue } from "@/hooks/useRafMessageQueue";
 import { useBondingCurveMachine } from "@/hooks/useBondingCurveMachine";
@@ -758,49 +758,52 @@ export function TokenDetailLive({
     </div>
   );
 
-  return (
-    <div className="token-page pb-[var(--mobile-token-footer-height)] lg:pb-0">
-      <div className="token-detail-toolbar panel-surface">
-        <div className="token-detail-toolbar__identity">
-          <TokenAvatar
-            address={liveToken.address}
-            symbol={liveToken.symbol}
-            logoUrl={liveToken.logoUrl}
-            size={36}
-            className="shrink-0"
-          />
-          <div className="min-w-0">
-            <div className="token-detail-toolbar__title-row">
-              <h1 className="financial-value truncate text-body font-semibold text-pump-text">
-                {liveToken.name}
-              </h1>
-              <span className="financial-value shrink-0 text-body-sm font-medium text-pump-muted">
-                ${liveToken.symbol}
-              </span>
-              <TokenAirdropLinkChip tokenAddress={tokenAddress} />
-            </div>
-            <div className="token-detail-toolbar__meta-row">
-              <span className="shrink-0 whitespace-nowrap">{elapsed}</span>
-              <span className="shrink-0 text-pump-muted/40" aria-hidden>
-                ·
-              </span>
-              {creatorMeta}
-              {hasSocialLinks(liveToken.socialLinks) ? (
-                <>
-                  <span className="shrink-0 text-pump-muted/40" aria-hidden>
-                    ·
-                  </span>
-                  <TokenSocialLinksBar links={liveToken.socialLinks} inline />
-                </>
-              ) : null}
-            </div>
+  const tokenToolbar = (
+    <div className="token-detail-toolbar panel-surface">
+      <div className="token-detail-toolbar__identity">
+        <TokenAvatar
+          address={liveToken.address}
+          symbol={liveToken.symbol}
+          logoUrl={liveToken.logoUrl}
+          size={36}
+          className="shrink-0"
+        />
+        <div className="min-w-0">
+          <div className="token-detail-toolbar__title-row">
+            <h1 className="financial-value truncate text-body font-semibold text-pump-text">
+              {liveToken.name}
+            </h1>
+            <span className="financial-value shrink-0 text-body-sm font-medium text-pump-muted">
+              ${liveToken.symbol}
+            </span>
+            <TokenAirdropLinkChip tokenAddress={tokenAddress} />
+          </div>
+          <div className="token-detail-toolbar__meta-row">
+            <span className="shrink-0 whitespace-nowrap">{elapsed}</span>
+            <span className="shrink-0 text-pump-muted/40" aria-hidden>
+              ·
+            </span>
+            {creatorMeta}
+            {hasSocialLinks(liveToken.socialLinks) ? (
+              <>
+                <span className="shrink-0 text-pump-muted/40" aria-hidden>
+                  ·
+                </span>
+                <TokenSocialLinksBar links={liveToken.socialLinks} inline />
+              </>
+            ) : null}
           </div>
         </div>
-        {toolbarActions}
       </div>
+      {toolbarActions}
+    </div>
+  );
 
+  return (
+    <div className="token-page pb-[var(--mobile-token-footer-height)] lg:pb-0">
       <div className="token-page-grid">
-        <div className="token-page-stack">
+        <div className="token-page-stack token-page-stack--main">
+          {tokenToolbar}
           <PriceChart
               tokenAddress={tokenAddress}
               symbol={symbol}
@@ -837,7 +840,7 @@ export function TokenDetailLive({
           />
         </div>
 
-        <aside className="token-page-stack lg:sticky lg:top-[4.75rem] lg:self-start">
+        <aside className="token-page-stack token-page-stack--aside lg:sticky lg:top-[4.75rem] lg:self-start">
           <div className="hidden lg:block">
             <TradePanel
               tokenAddress={tokenAddress as `0x${string}`}
@@ -870,7 +873,7 @@ export function TokenDetailLive({
       </div>
 
       <div className="token-trade-dock lg:hidden" role="toolbar" aria-label="Trade actions">
-        <div className={`token-trade-dock-inner ${shellPaddingXClass}`}>
+        <div className={`token-trade-dock-inner ${shellTokenPagePaddingXClass}`}>
           <div className="token-trade-dock-actions">
             <button
               type="button"

@@ -4,7 +4,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useLayoutEffect } from "react";
 import { AppHeaderView } from "@/components/layout/AppHeader";
 import { AppNavView } from "@/components/layout/AppNav";
-import { shellMaxWidthClassForPath, shellPaddingXClass, shellTokenPagePaddingClass, shellWideMaxWidthClass } from "@/components/layout/layout-shell";
+import { shellMaxWidthClassForPath, shellPaddingXClass, shellTokenPagePaddingClass, shellTokenPagePaddingXClass, shellWideMaxWidthClass } from "@/components/layout/layout-shell";
 import { noteNavFromCurrentPath, syncNavHistory } from "@/lib/nav-history";
 
 type AppShellProps = {
@@ -26,12 +26,13 @@ export function AppShellFrame({ children, wide = false, pathname }: AppShellFram
   const mainPadding = onTokenPage
     ? shellTokenPagePaddingClass
     : `py-5 md:py-8 md:pb-8 ${shellPaddingXClass}`;
+  const mainWidthClass = onTokenPage ? "w-full max-w-none" : `mx-auto w-full ${mainMaxWidth}`;
 
   return (
     <div className="flex min-h-screen flex-col">
       <AppHeaderView pathname={pathname} />
       <main
-        className={`mx-auto w-full flex-1 ${mainPadding} ${mobileBottomOffset} ${mainMaxWidth}`}
+        className={`flex-1 ${mainPadding} ${mobileBottomOffset} ${mainWidthClass}`}
       >
         {children}
       </main>

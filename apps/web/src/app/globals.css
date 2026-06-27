@@ -884,9 +884,6 @@ code,
 
   .token-page {
     --token-grid-gap: 0.375rem;
-    display: flex;
-    flex-direction: column;
-    gap: var(--token-grid-gap);
   }
 
   .token-page-grid {
@@ -898,6 +895,17 @@ code,
   @media (min-width: 1024px) {
     .token-page-grid {
       grid-template-columns: minmax(0, 1fr) 340px;
+      grid-template-rows: auto 1fr;
+    }
+
+    .token-page-stack--main {
+      grid-column: 1;
+      grid-row: 1 / -1;
+    }
+
+    .token-page-stack--aside {
+      grid-column: 2;
+      grid-row: 1 / -1;
     }
   }
 
