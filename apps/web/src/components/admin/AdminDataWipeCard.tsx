@@ -8,7 +8,7 @@ import {
   WIPE_DATA_CONFIRMATION_PHRASE,
   WIPE_PRESERVED_TABLES,
   WIPE_TRUNCATED_TABLES,
-} from "@/lib/db/admin-wipe";
+} from "@/lib/admin/wipe-data.constants";
 import { AdminAlert, AdminBlock, AdminBtn } from "@/components/admin/AdminChrome";
 
 type AdminDataWipeCardProps = {

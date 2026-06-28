@@ -1,29 +1,11 @@
 import { getLaunchpadPool } from "@/lib/db/launchpad";
 import { readIndexerCursorForEnv } from "@/lib/db/indexer-env-seed";
 
-/** Must match admin UI — typed confirmation before wipe. */
-export const WIPE_DATA_CONFIRMATION_PHRASE = "WIPE PUMP DATA";
-
-export const WIPE_PRESERVED_TABLES = [
-  "contract_registry",
-  "launchpad_tasks",
-  "platform_settings",
-  "admin_todos",
-] as const;
-
-export const WIPE_TRUNCATED_TABLES = [
-  "users",
-  "tokens",
-  "trades",
-  "airdrops",
-  "bonding_states",
-  "user_positions",
-  "indexer_state",
-  "telegram_wallets",
-  "oauth_wallets",
-  "email_wallets",
-  "…and related airdrop / points / referral rows",
-] as const;
+export {
+  WIPE_DATA_CONFIRMATION_PHRASE,
+  WIPE_PRESERVED_TABLES,
+  WIPE_TRUNCATED_TABLES,
+} from "@/lib/admin/wipe-data.constants";
 
 export type WipeAppDataResult = {
   ok: true;

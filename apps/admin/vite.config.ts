@@ -18,7 +18,7 @@ export default defineConfig(({ mode }) => {
     base: adminBase,
     plugins: [react()],
     resolve: {
-      dedupe: ["viem", "wagmi", "@tanstack/react-query", "react", "react-dom"],
+      dedupe: ["viem", "wagmi", "valtio", "@tanstack/react-query", "react", "react-dom"],
       alias: {
         "@": webSrc,
         buffer: "buffer",
