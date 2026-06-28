@@ -3,9 +3,14 @@
 import { useTheme } from "@/components/theme/ThemeProvider";
 import { PumpIcon, faMoon, faSun } from "@/lib/icons";
 
-export function ThemePicker() {
+type ThemePickerProps = {
+  className?: string;
+};
+
+export function ThemePicker({ className }: ThemePickerProps) {
   const { theme, toggleTheme } = useTheme();
   const isDark = theme === "dark";
+  const resolvedClass = className ?? "toolbar-btn text-pump-muted";
 
   return (
     <button
@@ -13,7 +18,7 @@ export function ThemePicker() {
       onClick={toggleTheme}
       aria-label={isDark ? "Switch to light theme" : "Switch to dark theme"}
       title={isDark ? "Light mode" : "Dark mode"}
-      className="toolbar-btn text-pump-muted"
+      className={resolvedClass}
     >
       {isDark ? (
         <PumpIcon icon={faSun} className="h-[1.125rem] w-[1.125rem]" />

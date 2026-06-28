@@ -7,21 +7,16 @@ import { WalletBar } from "@/components/wallet/WalletBar";
 import { ThemePicker } from "@/components/theme/ThemePicker";
 import { APP_NAV_ITEMS } from "@/lib/nav-config";
 import { PumpIcon, faPlus } from "@/lib/icons";
-import { shellInnerClassForPath, shellTokenPageHeaderInnerClass } from "@/components/layout/layout-shell";
+import { shellHeaderInnerClass } from "@/components/layout/layout-shell";
 
 function navLinkClass(active: boolean): string {
   return `header-nav-link ${active ? "header-nav-link-active" : "header-nav-link-idle"}`;
 }
 
 export function AppHeaderView({ pathname }: { pathname: string }) {
-  const onTokenPage = pathname.startsWith("/token/");
   return (
-    <header className={onTokenPage ? "app-header app-header--card" : "app-header"}>
-      <div
-        className={`app-header-inner ${
-          onTokenPage ? shellTokenPageHeaderInnerClass : shellInnerClassForPath(pathname)
-        }`}
-      >
+    <header className="app-header">
+      <div className={`app-header-inner ${shellHeaderInnerClass}`}>
         <div className="app-header-start">
           <Link href="/" className="app-header-brand">
             <span className="app-header-brand-mark">

@@ -67,7 +67,7 @@ export default async function TokenDetailPage({ params }: PageProps) {
   return (
     <Suspense
       fallback={
-        <AppShellFrame wide pathname="/token">
+        <AppShellFrame wide pathname={`/token/${address}`}>
           <TokenDetailBodySkeleton />
         </AppShellFrame>
       }

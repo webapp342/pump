@@ -252,10 +252,10 @@ export function TokenDetailLive({
   const router = useRouter();
   const { bnbUsd } = useBnbUsdPrice();
   const { expanded, sidebarWidth, toggleExpanded, gridStyle } = useTokenSidebarWidth();
-  const gridRef = useRef<HTMLDivElement>(null);
+  const mainStackRef = useRef<HTMLDivElement>(null);
   const headWrapRef = useRef<HTMLDivElement>(null);
   const toggleTop = useTokenSidebarHeadAnchor(
-    gridRef,
+    mainStackRef,
     headWrapRef,
     `${sidebarWidth}:${expanded ? 1 : 0}`
   );
@@ -849,7 +849,7 @@ export function TokenDetailLive({
 
   return (
     <div className="token-page">
-      <div className="token-page-grid" ref={gridRef} style={gridStyle}>
+      <div className="token-page-grid" style={gridStyle}>
         <div className="token-page-toolbar-slot hidden lg:block">{tokenToolbar}</div>
 
         <div className="token-page-stack token-page-stack--sidebar hidden lg:flex">
@@ -861,16 +861,15 @@ export function TokenDetailLive({
           />
         </div>
 
-        {toggleTop != null ? (
-          <TokenSidebarCollapseToggle
-            expanded={expanded}
-            onToggle={toggleExpanded}
-            className="token-sidebar-collapse-toggle--chart-side hidden lg:flex"
-            style={{ top: toggleTop }}
-          />
-        ) : null}
-
-        <div className="token-page-stack token-page-stack--main">
+        <div className="token-page-stack token-page-stack--main" ref={mainStackRef}>
+          {toggleTop != null ? (
+            <TokenSidebarCollapseToggle
+              expanded={expanded}
+              onToggle={toggleExpanded}
+              className="token-sidebar-collapse-toggle--chart-side hidden lg:flex"
+              style={{ top: toggleTop }}
+            />
+          ) : null}
           <div className="shrink-0 lg:hidden">{tokenToolbar}</div>
           <div className="token-page-chart-slot">
             <PriceChart

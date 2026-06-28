@@ -4,7 +4,13 @@ import { usePathname } from "next/navigation";
 import { useEffect, useLayoutEffect } from "react";
 import { AppHeaderView } from "@/components/layout/AppHeader";
 import { AppNavView } from "@/components/layout/AppNav";
-import { shellMaxWidthClassForPath, shellPaddingXClass, shellTokenPagePaddingClass, shellTokenPagePaddingXClass, shellWideMaxWidthClass } from "@/components/layout/layout-shell";
+import {
+  isTokenRoute,
+  shellMaxWidthClassForPath,
+  shellPaddingXClass,
+  shellTokenPagePaddingClass,
+  shellWideMaxWidthClass,
+} from "@/components/layout/layout-shell";
 import { noteNavFromCurrentPath, syncNavHistory } from "@/lib/nav-history";
 
 type AppShellProps = {
@@ -21,7 +27,7 @@ type AppShellFrameProps = AppShellProps & {
 /** Prerender-safe shell — use in route `loading.tsx` and Suspense fallbacks. */
 export function AppShellFrame({ children, wide = false, pathname }: AppShellFrameProps) {
   const mainMaxWidth = wide ? shellWideMaxWidthClass : shellMaxWidthClassForPath(pathname);
-  const onTokenPage = pathname.startsWith("/token/");
+  const onTokenPage = isTokenRoute(pathname);
   const mobileBottomOffset = onTokenPage ? "" : "pb-[var(--mobile-bottom-nav-height)]";
   const mainPadding = onTokenPage
     ? shellTokenPagePaddingClass

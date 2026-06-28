@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { PumpIcon, faPlus } from "@/lib/icons";
+import { isTokenRoute } from "@/components/layout/layout-shell";
 import { APP_NAV_ITEMS } from "@/lib/nav-config";
 
 function isNavActive(pathname: string, href: string): boolean {
@@ -13,7 +14,7 @@ const BEFORE_CREATE = APP_NAV_ITEMS.slice(0, 2);
 const AFTER_CREATE = APP_NAV_ITEMS.slice(2);
 
 export function AppNavView({ pathname }: { pathname: string }) {
-  if (pathname.startsWith("/token/")) {
+  if (isTokenRoute(pathname)) {
     return null;
   }
 

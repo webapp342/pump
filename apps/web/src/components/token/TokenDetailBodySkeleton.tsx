@@ -4,34 +4,17 @@ import {
 } from "@/components/ui/skeleton-parts";
 import { Skeleton } from "@/components/ui/Skeleton";
 
-export function TokenDetailBodySkeleton() {
-  const toolbarSkeleton = (
-    <div className="token-detail-toolbar panel-surface">
-      <div className="token-detail-toolbar__row">
-        <div className="token-detail-toolbar__identity">
-          <Skeleton className="h-5 w-5 shrink-0 rounded-sm" />
-          <Skeleton variant="circle" className="h-7 w-7 shrink-0" />
-          <div className="token-detail-toolbar__pair-meta">
-            <Skeleton className="h-5 w-24" />
-            <Skeleton variant="line" className="h-3 w-14" />
-          </div>
-        </div>
-        <div className="token-detail-toolbar__scroll">
-          <div className="token-detail-toolbar__stats">
-            {Array.from({ length: 5 }).map((_, index) => (
-              <div key={index} className="token-detail-toolbar__stat">
-                <Skeleton variant="line" className="h-3 w-14" />
-                <Skeleton className="mt-1 h-4 w-24" />
-              </div>
-            ))}
-          </div>
-        </div>
-        <div className="token-detail-toolbar__actions">
-          <Skeleton className="h-5 w-5 shrink-0 rounded-sm" />
-        </div>
-      </div>
+/** Compact placeholder — not a second navbar; matches token stats strip height only. */
+function TokenToolbarSkeleton() {
+  return (
+    <div className="token-detail-toolbar-skeleton panel-surface" aria-hidden>
+      <Skeleton className="token-detail-toolbar-skeleton__bar" />
     </div>
   );
+}
+
+export function TokenDetailBodySkeleton() {
+  const toolbarSkeleton = <TokenToolbarSkeleton />;
 
   return (
     <div className="token-page" aria-busy="true" aria-label="Loading token">

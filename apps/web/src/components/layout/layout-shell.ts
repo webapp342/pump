@@ -7,11 +7,18 @@ export const shellTokenPagePaddingClass = "";
 export const shellTokenPagePaddingXClass = "";
 /** Matches --token-page-gutter in globals.css (0). */
 export const shellTokenPageGutterClass = "gap-0";
-export const shellTokenPageHeaderInnerClass = "w-full max-w-none px-3 sm:px-4";
+export const shellHeaderInnerClass = "w-full max-w-none px-3 sm:px-4";
+/** @deprecated Use shellHeaderInnerClass */
+export const shellTokenPageHeaderInnerClass = shellHeaderInnerClass;
 export const shellInnerClass = `mx-auto w-full ${shellMaxWidthClass} ${shellPaddingXClass}`;
 
+/** Token detail routes — includes `/token` fallbacks and `/token/0x…` pages. */
+export function isTokenRoute(pathname: string): boolean {
+  return pathname === "/token" || pathname.startsWith("/token/");
+}
+
 export function shellUsesWideLayout(pathname: string): boolean {
-  return pathname.startsWith("/token/");
+  return isTokenRoute(pathname);
 }
 
 export function shellMaxWidthClassForPath(pathname: string): string {
