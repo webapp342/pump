@@ -1,4 +1,7 @@
-/** Canonical Pump mark — `src/app/logos/light.svg`, served at `/logos/light.svg`. */
-export const PUMP_LOGO_SRC = "/logos/light.svg";
-
-export const PUMP_LOGO_FILE = "src/app/logos/light.svg";
+/** Public URLs for Pump brand marks (synced from `src/app/logos/`). */
+export const PUMP_LOGO = {
+  glyphLight: "/logos/light.svg",
+  glyphDark: "/logos/dark.svg",
+  rounded: "/logos/light-rounded.svg",
+  favicon: "/logos/light.svg",
+} as const;

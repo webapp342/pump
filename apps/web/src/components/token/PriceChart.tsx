@@ -247,7 +247,6 @@ export function PriceChart({
   /** Series values: BNB spot (usd) or BNB mcap — USD only in formatters. */
   const candleUnitScale =
     currency === "mcap" ? DEFAULT_TOKEN_TOTAL_SUPPLY : 1;
-  const unitLabel = currency === "usd" ? "USD" : "MCAP";
 
   const fetchCandles = useCallback(async () => {
     const intervalAtFetch = timeInterval;
@@ -594,7 +593,7 @@ export function PriceChart({
     if (!el || chartRef.current) return;
 
     const height = resolveChartHeight(el, fillContainer);
-    const bgColor = `rgb(${cssVar("--pump-card", "16 27 44")})`;
+    const bgColor = `rgb(${cssVar("--pump-bg", "10 11 13")})`;
     const textColor = `rgb(${cssVar("--pump-muted", "142 157 181")})`;
     const borderColor = `rgb(${cssVar("--pump-border", "96 116 148")} / 0.22)`;
     const gridColor = `rgb(${cssVar("--pump-border", "96 116 148")} / 0.12)`;
@@ -725,7 +724,7 @@ export function PriceChart({
   useEffect(() => {
     if (!chartRef.current || !candleSeriesRef.current) return;
 
-    const bgColor = `rgb(${cssVar("--pump-card", "16 27 44")})`;
+    const bgColor = `rgb(${cssVar("--pump-bg", "10 11 13")})`;
     const textColor = `rgb(${cssVar("--pump-muted", "142 157 181")})`;
     const borderColor = `rgb(${cssVar("--pump-border", "96 116 148")} / 0.22)`;
     const gridColor = `rgb(${cssVar("--pump-border", "96 116 148")} / 0.12)`;
@@ -913,9 +912,6 @@ export function PriceChart({
                 </button>
               ))}
             </div>
-            <span className="financial-value shrink-0 pr-1 text-[11px] text-pump-muted md:text-caption">
-              {symbol}/{unitLabel}
-            </span>
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-2">
@@ -982,7 +978,7 @@ export function PriceChart({
       {/* Chart container always mounted so lightweight-charts can init on first load */}
       <div className={fillContainer ? "relative min-h-0 flex-1" : "relative"}>
         {(loading && candles.length === 0) || showEmpty || showError ? (
-          <div className="absolute inset-0 z-10 flex items-center justify-center bg-pump-card/92 px-4 text-center text-sm">
+          <div className="absolute inset-0 z-10 flex items-center justify-center bg-pump-bg/92 px-4 text-center text-sm">
             {loading && candles.length === 0 ? (
               <span className="text-pump-muted">Loading chart…</span>
             ) : showError ? (

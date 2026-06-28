@@ -41,12 +41,22 @@ export function TokenDetailBodySkeleton() {
         <div className="token-page-stack token-page-stack--sidebar hidden lg:flex">
           <section className="token-market-sidebar panel-surface">
             <div className="token-market-sidebar__toolbar">
-              <Skeleton className="h-8 w-full rounded-md" />
-              <div className="mt-2 flex gap-2">
-                <Skeleton className="h-3 w-8" />
-                <Skeleton className="h-3 w-10" />
-                <Skeleton className="h-3 w-8" />
+              <Skeleton className="mb-2 h-8 w-full rounded-none" />
+              <div className="token-market-sidebar__filter-strip">
+                <Skeleton className="h-4 w-3 shrink-0 rounded-none" />
+                <div className="flex min-w-0 gap-2 px-1">
+                  <Skeleton className="h-4 w-10 shrink-0" />
+                  <Skeleton className="h-4 w-8 shrink-0" />
+                  <Skeleton className="h-4 w-12 shrink-0" />
+                </div>
+                <Skeleton className="h-4 w-3 shrink-0 rounded-none" />
               </div>
+            </div>
+            <div className="token-market-sidebar__head" aria-hidden>
+              <Skeleton variant="line" className="h-3 w-14" />
+              <Skeleton variant="line" className="ml-auto h-3 w-8" />
+              <Skeleton variant="line" className="ml-auto h-3 w-8" />
+              <Skeleton variant="line" className="ml-auto h-3 w-6" />
             </div>
             <div className="token-market-sidebar__list p-2">
               {Array.from({ length: 8 }).map((_, index) => (

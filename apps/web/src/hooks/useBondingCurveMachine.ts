@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import type { BondingCurveSnapshot } from "@/lib/bonding-curve";
 import {
   applyWsBondingToMachine,
+  isUninitializedCurveTuple,
   machineFromCurveTuple,
   machineFromTokenReserves,
   reconcileMachineWithChain,
@@ -40,7 +41,7 @@ export function useBondingCurveMachine({
   }, [reserveBnb, tokenSold, paused]);
 
   useEffect(() => {
-    if (!chainCurve) return;
+    if (!chainCurve || isUninitializedCurveTuple(chainCurve)) return;
     setMachine((prev) => {
       const base =
         prev ?? machineFromTokenReserves(reserveBnb, tokenSold, paused);

@@ -631,10 +631,15 @@ export function resolveTokenInForBnbOut(
   const y0 = curve.virtualTokenReserve - curve.soldTokens;
   if (y0 === 0n || x0 === 0n) return null;
 
+  const { ethOut: maxEthOut } = quoteSellFromCurveState(curve, protocolFeeBps, y0);
+  const effectiveTarget =
+    maxEthOut > 0n && targetZugOut > maxEthOut ? maxEthOut : targetZugOut;
+  if (effectiveTarget <= 0n) return null;
+
   const feeMultiplier = BPS - protocolFeeBps;
   if (feeMultiplier <= 0n) return null;
 
-  let grossNeeded = (targetZugOut * BPS + feeMultiplier - 1n) / feeMultiplier;
+  let grossNeeded = (effectiveTarget * BPS + feeMultiplier - 1n) / feeMultiplier;
   if (grossNeeded > curve.reserveZug) grossNeeded = curve.reserveZug;
   if (grossNeeded <= 0n || grossNeeded >= x0) return null;
 
@@ -647,7 +652,7 @@ export function resolveTokenInForBnbOut(
 
   for (let i = 0; i < 8; i++) {
     const { ethOut } = quoteSellFromCurveState(curve, protocolFeeBps, tokenIn);
-    if (ethOut >= targetZugOut) return tokenIn;
+    if (ethOut >= effectiveTarget) return tokenIn;
     tokenIn += 1n;
   }
 

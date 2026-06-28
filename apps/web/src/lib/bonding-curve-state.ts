@@ -142,11 +142,29 @@ export function applyWsBondingToMachine(
 
 const DRIFT_WEI_FLOOR = 10n ** 14n;
 
+/** Curve tuple with no virtual reserves — token not registered on this manager. */
+export function isUninitializedCurveTuple(
+  tuple: readonly [unknown, unknown, bigint, bigint, bigint, bigint, bigint, boolean]
+): boolean {
+  return tuple[5] === 0n && tuple[6] === 0n;
+}
+
+/** Snapshot missing virtual reserves — quotes would always return zero. */
+export function isEmptyCurveSnapshot(snapshot: BondingCurveSnapshot): boolean {
+  const virtualZug = BigInt(snapshot.virtualZugReserve || "0");
+  const virtualToken = BigInt(snapshot.virtualTokenReserve || "0");
+  return virtualZug === 0n && virtualToken === 0n;
+}
+
 /** Prefer chain snapshot when local WS state drifts beyond tolerance. */
 export function reconcileMachineWithChain(
   machine: BondingCurveMachine,
   chain: BondingCurveSnapshot
 ): BondingCurveMachine {
+  if (isEmptyCurveSnapshot(chain)) {
+    return machine;
+  }
+
   if (machine.version === 0) {
     return buildMachine(chain, 0);
   }
@@ -174,7 +192,7 @@ export function pickLiveCurveSnapshot(
   paused: boolean
 ): BondingCurveSnapshot | undefined {
   if (wsMachine) return wsMachine.snapshot;
-  if (chainSnapshot) return chainSnapshot;
+  if (chainSnapshot && !isEmptyCurveSnapshot(chainSnapshot)) return chainSnapshot;
   if (tokenReserveBnb || tokenSold) {
     return machineFromTokenReserves(tokenReserveBnb, tokenSold, paused).snapshot;
   }

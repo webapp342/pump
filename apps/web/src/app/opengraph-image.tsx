@@ -1,15 +1,14 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { ImageResponse } from "next/og";
-import { PUMP_LOGO_FILE } from "@/lib/pump-logo-paths";
 
 export const alt = "Pump — BSC Meme Launchpad";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
-function loadLogoDataUri(): string | null {
+function loadRoundedLogoDataUri(): string | null {
   try {
-    const filePath = path.join(process.cwd(), PUMP_LOGO_FILE);
+    const filePath = path.join(process.cwd(), "public/logos/light-rounded.svg");
     const svg = readFileSync(filePath, "utf8");
     return `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`;
   } catch {
@@ -18,7 +17,7 @@ function loadLogoDataUri(): string | null {
 }
 
 export default function OpenGraphImage() {
-  const logoSrc = loadLogoDataUri();
+  const logoSrc = loadRoundedLogoDataUri();
 
   return new ImageResponse(
     (
@@ -55,7 +54,7 @@ export default function OpenGraphImage() {
                 alignItems: "center",
                 justifyContent: "center",
                 borderRadius: 20,
-                background: "#2563EB",
+                background: "#0052FF",
                 fontSize: 40,
                 fontWeight: 700,
               }}

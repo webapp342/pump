@@ -46,7 +46,10 @@ import {
   type TradePrefillConfig,
 } from "@/lib/token-trade-prefill";
 import { TradeTape } from "@/components/token/TradeTape";
-import { TokenMarketListPlaceholder } from "@/components/token/TokenMarketListPlaceholder";
+import { TokenMarketSidebar } from "@/components/token/TokenMarketSidebar";
+import { TokenSidebarCollapseToggle } from "@/components/token/TokenSidebarCollapseToggle";
+import { useTokenSidebarWidth, tokenSidebarDensity } from "@/hooks/useTokenSidebarWidth";
+import { useTokenSidebarHeadAnchor } from "@/hooks/useTokenSidebarHeadAnchor";
 import { PriceChart } from "@/components/token/PriceChart";
 import { FavoriteIcon } from "@/components/icons/FavoriteIcon";
 import { useFavorites } from "@/components/favorites/FavoritesProvider";
@@ -58,11 +61,13 @@ import { TokenSocialLinksBar } from "@/components/token/TokenSocialLinksBar";
 import { hasSocialLinks } from "@/lib/token-social";
 import { formatAge } from "@/lib/arena-board-format";
 import { tokenSharePayload } from "@/lib/share-links";
+import { tokenDocumentTitle } from "@/lib/token-tab-title";
 import { shellTokenPagePaddingXClass } from "@/components/layout/layout-shell";
 import { useLiveChannel, resolveLivePollDelay } from "@/hooks/useLiveChannel";
 import { useRafMessageQueue } from "@/hooks/useRafMessageQueue";
 import { useBondingCurveMachine } from "@/hooks/useBondingCurveMachine";
 import {
+  isUninitializedCurveTuple,
   machineFromSnapshot,
   machineSpotPriceBnb,
 } from "@/lib/bonding-curve-state";
@@ -90,24 +95,10 @@ function formatToolbarUsdAmount(value: number | null): string {
   return `${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`;
 }
 
-function formatToolbarChangeUsd(value: number): string {
-  const sign = value > 0 ? "+" : value < 0 ? "-" : "";
-  const abs = Math.abs(value);
-  if (!Number.isFinite(abs) || abs === 0) return "0";
-  if (abs >= 1) {
-    return `${sign}${abs.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })}`;
-  }
-  if (abs >= 0.01) {
-    return `${sign}${abs.toFixed(4)}`;
-  }
-  return `${sign}${formatPumpSubscriptPrice(abs, "")}`;
-}
-
-function formatToolbarChange24h(change: PriceChange24h | null): string {
+function formatToolbarChangePctOnly(change: PriceChange24h | null): string {
   if (!change) return "—";
-  const pct = `${change.changePct >= 0 && change.changePct !== 0 ? "+" : ""}${change.changePct.toFixed(2)}%`;
-  if (change.changeUsd == null) return pct;
-  return `${formatToolbarChangeUsd(change.changeUsd)} / ${pct}`;
+  const pct = change.changePct;
+  return `${pct >= 0 && pct !== 0 ? "+" : ""}${pct.toFixed(2)}%`;
 }
 
 function formatToolbarAge(createdAt: string): string {
@@ -260,6 +251,14 @@ export function TokenDetailLive({
   const searchParams = useSearchParams();
   const router = useRouter();
   const { bnbUsd } = useBnbUsdPrice();
+  const { expanded, sidebarWidth, toggleExpanded, gridStyle } = useTokenSidebarWidth();
+  const gridRef = useRef<HTMLDivElement>(null);
+  const headWrapRef = useRef<HTMLDivElement>(null);
+  const toggleTop = useTokenSidebarHeadAnchor(
+    gridRef,
+    headWrapRef,
+    `${sidebarWidth}:${expanded ? 1 : 0}`
+  );
   const { isFavorite, toggleFavorite } = useFavorites();
   const burstUntilRef = useRef(0);
   const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -314,11 +313,12 @@ export function TokenDetailLive({
     [token, chainCurve, trades]
   );
 
-  const chainCurveSnapshot = useMemo(
-    () =>
-      chainCurve ? bondingCurveSnapshotFromTuple(chainCurve as CurveTuple) : undefined,
-    [chainCurve]
-  );
+  const chainCurveSnapshot = useMemo(() => {
+    if (!chainCurve) return undefined;
+    const tuple = chainCurve as CurveTuple;
+    if (isUninitializedCurveTuple(tuple)) return undefined;
+    return bondingCurveSnapshotFromTuple(tuple);
+  }, [chainCurve]);
 
   const liveCurveSnapshot = useBondingCurveMachine({
     reserveBnb: token.reserveBnb,
@@ -676,6 +676,11 @@ export function TokenDetailLive({
     resolveMarkPriceBnb(liveToken, trades, chainCurve as CurveTuple | undefined);
   const priceUsd = tokenPriceUsd(displayPrice, bnbUsd);
   const fdvUsd = estimateFdvUsd(displayPrice, bnbUsd);
+
+  useEffect(() => {
+    document.title = tokenDocumentTitle(liveToken.symbol, priceUsd);
+  }, [liveToken.symbol, priceUsd]);
+
   const volume24hBnb = useMemo(() => {
     const fromTape = computeVolumeWindowBnb(trades, 86_400_000);
     const fromToken = Number(liveToken.volume24hBnb ?? 0);
@@ -700,7 +705,6 @@ export function TokenDetailLive({
 
   const volume24hUsd = bnbToUsd(volume24hBnb, bnbUsd);
   const changeTone = change24h?.changePct ?? null;
-  const priceToneClass = changeToneClass(changeTone);
   const showSocialLinks = hasSocialLinks(liveToken.socialLinks);
 
   const sharePayload = useMemo(
@@ -764,16 +768,14 @@ export function TokenDetailLive({
         <div className="token-detail-toolbar__scroll">
           <div className="token-detail-toolbar__stats">
             <div className="token-detail-toolbar__stat">
-              <span className="token-detail-toolbar__stat-label">Price</span>
-              <span className={`token-detail-toolbar__stat-value financial-value ${priceToneClass}`}>
-                {formatToolbarPriceUsd(priceUsd)}
-              </span>
-            </div>
-
-            <div className="token-detail-toolbar__stat">
-              <span className="token-detail-toolbar__stat-label">24h Change</span>
-              <span className={`token-detail-toolbar__stat-value financial-value ${changeToneClass(changeTone)}`}>
-                {formatToolbarChange24h(change24h)}
+              <span className="token-detail-toolbar__stat-label">Last price (24h)</span>
+              <span className="token-detail-toolbar__stat-value token-detail-toolbar__price-line financial-value">
+                <span className="token-detail-toolbar__price-amount">
+                  {formatToolbarPriceUsd(priceUsd)}
+                </span>
+                <span className={changeToneClass(changeTone)}>
+                  {formatToolbarChangePctOnly(change24h)}
+                </span>
               </span>
             </div>
 
@@ -847,12 +849,26 @@ export function TokenDetailLive({
 
   return (
     <div className="token-page">
-      <div className="token-page-grid">
+      <div className="token-page-grid" ref={gridRef} style={gridStyle}>
         <div className="token-page-toolbar-slot hidden lg:block">{tokenToolbar}</div>
 
         <div className="token-page-stack token-page-stack--sidebar hidden lg:flex">
-          <TokenMarketListPlaceholder />
+          <TokenMarketSidebar
+            id="token-market-sidebar"
+            activeTokenAddress={tokenAddress}
+            density={tokenSidebarDensity(sidebarWidth)}
+            headWrapRef={headWrapRef}
+          />
         </div>
+
+        {toggleTop != null ? (
+          <TokenSidebarCollapseToggle
+            expanded={expanded}
+            onToggle={toggleExpanded}
+            className="token-sidebar-collapse-toggle--chart-side hidden lg:flex"
+            style={{ top: toggleTop }}
+          />
+        ) : null}
 
         <div className="token-page-stack token-page-stack--main">
           <div className="shrink-0 lg:hidden">{tokenToolbar}</div>
@@ -896,12 +912,13 @@ export function TokenDetailLive({
         </div>
 
         <aside className="token-page-stack token-page-stack--aside hidden lg:flex">
-          <div className="hidden lg:block">
+          <div className="token-aside-trade-slot hidden lg:block">
             <TradePanel
               tokenAddress={tokenAddress as `0x${string}`}
               symbol={symbol}
               status={liveToken.status}
               reserveBnb={liveToken.reserveBnb}
+              tokenSold={liveToken.tokenSold ?? "0"}
               prefill={tradePrefill}
               onTradeOptimistic={handleTradeOptimistic}
               onTradeOptimisticRollback={handleTradeOptimisticRollback}
@@ -955,6 +972,7 @@ export function TokenDetailLive({
         symbol={symbol}
         status={liveToken.status}
         reserveBnb={liveToken.reserveBnb}
+        tokenSold={liveToken.tokenSold ?? "0"}
         prefill={tradePrefill}
         onTradeOptimistic={handleTradeOptimistic}
         onTradeOptimisticRollback={handleTradeOptimisticRollback}

@@ -4,7 +4,11 @@ import { AppShellFrame } from "@/components/layout/AppShell";
 import { TokenDetailPageLoader } from "@/components/token/TokenDetailPageLoader";
 import { TokenDetailBodySkeleton } from "@/components/token/TokenDetailBodySkeleton";
 import { normalizeAddressParam } from "@/lib/address";
+import { fetchBnbUsdPrice } from "@/lib/bnb-price-server";
 import { getTokenByAddress } from "@/lib/db/launchpad";
+import { tokenPriceUsd } from "@/lib/format-usd";
+import { resolveMarkPriceBnb } from "@/lib/mark-price";
+import { formatTokenPageTitle } from "@/lib/token-tab-title";
 
 type PageProps = { params: Promise<{ address: string }> };
 
@@ -16,19 +20,24 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   }
 
   try {
-    const token = await getTokenByAddress(normalized);
+    const [token, { bnbUsd }] = await Promise.all([
+      getTokenByAddress(normalized),
+      fetchBnbUsdPrice(),
+    ]);
     if (!token) {
       return { title: "Token not found" };
     }
 
-    const title = `${token.symbol} — ${token.name}`;
-    const description = `Trade $${token.symbol} on Pump. BSC bonding curve meme launchpad.`;
+    const markBnb = resolveMarkPriceBnb(token, []);
+    const priceUsd = tokenPriceUsd(markBnb, bnbUsd);
+    const title = formatTokenPageTitle(token.symbol, priceUsd);
+    const description = `Trade ${token.symbol}/USD on Pump. BSC bonding curve meme launchpad.`;
 
     return {
       title,
       description,
       openGraph: {
-        title,
+        title: `${title} | Pump`,
         description,
         type: "website",
         images: [
@@ -42,7 +51,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       },
       twitter: {
         card: "summary_large_image",
-        title,
+        title: `${title} | Pump`,
         description,
         images: [`/token/${normalized}/opengraph-image`],
       },

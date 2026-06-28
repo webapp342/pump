@@ -104,6 +104,11 @@ import {
   resolveTradeReferrer,
 } from "@/lib/referral-storage";
 import { bnbToUsd, formatUsdReadable } from "@/lib/format-usd";
+import {
+  isEmptyCurveSnapshot,
+  isUninitializedCurveTuple,
+  machineFromTokenReserves,
+} from "@/lib/bonding-curve-state";
 import { quoteFillPriceBnb, quoteFillDeviationBps, isPriceAccuracyViolation, logPriceAccuracyViolation } from "@/lib/price-semantics";
 import { tradeFillPriceBnb } from "@/lib/format-usd";
 import { parseTradesFromReceipt } from "@/lib/launchpad-events";
@@ -146,6 +151,7 @@ type TradePanelProps = {
   symbol: string;
   status: string;
   reserveBnb?: string;
+  tokenSold?: string;
   embedded?: boolean;
   prefill?: TradePrefillConfig | null;
   onTradeOptimistic?: (payload: TradeOptimisticPayload) => void;
@@ -208,6 +214,16 @@ function formatAmountFromWei(wei: bigint): string {
   const raw = formatEther(wei);
   if (!raw.includes(".")) return raw;
   return raw.replace(/0+$/, "").replace(/\.$/, "");
+}
+
+function usdToNativeAmountString(usd: number, nativeUsd: number): string {
+  const native = usd / nativeUsd;
+  if (!Number.isFinite(native) || native <= 0) return "";
+  try {
+    return formatAmountFromWei(parseEther(native.toFixed(12)));
+  } catch {
+    return "";
+  }
 }
 
 function formatTokenInputAmount(wei: bigint): string {
@@ -274,6 +290,8 @@ export function TradePanel({
   tokenAddress,
   symbol,
   status,
+  reserveBnb,
+  tokenSold = "0",
   embedded = false,
   prefill = null,
   onTradeOptimistic,
@@ -379,16 +397,33 @@ export function TradePanel({
     args: [tokenAddress],
     chainId: pumpChain.id,
     query: {
-      enabled: chainCurveSnapshot == null,
+      enabled:
+        !chainCurveSnapshot ||
+        isEmptyCurveSnapshot(chainCurveSnapshot),
       refetchInterval: CURVE_POLL_MS,
     },
   });
 
+  const paused =
+    chainCurveSnapshot?.paused ?? localCurveState?.[7] ?? status === "PAUSED";
+
+  const dbCurveSnapshot = useMemo(() => {
+    if (!reserveBnb && !tokenSold) return null;
+    return machineFromTokenReserves(reserveBnb ?? "0", tokenSold, paused).snapshot;
+  }, [reserveBnb, tokenSold, paused]);
+
   const bondingCurve = useMemo(() => {
-    if (chainCurveSnapshot) return bondingCurveFromSnapshot(chainCurveSnapshot);
-    if (localCurveState) return bondingCurveStateFromTuple(localCurveState);
+    if (chainCurveSnapshot && !isEmptyCurveSnapshot(chainCurveSnapshot)) {
+      return bondingCurveFromSnapshot(chainCurveSnapshot);
+    }
+    if (localCurveState && !isUninitializedCurveTuple(localCurveState)) {
+      return bondingCurveStateFromTuple(localCurveState);
+    }
+    if (dbCurveSnapshot) {
+      return bondingCurveFromSnapshot(dbCurveSnapshot);
+    }
     return null;
-  }, [chainCurveSnapshot, localCurveState]);
+  }, [chainCurveSnapshot, localCurveState, dbCurveSnapshot]);
 
   const { data: protocolFeeBps } = useReadContract({
     address: contracts.bondingCurveManager,
@@ -639,9 +674,6 @@ export function TradePanel({
     failTradeTrace("ux.write_error", writeError);
   }, [writeError]);
 
-  const paused =
-    chainCurveSnapshot?.paused ?? localCurveState?.[7] ?? status === "PAUSED";
-
   const estimatedOut =
     side === "sell"
       ? sellQuoteOut ?? 0n
@@ -763,7 +795,7 @@ export function TradePanel({
   ]);
 
   const { gasCostWei, isLoading: gasLoading } = useTradeGasEstimate({
-    enabled: !paused && !wrongChain && Boolean(address),
+    enabled: !paused && !wrongChain && hasTradeAmount,
     address,
     side,
     buyInputMode,
@@ -1235,7 +1267,8 @@ export function TradePanel({
       }
       const usd = Number(cleaned);
       if (!Number.isFinite(usd)) return;
-      setAmount(String(usd / bnbUsd));
+      const nativeAmount = usdToNativeAmountString(usd, bnbUsd);
+      setAmount(nativeAmount);
       return;
     }
     setAmount(cleaned);
@@ -2390,6 +2423,7 @@ export function TradePanel({
           </div>
         </div>
 
+        {hasTradeAmount ? (
         <div className="trade-panel-details-zone trade-panel-details-grid">
           <span className="trade-detail-row__label">Order value</span>
           {orderValuePrimary ? (
@@ -2417,6 +2451,7 @@ export function TradePanel({
             {gasCostLabel}
           </span>
         </div>
+        ) : null}
 
         {error ? (
           <div className="notice-error mx-3 mb-2 px-3 py-2 text-caption" role="alert">

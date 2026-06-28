@@ -18,7 +18,7 @@ export const metadata: Metadata = {
   },
   description: defaultDescription,
   icons: {
-    icon: [{ url: "/logos/light-rounded.svg", type: "image/svg+xml" }],
+    icon: [{ url: "/logos/light.svg", type: "image/svg+xml" }],
     apple: [{ url: "/logos/light-rounded.svg", type: "image/svg+xml" }],
   },
   openGraph: {

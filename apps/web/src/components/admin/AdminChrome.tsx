@@ -99,7 +99,7 @@ export function AdminLayout({
       <header className="admin-ent-header">
         <div className="admin-ent-header-row">
           <div className="admin-ent-brand">
-            <PumpLogo size={36} className="admin-ent-brand-logo" />
+            <PumpLogo size={36} variant="rounded" className="admin-ent-brand-logo" />
             <div className="admin-ent-brand-text">
               <span className="admin-ent-brand-title">{ADMIN_COPY.brand.title}</span>
               <span className="admin-ent-env" title={ADMIN_COPY.nav.environment}>

@@ -13,6 +13,7 @@ type TradeSheetProps = {
   symbol: string;
   status: string;
   reserveBnb?: string;
+  tokenSold?: string;
   prefill?: TradePrefillConfig | null;
   onTradeOptimistic?: (payload: TradeOptimisticPayload) => void;
   onTradeOptimisticRollback?: (payload: { pendingId: string }) => void;
@@ -30,6 +31,7 @@ export function TradeSheet({
   symbol,
   status,
   reserveBnb,
+  tokenSold = "0",
   prefill = null,
   onTradeOptimistic,
   onTradeOptimisticRollback,
@@ -116,6 +118,7 @@ export function TradeSheet({
               symbol={symbol}
               status={status}
               reserveBnb={reserveBnb}
+              tokenSold={tokenSold}
               prefill={prefill}
               onTradeOptimistic={onTradeOptimistic}
               onTradeOptimisticRollback={onTradeOptimisticRollback}
