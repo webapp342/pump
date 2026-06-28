@@ -45,7 +45,7 @@ Tailwind tokens: `text-h1`…`text-caption`, `text-pump-*`, `bg-pump-*`, `border
 
 ## Themes
 
-Four themes via `data-theme` on `<html>`: `light`, `dark`, `navy`, `slate`. CSS vars in `globals.css`; logic in `src/lib/theme.ts`. RainbowKit accent follows theme via `getRainbowAccent`.
+Two Coinbase CDS themes via `data-theme` on `<html>`: `light`, `dark`. CSS vars in `globals.css`; logic in `src/lib/theme.ts`. First visit follows `prefers-color-scheme` (fallback dark); sun/moon toggle saves explicit preference.
 
 ## Icons & loading
 

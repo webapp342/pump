@@ -46,11 +46,22 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             __html: `
               try {
                 var storedTheme = localStorage.getItem("pump-theme");
-                var valid = storedTheme === "light" || storedTheme === "dark" || storedTheme === "navy" || storedTheme === "slate";
-                var theme = valid ? storedTheme : "dark";
+                var theme;
+                if (storedTheme === "light" || storedTheme === "dark") {
+                  theme = storedTheme;
+                } else if (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) {
+                  theme = "dark";
+                } else if (window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches) {
+                  theme = "light";
+                } else {
+                  theme = "dark";
+                }
                 document.documentElement.dataset.theme = theme;
-                document.documentElement.style.colorScheme = theme === "dark" || theme === "navy" || theme === "slate" ? "dark" : "light";
-              } catch (error) {}
+                document.documentElement.style.colorScheme = theme;
+              } catch (error) {
+                document.documentElement.dataset.theme = "dark";
+                document.documentElement.style.colorScheme = "dark";
+              }
             `,
           }}
         />

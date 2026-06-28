@@ -37,21 +37,19 @@ Authoritative visual and layout spec for Pump. Supersedes spreadsheet/Excel meta
 
 Defined in `globals.css` as RGB triplets for `rgb(var(--pump-*))`.
 
-| Token | Role | Theme guidance |
-|-------|------|----------------|
-| `--pump-bg` | App canvas / panel gutters | **Not** marketing near-black (`#0B0E11`). Use lifted canvas ~`#14171C`–`#161B22` so gutters match panels |
-| `--pump-surface` | Header, bottom bar | One luminance step above bg |
-| `--pump-card` | Panels, modals | Binance `#1E2329` or GitHub `#21262D` — ~8–12% lightness above bg |
-| `--pump-card-soft` | Hover, inset, chart bg | Next step up (`#2B3139` graphite / `#2A2F36` carbon) |
-| `--pump-border` | Dividers | Prefer surface steps over heavy borders (Midnight Banking rule) |
-| `--pump-accent` | Brand, primary CTA | Coinbase Blue `#0052FF` (light), info blue (dark) — never trading yellow |
-| `--pump-text` | Primary copy | Binance `#EAECEF` on dark; Coinbase ink `#0A0B0D` on light |
-| `--pump-muted` | Labels, secondary | `#707A8A` / `#8B949E` cool gray |
-| `--pump-success` / `--pump-danger` | P&L, buy/sell only | Binance `#0ECB81` / `#F6465D` or GitHub semantic greens/reds |
+Two Coinbase CDS themes: `light`, `dark`. Default resolved theme: system preference via `prefers-color-scheme`, fallback `dark`. User override via sun/moon toggle → `localStorage` `pump-theme`.
 
-Four research-backed themes: `light` (Boardroom Light / Coinbase), `dark` (Terminal Graphite / Binance panels), `navy` (Midnight Banking / designmd.ai), `slate` (Executive Carbon / GitHub dark + Material M3). Default: `dark`.
+| Token | CDS light | CDS dark |
+|-------|-----------|----------|
+| `--pump-bg` | gray5 `#F7F8F9` | gray0 `#0A0B0D` |
+| `--pump-card` | `#FFFFFF` | bgElevation2 gray10 `#1E2025` |
+| `--pump-card-soft` | gray10 `#EEF0F3` | gray15 `#282B31` |
+| `--pump-accent` | blue60 `#0052FF` | blue70 `#578BFA` |
+| `--pump-text` | gray100 `#0A0B0D` | `#FFFFFF` |
+| `--pump-muted` | gray60 | gray60 `#8A919E` |
+| `--pump-success` / `--pump-danger` | green60 / red60 | green60 / red60 |
 
-**Luminance ladder rule:** bg → surface → card → card-soft always step lighter. Target ~10 RGB points per tier on dark themes to avoid black-hole gutters on token detail layout.
+**Elevation ladder (dark):** `#0A0B0D` → `#141519` → `#1E2025` → `#282B31` — color steps, not borders (Coinbase CDS `bgElevation1/2`).
 
 ## Typography
 

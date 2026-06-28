@@ -38,78 +38,40 @@ html[data-theme="light"] {
   --radius-xl: 12px;
   --radius-full: 9999px;
 
-  /* Boardroom Light — Coinbase institutional: soft gray canvas, Coinbase Blue accent */
-  --pump-bg: 247 247 247;
+  /* Coinbase CDS lightColor — canvas #FFFFFF, gray5 gutters, blue60 primary */
+  --pump-bg: 247 248 249;
   --pump-surface: 255 255 255;
   --pump-card: 255 255 255;
   --pump-card-soft: 238 240 243;
-  --pump-border: 218 222 228;
+  --pump-border: 206 210 219;
   --pump-accent: 0 82 255;
-  --pump-accent-strong: 0 68 214;
+  --pump-accent-strong: 0 75 235;
   --pump-accent-foreground: 255 255 255;
   --pump-text: 10 11 13;
-  --pump-muted: 106 112 122;
-  --pump-success: 14 152 83;
-  --pump-danger: 207 46 46;
-  --pump-warning: 180 120 24;
-  --pump-shadow: 10 11 13 / 0.07;
+  --pump-muted: 91 97 110;
+  --pump-success: 9 133 81;
+  --pump-danger: 207 32 47;
+  --pump-warning: 207 71 14;
+  --pump-shadow: 10 11 13 / 0.08;
   color-scheme: light;
 }
 
 html[data-theme="dark"] {
-  /* Terminal Graphite — Binance panel ladder with lifted canvas (#14171C gutter, not #0B0E11 pit) */
-  --pump-bg: 20 23 28;
-  --pump-surface: 24 28 34;
-  --pump-card: 30 35 41;
-  --pump-card-soft: 43 48 53;
-  --pump-border: 71 77 84;
-  --pump-accent: 59 130 246;
-  --pump-accent-strong: 96 155 248;
+  /* Coinbase CDS darkColor — bg #0A0B0D, elevation1/2 panel ladder, blue70 primary */
+  --pump-bg: 10 11 13;
+  --pump-surface: 20 21 25;
+  --pump-card: 30 32 37;
+  --pump-card-soft: 40 43 49;
+  --pump-border: 50 53 61;
+  --pump-accent: 87 139 250;
+  --pump-accent-strong: 132 170 253;
   --pump-accent-foreground: 255 255 255;
-  --pump-text: 234 236 239;
-  --pump-muted: 112 122 138;
-  --pump-success: 14 203 129;
-  --pump-danger: 246 70 93;
-  --pump-warning: 212 168 72;
-  --pump-shadow: 0 0 0 / 0.42;
-  color-scheme: dark;
-}
-
-html[data-theme="navy"] {
-  /* Midnight Banking — award fintech dashboard: cohesive navy steps (#141C4E → #1D2552), no black gutters */
-  --pump-bg: 18 24 58;
-  --pump-surface: 26 34 82;
-  --pump-card: 35 44 98;
-  --pump-card-soft: 44 54 114;
-  --pump-border: 72 88 138;
-  --pump-accent: 45 125 210;
-  --pump-accent-strong: 72 148 228;
-  --pump-accent-foreground: 244 248 255;
-  --pump-text: 240 242 248;
-  --pump-muted: 165 172 198;
-  --pump-success: 127 224 137;
-  --pump-danger: 249 125 125;
-  --pump-warning: 212 168 72;
-  --pump-shadow: 8 12 32 / 0.45;
-  color-scheme: dark;
-}
-
-html[data-theme="slate"] {
-  /* Executive Carbon — GitHub dark + Material M3: neutral gray ladder, link-blue accent */
-  --pump-bg: 22 27 34;
-  --pump-surface: 28 33 40;
-  --pump-card: 33 38 45;
-  --pump-card-soft: 42 47 54;
-  --pump-border: 48 54 61;
-  --pump-accent: 88 166 255;
-  --pump-accent-strong: 121 184 255;
-  --pump-accent-foreground: 13 17 23;
-  --pump-text: 230 237 243;
-  --pump-muted: 139 148 158;
-  --pump-success: 63 185 80;
-  --pump-danger: 248 81 73;
-  --pump-warning: 210 168 68;
-  --pump-shadow: 0 0 0 / 0.4;
+  --pump-text: 255 255 255;
+  --pump-muted: 138 145 158;
+  --pump-success: 39 173 117;
+  --pump-danger: 240 97 109;
+  --pump-warning: 240 120 54;
+  --pump-shadow: 0 0 0 / 0.45;
   color-scheme: dark;
 }
 
@@ -1750,9 +1712,7 @@ code,
   }
 
   /* Dark canvases — invert ETH logo for legibility on charcoal/blue terminals */
-  [data-theme="dark"] .native-logo,
-  [data-theme="navy"] .native-logo,
-  [data-theme="slate"] .native-logo {
+  [data-theme="dark"] .native-logo {
     filter: brightness(0) invert(1);
   }
 
