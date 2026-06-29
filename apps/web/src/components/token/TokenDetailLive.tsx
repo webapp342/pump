@@ -4,7 +4,6 @@ import {
   PumpIcon,
   faCheck,
   faChevronDown,
-  faChevronUp,
   faCopy,
   faExternalLink,
   faShare,
@@ -49,6 +48,10 @@ import {
 import { contracts, explorerAddressUrl, pumpChain, shortAddress } from "@/config/chain";
 import { copyToClipboard } from "@/lib/copy-to-clipboard";
 import { TradePanel, type TradeConfirmedPayload, type TradeOptimisticPayload, type TradeSubmittedPayload } from "@/components/token/TradePanel";
+import { TradeSheet } from "@/components/token/TradeSheet";
+import { TokenMobileHero } from "@/components/token/TokenMobileHero";
+import { TokenTradeDock } from "@/components/token/TokenTradeDock";
+import { TokenMobileMarketSheet } from "@/components/token/TokenMobileMarketSheet";
 import { TokenMobileMainTabs, type TokenMobileMainTab } from "@/components/token/TokenMobileMainTabs";
 import {
   parseTradePrefillFromSearchParams,
@@ -260,6 +263,8 @@ export function TokenDetailLive({
   const [mobileMainTab, setMobileMainTab] = useState<TokenMobileMainTab>("chart");
   const [shareOpen, setShareOpen] = useState(false);
   const [mobileMarketOpen, setMobileMarketOpen] = useState(false);
+  const [mobileHeroDetailsOpen, setMobileHeroDetailsOpen] = useState(false);
+  const [tradeSheetOpen, setTradeSheetOpen] = useState(false);
   const [, setAgeTick] = useState(0);
   const tradePrefillCapturedRef = useRef(false);
   const searchParams = useSearchParams();
@@ -289,6 +294,9 @@ export function TokenDetailLive({
     tradePrefillCapturedRef.current = true;
     setTradePrefill(parsed);
     setMobileMainTab("chart");
+    if (typeof window !== "undefined" && window.matchMedia("(max-width: 1023px)").matches) {
+      setTradeSheetOpen(true);
+    }
     router.replace(`/token/${tokenAddress}`, { scroll: false });
   }, [searchParams, router, tokenAddress]);
 
@@ -743,22 +751,40 @@ export function TokenDetailLive({
 
   useEffect(() => {
     setMobileMarketOpen(false);
+    setMobileHeroDetailsOpen(false);
     setMobileMainTab("chart");
+    setTradeSheetOpen(false);
+    setTradePrefill(null);
   }, [tokenAddress]);
 
-  useEffect(() => {
-    if (!mobileMarketOpen) return;
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setMobileMarketOpen(false);
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [mobileMarketOpen]);
-
   const closeMobileMarket = useCallback(() => setMobileMarketOpen(false), []);
-  const toggleMobileMarket = useCallback(
-    () => setMobileMarketOpen((open) => !open),
+  const openMobileMarket = useCallback(() => {
+    setMobileHeroDetailsOpen(false);
+    setMobileMarketOpen(true);
+  }, []);
+
+  const toggleMobileHeroDetails = useCallback(
+    () => setMobileHeroDetailsOpen((open) => !open),
     []
+  );
+
+  const closeTradeSheet = useCallback(() => {
+    setTradeSheetOpen(false);
+    setTradePrefill(null);
+  }, []);
+
+  const openMobileTrade = useCallback((side: "buy" | "sell") => {
+    setTradePrefill({ side });
+    setTradeSheetOpen(true);
+  }, []);
+
+  const handleMobileTradeConfirmed = useCallback(
+    async (payload: TradeConfirmedPayload) => {
+      await handleTradeConfirmed(payload);
+      setTradeSheetOpen(false);
+      setTradePrefill(null);
+    },
+    [handleTradeConfirmed]
   );
 
   const tokenToolbar = (
@@ -802,16 +828,11 @@ export function TokenDetailLive({
                 type="button"
                 className="token-detail-toolbar__market-toggle lg:hidden"
                 aria-expanded={mobileMarketOpen}
-                aria-controls="token-mobile-market-drawer"
-                aria-label={
-                  mobileMarketOpen ? "Close explore coins list" : "Open explore coins list"
-                }
-                onClick={toggleMobileMarket}
+                aria-controls="token-mobile-market-sheet"
+                aria-label="Explore coins"
+                onClick={openMobileMarket}
               >
-                <PumpIcon
-                  icon={mobileMarketOpen ? faChevronUp : faChevronDown}
-                  className="h-4 w-4"
-                />
+                <PumpIcon icon={faChevronDown} className="h-4 w-4" />
               </button>
             </div>
             <span className="token-detail-toolbar__age">{formatToolbarAge(liveToken.createdAt)}</span>
@@ -909,9 +930,7 @@ export function TokenDetailLive({
 
   return (
     <div
-      className={`token-page ${!contentSynced ? "token-page--switching" : ""} ${
-        mobileMarketOpen ? "token-page--market-open" : ""
-      }`}
+      className={`token-page ${!contentSynced ? "token-page--switching" : ""}`}
       aria-busy={isRefreshing || undefined}
     >
       <div className="token-page-grid" style={gridStyle}>
@@ -936,22 +955,26 @@ export function TokenDetailLive({
             />
           ) : null}
           <div className="token-mobile-toolbar-host shrink-0 lg:hidden">
-            {tokenToolbar}
-            {mobileMarketOpen ? (
-              <div
-                id="token-mobile-market-drawer"
-                className="token-mobile-market-drawer"
-                role="region"
-                aria-label="Explore coins"
-              >
-                <TokenMarketSidebar
-                  id="token-mobile-market-sidebar"
-                  activeTokenAddress={tokenAddress}
-                  density="compact"
-                  onTokenSelect={closeMobileMarket}
-                />
-              </div>
-            ) : null}
+            <TokenMobileHero
+              token={liveToken}
+              priceUsd={priceUsd}
+              changePct={changeTone}
+              volume24hLabel={formatToolbarUsdAmount(volume24hUsd)}
+              fdvLabel={formatToolbarUsdAmount(fdvUsd)}
+              ageLabel={formatToolbarAge(liveToken.createdAt)}
+              showSocialLinks={showSocialLinks}
+              favorited={favorited}
+              tradeLocked={tradeLocked}
+              copiedAddress={copiedAddress}
+              detailsOpen={mobileHeroDetailsOpen}
+              onToggleDetails={toggleMobileHeroDetails}
+              onOpenMarket={openMobileMarket}
+              onToggleFavorite={() => toggleFavorite(streamAddress)}
+              onShare={() => setShareOpen(true)}
+              onCopyAddress={() => void onCopyAddress()}
+              onOpenCreator={setProfileAddress}
+              isRefreshing={isRefreshing}
+            />
           </div>
 
           <TokenMobileMainTabs active={mobileMainTab} onChange={setMobileMainTab} />
@@ -1036,25 +1059,6 @@ export function TokenDetailLive({
               />
             </div>
           </div>
-
-          <div className="token-mobile-trade-panel relative lg:hidden">
-            {tradeLocked ? <div className="token-page-trade-lock" aria-hidden /> : null}
-            <TradePanel
-              embedded
-              compact
-              tokenAddress={streamAddress as `0x${string}`}
-              symbol={liveToken.symbol}
-              status={liveToken.status}
-              reserveBnb={liveToken.reserveBnb}
-              tokenSold={liveToken.tokenSold ?? "0"}
-              prefill={tradePrefill}
-              onTradeOptimistic={handleTradeOptimistic}
-              onTradeOptimisticRollback={handleTradeOptimisticRollback}
-              onTradeSubmitted={handleTradeSubmitted}
-              onTradeConfirmed={handleTradeConfirmed}
-              chainCurveSnapshot={tradeCurveSnapshot}
-            />
-          </div>
         </div>
 
         <aside className="token-page-stack token-page-stack--aside hidden lg:flex">
@@ -1105,6 +1109,35 @@ export function TokenDetailLive({
         payload={sharePayload}
         title="Share token"
         description={`Spread the word about $${liveToken.symbol}.`}
+      />
+
+      <TokenMobileMarketSheet
+        open={mobileMarketOpen}
+        onClose={closeMobileMarket}
+        activeTokenAddress={tokenAddress}
+      />
+
+      <TradeSheet
+        open={tradeSheetOpen}
+        onClose={closeTradeSheet}
+        tokenAddress={streamAddress as `0x${string}`}
+        symbol={liveToken.symbol}
+        status={liveToken.status}
+        reserveBnb={liveToken.reserveBnb}
+        tokenSold={liveToken.tokenSold ?? "0"}
+        prefill={tradePrefill}
+        onTradeOptimistic={handleTradeOptimistic}
+        onTradeOptimisticRollback={handleTradeOptimisticRollback}
+        onTradeSubmitted={handleTradeSubmitted}
+        onTradeConfirmed={handleMobileTradeConfirmed}
+        chainCurveSnapshot={tradeCurveSnapshot}
+      />
+
+      <TokenTradeDock
+        symbol={liveToken.symbol}
+        disabled={tradeLocked}
+        onBuy={() => openMobileTrade("buy")}
+        onSell={() => openMobileTrade("sell")}
       />
     </div>
   );

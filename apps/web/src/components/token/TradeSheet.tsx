@@ -114,6 +114,7 @@ export function TradeSheet({
             <TradePanel
               key={`${tokenAddress}-${tradeSide}`}
               embedded
+              compact={!isModal}
               tokenAddress={tokenAddress}
               symbol={symbol}
               status={status}
