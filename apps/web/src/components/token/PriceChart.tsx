@@ -148,6 +148,12 @@ function resolveChartAxisFontSize(): number {
   return window.matchMedia("(min-width: 768px)").matches ? 15 : 13;
 }
 
+/** Mobile token terminal — hide bottom time labels (Hyperliquid-style). */
+function isMobileChartViewport(): boolean {
+  if (typeof window === "undefined") return false;
+  return window.matchMedia("(max-width: 1023px)").matches;
+}
+
 function ChartOhlcValue({
   value,
   currency,
@@ -242,6 +248,7 @@ export function PriceChart({
   fillContainer = false,
 }: PriceChartProps) {
   const { theme } = useTheme();
+  const [hideTimeAxis, setHideTimeAxis] = useState(isMobileChartViewport);
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const candleSeriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
@@ -608,6 +615,14 @@ export function PriceChart({
   const scheduleFitViewportRef = useRef(scheduleFitViewport);
   scheduleFitViewportRef.current = scheduleFitViewport;
 
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 1023px)");
+    const sync = () => setHideTimeAxis(mq.matches);
+    sync();
+    mq.addEventListener("change", sync);
+    return () => mq.removeEventListener("change", sync);
+  }, []);
+
   // Create chart once — container is always in the DOM.
   useLayoutEffect(() => {
     const el = containerRef.current;
@@ -645,7 +660,8 @@ export function PriceChart({
       },
       timeScale: {
         borderColor,
-        timeVisible: true,
+        visible: !hideTimeAxis,
+        timeVisible: !hideTimeAxis,
         secondsVisible: false,
         barSpacing: 12,
         minBarSpacing: 6,
@@ -742,6 +758,15 @@ export function PriceChart({
       setReady(false);
     };
   }, [fillContainer]);
+
+  useEffect(() => {
+    chartRef.current?.applyOptions({
+      timeScale: {
+        visible: !hideTimeAxis,
+        timeVisible: !hideTimeAxis,
+      },
+    });
+  }, [hideTimeAxis]);
 
   useEffect(() => {
     if (!chartRef.current || !candleSeriesRef.current) return;

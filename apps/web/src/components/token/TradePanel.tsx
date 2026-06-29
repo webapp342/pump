@@ -2216,40 +2216,42 @@ export function TradePanel({
       }
     >
       <form onSubmit={onSubmit}>
-        <div className="trade-panel-mode-tabs" role="tablist" aria-label="Order type">
-          <button
-            type="button"
-            role="tab"
-            aria-selected={tradeMode === "market"}
-            className={
-              tradeMode === "market"
-                ? "trade-panel-mode-tab trade-panel-mode-tab--active"
-                : "trade-panel-mode-tab"
-            }
-            onClick={() => {
-              setTradeMode("market");
-              setAssetMenuOpen(false);
-            }}
-          >
-            Market
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={tradeMode === "limit"}
-            className={
-              tradeMode === "limit"
-                ? "trade-panel-mode-tab trade-panel-mode-tab--active"
-                : "trade-panel-mode-tab"
-            }
-            onClick={() => {
-              setTradeMode("limit");
-              setAssetMenuOpen(false);
-            }}
-          >
-            Limit
-          </button>
-        </div>
+        {!compact ? (
+          <div className="trade-panel-mode-tabs" role="tablist" aria-label="Order type">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={tradeMode === "market"}
+              className={
+                tradeMode === "market"
+                  ? "trade-panel-mode-tab trade-panel-mode-tab--active"
+                  : "trade-panel-mode-tab"
+              }
+              onClick={() => {
+                setTradeMode("market");
+                setAssetMenuOpen(false);
+              }}
+            >
+              Market
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={tradeMode === "limit"}
+              className={
+                tradeMode === "limit"
+                  ? "trade-panel-mode-tab trade-panel-mode-tab--active"
+                  : "trade-panel-mode-tab"
+              }
+              onClick={() => {
+                setTradeMode("limit");
+                setAssetMenuOpen(false);
+              }}
+            >
+              Limit
+            </button>
+          </div>
+        ) : null}
 
         {tradeMode === "market" ? (
           <div className="trade-panel-tabs">

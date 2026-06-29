@@ -1172,17 +1172,71 @@ code,
       overflow: hidden;
     }
 
-    .trade-panel--compact .trade-panel-mode-tabs {
-      padding: 0.375rem 0.625rem 0;
-    }
-
-    .trade-panel--compact .trade-panel-mode-tab {
-      padding-bottom: 0.375rem;
-      font-size: var(--text-caption);
-    }
-
     .trade-panel--compact .trade-panel-tabs {
-      padding: 0.375rem 0.625rem 0;
+      padding: 0;
+    }
+
+    .trade-panel--compact .trade-side-group {
+      display: flex;
+      gap: 0;
+      padding: 0;
+      border: none;
+      border-radius: 0;
+      background: transparent;
+      border-bottom: 1px solid rgb(var(--pump-border) / 0.32);
+    }
+
+    .trade-panel--compact .trade-side-button,
+    .trade-panel--compact .trade-side-button-active-buy,
+    .trade-panel--compact .trade-side-button-active-sell {
+      position: relative;
+      flex: 1;
+      min-height: 0;
+      padding: 0.4375rem 0.5rem;
+      border-radius: 0;
+      box-shadow: none;
+      font-size: var(--text-body-sm);
+      line-height: 1.25;
+    }
+
+    .trade-panel--compact .trade-side-button {
+      background: transparent;
+      color: rgb(var(--pump-muted));
+      font-weight: 500;
+    }
+
+    .trade-panel--compact .trade-side-button-active-buy {
+      background: transparent;
+      color: rgb(var(--pump-success));
+      font-weight: 600;
+    }
+
+    .trade-panel--compact .trade-side-button-active-buy::after {
+      content: "";
+      position: absolute;
+      right: 0.75rem;
+      bottom: 0;
+      left: 0.75rem;
+      height: 2px;
+      border-radius: 2px 2px 0 0;
+      background: rgb(var(--pump-success));
+    }
+
+    .trade-panel--compact .trade-side-button-active-sell {
+      background: transparent;
+      color: rgb(var(--pump-danger));
+      font-weight: 600;
+    }
+
+    .trade-panel--compact .trade-side-button-active-sell::after {
+      content: "";
+      position: absolute;
+      right: 0.75rem;
+      bottom: 0;
+      left: 0.75rem;
+      height: 2px;
+      border-radius: 2px 2px 0 0;
+      background: rgb(var(--pump-danger));
     }
 
     .trade-panel--compact .trade-panel-input-zone {
