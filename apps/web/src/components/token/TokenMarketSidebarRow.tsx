@@ -4,6 +4,7 @@ import type { TokenListItem } from "@/lib/db/launchpad";
 import { FavoriteIcon } from "@/components/icons/FavoriteIcon";
 import { TokenAvatar } from "@/components/token/TokenAvatar";
 import { TokenDetailLink } from "@/components/token/TokenDetailLink";
+import { seedTokenDetailFromListItem } from "@/lib/token-detail-client";
 import { PctChange } from "@/components/ui/PctChange";
 import { formatUsdReadable } from "@/lib/format-usd";
 import {
@@ -56,6 +57,7 @@ export function TokenMarketSidebarRow({
   return (
     <TokenDetailLink
       address={token.address}
+      onClick={() => seedTokenDetailFromListItem(token)}
       className={`token-market-sidebar__row ${rowClass} ${
         isActive ? "token-market-sidebar__row--active" : ""
       }`}

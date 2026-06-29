@@ -1,8 +1,4 @@
-import { Suspense } from "react";
 import type { Metadata } from "next";
-import { AppShellFrame } from "@/components/layout/AppShell";
-import { TokenDetailPageLoader } from "@/components/token/TokenDetailPageLoader";
-import { TokenDetailBodySkeleton } from "@/components/token/TokenDetailBodySkeleton";
 import { normalizeAddressParam } from "@/lib/address";
 import { fetchBnbUsdPrice } from "@/lib/bnb-price-server";
 import { getTokenByAddress } from "@/lib/db/launchpad";
@@ -61,18 +57,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   }
 }
 
-export default async function TokenDetailPage({ params }: PageProps) {
-  const { address } = await params;
-
-  return (
-    <Suspense
-      fallback={
-        <AppShellFrame wide pathname={`/token/${address}`}>
-          <TokenDetailBodySkeleton />
-        </AppShellFrame>
-      }
-    >
-      <TokenDetailPageLoader address={address} />
-    </Suspense>
-  );
+/** Metadata-only route segment — terminal UI lives in layout.tsx. */
+export default function TokenDetailPage() {
+  return null;
 }

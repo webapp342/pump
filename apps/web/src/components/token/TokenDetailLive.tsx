@@ -120,6 +120,10 @@ type TokenDetailLiveProps = {
   initialTrades: TradeItem[];
   initialHolders?: TokenHolderSnapshot[];
   initialCandles?: InitialChartCandles;
+  /** Bundle matches routed token address — safe to trade. */
+  contentSynced?: boolean;
+  /** Background fetch or pair switch in progress. */
+  isRefreshing?: boolean;
 };
 
 type PriceChange24h = {
@@ -212,24 +216,36 @@ export function TokenDetailLive({
   initialTrades,
   initialHolders = [],
   initialCandles,
+  contentSynced = true,
+  isRefreshing = false,
 }: TokenDetailLiveProps) {
   const [token, setToken] = useState(initialToken);
   const [dbTrades, setDbTrades] = useState(initialTrades);
   const [liveCandleUpdates, setLiveCandleUpdates] = useState<CandleWsUpdate[]>([]);
-
-  useEffect(() => {
-    setLiveCandleUpdates([]);
-  }, [tokenAddress]);
-
-  // Reconcile: if real candle data from indexer arrives covering the optimistic trade time, drop the transient actor view.
-  // This ensures the trader sees authoritative data once it lands, and other viewers were never seeing the actor patch.
   const [holdersRefreshKey, setHoldersRefreshKey] = useState(0);
   const [optimisticTrades, setOptimisticTrades] = useState<TradeItem[]>([]);
   const [actorChartSpot, setActorChartSpot] = useState<ActorOptimisticChartSpot | null>(null);
   const [indexerSyncing, setIndexerSyncing] = useState(false);
+  const [latestWsBonding, setLatestWsBonding] = useState<
+    TokenTradeWsPayload["bonding"] | null
+  >(null);
 
-  // Reconcile: if real candle data from indexer arrives covering the optimistic trade time, drop the transient actor view.
-  // Trader sees authoritative once it lands; other viewers never saw the client-only patch.
+  const streamAddress = contentSynced ? tokenAddress : token.address;
+
+  useEffect(() => {
+    setLiveCandleUpdates([]);
+  }, [streamAddress]);
+
+  useEffect(() => {
+    if (!contentSynced) return;
+    setToken(initialToken);
+    setDbTrades(initialTrades);
+    setOptimisticTrades([]);
+    setActorChartSpot(null);
+    setIndexerSyncing(false);
+    setLatestWsBonding(null);
+    hydratedRef.current = false;
+  }, [contentSynced, tokenAddress, initialToken, initialTrades]);
   useEffect(() => {
     if (!actorChartSpot || liveCandleUpdates.length === 0) return;
     const latest = [...liveCandleUpdates].sort((a, b) => b.time - a.time)[0];
@@ -238,9 +254,6 @@ export function TokenDetailLive({
       setIndexerSyncing(false);
     }
   }, [liveCandleUpdates, actorChartSpot]);
-  const [latestWsBonding, setLatestWsBonding] = useState<
-    TokenTradeWsPayload["bonding"] | null
-  >(null);
   const [copiedAddress, setCopiedAddress] = useState(false);
   const [profileAddress, setProfileAddress] = useState<string | null>(null);
   const [tradePrefill, setTradePrefill] = useState<TradePrefillConfig | null>(null);
@@ -295,12 +308,13 @@ export function TokenDetailLive({
   );
 
   const hasLivePending = optimisticTrades.length > 0 || indexerSyncing;
+  const tradeLocked = !contentSynced;
 
   const { data: chainCurve, refetch: refetchCurve } = useReadContract({
     address: contracts.bondingCurveManager,
     abi: bondingCurveManagerAbi,
     functionName: "curves",
-    args: [tokenAddress as `0x${string}`],
+    args: [streamAddress as `0x${string}`],
     chainId: pumpChain.id,
     query: {
       refetchInterval: hasLivePending ? BURST_POLL_MS : CHAIN_LIVE_POLL_MS,
@@ -338,7 +352,7 @@ export function TokenDetailLive({
 
   const fetchLive = useCallback(async () => {
     try {
-      const response = await fetch(`/api/tokens/${tokenAddress}`, { cache: "no-store" });
+      const response = await fetch(`/api/tokens/${streamAddress}`, { cache: "no-store" });
       const body = (await response.json()) as {
         data?: { token: TokenDetail; trades: TradeItem[] };
       };
@@ -377,7 +391,7 @@ export function TokenDetailLive({
     } catch {
       // Keep last good snapshot on transient errors.
     }
-  }, [tokenAddress, refetchCurve]);
+  }, [streamAddress, refetchCurve]);
 
   const fetchLiveRef = useRef(fetchLive);
   fetchLiveRef.current = fetchLive;
@@ -402,7 +416,7 @@ export function TokenDetailLive({
             setLiveCandleUpdates((prev) => mergeWsCandleUpdates(prev, updates));
             for (const update of updates) {
               logChartWsMerge({
-                tokenAddress,
+                tokenAddress: streamAddress,
                 interval: update.interval,
                 updateCount: updates.length,
                 isNewBucket: update.isNewBucket,
@@ -426,12 +440,12 @@ export function TokenDetailLive({
         void fetchLiveRef.current();
       }
     }
-  }, [tokenAddress]);
+  }, [streamAddress]);
 
   const queueWsMessage = useRafMessageQueue(applyWsMessages);
 
   const { connected: wsConnected } = useLiveChannel({
-    room: `token:${tokenAddress.toLowerCase()}`,
+    room: `token:${streamAddress.toLowerCase()}`,
     onMessage: (message) => {
       queueWsMessage(message);
     },
@@ -477,7 +491,7 @@ export function TokenDetailLive({
       const { items, parsed } = resolveTradeItemsFromReceipt(
         payload.receipt,
         payload.txHash,
-        tokenAddress as `0x${string}`,
+        streamAddress as `0x${string}`,
         blockTimeIso,
         snapshotUsdRate
       );
@@ -499,7 +513,7 @@ export function TokenDetailLive({
             address: contracts.bondingCurveManager,
             abi: bondingCurveManagerAbi,
             functionName: "curves",
-            args: [tokenAddress as `0x${string}`],
+            args: [streamAddress as `0x${string}`],
           })) as CurveTuple;
           setToken((prev) => tokenFromCurve(prev, curve));
           void refetchCurve();
@@ -508,7 +522,7 @@ export function TokenDetailLive({
         }
       }
     },
-    [tokenAddress, refetchCurve, bnbUsd]
+    [streamAddress, refetchCurve, bnbUsd]
   );
 
   const handleTradeOptimistic = useCallback(
@@ -574,14 +588,14 @@ export function TokenDetailLive({
         txHash: payload.txHash,
         type: payload.side,
         at: new Date().toISOString(),
-        tokenAddress,
+        tokenAddress: streamAddress,
         missionKeys: [MISSION_KEYS.dailySwap],
       });
 
       await applyOptimisticFromReceipt(payload);
       void fetchLive();
     },
-    [applyOptimisticFromReceipt, fetchLive, tokenAddress]
+    [applyOptimisticFromReceipt, fetchLive, streamAddress]
   );
 
   useEffect(() => {
@@ -598,7 +612,7 @@ export function TokenDetailLive({
 
     const pending = listRecentOptimisticActivities().filter(
       (activity) =>
-        activity.tokenAddress?.toLowerCase() === tokenAddress.toLowerCase() &&
+        activity.tokenAddress?.toLowerCase() === streamAddress.toLowerCase() &&
         (activity.type === "create" || activity.type === "buy" || activity.type === "sell") &&
         !knownHashes.has(activity.txHash.toLowerCase())
     );
@@ -646,7 +660,7 @@ export function TokenDetailLive({
         const { items, parsed } = resolveTradeItemsFromReceipt(
           row.receipt,
           row.activity.txHash,
-          tokenAddress as `0x${string}`,
+          streamAddress as `0x${string}`,
           blockTimeIso,
           snapshotUsdRate
         );
@@ -669,7 +683,7 @@ export function TokenDetailLive({
 
       void fetchLive();
     })();
-  }, [bnbUsd, fetchLive, initialTrades, refetchCurve, tokenAddress]);
+  }, [bnbUsd, fetchLive, initialTrades, refetchCurve, streamAddress]);
 
   const displayPrice =
     onChainSpotBnb ??
@@ -678,8 +692,9 @@ export function TokenDetailLive({
   const fdvUsd = estimateFdvUsd(displayPrice, bnbUsd);
 
   useEffect(() => {
+    if (!contentSynced) return;
     document.title = tokenDocumentTitle(liveToken.symbol, priceUsd);
-  }, [liveToken.symbol, priceUsd]);
+  }, [contentSynced, liveToken.symbol, priceUsd]);
 
   const volume24hBnb = useMemo(() => {
     const fromTape = computeVolumeWindowBnb(trades, 86_400_000);
@@ -718,7 +733,7 @@ export function TokenDetailLive({
     if (ok) setTimeout(() => setCopiedAddress(false), 2000);
   }
 
-  const favorited = isFavorite(tokenAddress);
+  const favorited = isFavorite(streamAddress);
 
   useEffect(() => {
     document.documentElement.classList.add("token-page-lock");
@@ -731,7 +746,11 @@ export function TokenDetailLive({
   }, []);
 
   const tokenToolbar = (
-    <div className="token-detail-toolbar panel-surface">
+    <div
+      className={`token-detail-toolbar panel-surface ${
+        isRefreshing ? "token-detail-toolbar--refreshing" : ""
+      }`}
+    >
       <h1 className="sr-only">
         {liveToken.name} ({liveToken.symbol}/USD)
       </h1>
@@ -739,7 +758,8 @@ export function TokenDetailLive({
         <div className="token-detail-toolbar__identity">
           <button
             type="button"
-            onClick={() => toggleFavorite(tokenAddress)}
+            onClick={() => toggleFavorite(streamAddress)}
+            disabled={tradeLocked}
             aria-label={favorited ? "Remove from favorites" : "Add to favorites"}
             title={favorited ? "Remove from favorites" : "Add to favorites"}
             className={
@@ -848,7 +868,10 @@ export function TokenDetailLive({
   );
 
   return (
-    <div className="token-page">
+    <div
+      className={`token-page ${!contentSynced ? "token-page--switching" : ""}`}
+      aria-busy={isRefreshing || undefined}
+    >
       <div className="token-page-grid" style={gridStyle}>
         <div className="token-page-toolbar-slot hidden lg:block">{tokenToolbar}</div>
 
@@ -874,8 +897,8 @@ export function TokenDetailLive({
           <div className="token-page-chart-slot">
             <PriceChart
               fillContainer
-              tokenAddress={tokenAddress}
-              symbol={symbol}
+              tokenAddress={streamAddress}
+              symbol={liveToken.symbol}
               status={liveToken.status}
               initialCandles={initialCandles}
               actorOptimisticSpot={actorChartSpot}
@@ -896,7 +919,7 @@ export function TokenDetailLive({
 
           <div className="token-page-tape-slot">
             <TradeTape
-              tokenAddress={tokenAddress}
+              tokenAddress={streamAddress}
               creatorAddress={liveToken.creatorAddress}
               symbol={liveToken.symbol}
               headTrades={trades}
@@ -911,10 +934,13 @@ export function TokenDetailLive({
         </div>
 
         <aside className="token-page-stack token-page-stack--aside hidden lg:flex">
-          <div className="token-aside-trade-slot hidden lg:block">
+          <div className="token-aside-trade-slot relative hidden lg:block">
+            {tradeLocked ? (
+              <div className="token-page-trade-lock" aria-hidden />
+            ) : null}
             <TradePanel
-              tokenAddress={tokenAddress as `0x${string}`}
-              symbol={symbol}
+              tokenAddress={streamAddress as `0x${string}`}
+              symbol={liveToken.symbol}
               status={liveToken.status}
               reserveBnb={liveToken.reserveBnb}
               tokenSold={liveToken.tokenSold ?? "0"}
@@ -949,6 +975,7 @@ export function TokenDetailLive({
             <button
               type="button"
               className="token-trade-dock-buy"
+              disabled={tradeLocked}
               onClick={() => openMobileTrade("buy")}
             >
               Buy ${liveToken.symbol}
@@ -956,6 +983,7 @@ export function TokenDetailLive({
             <button
               type="button"
               className="token-trade-dock-sell"
+              disabled={tradeLocked}
               onClick={() => openMobileTrade("sell")}
             >
               Sell ${liveToken.symbol}
@@ -965,10 +993,10 @@ export function TokenDetailLive({
       </div>
 
       <TradeSheet
-        open={tradeSheetOpen}
+        open={tradeSheetOpen && !tradeLocked}
         onClose={() => setTradeSheetOpen(false)}
-        tokenAddress={tokenAddress as `0x${string}`}
-        symbol={symbol}
+        tokenAddress={streamAddress as `0x${string}`}
+        symbol={liveToken.symbol}
         status={liveToken.status}
         reserveBnb={liveToken.reserveBnb}
         tokenSold={liveToken.tokenSold ?? "0"}

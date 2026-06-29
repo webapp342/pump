@@ -1781,6 +1781,27 @@ code,
     border-left: 1px solid rgb(var(--pump-border) / 0.28);
   }
 
+  .token-detail-toolbar--refreshing {
+    opacity: 0.82;
+    transition: opacity 0.18s ease;
+  }
+
+  .token-page--switching .token-page-chart-slot,
+  .token-page--switching .token-page-tape-slot {
+    opacity: 0.88;
+    transition: opacity 0.18s ease;
+  }
+
+  .token-page-trade-lock {
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    border-radius: inherit;
+    background: rgb(var(--pump-bg) / 0.42);
+    pointer-events: all;
+    cursor: wait;
+  }
+
   .token-toolbar-btn {
     display: inline-flex;
     height: 2rem;

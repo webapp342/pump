@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { TokenDetail, TradeItem } from "@/lib/db/launchpad";
 import type { TokenDetailBundle, InitialChartCandles } from "@/lib/token-server";
 import { AppShell } from "@/components/layout/AppShell";
@@ -10,6 +10,11 @@ import {
   buildOptimisticTokenDetail,
   getPendingCreateForToken,
 } from "@/lib/optimistic-activity";
+import {
+  fetchTokenDetailBundleClient,
+  peekTokenDetailBundle,
+  seedTokenDetailBundle,
+} from "@/lib/token-detail-client";
 
 const POLL_MS = 2_000;
 const POLL_MAX_MS = 90_000;
@@ -19,40 +24,20 @@ type TokenDetailShellProps = {
   initialBundle?: TokenDetailBundle | null;
 };
 
-function TokenDetailView({
-  token,
-  trades,
-  initialHolders,
-  initialCandles,
-  indexerSyncing,
-}: {
+type ResolvedBundle = {
   token: TokenDetail;
   trades: TradeItem[];
-  initialHolders?: TokenDetailBundle["holders"];
+  holders: TokenDetailBundle["holders"];
   initialCandles?: InitialChartCandles;
-  indexerSyncing: boolean;
-}) {
-  return (
-    <>
-      {indexerSyncing ? (
-        <p className="notice-warning mt-4 text-xs">
-          On-chain confirmed — indexer syncing token to Arena. Stats update automatically.
-        </p>
-      ) : null}
+};
 
-      <Suspense fallback={<TokenDetailBodySkeleton />}>
-        <TokenDetailLive
-          tokenAddress={token.address}
-          symbol={token.symbol}
-          status={token.status}
-          initialToken={token}
-          initialTrades={trades}
-          initialHolders={initialHolders}
-          initialCandles={initialCandles}
-        />
-      </Suspense>
-    </>
-  );
+function bundleFromPayload(payload: TokenDetailBundle): ResolvedBundle {
+  return {
+    token: payload.token,
+    trades: payload.trades,
+    holders: payload.holders ?? [],
+    initialCandles: payload.initialCandles,
+  };
 }
 
 export function TokenDetailShell({
@@ -60,20 +45,15 @@ export function TokenDetailShell({
   initialBundle = null,
 }: TokenDetailShellProps) {
   const normalized = address.toLowerCase();
-  const [data, setData] = useState<{
-    token: TokenDetail;
-    trades: TradeItem[];
-    holders: TokenDetailBundle["holders"];
-    initialCandles?: InitialChartCandles;
-  } | null>(
-    initialBundle
-      ? {
-          token: initialBundle.token,
-          trades: initialBundle.trades,
-          holders: initialBundle.holders,
-          initialCandles: initialBundle.initialCandles,
-        }
-      : null
+
+  useEffect(() => {
+    if (initialBundle) seedTokenDetailBundle(normalized, initialBundle);
+  }, [initialBundle, normalized]);
+
+  const initialCached = initialBundle ?? peekTokenDetailBundle(normalized) ?? null;
+
+  const [resolved, setResolved] = useState<ResolvedBundle | null>(
+    initialCached ? bundleFromPayload(initialCached) : null
   );
   const [optimisticToken, setOptimisticToken] = useState<TokenDetail | null>(() => {
     const pending = getPendingCreateForToken(normalized);
@@ -83,51 +63,67 @@ export function TokenDetailShell({
     Boolean(getPendingCreateForToken(normalized))
   );
   const [fatalError, setFatalError] = useState<string | null>(null);
-  const [initialLoading, setInitialLoading] = useState(!initialBundle);
-  const initialBundleRef = useRef(initialBundle);
+  const [refreshing, setRefreshing] = useState(false);
+  const layoutMountedRef = useRef(Boolean(initialCached || optimisticToken));
+  const pollUntilRef = useRef(0);
+  const loadGenerationRef = useRef(0);
 
-  const load = useCallback(async (): Promise<boolean> => {
-    try {
-      const response = await fetch(`/api/tokens/${normalized}`, { cache: "no-store" });
-      const body = (await response.json()) as {
-        data?: TokenDetailBundle;
-        error?: string;
-      };
+  const contentSynced =
+    resolved != null && resolved.token.address.toLowerCase() === normalized;
 
-      if (!response.ok || !body.data) {
-        return false;
+  const load = useCallback(
+    async (options: { silent?: boolean } = {}) => {
+      const generation = ++loadGenerationRef.current;
+      const hadLayout = layoutMountedRef.current;
+
+      if (!options.silent && hadLayout) {
+        setRefreshing(true);
       }
 
-      setData({
-        token: body.data.token,
-        trades: body.data.trades,
-        holders: body.data.holders ?? [],
-        initialCandles: body.data.initialCandles,
-      });
-      setOptimisticToken(null);
-      setIndexerSyncing(false);
-      setFatalError(null);
-      return true;
-    } catch {
-      return false;
-    }
+      try {
+        const payload = await fetchTokenDetailBundleClient(normalized);
+        if (generation !== loadGenerationRef.current) return false;
+
+        if (!payload) return false;
+
+        setResolved(bundleFromPayload(payload));
+        setOptimisticToken(null);
+        setIndexerSyncing(false);
+        setFatalError(null);
+        layoutMountedRef.current = true;
+        return true;
+      } catch {
+        return false;
+      } finally {
+        if (generation === loadGenerationRef.current) {
+          setRefreshing(false);
+        }
+      }
+    },
+    [normalized]
+  );
+
+  useLayoutEffect(() => {
+    const cached = peekTokenDetailBundle(normalized);
+    if (!cached) return;
+    setResolved(bundleFromPayload(cached));
+    layoutMountedRef.current = true;
+    setFatalError(null);
   }, [normalized]);
 
-  const pollUntilRef = useRef(0);
-
   useEffect(() => {
-    if (initialBundleRef.current) {
-      initialBundleRef.current = null;
+    const cached = peekTokenDetailBundle(normalized);
+    const pending = getPendingCreateForToken(normalized);
+
+    if (cached) {
+      setResolved(bundleFromPayload(cached));
+      layoutMountedRef.current = true;
+      setFatalError(null);
       pollUntilRef.current = Date.now() + POLL_MAX_MS;
-      void load();
+      void load({ silent: true });
       return;
     }
 
-    setData(null);
-    setFatalError(null);
-    setInitialLoading(true);
-
-    const pending = getPendingCreateForToken(normalized);
     if (pending) {
       setOptimisticToken(buildOptimisticTokenDetail(normalized, pending));
       setIndexerSyncing(true);
@@ -138,23 +134,26 @@ export function TokenDetailShell({
 
     pollUntilRef.current = Date.now() + POLL_MAX_MS;
 
-    void (async () => {
-      const found = await load();
-      setInitialLoading(false);
-      if (found) return;
+    if (!layoutMountedRef.current && !pending) {
+      setResolved(null);
+      setFatalError(null);
+    }
 
-      if (!pending) {
+    void (async () => {
+      const found = await load({ silent: layoutMountedRef.current });
+      if (found) return;
+      if (!pending && !layoutMountedRef.current) {
         setFatalError("Token not found");
       }
     })();
   }, [load, normalized]);
 
   useEffect(() => {
-    if (data || fatalError) return;
+    if (contentSynced || fatalError) return;
 
     const timer = setInterval(async () => {
       if (Date.now() > pollUntilRef.current) {
-        if (!optimisticToken) {
+        if (!optimisticToken && !layoutMountedRef.current) {
           setFatalError(
             "Token not found — indexer may still be catching up. Try refresh in a minute."
           );
@@ -163,14 +162,16 @@ export function TokenDetailShell({
         return;
       }
 
-      const found = await load();
+      const found = await load({ silent: true });
       if (found) clearInterval(timer);
     }, POLL_MS);
 
     return () => clearInterval(timer);
-  }, [data, fatalError, load, optimisticToken]);
+  }, [contentSynced, fatalError, load, optimisticToken]);
 
-  if (initialLoading && !optimisticToken) {
+  const showFullSkeleton = !layoutMountedRef.current && !resolved && !optimisticToken;
+
+  if (showFullSkeleton) {
     return (
       <AppShell wide>
         <TokenDetailBodySkeleton />
@@ -178,19 +179,15 @@ export function TokenDetailShell({
     );
   }
 
-  if (fatalError && !data && !optimisticToken) {
+  if (fatalError && !resolved && !optimisticToken) {
     return (
       <AppShell wide>
-        <div className="notice-error mt-6 p-4">
-          {fatalError}
-        </div>
+        <div className="notice-error mt-6 p-4">{fatalError}</div>
         <button
           type="button"
           onClick={() => {
             setFatalError(null);
-            setInitialLoading(true);
-            pollUntilRef.current = Date.now() + POLL_MAX_MS;
-            void load().finally(() => setInitialLoading(false));
+            void load({ silent: false });
           }}
           className="secondary-button mt-4 w-full max-w-md"
         >
@@ -200,8 +197,8 @@ export function TokenDetailShell({
     );
   }
 
-  const token = data?.token ?? optimisticToken;
-  if (!token) {
+  const display = resolved ?? (optimisticToken ? { token: optimisticToken, trades: [], holders: [] } : null);
+  if (!display) {
     return (
       <AppShell wide>
         <TokenDetailBodySkeleton />
@@ -211,12 +208,22 @@ export function TokenDetailShell({
 
   return (
     <AppShell wide>
-      <TokenDetailView
-        token={token}
-        trades={data?.trades ?? []}
-        initialHolders={data?.holders}
-        initialCandles={data?.initialCandles}
-        indexerSyncing={indexerSyncing && !data}
+      {indexerSyncing && !contentSynced ? (
+        <p className="notice-warning mt-4 text-xs">
+          On-chain confirmed — indexer syncing token to Arena. Stats update automatically.
+        </p>
+      ) : null}
+
+      <TokenDetailLive
+        tokenAddress={normalized}
+        symbol={display.token.symbol}
+        status={display.token.status}
+        initialToken={display.token}
+        initialTrades={display.trades}
+        initialHolders={display.holders}
+        initialCandles={display.initialCandles}
+        contentSynced={contentSynced}
+        isRefreshing={refreshing || !contentSynced}
       />
     </AppShell>
   );
