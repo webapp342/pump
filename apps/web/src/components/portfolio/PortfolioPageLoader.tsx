@@ -3,17 +3,18 @@ import { connection } from "next/server";
 import { PortfolioPanel } from "@/components/portfolio/PortfolioPanel";
 import { normalizeAddressParam } from "@/lib/address";
 import { fetchPortfolioPayload } from "@/lib/portfolio-server";
+import { parsePortfolioTab } from "@/lib/portfolio-tabs";
 import { PORTFOLIO_WALLET_COOKIE } from "@/lib/portfolio-wallet-cookie";
 
 type PortfolioPageLoaderProps = {
-  searchParams: Promise<{ address?: string }>;
+  searchParams: Promise<{ address?: string; tab?: string }>;
 };
 
 /** Dynamic server island — portfolio SSR from cookie or ?address=. */
 export async function PortfolioPageLoader({ searchParams }: PortfolioPageLoaderProps) {
   await connection();
 
-  const { address: queryAddress } = await searchParams;
+  const { address: queryAddress, tab: queryTab } = await searchParams;
   const cookieStore = await cookies();
   const cookieAddress = cookieStore.get(PORTFOLIO_WALLET_COOKIE)?.value ?? null;
   const walletAddress = normalizeAddressParam(queryAddress ?? cookieAddress);
@@ -31,6 +32,7 @@ export async function PortfolioPageLoader({ searchParams }: PortfolioPageLoaderP
     <PortfolioPanel
       initialPortfolio={initialPortfolio}
       ssrWalletAddress={walletAddress}
+      initialTab={parsePortfolioTab(queryTab)}
     />
   );
 }

@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { formatEther } from "viem";
 import { useOpenConnectModal } from "@/hooks/useOpenConnectModal";
 import { useAccount } from "wagmi";
@@ -9,19 +10,14 @@ import { useReadContract } from "wagmi";
 import { contracts, pumpChain } from "@/config/chain";
 import { bondingCurveManagerAbi } from "@/lib/bonding-curve";
 import { ClaimCreatorFeesModal } from "@/components/portfolio/ClaimCreatorFeesModal";
-import { CreatorFeesCard } from "@/components/portfolio/CreatorFeesCard";
-import { PortfolioMetricBox } from "@/components/portfolio/PortfolioMetricBox";
-import { PumpIcon, type PumpIconDefinition } from "@/lib/icons";
-import { MetricIcons } from "@/lib/metric-icons";
+import { PortfolioHero } from "@/components/portfolio/PortfolioHero";
+import { PortfolioRewardsTab } from "@/components/portfolio/PortfolioRewardsTab";
+import { PortfolioTabNav } from "@/components/portfolio/PortfolioTabNav";
 import { ClaimReferrerFeesModal } from "@/components/portfolio/ClaimReferrerFeesModal";
-import { ReferralRewardsCard } from "@/components/referrals/ReferralRewardsCard";
 import { FollowNetworkModal } from "@/components/portfolio/FollowNetworkModal";
 import { AvatarPickerModal } from "@/components/user/AvatarPickerModal";
-import { UserAvatar } from "@/components/user/UserAvatar";
 import { useUserAvatar } from "@/components/user/UserAvatarProvider";
-import { shortAddress } from "@/config/chain";
 import { TokenBoardTable } from "@/components/arena/TokenBoardTable";
-import { PortfolioAirdropsSection } from "@/components/portfolio/PortfolioAirdropsSection";
 import { SellAllHoldingsModal } from "@/components/portfolio/SellAllHoldingsModal";
 import { PortfolioPanelSkeleton } from "@/components/portfolio/PortfolioPanelSkeleton";
 import { HoldingSwipeRow } from "@/components/portfolio/HoldingSwipeRow";
@@ -65,6 +61,7 @@ import {
   type WalletTradeWsPayload,
 } from "@/lib/portfolio-live-delta";
 import { writePortfolioWalletCookie } from "@/lib/portfolio-wallet-cookie";
+import { parsePortfolioTab, type PortfolioTab } from "@/lib/portfolio-tabs";
 
 type PortfolioPosition = {
   tokenAddress: string;
@@ -213,37 +210,6 @@ function formatTokenBalance(value: number): string {
   if (value >= 1_000) return `${(value / 1_000).toFixed(2)}K`;
   if (value >= 1) return value.toFixed(2);
   return value.toFixed(4);
-}
-
-function PortfolioStatBox({
-  label,
-  icon,
-  value,
-  sub,
-  valueClassName = "financial-value text-body-sm font-semibold text-pump-text",
-  className = "",
-}: {
-  label: string;
-  icon?: PumpIconDefinition;
-  value: ReactNode;
-  sub?: ReactNode;
-  valueClassName?: string;
-  className?: string;
-}) {
-  return (
-    <PortfolioMetricBox
-      label={label}
-      icon={icon}
-      value={
-        <>
-          {value}
-          {sub ? <span className="mt-0.5 block text-caption text-pump-muted">{sub}</span> : null}
-        </>
-      }
-      valueClassName={valueClassName}
-      className={className}
-    />
-  );
 }
 
 function PnlCell({
@@ -587,10 +553,14 @@ function portfolioMatchesWallet(
 export function PortfolioPanel({
   initialPortfolio = null,
   ssrWalletAddress = null,
+  initialTab = "holdings",
 }: {
   initialPortfolio?: PortfolioSnapshot | null;
   ssrWalletAddress?: string | null;
+  initialTab?: PortfolioTab;
 }) {
+  const searchParams = useSearchParams();
+  const activeTab = parsePortfolioTab(searchParams.get("tab") ?? initialTab);
   const hasSsrPortfolio = portfolioMatchesWallet(initialPortfolio, ssrWalletAddress);
   const { address, isConnected, isConnecting, isReconnecting } = useAccount();
   const { openConnectModal } = useOpenConnectModal();
@@ -1191,6 +1161,9 @@ export function PortfolioPanel({
     ];
   });
 
+  const rewardsPending =
+    pendingBnb > 0 || (pendingReferrerWei != null && pendingReferrerWei > 0n);
+
   return (
     <>
       <ClaimCreatorFeesModal
@@ -1260,142 +1233,67 @@ export function PortfolioPanel({
         />
       ) : null}
 
-      <div className="space-y-3 md:space-y-4">
-        <section className="panel-surface overflow-hidden bg-gradient-to-br from-pump-accent/10 via-pump-card to-pump-surface/60 p-4 md:p-5">
-          <div className="flex items-center gap-3">
-            {avatarId ? (
-              <button
-                type="button"
-                onClick={() => setAvatarPickerOpen(true)}
-                className="shrink-0 rounded-full transition hover:opacity-90"
-                aria-label="Change avatar"
-              >
-                <UserAvatar address={walletAddress} avatarId={avatarId} size={48} />
-              </button>
-            ) : (
-              <div className="skeleton-shimmer h-12 w-12 shrink-0 rounded-full md:h-14 md:w-14" />
-            )}
-            <div className="min-w-0 flex-1">
-              <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
-                <p className="financial-value text-body-sm font-semibold text-pump-text md:text-body">
-                  {shortAddress(walletAddress)}
-                </p>
-                <button
-                  type="button"
-                  onClick={() => setAvatarPickerOpen(true)}
-                  className="shrink-0 text-caption font-medium text-pump-accent hover:underline"
-                >
-                  Change avatar
-                </button>
-              </div>
-              <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-caption md:mt-2 md:text-body-sm">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setFollowModalTab("following");
-                    setFollowModalOpen(true);
-                  }}
-                  className="financial-value font-semibold text-pump-text transition hover:text-pump-accent"
-                >
-                  {data.followingCount ?? 0} following
-                </button>
-                <span className="text-pump-muted">·</span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setFollowModalTab("followers");
-                    setFollowModalOpen(true);
-                  }}
-                  className="financial-value font-semibold text-pump-text transition hover:text-pump-accent"
-                >
-                  {data.followerCount ?? 0} followers
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <div className="portfolio-hero-metrics mt-3 grid grid-cols-2 items-stretch gap-2 md:mt-4 lg:grid-cols-4">
-            <PortfolioStatBox
-              label="Portfolio value"
-              icon={MetricIcons.portfolioValue}
-              value={
-                <>
-                  <span>{formatPortfolioHoldingValueUsd(totalEstimatedUsd)}</span>
-                  <PctChange
-                    value={portfolioValuePct}
-                    className="text-caption font-medium"
-                    toneClassName={pnlTone(portfolioValuePct ?? totalNetPnl)}
-                  />
-                </>
-              }
-              valueClassName={`inline-flex flex-wrap items-baseline gap-x-2 gap-y-0.5 financial-value text-body-sm font-semibold text-pump-text ${flashText(totalValueFlash)}`}
-            />
-            <PortfolioStatBox
-              label="Net PnL"
-              icon={MetricIcons.netPnl}
-              value={formatUsdReadable(totalNetPnlUsd, { compact: true, signed: true })}
-              valueClassName={`financial-value text-body-sm font-semibold ${pnlTone(totalNetPnlUsd)} ${flashText(totalPnlFlash)}`}
-            />
-            <CreatorFeesCard
-              className="col-span-2 lg:col-span-1"
-              totalBnb={creatorFeesTotalBnb}
-              bnbUsd={bnbUsd}
-              onOpenModal={() => setClaimOpen(true)}
-            />
-            {walletAddress ? (
-              <ReferralRewardsCard
-                className="col-span-2 lg:col-span-1"
-                address={walletAddress}
-                claimedBnb={referralStats?.claimedBnb ?? 0}
-                pendingWei={pendingReferrerWei}
-                bnbUsd={bnbUsd}
-                onOpenModal={() => setReferrerClaimOpen(true)}
-              />
-            ) : null}
-          </div>
-        </section>
+      <div className="portfolio-hub space-y-3 md:space-y-4">
+        <PortfolioHero
+          walletAddress={walletAddress}
+          avatarId={avatarId}
+          onEditAvatar={() => setAvatarPickerOpen(true)}
+          onOpenFollowing={() => {
+            setFollowModalTab("following");
+            setFollowModalOpen(true);
+          }}
+          onOpenFollowers={() => {
+            setFollowModalTab("followers");
+            setFollowModalOpen(true);
+          }}
+          followingCount={data.followingCount ?? 0}
+          followerCount={data.followerCount ?? 0}
+          totalValueUsd={totalEstimatedUsd}
+          totalNetPnlUsd={totalNetPnlUsd}
+          portfolioValuePct={portfolioValuePct}
+          holdingsCount={holdingsCount}
+          totalUnrealizedPnlUsd={totalUnrealizedPnlUsd}
+          totalRealizedPnlUsd={totalRealizedPnlUsd}
+          valueFlashClass={flashText(totalValueFlash)}
+          pnlFlashClass={flashText(totalPnlFlash)}
+        />
 
         {error ? <div className="notice-error p-4">{error}</div> : null}
 
-        <PortfolioAirdropsSection address={walletAddress} />
+        <PortfolioTabNav
+          active={activeTab}
+          counts={{
+            holdings: holdingsCount,
+            launched: data.createdTokensTotal,
+          }}
+          rewardsPending={rewardsPending}
+        />
 
-        {data && !error ? (
-          <>
-            <div className="space-y-2 md:space-y-3">
-              <div className="flex flex-wrap items-center justify-between gap-2 md:gap-3">
-                <h3 className="section-heading text-h3 inline-flex items-center gap-2">
-                  <PumpIcon
-                    icon={MetricIcons.holdings}
-                    className="hidden h-[1.05em] w-[1.05em] shrink-0 text-pump-accent sm:block"
-                  />
-                  Holdings ({holdingsCount})
-                </h3>
-                <div className="flex flex-wrap items-center justify-end gap-2">
-                  {dustHoldingsCount > 0 ? (
-                    <button
-                      type="button"
-                      onClick={toggleShowDustHoldings}
-                      className={
-                        showDustHoldings ? "chip-button chip-button-active" : "chip-button"
-                      }
-                      aria-pressed={showDustHoldings}
-                    >
-                      {showDustHoldings
-                        ? `Hide dust (<$${PORTFOLIO_DUST_MIN_VALUE_USD})`
-                        : portfolioDustLabel(dustHoldingsCount)}
-                    </button>
-                  ) : null}
-                  {holdingsCount > 0 ? (
-                    <button
-                      type="button"
-                      onClick={() => setSellAllOpen(true)}
-                      className="secondary-button shrink-0 border-pump-danger/35 px-3 py-1.5 text-caption text-pump-danger hover:bg-pump-danger/10"
-                    >
-                      Sell all ({holdingsCount})
-                    </button>
-                  ) : null}
-                </div>
-              </div>
+        {activeTab === "holdings" ? (
+          <div className="space-y-2 md:space-y-3">
+            <div className="portfolio-tab-toolbar flex flex-wrap items-center justify-end gap-2">
+              {dustHoldingsCount > 0 ? (
+                <button
+                  type="button"
+                  onClick={toggleShowDustHoldings}
+                  className={showDustHoldings ? "chip-button chip-button-active" : "chip-button"}
+                  aria-pressed={showDustHoldings}
+                >
+                  {showDustHoldings
+                    ? `Hide dust (<$${PORTFOLIO_DUST_MIN_VALUE_USD})`
+                    : portfolioDustLabel(dustHoldingsCount)}
+                </button>
+              ) : null}
+              {holdingsCount > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => setSellAllOpen(true)}
+                  className="secondary-button shrink-0 border-pump-danger/35 px-3 py-1.5 text-caption text-pump-danger hover:bg-pump-danger/10"
+                >
+                  Sell all ({holdingsCount})
+                </button>
+              ) : null}
+            </div>
               {holdingsCount > 0 ? <HoldingsSwipeHint /> : null}
               {awaitingDustFilter ? (
                 <section className="panel-surface portfolio-section-surface p-4" aria-busy="true">
@@ -1418,7 +1316,10 @@ export function PortfolioPanel({
                 </div>
               ) : holdingsCount === 0 ? (
                 <div className="panel-surface empty-state">
-                  <p className="empty-state-copy">No open positions. Buy from the Arena.</p>
+                  <p className="empty-state-copy">No open positions yet.</p>
+                  <Link href="/" className="primary-button mt-3 px-5 py-2 text-body-sm">
+                    Explore Arena
+                  </Link>
                 </div>
               ) : (
                 <section className="panel-surface portfolio-section-surface">
@@ -1629,16 +1530,11 @@ export function PortfolioPanel({
                   ) : null}
                 </section>
               )}
-            </div>
+          </div>
+        ) : null}
 
-            <div className="space-y-2 md:space-y-3">
-              <h3 className="section-heading text-h3 inline-flex items-center gap-2">
-                <PumpIcon
-                  icon={MetricIcons.launch}
-                  className="hidden h-[1.05em] w-[1.05em] shrink-0 text-pump-accent sm:block"
-                />
-                Launched tokens ({data.createdTokensTotal})
-              </h3>
+        {activeTab === "launched" ? (
+          <div className="space-y-2 md:space-y-3">
               {data.createdTokens.length === 0 ? (
                 <div className="panel-surface empty-state">
                   <p className="empty-state-copy">
@@ -1716,8 +1612,19 @@ export function PortfolioPanel({
                   ) : null}
                 </section>
               )}
-            </div>
-          </>
+          </div>
+        ) : null}
+
+        {activeTab === "rewards" ? (
+          <PortfolioRewardsTab
+            walletAddress={walletAddress}
+            creatorFeesTotalBnb={creatorFeesTotalBnb}
+            bnbUsd={bnbUsd}
+            onOpenCreatorClaim={() => setClaimOpen(true)}
+            referralClaimedBnb={referralStats?.claimedBnb ?? 0}
+            pendingReferrerWei={pendingReferrerWei}
+            onOpenReferrerClaim={() => setReferrerClaimOpen(true)}
+          />
         ) : null}
       </div>
     </>

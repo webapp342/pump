@@ -4,7 +4,7 @@ import { PortfolioPageLoader } from "@/components/portfolio/PortfolioPageLoader"
 import { PortfolioPanelSkeleton } from "@/components/portfolio/PortfolioPanelSkeleton";
 
 type PortfolioPageProps = {
-  searchParams: Promise<{ address?: string }>;
+  searchParams: Promise<{ address?: string; tab?: string }>;
 };
 
 export default function PortfolioPage({ searchParams }: PortfolioPageProps) {
