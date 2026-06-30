@@ -28,7 +28,9 @@ type AppShellFrameProps = AppShellProps & {
 export function AppShellFrame({ children, wide = false, pathname }: AppShellFrameProps) {
   const mainMaxWidth = wide ? shellWideMaxWidthClass : shellMaxWidthClassForPath(pathname);
   const onTokenPage = isTokenRoute(pathname);
-  const mobileBottomOffset = "max-md:pb-[var(--mobile-main-bottom-pad)]";
+  const mobileBottomOffset = onTokenPage
+    ? ""
+    : "max-md:pb-[var(--mobile-main-bottom-pad)]";
   const mainPadding = onTokenPage
     ? shellTokenPagePaddingClass
     : `py-5 md:py-8 md:pb-8 ${shellPaddingXClass}`;

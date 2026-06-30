@@ -940,16 +940,16 @@ export function PriceChart({
           : "panel-surface overflow-hidden"
       }
     >
-      <div className={`flex items-center justify-between gap-2 border-b border-pump-border/10 px-3 py-2.5 ${chromeBlockClass}`}>
-        <div className="min-w-0 flex-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          <div className="inline-flex min-w-max items-center gap-2">
+      <div className={`price-chart-toolbar ${chromeBlockClass}`}>
+        <div className="price-chart-toolbar__intervals">
+          <div className="price-chart-toolbar__interval-row">
             <div className="segment-control">
               {CANDLE_INTERVALS.map((item) => (
                 <button
                   key={item.id}
                   type="button"
                   onClick={() => selectInterval(item.id)}
-                  className={`shrink-0 px-2.5 py-1.5 text-[11px] font-medium transition md:px-3 md:text-caption ${
+                  className={`price-chart-toolbar__btn shrink-0 transition ${
                     timeInterval === item.id
                       ? "chip-button-active"
                       : "chip-button chip-button-ghost"
@@ -961,13 +961,13 @@ export function PriceChart({
             </div>
           </div>
         </div>
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="price-chart-toolbar__actions">
           <div className="segment-control shrink-0">
             <button
               type="button"
               onClick={() => selectCurrency("usd")}
               disabled={bnbUsd == null}
-              className={`px-2 py-0.5 text-[10px] font-medium transition disabled:opacity-40 sm:px-2.5 sm:py-1 sm:text-[11px] md:text-caption ${
+              className={`price-chart-toolbar__btn transition disabled:opacity-40 ${
                 currency === "usd"
                   ? "chip-button-active"
                   : "chip-button chip-button-ghost"
@@ -979,7 +979,7 @@ export function PriceChart({
               type="button"
               onClick={() => selectCurrency("mcap")}
               disabled={bnbUsd == null}
-              className={`px-2 py-0.5 text-[10px] font-medium transition disabled:opacity-40 sm:px-2.5 sm:py-1 sm:text-[11px] md:text-caption ${
+              className={`price-chart-toolbar__btn transition disabled:opacity-40 ${
                 currency === "mcap"
                   ? "chip-button-active"
                   : "chip-button chip-button-ghost"
@@ -995,7 +995,7 @@ export function PriceChart({
               shouldFitViewportRef.current = true;
               scheduleFitViewport();
             }}
-            className="chip-button chip-button-ghost hidden shrink-0 px-2.5 py-1.5 text-caption md:inline-flex"
+            className="price-chart-toolbar__btn chip-button chip-button-ghost hidden shrink-0 md:inline-flex"
           >
             Fit
           </button>
@@ -1003,7 +1003,7 @@ export function PriceChart({
       </div>
 
       {displayCandle ? (
-        <div className={`financial-value flex items-center gap-x-3 overflow-x-auto border-t border-pump-border/10 px-3 py-1.5 text-body-sm text-pump-muted [scrollbar-width:none] md:gap-x-4 md:py-2 [&::-webkit-scrollbar]:hidden ${chromeBlockClass}`}>
+        <div className={`price-chart-ohlc financial-value ${chromeBlockClass}`}>
           <span className="shrink-0">
             O{" "}
             <ChartOhlcValue
@@ -1047,7 +1047,11 @@ export function PriceChart({
       ) : null}
 
       {/* Chart container always mounted so lightweight-charts can init on first load */}
-      <div className={fillContainer ? "relative min-h-0 flex-1" : "relative"}>
+      <div
+        className={
+          fillContainer ? "price-chart-canvas relative min-h-0 flex-1" : "relative"
+        }
+      >
         {(loading && candles.length === 0) || showEmpty || showError ? (
           <div className="absolute inset-0 z-10 flex items-center justify-center bg-pump-bg/92 px-4 text-center text-sm">
             {loading && candles.length === 0 ? (
