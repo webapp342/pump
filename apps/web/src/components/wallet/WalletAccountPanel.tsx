@@ -3,6 +3,7 @@
 import { useState, type MouseEvent } from "react";
 import { formatEther } from "viem";
 import { NATIVE_SYMBOL, shortAddress } from "@/config/chain";
+import { ThemePicker } from "@/components/theme/ThemePicker";
 import { PumpIcon, faCopy } from "@/lib/icons";
 import { copyToClipboard } from "@/lib/copy-to-clipboard";
 import { startScwDepositWatch } from "@/lib/scw-balance-sync";
@@ -125,6 +126,13 @@ export function WalletAccountPanel({
       >
         Log out
       </button>
+
+      {variant === "sheet" ? (
+        <div className="wallet-account-panel__appearance">
+          <span className="wallet-account-panel__appearance-label">Appearance</span>
+          <ThemePicker className="wallet-account-panel__appearance-toggle" />
+        </div>
+      ) : null}
     </div>
   );
 }
