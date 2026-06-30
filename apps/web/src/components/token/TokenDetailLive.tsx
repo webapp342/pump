@@ -95,7 +95,7 @@ const BURST_DURATION_MS = 60_000;
 
 function formatToolbarUsdAmount(value: number | null): string {
   if (value == null || !Number.isFinite(value)) return "—";
-  return `${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`;
+  return `$${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 function formatToolbarChangePctOnly(change: PriceChange24h | null): string {
@@ -965,13 +965,11 @@ export function TokenDetailLive({
               showSocialLinks={showSocialLinks}
               favorited={favorited}
               tradeLocked={tradeLocked}
-              copiedAddress={copiedAddress}
               detailsOpen={mobileHeroDetailsOpen}
               onToggleDetails={toggleMobileHeroDetails}
               onOpenMarket={openMobileMarket}
               onToggleFavorite={() => toggleFavorite(streamAddress)}
               onShare={() => setShareOpen(true)}
-              onCopyAddress={() => void onCopyAddress()}
               onOpenCreator={setProfileAddress}
               isRefreshing={isRefreshing}
             />
@@ -1134,7 +1132,6 @@ export function TokenDetailLive({
       />
 
       <TokenTradeDock
-        symbol={liveToken.symbol}
         disabled={tradeLocked}
         onBuy={() => openMobileTrade("buy")}
         onSell={() => openMobileTrade("sell")}

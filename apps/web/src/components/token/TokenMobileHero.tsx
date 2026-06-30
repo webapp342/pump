@@ -6,7 +6,7 @@ import { FavoriteIcon } from "@/components/icons/FavoriteIcon";
 import { TokenAvatar } from "@/components/token/TokenAvatar";
 import { TokenSocialLinksBar } from "@/components/token/TokenSocialLinksBar";
 import { UserAvatarForAddress } from "@/components/user/UserAvatarForAddress";
-import { PumpIcon, faCheck, faChevronDown, faCopy, faExternalLink, faShare } from "@/lib/icons";
+import { PumpIcon, faChevronDown, faExternalLink, faShare } from "@/lib/icons";
 import { explorerAddressUrl, shortAddress } from "@/config/chain";
 
 type TokenMobileHeroProps = {
@@ -19,13 +19,11 @@ type TokenMobileHeroProps = {
   showSocialLinks: boolean;
   favorited: boolean;
   tradeLocked: boolean;
-  copiedAddress: boolean;
   detailsOpen: boolean;
   onToggleDetails: () => void;
   onOpenMarket: () => void;
   onToggleFavorite: () => void;
   onShare: () => void;
-  onCopyAddress: () => void;
   onOpenCreator?: (address: string) => void;
   isRefreshing?: boolean;
 };
@@ -70,13 +68,11 @@ export function TokenMobileHero({
   showSocialLinks,
   favorited,
   tradeLocked,
-  copiedAddress,
   detailsOpen,
   onToggleDetails,
   onOpenMarket,
   onToggleFavorite,
   onShare,
-  onCopyAddress,
   onOpenCreator,
   isRefreshing = false,
 }: TokenMobileHeroProps) {
@@ -179,86 +175,74 @@ export function TokenMobileHero({
         }
         aria-hidden={!detailsOpen}
       >
-        <div className="token-mobile-hero__details-body token-mobile-hero__cols">
-          <div className="token-mobile-hero__col token-mobile-hero__col--symbol">
-            <div className="token-mobile-hero__metric">
-              <span className="token-mobile-hero__metric-label">24h volume</span>
-              <span className="token-mobile-hero__metric-value financial-value">{volume24hLabel}</span>
-            </div>
-            <div className="token-mobile-hero__metric">
-              <span className="token-mobile-hero__metric-label">Contract</span>
-              <div className="token-mobile-hero__contract-line">
-                <span className="token-mobile-hero__metric-value financial-value">
-                  {shortAddress(token.address, true)}
-                </span>
-                <a
-                  href={explorerAddressUrl(token.address)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="token-mobile-hero__contract-btn"
-                  aria-label="View contract on explorer"
-                >
-                  <PumpIcon icon={faExternalLink} className="h-3 w-3" />
-                </a>
-                <button
-                  type="button"
-                  onClick={onCopyAddress}
-                  className="token-mobile-hero__contract-btn"
-                  aria-label={copiedAddress ? "Address copied" : "Copy contract address"}
-                >
-                  {copiedAddress ? (
-                    <PumpIcon icon={faCheck} className="h-3 w-3" />
-                  ) : (
-                    <PumpIcon icon={faCopy} className="h-3 w-3" />
-                  )}
-                </button>
-              </div>
-            </div>
+        <div className="token-mobile-hero__details-grid">
+          <div className="token-mobile-hero__metric token-mobile-hero__metric--col-a">
+            <span className="token-mobile-hero__metric-label">24h volume</span>
+            <span className="token-mobile-hero__metric-value financial-value">{volume24hLabel}</span>
           </div>
-
-          <div className="token-mobile-hero__col token-mobile-hero__col--price">
-            <div className="token-mobile-hero__metric">
-              <span className="token-mobile-hero__metric-label">Market cap</span>
-              <span className="token-mobile-hero__metric-value financial-value">{fdvLabel}</span>
-            </div>
-            {showSocialLinks ? (
-              <div className="token-mobile-hero__metric">
-                <span className="token-mobile-hero__metric-label">Links</span>
-                <TokenSocialLinksBar links={token.socialLinks} variant="toolbar" />
-              </div>
-            ) : null}
+          <div className="token-mobile-hero__metric token-mobile-hero__metric--col-b">
+            <span className="token-mobile-hero__metric-label">Market cap</span>
+            <span className="token-mobile-hero__metric-value financial-value">{fdvLabel}</span>
           </div>
-
-          <div className="token-mobile-hero__col token-mobile-hero__col--actions">
-            <div className="token-mobile-hero__side-meta">
-              <div className="token-mobile-hero__metric token-mobile-hero__metric--side">
-                <span className="token-mobile-hero__metric-label">Creation time</span>
+          <div className="token-mobile-hero__details-col-c">
+            <div className="token-mobile-hero__metric">
+              <span className="token-mobile-hero__metric-label">Creation time</span>
+              <div className="token-mobile-hero__value-row">
                 <span className="token-mobile-hero__metric-value">{ageLabel}</span>
               </div>
-              <div className="token-mobile-hero__metric token-mobile-hero__metric--side">
-                <span className="token-mobile-hero__metric-label">Creator</span>
-                {creatorAddress ? (
-                  <button
-                    type="button"
-                    className="token-mobile-hero__creator-line"
-                    onClick={() => onOpenCreator?.(creatorAddress)}
-                    disabled={!onOpenCreator}
-                  >
-                    <UserAvatarForAddress
-                      address={creatorAddress}
-                      size={16}
-                      className="token-mobile-hero__creator-avatar shrink-0 !ring-0"
-                    />
-                    <span className="token-mobile-hero__metric-value financial-value">
-                      {shortAddress(creatorAddress, true)}
-                    </span>
-                  </button>
-                ) : (
-                  <span className="token-mobile-hero__metric-value">—</span>
-                )}
-              </div>
+            </div>
+            <div className="token-mobile-hero__metric">
+              <span className="token-mobile-hero__metric-label">Creator</span>
+              {creatorAddress ? (
+                <button
+                  type="button"
+                  className="token-mobile-hero__value-row token-mobile-hero__creator-line"
+                  onClick={() => onOpenCreator?.(creatorAddress)}
+                  disabled={!onOpenCreator}
+                >
+                  <UserAvatarForAddress
+                    address={creatorAddress}
+                    size={16}
+                    className="token-mobile-hero__creator-avatar shrink-0 !ring-0"
+                  />
+                  <span className="token-mobile-hero__metric-value financial-value">
+                    {shortAddress(creatorAddress, true)}
+                  </span>
+                </button>
+              ) : (
+                <span className="token-mobile-hero__metric-value">—</span>
+              )}
             </div>
           </div>
+
+          <div className="token-mobile-hero__metric token-mobile-hero__metric--col-a">
+            <span className="token-mobile-hero__metric-label">Contract</span>
+            <div className="token-mobile-hero__value-row token-mobile-hero__contract-line">
+              <span className="token-mobile-hero__metric-value financial-value">
+                {shortAddress(token.address, true)}
+              </span>
+              <a
+                href={explorerAddressUrl(token.address)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="token-mobile-hero__contract-btn"
+                aria-label="View contract on explorer"
+              >
+                <PumpIcon icon={faExternalLink} className="h-3 w-3" />
+              </a>
+            </div>
+          </div>
+
+          {showSocialLinks ? (
+            <div className="token-mobile-hero__metric token-mobile-hero__metric--col-b">
+              <span className="token-mobile-hero__metric-label">Links</span>
+              <div className="token-mobile-hero__value-row">
+                <TokenSocialLinksBar links={token.socialLinks} variant="toolbar" />
+              </div>
+            </div>
+          ) : (
+            <div className="token-mobile-hero__metric token-mobile-hero__metric--col-b" aria-hidden="true" />
+          )}
         </div>
       </div>
     </div>
