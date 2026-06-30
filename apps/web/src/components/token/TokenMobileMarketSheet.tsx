@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   releaseMobileViewportAfterKeyboard,
+  settleMobileViewportAfterSheetClose,
   useMobileModalClose,
   useMobileModalScrollLock,
   usePinMobileWindowScrollWhile,
@@ -28,6 +29,20 @@ export function TokenMobileMarketSheet({
   const [searchFocused, setSearchFocused] = useState(false);
   const wasOpenRef = useRef(false);
   const handleClose = useMobileModalClose(onClose);
+
+  const handleTokenSelect = () => {
+    const inputFocused = document.activeElement instanceof HTMLInputElement;
+    setSearchFocused(false);
+    if (inputFocused) {
+      document.activeElement.blur();
+    }
+    onClose();
+    if (inputFocused) {
+      releaseMobileViewportAfterKeyboard();
+      return;
+    }
+    settleMobileViewportAfterSheetClose();
+  };
   const sheetFrame = useVisualViewportSheetFrame(open && searchFocused);
 
   useEffect(() => {
@@ -49,7 +64,7 @@ export function TokenMobileMarketSheet({
     }
     if (!wasOpenRef.current) return;
     wasOpenRef.current = false;
-    releaseMobileViewportAfterKeyboard();
+    settleMobileViewportAfterSheetClose();
   }, [open]);
 
   useEffect(() => {
@@ -102,7 +117,7 @@ export function TokenMobileMarketSheet({
               id="token-mobile-market-sidebar"
               activeTokenAddress={activeTokenAddress}
               density="compact"
-              onTokenSelect={handleClose}
+              onTokenSelect={handleTokenSelect}
               onSearchFocusChange={setSearchFocused}
             />
           </div>

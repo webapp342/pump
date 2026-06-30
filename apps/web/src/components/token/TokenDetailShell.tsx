@@ -15,6 +15,10 @@ import {
   peekTokenDetailBundle,
   seedTokenDetailBundle,
 } from "@/lib/token-detail-client";
+import {
+  pinMobileWindowScroll,
+  settleMobileViewportAfterSheetClose,
+} from "@/hooks/useMobileModalScrollLock";
 
 const POLL_MS = 2_000;
 const POLL_MAX_MS = 90_000;
@@ -48,8 +52,23 @@ export function TokenDetailShell({
 
   useEffect(() => {
     document.documentElement.classList.add("token-page-lock");
-    return () => document.documentElement.classList.remove("token-page-lock");
+    if (typeof history !== "undefined") {
+      history.scrollRestoration = "manual";
+    }
+    pinMobileWindowScroll();
+    return () => {
+      document.documentElement.classList.remove("token-page-lock");
+      if (typeof history !== "undefined") {
+        history.scrollRestoration = "auto";
+      }
+    };
   }, []);
+
+  useEffect(() => {
+    pinMobileWindowScroll();
+    requestAnimationFrame(() => pinMobileWindowScroll());
+    settleMobileViewportAfterSheetClose();
+  }, [normalized]);
 
   useEffect(() => {
     if (initialBundle) seedTokenDetailBundle(normalized, initialBundle);

@@ -63,6 +63,20 @@ function shouldPreserveTokenPageInnerScroll(): boolean {
   return isTokenPageLockActive() && isMobileViewport();
 }
 
+function keyboardLikelyOpen(): boolean {
+  const vv = window.visualViewport;
+  if (!vv) return false;
+  return window.innerHeight - vv.height > 72;
+}
+
+function isStandaloneDisplayMode(): boolean {
+  if (typeof window === "undefined") return false;
+  return (
+    window.matchMedia("(display-mode: standalone)").matches ||
+    ("standalone" in navigator && (navigator as Navigator & { standalone?: boolean }).standalone === true)
+  );
+}
+
 /** iOS Safari may scroll the window even when html/body are overflow:hidden. */
 export function pinMobileWindowScroll() {
   if (typeof window === "undefined" || !isMobileViewport()) return;
@@ -72,9 +86,27 @@ export function pinMobileWindowScroll() {
   document.body.scrollTop = 0;
 
   const offsetTop = window.visualViewport?.offsetTop ?? 0;
-  if (offsetTop > 0) {
+  if (offsetTop > 0 && keyboardLikelyOpen()) {
     window.scrollTo(0, offsetTop);
     window.scrollTo(0, 0);
+  }
+}
+
+/** Lighter settle after sheet close / token switch — no input blur. */
+export function settleMobileViewportAfterSheetClose() {
+  if (typeof window === "undefined" || !isMobileViewport()) return;
+
+  const run = () => {
+    pinMobileWindowScroll();
+    clearStuckKeyboardBodyStyles();
+  };
+
+  run();
+  requestAnimationFrame(run);
+  window.setTimeout(run, 80);
+  if (isStandaloneDisplayMode()) {
+    window.setTimeout(run, 200);
+    window.setTimeout(run, 420);
   }
 }
 
@@ -175,6 +207,11 @@ function unlockBodyScroll(snapshot: BodySnapshot) {
     window.scrollTo(0, snapshot.scrollY);
   }
 
+  if (isTokenPageLockActive() && isMobileViewport()) {
+    settleMobileViewportAfterSheetClose();
+    return;
+  }
+
   releaseMobileViewportAfterKeyboard();
 }
 
@@ -260,6 +297,10 @@ export function useMobileModalClose(onClose: () => void) {
   return useCallback(() => {
     blurActiveElement();
     onClose();
+    if (isTokenPageLockActive() && isMobileViewport()) {
+      settleMobileViewportAfterSheetClose();
+      return;
+    }
     releaseMobileViewportAfterKeyboard();
   }, [onClose]);
 }
