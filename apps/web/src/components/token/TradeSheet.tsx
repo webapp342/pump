@@ -2,7 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { useMobileModalScrollLock } from "@/hooks/useMobileModalScrollLock";
+import {
+  useMobileModalClose,
+  useMobileModalScrollLock,
+} from "@/hooks/useMobileModalScrollLock";
 import { TradePanel, type TradeConfirmedPayload, type TradeOptimisticPayload, type TradeSubmittedPayload } from "@/components/token/TradePanel";
 import type { TradePrefillConfig } from "@/lib/token-trade-prefill";
 import type { BondingCurveSnapshot } from "@/lib/bonding-curve";
@@ -42,6 +45,7 @@ export function TradeSheet({
   presentation = "sheet",
 }: TradeSheetProps) {
   const [mounted, setMounted] = useState(false);
+  const handleClose = useMobileModalClose(onClose);
 
   useEffect(() => {
     setMounted(true);
@@ -52,11 +56,11 @@ export function TradeSheet({
   useEffect(() => {
     if (!open) return;
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
+      if (event.key === "Escape") handleClose();
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [open, onClose]);
+  }, [open, handleClose]);
 
   if (!open || !mounted) return null;
 
@@ -70,7 +74,7 @@ export function TradeSheet({
         type="button"
         className={`modal-backdrop modal-backdrop-dismiss z-[100] cursor-default transition-opacity ${isModal ? "" : "lg:hidden"}`}
         aria-label="Close trade panel"
-        onClick={onClose}
+        onClick={handleClose}
       />
       <div
         className={`modal-sheet-host z-[101] ${isModal ? "items-center p-4" : "lg:hidden"}`}
@@ -91,7 +95,7 @@ export function TradeSheet({
                 <h2 className="text-h3 font-semibold text-pump-text">{tradeTitle}</h2>
                 <button
                   type="button"
-                  onClick={onClose}
+                  onClick={handleClose}
                   className="inline-flex h-8 w-8 shrink-0 items-center justify-center text-pump-muted transition hover:bg-pump-border/10 hover:text-pump-text"
                   aria-label="Close"
                 >

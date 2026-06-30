@@ -2,7 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { useMobileModalScrollLock } from "@/hooks/useMobileModalScrollLock";
+import {
+  useMobileModalClose,
+  useMobileModalScrollLock,
+} from "@/hooks/useMobileModalScrollLock";
 import { PumpIcon, faX } from "@/lib/icons";
 import { TokenMarketSidebar } from "@/components/token/TokenMarketSidebar";
 
@@ -19,6 +22,7 @@ export function TokenMobileMarketSheet({
   activeTokenAddress,
 }: TokenMobileMarketSheetProps) {
   const [mounted, setMounted] = useState(false);
+  const handleClose = useMobileModalClose(onClose);
 
   useEffect(() => {
     setMounted(true);
@@ -29,11 +33,11 @@ export function TokenMobileMarketSheet({
   useEffect(() => {
     if (!open) return;
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
+      if (event.key === "Escape") handleClose();
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [open, onClose]);
+  }, [open, handleClose]);
 
   if (!open || !mounted) return null;
 
@@ -43,7 +47,7 @@ export function TokenMobileMarketSheet({
         type="button"
         className="modal-backdrop modal-backdrop-dismiss z-[100] cursor-default lg:hidden"
         aria-label="Close markets list"
-        onClick={onClose}
+        onClick={handleClose}
       />
       <div
         className="modal-sheet-host z-[101] lg:hidden"
@@ -58,7 +62,7 @@ export function TokenMobileMarketSheet({
               <h2 className="text-h3 font-semibold text-pump-text">Explore coins</h2>
               <button
                 type="button"
-                onClick={onClose}
+                onClick={handleClose}
                 className="inline-flex h-9 w-9 shrink-0 items-center justify-center text-pump-muted transition hover:bg-pump-border/10 hover:text-pump-text"
                 aria-label="Close"
               >
@@ -71,7 +75,7 @@ export function TokenMobileMarketSheet({
               id="token-mobile-market-sidebar"
               activeTokenAddress={activeTokenAddress}
               density="compact"
-              onTokenSelect={onClose}
+              onTokenSelect={handleClose}
             />
           </div>
         </div>
