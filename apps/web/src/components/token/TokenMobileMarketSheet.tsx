@@ -98,7 +98,7 @@ export function TokenMobileMarketSheet({
         aria-modal="true"
         aria-label="Explore coins"
       >
-        <div className="token-mobile-market-sheet modal-panel modal-sheet-panel pointer-events-auto flex max-h-full flex-col overflow-hidden border-x-0 border-b-0 rounded-t-2xl">
+        <div className="token-mobile-market-sheet token-mobile-market-sheet--full modal-panel modal-sheet-panel pointer-events-auto flex flex-col overflow-hidden border-x-0 border-b-0 rounded-t-2xl">
           <div className="shrink-0 border-b border-pump-border/32 px-4 pb-3 pt-2">
             <div className="mx-auto mb-3 h-1 w-9 bg-pump-border/45" aria-hidden />
             <div className="flex items-center justify-between gap-3">

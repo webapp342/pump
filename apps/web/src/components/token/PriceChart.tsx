@@ -1003,46 +1003,48 @@ export function PriceChart({
       </div>
 
       {displayCandle ? (
-        <div className={`price-chart-ohlc financial-value ${chromeBlockClass}`}>
-          <span className="shrink-0">
-            O{" "}
-            <ChartOhlcValue
-              value={displayCandle.open}
-              currency={currency}
-              bnbUsd={bnbUsd}
-              className="text-pump-text"
-            />
-          </span>
-          <span className="shrink-0">
-            H{" "}
-            <ChartOhlcValue
-              value={displayCandle.high}
-              currency={currency}
-              bnbUsd={bnbUsd}
-              className="text-pump-accent"
-            />
-          </span>
-          <span className="shrink-0">
-            L{" "}
-            <ChartOhlcValue
-              value={displayCandle.low}
-              currency={currency}
-              bnbUsd={bnbUsd}
-              className="text-pump-danger"
-            />
-          </span>
-          <span className="shrink-0">
-            C{" "}
-            <ChartOhlcValue
-              value={displayCandle.close}
-              currency={currency}
-              bnbUsd={bnbUsd}
-              className="text-pump-text"
-            />
-          </span>
-          {hoverOhlc && displayTimeLabel ? (
-            <span className="hidden shrink-0 sm:inline">{displayTimeLabel}</span>
-          ) : null}
+        <div className={`price-chart-ohlc-bar ${chromeBlockClass}`}>
+          <div className="price-chart-ohlc financial-value">
+            <span className="shrink-0">
+              O{" "}
+              <ChartOhlcValue
+                value={displayCandle.open}
+                currency={currency}
+                bnbUsd={bnbUsd}
+                className="text-pump-text"
+              />
+            </span>
+            <span className="shrink-0">
+              H{" "}
+              <ChartOhlcValue
+                value={displayCandle.high}
+                currency={currency}
+                bnbUsd={bnbUsd}
+                className="text-pump-accent"
+              />
+            </span>
+            <span className="shrink-0">
+              L{" "}
+              <ChartOhlcValue
+                value={displayCandle.low}
+                currency={currency}
+                bnbUsd={bnbUsd}
+                className="text-pump-danger"
+              />
+            </span>
+            <span className="shrink-0">
+              C{" "}
+              <ChartOhlcValue
+                value={displayCandle.close}
+                currency={currency}
+                bnbUsd={bnbUsd}
+                className="text-pump-text"
+              />
+            </span>
+            {hoverOhlc && displayTimeLabel ? (
+              <span className="hidden shrink-0 sm:inline">{displayTimeLabel}</span>
+            ) : null}
+          </div>
         </div>
       ) : null}
 
