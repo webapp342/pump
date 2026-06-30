@@ -31,6 +31,7 @@ html[data-theme="light"] {
   );
   --mobile-token-footer-height: var(--mobile-trade-dock-height);
   --app-header-height: 3.25rem;
+  --app-header-control-height: 2.75rem;
 
   --modal-overlay-color: 0 0 0;
   --modal-overlay-opacity: 0.58;
@@ -980,6 +981,26 @@ code,
 
   .trade-quick-order-header__logo {
     flex-shrink: 0;
+  }
+
+  .trade-quick-order-header__list-btn {
+    display: inline-flex;
+    width: 2rem;
+    height: 2rem;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgb(var(--pump-border) / 0.35);
+    border-radius: var(--radius-md);
+    background: rgb(var(--pump-card-soft) / 0.45);
+    color: rgb(var(--pump-muted));
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  }
+
+  .trade-quick-order-header__list-btn:hover {
+    border-color: rgb(var(--pump-border) / 0.55);
+    background: rgb(var(--pump-border) / 0.1);
+    color: rgb(var(--pump-text));
   }
 
   .trade-quick-order-header__pair {
@@ -3331,8 +3352,8 @@ code,
 
   .app-header-menu-btn {
     display: inline-flex;
-    width: 2.75rem;
-    height: 2.75rem;
+    width: var(--app-header-control-height);
+    height: var(--app-header-control-height);
     flex-shrink: 0;
     align-items: center;
     justify-content: center;
@@ -3545,7 +3566,9 @@ code,
   }
 
   .app-header-actions .toolbar-btn {
-    height: 2.25rem;
+    height: var(--app-header-control-height);
+    min-height: var(--app-header-control-height);
+    padding-inline: 0.875rem;
   }
 
   /* AppKit connect modal inherits --apkt-font-family from appkit-theme.ts */

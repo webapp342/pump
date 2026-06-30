@@ -1,6 +1,7 @@
 "use client";
 
 import { TokenAvatar } from "@/components/token/TokenAvatar";
+import { PumpIcon, faList } from "@/lib/icons";
 
 type TradeQuickOrderSide = "buy" | "sell";
 
@@ -12,6 +13,7 @@ type TradeQuickOrderHeaderProps = {
   side: TradeQuickOrderSide;
   onSideChange: (side: TradeQuickOrderSide) => void;
   onClose: () => void;
+  onOpenMarket?: () => void;
 };
 
 function formatChangePct(pct: number | null | undefined): string {
@@ -36,6 +38,7 @@ export function TradeQuickOrderHeader({
   side,
   onSideChange,
   onClose,
+  onOpenMarket,
 }: TradeQuickOrderHeaderProps) {
   return (
     <header className="trade-quick-order-header">
@@ -53,6 +56,16 @@ export function TradeQuickOrderHeader({
 
       <div className="trade-quick-order-header__meta">
         <div className="trade-quick-order-header__pair-row">
+          {onOpenMarket ? (
+            <button
+              type="button"
+              className="trade-quick-order-header__list-btn"
+              onClick={onOpenMarket}
+              aria-label="Explore coins"
+            >
+              <PumpIcon icon={faList} className="h-4 w-4" />
+            </button>
+          ) : null}
           <TokenAvatar
             address={tokenAddress}
             symbol={symbol}

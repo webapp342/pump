@@ -29,6 +29,8 @@ type TradeSheetProps = {
   changePct?: number | null;
   /** Token logo for mobile Quick Order header. */
   logoUrl?: string | null;
+  /** Opens explore-coins sheet from trade header. */
+  onOpenMarket?: () => void;
   /** Bottom sheet on mobile token page; centered modal for portfolio quick actions. */
   presentation?: "sheet" | "modal";
 };
@@ -49,6 +51,7 @@ export function TradeSheet({
   chainCurveSnapshot,
   changePct = null,
   logoUrl = null,
+  onOpenMarket,
   presentation = "sheet",
 }: TradeSheetProps) {
   const [mounted, setMounted] = useState(false);
@@ -135,6 +138,7 @@ export function TradeSheet({
               chainCurveSnapshot={chainCurveSnapshot}
               changePct={changePct}
               logoUrl={logoUrl}
+              onOpenMarket={onOpenMarket}
               sheetOnClose={isModal ? undefined : handleClose}
             />
           </div>

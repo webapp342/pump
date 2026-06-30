@@ -4,6 +4,7 @@ import {
   PumpIcon,
   faCheck,
   faChevronDown,
+  faList,
   faCopy,
   faExternalLink,
   faShare,
@@ -767,6 +768,13 @@ export function TokenDetailLive({
     setMobileMarketOpen(true);
   }, []);
 
+  const openMarketFromTradeSheet = useCallback(() => {
+    setTradeSheetOpen(false);
+    setTradePrefill(null);
+    setMobileHeroDetailsOpen(false);
+    setMobileMarketOpen(true);
+  }, []);
+
   const toggleMobileHeroDetails = useCallback(
     () => setMobileHeroDetailsOpen((open) => !open),
     []
@@ -836,7 +844,7 @@ export function TokenDetailLive({
                 aria-label="Explore coins"
                 onClick={openMobileMarket}
               >
-                <PumpIcon icon={faChevronDown} className="h-4 w-4" />
+                <PumpIcon icon={faList} className="h-4 w-4" />
               </button>
             </div>
             <span className="token-detail-toolbar__age">{formatToolbarAge(liveToken.createdAt)}</span>
@@ -1087,6 +1095,7 @@ export function TokenDetailLive({
         chainCurveSnapshot={tradeCurveSnapshot}
         changePct={changeTone}
         logoUrl={liveToken.logoUrl}
+        onOpenMarket={openMarketFromTradeSheet}
       />
 
     </div>

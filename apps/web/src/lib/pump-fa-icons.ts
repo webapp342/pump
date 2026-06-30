@@ -28,6 +28,7 @@ export {
   faGlobe,
   faGripVertical,
   faHourglassHalf,
+  faListUl,
   faMagnifyingGlass,
   faMoon,
   faParachuteBox,
@@ -92,6 +93,9 @@ export { faRightLeft as faArrowLeftRight } from "@fortawesome/free-solid-svg-ico
 
 /** Lucide LayoutGrid */
 export { faTableCellsLarge as faLayoutGrid } from "@fortawesome/free-solid-svg-icons";
+
+/** List / browse rows */
+export { faListUl as faList } from "@fortawesome/free-solid-svg-icons";
 
 /** Lucide Table2 */
 export { faTable as faTable2 } from "@fortawesome/free-solid-svg-icons";

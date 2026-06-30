@@ -11,7 +11,7 @@ import {
   faCheck,
   faChevronDown,
   faCopy,
-  faLayoutGrid,
+  faList,
   faShare,
 } from "@/lib/icons";
 import { shortAddress } from "@/config/chain";
@@ -102,7 +102,7 @@ export function TokenMobileHero({
           onClick={onOpenMarket}
           aria-label="Explore coins"
         >
-          <PumpIcon icon={faLayoutGrid} className="token-mobile-hero__explore-icon" />
+          <PumpIcon icon={faList} className="token-mobile-hero__explore-icon" />
         </button>
 
         <div className="token-mobile-hero__pair">
