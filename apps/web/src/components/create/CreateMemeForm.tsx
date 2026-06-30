@@ -638,7 +638,7 @@ export function CreateMemeForm() {
   return (
     <form
       onSubmit={onSubmit}
-      className="create-meme-form grid gap-3 pb-[calc(var(--mobile-bottom-nav-height)+5.25rem)] md:gap-4 md:pb-0 xl:grid-cols-[minmax(0,1fr)_minmax(280px,360px)] xl:items-start"
+      className="create-meme-form grid gap-3 pb-[var(--mobile-main-bottom-pad)] md:gap-4 md:pb-0 xl:grid-cols-[minmax(0,1fr)_minmax(280px,360px)] xl:items-start"
     >
       <div className="space-y-3 md:space-y-4">
         <section className="panel-surface p-3 md:p-5">

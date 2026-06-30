@@ -3,7 +3,7 @@ import { Skeleton } from "@/components/ui/Skeleton";
 export function CreateMemeFormSkeleton() {
   return (
     <div
-      className="create-meme-form grid gap-3 pb-[calc(var(--mobile-bottom-nav-height)+5.25rem)] md:gap-4 md:pb-0 xl:grid-cols-[minmax(0,1fr)_minmax(280px,360px)] xl:items-start"
+      className="create-meme-form grid gap-3 pb-[var(--mobile-main-bottom-pad)] md:gap-4 md:pb-0 xl:grid-cols-[minmax(0,1fr)_minmax(280px,360px)] xl:items-start"
       aria-busy="true"
       aria-label="Loading create form"
     >

@@ -54,12 +54,12 @@ export function AppHeaderView({ pathname }: { pathname: string }) {
             href="/create"
             prefetch={true}
             aria-current={pathname.startsWith("/create") ? "page" : undefined}
-            className={`toolbar-btn toolbar-btn-accent hidden sm:inline-flex ${
+            className={`app-header-create-btn toolbar-btn toolbar-btn-accent ${
               pathname.startsWith("/create") ? "opacity-95" : ""
             }`}
           >
             <PumpIcon icon={faPlus} className="h-4 w-4 shrink-0" />
-            Create
+            <span className="app-header-create-btn__label">Create</span>
           </Link>
           <div className="app-header-actions__account">
             <WalletBar />

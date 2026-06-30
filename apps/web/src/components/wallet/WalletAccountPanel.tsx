@@ -1,10 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { useState, type MouseEvent } from "react";
-import { formatEther } from "viem";
 import { NATIVE_SYMBOL, shortAddress } from "@/config/chain";
 import { ThemePicker } from "@/components/theme/ThemePicker";
-import { PumpIcon, faCopy } from "@/lib/icons";
+import { PumpIcon, faCopy, faWallet } from "@/lib/icons";
 import { copyToClipboard } from "@/lib/copy-to-clipboard";
 import { startScwDepositWatch } from "@/lib/scw-balance-sync";
 import { useWalletFunding } from "@/components/wallet/WalletFundingProvider";
@@ -59,6 +59,101 @@ export function WalletAccountPanel({
       startScwDepositWatch();
       setTimeout(() => setCopied(false), 2000);
     }
+  }
+
+  if (variant === "sheet") {
+    return (
+      <div className={rootClass} role="menu">
+        <div className="wallet-account-panel__hero">
+          <p className="wallet-account-panel__hero-label">Available balance</p>
+          <button
+            type="button"
+            onClick={onToggleBalanceUnit}
+            className="wallet-account-panel__balance-toggle wallet-account-panel__balance-toggle--hero"
+            aria-label={showBnb ? "Show balance in USD" : `Show balance in ${NATIVE_SYMBOL}`}
+          >
+            <span className="financial-value wallet-account-panel__balance-value wallet-account-panel__balance-value--hero">
+              {showBnb ? formatHeaderBalanceNative(bnbAmount) : formatHeaderBalanceUsd(usdAmount)}
+            </span>
+          </button>
+          <p className="wallet-account-panel__hero-sub">
+            {showBnb
+              ? `${formatHeaderBalanceUsd(usdAmount)} · tap to switch units`
+              : `${formatNativeAvailable(bnbAmount)} · tap to switch units`}
+          </p>
+        </div>
+
+        <div className="wallet-account-panel__actions wallet-account-panel__actions--hero">
+          <button
+            type="button"
+            onClick={() => {
+              onClose();
+              openDeposit();
+            }}
+            className="primary-button py-2.5 text-body-sm"
+          >
+            Deposit
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              onClose();
+              openWithdraw();
+            }}
+            className="secondary-button py-2.5 text-body-sm"
+          >
+            Withdraw
+          </button>
+        </div>
+
+        <div className="wallet-account-panel__section">
+          <p className="wallet-account-panel__section-label">Smart wallet</p>
+          <button
+            type="button"
+            onClick={(event) => void onCopyAddress(event)}
+            className="wallet-account-panel__address wallet-account-panel__address--sheet"
+            aria-label={copied ? "Address copied" : "Copy smart wallet address"}
+          >
+            <span className="financial-value">{shortAddress(address)}</span>
+            <span className="wallet-account-panel__address-copy">
+              {copied ? "Copied" : <PumpIcon icon={faCopy} className="h-3.5 w-3.5" />}
+            </span>
+          </button>
+          <p className="wallet-account-panel__section-hint">Deposit address · BSC smart wallet</p>
+        </div>
+
+        <div className="wallet-account-panel__menu">
+          <Link
+            href="/portfolio"
+            onClick={onClose}
+            className="wallet-account-panel__menu-item"
+          >
+            <span className="wallet-account-panel__menu-leading">
+              <PumpIcon icon={faWallet} className="h-4 w-4 shrink-0 opacity-80" />
+              Portfolio
+            </span>
+            <span className="wallet-account-panel__menu-chevron" aria-hidden>
+              ›
+            </span>
+          </Link>
+          <div className="wallet-account-panel__menu-item wallet-account-panel__menu-item--static">
+            <span className="wallet-account-panel__menu-leading">Appearance</span>
+            <ThemePicker className="wallet-account-panel__appearance-toggle" />
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => {
+            onLogout();
+            onClose();
+          }}
+          className="secondary-button wallet-account-panel__logout-btn"
+        >
+          Log out
+        </button>
+      </div>
+    );
   }
 
   return (
@@ -126,13 +221,6 @@ export function WalletAccountPanel({
       >
         Log out
       </button>
-
-      {variant === "sheet" ? (
-        <div className="wallet-account-panel__appearance">
-          <span className="wallet-account-panel__appearance-label">Appearance</span>
-          <ThemePicker className="wallet-account-panel__appearance-toggle" />
-        </div>
-      ) : null}
     </div>
   );
 }

@@ -36,7 +36,8 @@ export function AccountSheet({ open, onClose, ...panelProps }: AccountSheetProps
           aria-modal="true"
           aria-label="Account"
         >
-          <div className="modal-panel modal-sheet-panel app-account-sheet pointer-events-auto max-h-[min(85dvh,520px)] overflow-hidden border-x-0 border-b-0 rounded-t-2xl">
+          <div className="modal-panel modal-sheet-panel app-account-sheet pointer-events-auto max-h-[min(88dvh,560px)] overflow-hidden border-x-0 border-b-0 rounded-t-2xl">
+            <div className="app-account-sheet__grab" aria-hidden />
             <div className="app-account-sheet__header">
               <h2 className="app-account-sheet__title">Account</h2>
               <button
