@@ -74,6 +74,7 @@ import { hasSocialLinks } from "@/lib/token-social";
 import { formatAge } from "@/lib/arena-board-format";
 import { tokenSharePayload } from "@/lib/share-links";
 import { tokenDocumentTitle } from "@/lib/token-tab-title";
+import { writeLastTradeTokenAddress } from "@/lib/last-trade-token";
 import { useLiveChannel, resolveLivePollDelay } from "@/hooks/useLiveChannel";
 import { useRafMessageQueue } from "@/hooks/useRafMessageQueue";
 import { useBondingCurveMachine } from "@/hooks/useBondingCurveMachine";
@@ -234,6 +235,10 @@ export function TokenDetailLive({
   >(null);
 
   const streamAddress = contentSynced ? tokenAddress : token.address;
+
+  useEffect(() => {
+    writeLastTradeTokenAddress(tokenAddress);
+  }, [tokenAddress]);
 
   useEffect(() => {
     setLiveCandleUpdates([]);

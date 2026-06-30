@@ -1,7 +1,8 @@
-import { redirect } from "next/navigation";
 import { resolveDefaultTradeHref } from "@/lib/trade-default";
+import { TradeRedirectClient } from "@/app/trade/TradeRedirectClient";
 
-/** Mobile Trade tab — opens the top market-cap token in trade mode. */
+/** Mobile Trade tab — last visited token, or top market-cap when none saved yet. */
 export default async function TradePage() {
-  redirect(await resolveDefaultTradeHref());
+  const fallbackHref = await resolveDefaultTradeHref();
+  return <TradeRedirectClient fallbackHref={fallbackHref} />;
 }

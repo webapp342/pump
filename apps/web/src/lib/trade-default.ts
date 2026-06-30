@@ -4,7 +4,7 @@ import { readTopMcapCache } from "@/lib/redis/arena-cache";
 
 const TOP_MCAP_LIMIT = 1;
 
-/** Highest market-cap token — default trade destination (Coinbase/Robinhood pattern). */
+/** Highest market-cap token — fallback when no last-visited token is saved locally. */
 export async function resolveDefaultTradeTokenAddress(): Promise<string | null> {
   if (useRedisArenaCache()) {
     const cached = await readTopMcapCache(TOP_MCAP_LIMIT);
