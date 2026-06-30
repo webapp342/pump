@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import { useMobileModalScrollLock } from "@/hooks/useMobileModalScrollLock";
 import { TradePanel, type TradeConfirmedPayload, type TradeOptimisticPayload, type TradeSubmittedPayload } from "@/components/token/TradePanel";
 import type { TradePrefillConfig } from "@/lib/token-trade-prefill";
 import type { BondingCurveSnapshot } from "@/lib/bonding-curve";
@@ -46,14 +47,7 @@ export function TradeSheet({
     setMounted(true);
   }, []);
 
-  useEffect(() => {
-    if (!open) return;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = previousOverflow;
-    };
-  }, [open]);
+  useMobileModalScrollLock(open);
 
   useEffect(() => {
     if (!open) return;

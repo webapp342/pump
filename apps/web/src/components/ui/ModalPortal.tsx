@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useSyncExternalStore, type ReactNode } from "react";
+import { useSyncExternalStore, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { useMobileModalScrollLock } from "@/hooks/useMobileModalScrollLock";
 
 type ModalPortalProps = {
   open: boolean;
@@ -23,14 +24,7 @@ function getServerSnapshot() {
 export function ModalPortal({ open, children }: ModalPortalProps) {
   const isClient = useSyncExternalStore(subscribe, getClientSnapshot, getServerSnapshot);
 
-  useEffect(() => {
-    if (!open) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = prev;
-    };
-  }, [open]);
+  useMobileModalScrollLock(open);
 
   if (!open || !isClient) return null;
 

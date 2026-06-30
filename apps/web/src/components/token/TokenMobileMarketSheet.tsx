@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import { useMobileModalScrollLock } from "@/hooks/useMobileModalScrollLock";
 import { PumpIcon, faX } from "@/lib/icons";
 import { TokenMarketSidebar } from "@/components/token/TokenMarketSidebar";
 
@@ -23,14 +24,7 @@ export function TokenMobileMarketSheet({
     setMounted(true);
   }, []);
 
-  useEffect(() => {
-    if (!open) return;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = previousOverflow;
-    };
-  }, [open]);
+  useMobileModalScrollLock(open);
 
   useEffect(() => {
     if (!open) return;
