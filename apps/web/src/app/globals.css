@@ -25,18 +25,20 @@ html[data-theme="light"] {
   --mobile-bottom-nav-inset-x: 0;
   --mobile-bottom-nav-float-gap: 0;
   --mobile-bottom-nav-float-radius: 0;
-  --mobile-bottom-bar-content-height: 3.5rem;
+  --mobile-bottom-bar-content-height: 3rem;
   --mobile-bottom-nav-height: calc(
     var(--mobile-bottom-bar-content-height) + env(safe-area-inset-bottom, 0px)
   );
   --mobile-main-bottom-pad: calc(
     var(--mobile-bottom-nav-height) + 1rem
   );
-  --mobile-trade-dock-bar-height: 2.25rem;
-  --mobile-trade-dock-pad-block: 0.5rem;
+  --mobile-trade-dock-bar-height: 2rem;
+  --mobile-trade-dock-pad-block: 0.375rem;
   --mobile-trade-dock-height: calc(
-    var(--mobile-trade-dock-bar-height) + var(--mobile-trade-dock-pad-block) +
-      env(safe-area-inset-bottom, 0px)
+    var(--mobile-trade-dock-bar-height) + var(--mobile-trade-dock-pad-block) * 2
+  );
+  --mobile-token-bottom-stack: calc(
+    var(--mobile-bottom-nav-height) + var(--mobile-trade-dock-height)
   );
   --mobile-token-footer-height: var(--mobile-trade-dock-height);
   --app-header-height: 3.25rem;
@@ -1122,7 +1124,7 @@ code,
     }
 
     .app-shell--token {
-      padding-bottom: var(--mobile-bottom-nav-height);
+      padding-bottom: var(--mobile-token-bottom-stack);
     }
 
     .app-shell--token .token-page-main {
@@ -1494,6 +1496,31 @@ code,
       margin-top: 0;
       margin-bottom: 0;
       min-height: 2rem;
+    }
+
+    .token-trade-dock--footer {
+      border-top: 1px solid rgb(var(--pump-border) / 0.24);
+      border-bottom: none;
+      box-shadow: none;
+    }
+
+    .token-trade-dock--footer .token-trade-dock-inner {
+      padding-top: 0.375rem;
+      padding-bottom: 0.375rem;
+      padding-inline: 0.75rem;
+    }
+
+    .token-trade-dock--footer .token-trade-dock-actions {
+      gap: 0.5rem;
+    }
+
+    .token-trade-dock--footer .token-trade-dock-btn {
+      min-height: var(--mobile-trade-dock-bar-height);
+    }
+
+    .app-shell--token .bottom-nav-host {
+      border-top: none;
+      box-shadow: none;
     }
 
     .token-page-mobile-activity {
@@ -3232,8 +3259,8 @@ code,
     pointer-events: none;
     padding-bottom: env(safe-area-inset-bottom, 0px);
     background: rgb(var(--pump-bg));
-    border-top: 1px solid rgb(var(--pump-border) / 0.38);
-    box-shadow: 0 -8px 24px rgb(var(--pump-shadow) / 0.12);
+    border-top: 1px solid rgb(var(--pump-border) / 0.32);
+    box-shadow: 0 -4px 16px rgb(var(--pump-shadow) / 0.08);
   }
 
   .bottom-nav-host::before {
@@ -3247,14 +3274,20 @@ code,
   .token-trade-dock:not(.token-trade-dock--inline) {
     position: fixed;
     inset-inline: 0;
-    bottom: 0;
-    padding-bottom: env(safe-area-inset-bottom, 0px);
+    bottom: var(--mobile-bottom-nav-height);
+    z-index: 41;
+    padding-bottom: 0;
   }
 
   .token-trade-dock {
-    z-index: 45;
+    z-index: 41;
     border-top: 1px solid rgb(var(--pump-border) / 0.28);
     background: rgb(var(--pump-bg));
+  }
+
+  .token-trade-dock--footer {
+    border-bottom: none;
+    box-shadow: none;
   }
 
   .token-trade-dock--inline {
@@ -5495,7 +5528,7 @@ code,
     background: rgb(var(--pump-border) / 0.55);
   }
 
-  /* Mobile bottom navigation — full-width dock */
+  /* Mobile bottom navigation — compact icon + label dock */
   .bottom-nav {
     position: relative;
     z-index: 1;
@@ -5505,7 +5538,7 @@ code,
     align-items: stretch;
     gap: 0;
     min-height: var(--mobile-bottom-bar-content-height);
-    padding: 0.25rem 0.375rem;
+    padding: 0.1875rem 0.25rem 0.125rem;
     border: none;
     border-radius: 0;
     background: transparent;
@@ -5518,45 +5551,51 @@ code,
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 0.125rem;
-    padding: 0.375rem 0.125rem;
-    border-radius: var(--radius-md);
+    gap: 0.0625rem;
+    padding: 0.125rem 0.0625rem;
+    border-radius: var(--radius-sm);
+    background: transparent;
     color: rgb(var(--pump-muted));
-    font-size: 0.6875rem;
-    font-weight: 500;
-    line-height: 1.2;
-    letter-spacing: 0.01em;
-    transition:
-      color 0.15s ease,
-      background-color 0.15s ease;
+    transition: color 0.15s ease;
   }
 
   .bottom-nav-item__icon {
     display: inline-flex;
-    width: 1.625rem;
-    height: 1.625rem;
+    width: 1.125rem;
+    height: 1.125rem;
     align-items: center;
     justify-content: center;
+    color: rgb(var(--pump-muted));
+    transition: color 0.15s ease;
   }
 
   .bottom-nav-item-active {
-    background: rgb(var(--pump-accent) / 0.1);
-    color: rgb(var(--pump-accent));
-    font-weight: 600;
+    background: transparent;
+    color: rgb(var(--pump-muted));
+    font-weight: 500;
   }
 
   .bottom-nav-item-active .bottom-nav-item__icon {
     color: rgb(var(--pump-accent));
   }
 
-  .bottom-nav-item--trade.bottom-nav-item-active {
+  .bottom-nav-item--trade.bottom-nav-item-active .bottom-nav-item__icon {
     color: rgb(var(--pump-accent));
   }
 
   .bottom-nav-icon {
-    width: 1.1875rem;
-    height: 1.1875rem;
+    width: 1rem;
+    height: 1rem;
     flex-shrink: 0;
+    opacity: 0.58;
+    transition:
+      opacity 0.15s ease,
+      color 0.15s ease;
+  }
+
+  .bottom-nav-item-active .bottom-nav-icon {
+    opacity: 1;
+    color: rgb(var(--pump-accent));
   }
 
   .bottom-nav-label {
@@ -5564,6 +5603,21 @@ code,
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    font-size: 0.5625rem;
+    line-height: 1.1;
+    font-weight: 500;
+    letter-spacing: 0.01em;
+    color: rgb(var(--pump-muted));
+    opacity: 0.88;
+    transition:
+      color 0.15s ease,
+      opacity 0.15s ease;
+  }
+
+  .bottom-nav-item-active .bottom-nav-label {
+    color: rgb(var(--pump-accent));
+    font-weight: 600;
+    opacity: 1;
   }
 
   .wallet-account-panel__appearance {

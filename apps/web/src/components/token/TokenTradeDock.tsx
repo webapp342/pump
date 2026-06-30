@@ -22,7 +22,9 @@ export function TokenTradeDock({
   return (
     <div
       className={`token-trade-dock lg:hidden${
-        placement === "inline" ? " token-trade-dock--inline" : ""
+        placement === "inline"
+          ? " token-trade-dock--inline"
+          : " token-trade-dock--footer"
       }`}
       role="region"
       aria-label="Trade actions"

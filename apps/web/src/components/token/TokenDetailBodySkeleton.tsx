@@ -55,14 +55,6 @@ export function TokenDetailBodySkeleton() {
             <div className="token-page-chart-slot">
               <SkeletonChartPanel />
             </div>
-            <div className="token-trade-dock token-trade-dock--inline lg:hidden" aria-hidden>
-              <div className="token-trade-dock-inner">
-                <div className="token-trade-dock-actions">
-                  <Skeleton className="h-9 w-full rounded-md" />
-                  <Skeleton className="h-9 w-full rounded-md" />
-                </div>
-              </div>
-            </div>
             <div className="token-page-mobile-activity lg:hidden">
               <section className="panel-surface token-trade-tape flex min-h-0 flex-1 flex-col">
                 <div className="flex gap-2 border-b border-pump-border/15 px-3 py-2">
@@ -95,6 +87,15 @@ export function TokenDetailBodySkeleton() {
         <aside className="token-page-stack token-page-stack--aside hidden lg:flex">
           <SkeletonTradePanel />
         </aside>
+      </div>
+
+      <div className="token-trade-dock token-trade-dock--footer lg:hidden" aria-hidden>
+        <div className="token-trade-dock-inner">
+          <div className="token-trade-dock-actions">
+            <Skeleton className="h-8 w-full rounded-md" />
+            <Skeleton className="h-8 w-full rounded-md" />
+          </div>
+        </div>
       </div>
     </div>
   );

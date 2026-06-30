@@ -995,13 +995,6 @@ export function TokenDetailLive({
               />
             </div>
 
-            <TokenTradeDock
-              placement="inline"
-              disabled={tradeLocked}
-              onBuy={() => openMobileTrade("buy")}
-              onSell={() => openMobileTrade("sell")}
-            />
-
             <div className="token-page-mobile-activity lg:hidden">
               <TradeTape {...tradeTapeProps} mobileStickyHead />
             </div>
@@ -1047,6 +1040,12 @@ export function TokenDetailLive({
           ) : null}
         </aside>
       </div>
+
+      <TokenTradeDock
+        disabled={tradeLocked}
+        onBuy={() => openMobileTrade("buy")}
+        onSell={() => openMobileTrade("sell")}
+      />
 
       <CreatorProfileModal
         open={profileAddress != null}
