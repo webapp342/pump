@@ -2,9 +2,11 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useAccount } from "wagmi";
 import { PumpLogo } from "@/components/brand/PumpLogo";
 import { WalletBar } from "@/components/wallet/WalletBar";
 import { ThemePicker } from "@/components/theme/ThemePicker";
+import { usePumpWallet } from "@/components/wallet/PumpWalletProvider";
 import { APP_NAV_ITEMS } from "@/lib/nav-config";
 import { PumpIcon, faPlus } from "@/lib/icons";
 import { shellHeaderInnerClass } from "@/components/layout/layout-shell";
@@ -14,15 +16,21 @@ function navLinkClass(active: boolean): string {
 }
 
 export function AppHeaderView({ pathname }: { pathname: string }) {
+  const { ready, authenticated, scwAddress } = usePumpWallet();
+  const { isConnected } = useAccount();
+  const walletReady =
+    ready && authenticated && Boolean(scwAddress) && isConnected;
+
   return (
     <header className="app-header">
       <div className={`app-header-inner ${shellHeaderInnerClass}`}>
         <div className="app-header-start">
           <Link href="/" className="app-header-brand">
             <span className="app-header-brand-mark">
-              <PumpLogo size={32} />
+              <PumpLogo size={22} className="md:hidden" />
+              <PumpLogo size={32} className="hidden md:block" />
             </span>
-            <span className="truncate">Pump</span>
+            <span className="app-header-brand__name truncate">Pump</span>
           </Link>
 
           <nav className="app-header-nav hidden md:flex" aria-label="Primary">
@@ -49,17 +57,25 @@ export function AppHeaderView({ pathname }: { pathname: string }) {
         </div>
 
         <div className="app-header-actions">
-          <ThemePicker className="toolbar-btn text-pump-muted hidden md:inline-flex" />
+          <ThemePicker
+            className={
+              walletReady
+                ? "app-header-icon-btn hidden md:inline-flex"
+                : "app-header-icon-btn"
+            }
+          />
           <Link
             href="/create"
             prefetch={true}
-            aria-label="Create token"
             aria-current={pathname.startsWith("/create") ? "page" : undefined}
-            className={`app-header-create-btn toolbar-btn ${
-              pathname.startsWith("/create") ? "app-header-create-btn--active" : ""
+            className={`app-header-create-btn${
+              pathname.startsWith("/create") ? " app-header-create-btn--active" : ""
             }`}
           >
-            <PumpIcon icon={faPlus} className="h-4 w-4 shrink-0" />
+            <PumpIcon
+              icon={faPlus}
+              className="app-header-create-btn__icon app-header-create-btn__icon--desktop shrink-0"
+            />
             <span className="app-header-create-btn__label">Create</span>
           </Link>
           <div className="app-header-actions__account">

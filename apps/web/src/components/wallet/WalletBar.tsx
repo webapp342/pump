@@ -92,7 +92,7 @@ function ConnectedWalletButton({ address }: { address: string }) {
           aria-label="Open account"
         >
           {avatarId ? (
-            <UserAvatar address={address} avatarId={avatarId} size={28} />
+            <UserAvatar address={address} avatarId={avatarId} size={24} />
           ) : (
             <span className="app-header-account-btn__fallback" aria-hidden>
               {address.slice(2, 4).toUpperCase()}
@@ -159,7 +159,7 @@ export function WalletBar() {
       })}
     >
       {!walletReady ? (
-        <button type="button" onClick={login} className="toolbar-btn text-body-sm font-semibold">
+        <button type="button" onClick={login} className="app-header-sign-in-btn">
           Sign in
         </button>
       ) : scwAddress ? (

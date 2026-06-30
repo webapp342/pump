@@ -25,7 +25,7 @@ html[data-theme="light"] {
   --mobile-bottom-nav-inset-x: 0;
   --mobile-bottom-nav-float-gap: 0;
   --mobile-bottom-nav-float-radius: 0;
-  --mobile-bottom-bar-content-height: 3rem;
+  --mobile-bottom-bar-content-height: 2.625rem;
   --mobile-bottom-nav-height: calc(
     var(--mobile-bottom-bar-content-height) + env(safe-area-inset-bottom, 0px)
   );
@@ -3259,8 +3259,8 @@ code,
     pointer-events: none;
     padding-bottom: env(safe-area-inset-bottom, 0px);
     background: rgb(var(--pump-bg));
-    border-top: 1px solid rgb(var(--pump-border) / 0.32);
-    box-shadow: 0 -4px 16px rgb(var(--pump-shadow) / 0.08);
+    border-top: 1px solid rgb(var(--pump-border) / 0.24);
+    box-shadow: none;
   }
 
   .bottom-nav-host::before {
@@ -3434,7 +3434,7 @@ code,
     align-items: center;
     justify-content: space-between;
     gap: 16px;
-    min-height: 52px;
+    min-height: var(--app-header-height);
   }
 
   .app-header-start {
@@ -3523,54 +3523,220 @@ code,
 
   .app-header-create-btn {
     display: inline-flex;
-    width: var(--app-header-control-height);
     height: var(--app-header-control-height);
+    min-height: var(--app-header-control-height);
     min-width: 0;
     flex-shrink: 0;
     align-items: center;
     justify-content: center;
     gap: 0.375rem;
-    padding: 0;
-    border: 1px solid rgb(var(--pump-border) / 0.38);
-    background: rgb(var(--pump-card) / 0.55);
-    color: rgb(var(--pump-text));
+    padding-inline: 0.875rem;
+    border: 1px solid rgb(var(--pump-accent));
+    background: rgb(var(--pump-accent));
+    color: rgb(var(--pump-accent-foreground));
     font-weight: 600;
   }
 
-  .app-header-create-btn:hover {
-    border-color: rgb(var(--pump-border) / 0.55);
-    background: rgb(var(--pump-border) / 0.1);
-  }
-
-  .app-header-create-btn--active {
-    border-color: rgb(var(--pump-accent) / 0.45);
-    background: rgb(var(--pump-accent) / 0.12);
-    color: rgb(var(--pump-accent));
-  }
-
-  .app-header-create-btn__label {
-    display: none;
-    font-size: var(--text-body-sm);
-    font-weight: 600;
+  .app-header-create-btn__icon {
+    width: 0.875rem;
+    height: 0.875rem;
   }
 
   @media (min-width: 768px) {
+    .app-header-create-btn__icon--desktop {
+      display: inline-flex;
+    }
+  }
+
+  .app-header-create-btn:hover {
+    border-color: rgb(var(--pump-accent-strong));
+    background: rgb(var(--pump-accent-strong));
+  }
+
+  .app-header-create-btn--active {
+    border-color: rgb(var(--pump-accent-strong));
+    background: rgb(var(--pump-accent-strong));
+    box-shadow: 0 0 0 2px rgb(var(--pump-accent) / 0.22);
+  }
+
+  .app-header-create-btn__label {
+    font-size: var(--text-body-sm);
+    font-weight: 600;
+    line-height: 1;
+  }
+
+  .app-header-icon-btn {
+    display: inline-flex;
+    width: var(--app-header-control-height);
+    height: var(--app-header-control-height);
+    min-width: var(--app-header-control-height);
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgb(var(--pump-border) / 0.38);
+    border-radius: var(--radius-md);
+    background: transparent;
+    color: rgb(var(--pump-muted));
+    padding: 0;
+    transition:
+      background 0.15s ease,
+      border-color 0.15s ease,
+      color 0.15s ease;
+  }
+
+  .app-header-icon-btn:hover {
+    border-color: rgb(var(--pump-border) / 0.55);
+    background: rgb(var(--pump-border) / 0.08);
+    color: rgb(var(--pump-text));
+  }
+
+  .app-header-icon-btn__glyph {
+    width: 1rem;
+    height: 1rem;
+  }
+
+  .app-header-sign-in-btn {
+    display: inline-flex;
+    height: var(--app-header-control-height);
+    min-height: var(--app-header-control-height);
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgb(var(--pump-border) / 0.45);
+    border-radius: var(--radius-md);
+    background: rgb(var(--pump-card));
+    padding-inline: 0.75rem;
+    font-size: var(--text-body-sm);
+    font-weight: 600;
+    line-height: 1;
+    color: rgb(var(--pump-text));
+    white-space: nowrap;
+    transition:
+      background 0.15s ease,
+      border-color 0.15s ease;
+  }
+
+  .app-header-sign-in-btn:hover {
+    border-color: rgb(var(--pump-border) / 0.62);
+    background: rgb(var(--pump-border) / 0.1);
+  }
+
+  @media (max-width: 767px) {
+    :root {
+      --app-header-height: 3rem;
+      --app-header-control-height: 1.75rem;
+    }
+
+    .app-header {
+      border-bottom-color: rgb(var(--pump-border) / 0.2);
+    }
+
+    .app-header-inner {
+      min-height: var(--app-header-height);
+      gap: 0.625rem;
+      padding-block: 0.375rem;
+    }
+
+    .app-header-start {
+      gap: 0.25rem;
+      min-width: 0;
+    }
+
+    .app-header-brand {
+      gap: 0.375rem;
+      padding-right: 0;
+      min-width: 0;
+    }
+
+    .app-header-brand__name {
+      font-size: 0.875rem;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+    }
+
+    .app-header-actions {
+      gap: 0.125rem;
+      align-items: center;
+    }
+
+    /* Header actions — text links + ghost icon (Coinbase / Robinhood mobile) */
+    .app-header-icon-btn {
+      width: 2rem;
+      height: 2rem;
+      min-width: 2rem;
+      border: none;
+      border-radius: var(--radius-sm);
+      background: transparent;
+      color: rgb(var(--pump-muted));
+    }
+
+    .app-header-icon-btn:hover {
+      background: rgb(var(--pump-border) / 0.1);
+      color: rgb(var(--pump-text));
+    }
+
+    .app-header-icon-btn__glyph {
+      width: 1rem;
+      height: 1rem;
+    }
+
     .app-header-create-btn {
-      width: auto;
-      height: var(--app-header-control-height);
-      padding-inline: 0.875rem;
-      border-color: rgb(var(--pump-accent));
-      background: rgb(var(--pump-accent));
-      color: rgb(var(--pump-accent-foreground));
+      height: auto;
+      min-height: 0;
+      padding: 0.3125rem 0.375rem;
+      gap: 0;
+      border: none;
+      border-radius: var(--radius-sm);
+      background: transparent;
+      color: rgb(var(--pump-accent));
+      font-size: 0.8125rem;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      box-shadow: none;
     }
 
     .app-header-create-btn:hover {
-      background: rgb(var(--pump-accent-strong));
-      border-color: rgb(var(--pump-accent-strong));
+      background: rgb(var(--pump-accent) / 0.08);
+      border: none;
+      color: rgb(var(--pump-accent));
+    }
+
+    .app-header-create-btn--active {
+      background: rgb(var(--pump-accent) / 0.1);
+      box-shadow: none;
+      color: rgb(var(--pump-accent));
+    }
+
+    .app-header-create-btn__icon--desktop {
+      display: none;
     }
 
     .app-header-create-btn__label {
-      display: inline;
+      font-size: 0.8125rem;
+      line-height: 1.2;
+    }
+
+    .app-header-sign-in-btn {
+      height: auto;
+      min-height: 0;
+      padding: 0.3125rem 0.375rem;
+      border: none;
+      border-radius: var(--radius-sm);
+      background: transparent;
+      font-size: 0.8125rem;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      color: rgb(var(--pump-text));
+    }
+
+    .app-header-sign-in-btn:hover {
+      background: rgb(var(--pump-border) / 0.08);
+    }
+
+    .app-header-account-btn {
+      width: 1.625rem;
+      height: 1.625rem;
+      border-color: rgb(var(--pump-border) / 0.28);
     }
   }
 
@@ -4041,7 +4207,7 @@ code,
     background: rgb(var(--pump-danger) / 0.08);
   }
 
-  .app-header-actions .toolbar-btn {
+  .app-header-actions .toolbar-btn:not(.app-header-create-btn) {
     height: var(--app-header-control-height);
     min-height: var(--app-header-control-height);
     padding-inline: 0.875rem;
@@ -5528,7 +5694,7 @@ code,
     background: rgb(var(--pump-border) / 0.55);
   }
 
-  /* Mobile bottom navigation — compact icon + label dock */
+  /* Mobile bottom navigation — icon + label tab bar */
   .bottom-nav {
     position: relative;
     z-index: 1;
@@ -5538,7 +5704,7 @@ code,
     align-items: stretch;
     gap: 0;
     min-height: var(--mobile-bottom-bar-content-height);
-    padding: 0.1875rem 0.25rem 0.125rem;
+    padding: 0.1875rem 0.125rem 0.125rem;
     border: none;
     border-radius: 0;
     background: transparent;
@@ -5553,16 +5719,17 @@ code,
     justify-content: center;
     gap: 0.0625rem;
     padding: 0.125rem 0.0625rem;
-    border-radius: var(--radius-sm);
+    border-radius: 0;
     background: transparent;
     color: rgb(var(--pump-muted));
+    -webkit-tap-highlight-color: transparent;
     transition: color 0.15s ease;
   }
 
   .bottom-nav-item__icon {
     display: inline-flex;
-    width: 1.125rem;
-    height: 1.125rem;
+    width: 1.0625rem;
+    height: 1.0625rem;
     align-items: center;
     justify-content: center;
     color: rgb(var(--pump-muted));
@@ -5584,10 +5751,10 @@ code,
   }
 
   .bottom-nav-icon {
-    width: 1rem;
-    height: 1rem;
+    width: 1.0625rem;
+    height: 1.0625rem;
     flex-shrink: 0;
-    opacity: 0.58;
+    opacity: 0.5;
     transition:
       opacity 0.15s ease,
       color 0.15s ease;
@@ -5603,12 +5770,12 @@ code,
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: 0.5625rem;
-    line-height: 1.1;
+    font-size: 0.625rem;
+    line-height: 1;
     font-weight: 500;
-    letter-spacing: 0.01em;
+    letter-spacing: 0;
     color: rgb(var(--pump-muted));
-    opacity: 0.88;
+    opacity: 0.65;
     transition:
       color 0.15s ease,
       opacity 0.15s ease;
@@ -7141,6 +7308,9 @@ code,
   .chip-button:focus-visible,
   .arena-filter-chip:focus-visible,
   .bottom-nav-item:focus-visible,
+  .app-header-sign-in-btn:focus-visible,
+  .app-header-icon-btn:focus-visible,
+  .app-header-create-btn:focus-visible,
   .app-header-account-btn:focus-visible,
   .app-account-sheet__close:focus-visible,
   .share-sheet-copy-button:focus-visible,
