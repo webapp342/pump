@@ -17,6 +17,32 @@ export function isTokenRoute(pathname: string): boolean {
   return pathname === "/token" || pathname.startsWith("/token/");
 }
 
+/** Portfolio terminal — flush on mobile like token detail. */
+export function isPortfolioRoute(pathname: string): boolean {
+  return pathname === "/portfolio" || pathname.startsWith("/portfolio/");
+}
+
+/** Main padding: portfolio mobile flush; token fully flush; default inset. */
+export function shellMainPaddingClass(pathname: string): string {
+  if (isTokenRoute(pathname)) return shellTokenPagePaddingClass;
+  if (isPortfolioRoute(pathname)) {
+    return `max-md:p-0 md:py-8 md:pb-8 ${shellPaddingXClass}`;
+  }
+  return `py-5 md:py-8 md:pb-8 ${shellPaddingXClass}`;
+}
+
+/** Main width: portfolio + token use full width on mobile. */
+export function shellMainLayoutClass(pathname: string, wide: boolean): string {
+  if (isTokenRoute(pathname)) {
+    return "token-page-main w-full max-w-none flex-1";
+  }
+  const maxWidth = wide ? shellWideMaxWidthClass : shellMaxWidthClassForPath(pathname);
+  if (isPortfolioRoute(pathname)) {
+    return `portfolio-page-main mx-auto w-full flex-1 max-md:max-w-none ${maxWidth}`;
+  }
+  return `mx-auto w-full flex-1 ${maxWidth}`;
+}
+
 export function shellUsesWideLayout(pathname: string): boolean {
   return isTokenRoute(pathname);
 }

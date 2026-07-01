@@ -4,8 +4,8 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 
 const ACTION_WIDTH = 92;
 const SNAP_THRESHOLD = 44;
-const PEEK_OFFSET = -28;
 const SWIPE_HINT_KEY = "pump-swipe-trade-hint";
+const REVEAL_ACTIONS_OFFSET = 4;
 
 export function isHoldingsSwipeHintDismissed(): boolean {
   if (typeof window === "undefined") return true;
@@ -39,7 +39,7 @@ export function HoldingSwipeRow({
   peekOnMount = false,
   dataBoardKey,
   rowClassName = "",
-  contentClassName = "bg-pump-card",
+  contentClassName = "bg-pump-bg",
 }: HoldingSwipeRowProps) {
   const [offset, setOffset] = useState(0);
   const [dragging, setDragging] = useState(false);
@@ -80,13 +80,6 @@ export function HoldingSwipeRow({
 
     peekPlayedRef.current = true;
     setShowEdgeHint(true);
-
-    const startTimer = window.setTimeout(() => {
-      setOffset(PEEK_OFFSET);
-      window.setTimeout(() => setOffset(0), 420);
-    }, 700);
-
-    return () => window.clearTimeout(startTimer);
   }, [peekOnMount, disabled]);
 
   useEffect(() => {
@@ -146,6 +139,8 @@ export function HoldingSwipeRow({
     setOffset(0);
   };
 
+  const revealActions = dragging || Math.abs(offset) >= REVEAL_ACTIONS_OFFSET;
+
   return (
     <div
       className={`relative overflow-hidden ${rowClassName}`.trim()}
@@ -153,7 +148,11 @@ export function HoldingSwipeRow({
     >
       {!disabled ? (
         <>
-          <div className="absolute inset-y-0 left-0 flex w-[92px] items-stretch">
+          <div
+            className={`absolute inset-y-0 left-0 flex w-[92px] items-stretch transition-opacity duration-150 ${
+              revealActions ? "opacity-100" : "pointer-events-none opacity-0"
+            }`}
+          >
             <button
               type="button"
               onClick={triggerBuy}
@@ -162,7 +161,11 @@ export function HoldingSwipeRow({
               {buyLabel}
             </button>
           </div>
-          <div className="absolute inset-y-0 right-0 flex w-[92px] items-stretch">
+          <div
+            className={`absolute inset-y-0 right-0 flex w-[92px] items-stretch transition-opacity duration-150 ${
+              revealActions ? "opacity-100" : "pointer-events-none opacity-0"
+            }`}
+          >
             <button
               type="button"
               onClick={triggerSell}
@@ -174,7 +177,7 @@ export function HoldingSwipeRow({
         </>
       ) : null}
       <div
-        className={`relative z-[1] w-full ${contentClassName} ${dragging ? "" : "transition-transform duration-200 ease-out"}`.trim()}
+        className={`relative z-[1] w-full min-h-full ${contentClassName} ${dragging ? "" : "transition-transform duration-200 ease-out"}`.trim()}
         style={{ transform: `translateX(${offset}px)` }}
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}

@@ -336,7 +336,7 @@ function NativeCashMobileRow({
       logo={<NativeLogo size={28} />}
       title={<p className="truncate">{NATIVE_SYMBOL}</p>}
       amount={formatTokenBalance(nativeBnb)}
-      value={formatPortfolioHoldingValueUsd(nativeUsd)}
+      valueUsd={nativeUsd}
     />
   );
 }
@@ -410,7 +410,7 @@ function WalletHoldingMobileRow({
           </Link>
         }
         amount={formatTokenBalance(balance)}
-        value={formatPortfolioHoldingValueUsd(positionValueUsd)}
+        valueUsd={positionValueUsd}
       />
     </HoldingSwipeRow>
   );
@@ -1423,8 +1423,8 @@ export function PortfolioPanel({
                   <div className="lg:hidden portfolio-holdings-mobile">
                     <div className="portfolio-holdings-mobile__header">
                       <span>Coin</span>
-                      <span className="portfolio-holdings-mobile__num">Amount</span>
-                      <span className="portfolio-holdings-mobile__num">Value</span>
+                      <span className="portfolio-holdings-mobile__amount-col">Amount</span>
+                      <span className="portfolio-holdings-mobile__value-col">Value/PNL</span>
                     </div>
                     <div className="portfolio-holdings-mobile__body">
                     <NativeCashMobileRow
@@ -1456,6 +1456,7 @@ export function PortfolioPanel({
                         balance * Number(position.lastPriceBnb),
                         bnbUsd
                       );
+                      const openPnlUsd = holdingOpenPnlUsd(row.view, bnbUsd);
 
                       return (
                         <HoldingSwipeRow
@@ -1481,15 +1482,11 @@ export function PortfolioPanel({
                               </Link>
                             }
                             amount={formatTokenBalance(balance)}
-                            value={
-                              <span
-                                className={flashText(
-                                  holdingFlashes[position.tokenAddress.toLowerCase()]
-                                )}
-                              >
-                                {formatPortfolioHoldingValueUsd(positionValueUsd)}
-                              </span>
-                            }
+                            valueUsd={positionValueUsd}
+                            pnlUsd={openPnlUsd}
+                            valueFlashClass={flashText(
+                              holdingFlashes[position.tokenAddress.toLowerCase()]
+                            )}
                           />
                         </HoldingSwipeRow>
                       );

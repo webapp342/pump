@@ -6,10 +6,8 @@ import { AppHeaderView } from "@/components/layout/AppHeader";
 import { AppNavView } from "@/components/layout/AppNav";
 import {
   isTokenRoute,
-  shellMaxWidthClassForPath,
-  shellPaddingXClass,
-  shellTokenPagePaddingClass,
-  shellWideMaxWidthClass,
+  shellMainLayoutClass,
+  shellMainPaddingClass,
 } from "@/components/layout/layout-shell";
 import { noteNavFromCurrentPath, syncNavHistory } from "@/lib/nav-history";
 
@@ -26,17 +24,12 @@ type AppShellFrameProps = AppShellProps & {
 
 /** Prerender-safe shell — use in route `loading.tsx` and Suspense fallbacks. */
 export function AppShellFrame({ children, wide = false, pathname }: AppShellFrameProps) {
-  const mainMaxWidth = wide ? shellWideMaxWidthClass : shellMaxWidthClassForPath(pathname);
   const onTokenPage = isTokenRoute(pathname);
   const mobileBottomOffset = onTokenPage
     ? ""
     : "max-md:pb-[var(--mobile-main-bottom-pad)]";
-  const mainPadding = onTokenPage
-    ? shellTokenPagePaddingClass
-    : `py-5 md:py-8 md:pb-8 ${shellPaddingXClass}`;
-  const mainLayoutClass = onTokenPage
-    ? "token-page-main w-full max-w-none flex-1"
-    : `mx-auto w-full flex-1 ${mainMaxWidth}`;
+  const mainPadding = shellMainPaddingClass(pathname);
+  const mainLayoutClass = shellMainLayoutClass(pathname, wide);
 
   return (
     <div className={onTokenPage ? "app-shell app-shell--token" : "flex min-h-screen flex-col"}>

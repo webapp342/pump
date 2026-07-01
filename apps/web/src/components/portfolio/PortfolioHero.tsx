@@ -39,18 +39,25 @@ function pnlTone(value: number): string {
 
 function PortfolioStat({
   label,
+  labelSuffix,
   children,
   hero = false,
   className = "",
 }: {
   label: string;
+  labelSuffix?: ReactNode;
   children: ReactNode;
   hero?: boolean;
   className?: string;
 }) {
   return (
     <div className={`portfolio-stat${hero ? " portfolio-stat--hero" : ""} ${className}`.trim()}>
-      <span className="portfolio-stat__label">{label}</span>
+      <div className="portfolio-stat__label-row">
+        <span className="portfolio-stat__label">{label}</span>
+        {labelSuffix != null ? (
+          <span className="portfolio-stat__label-suffix">{labelSuffix}</span>
+        ) : null}
+      </div>
       <div className="portfolio-stat__value financial-value">{children}</div>
     </div>
   );
@@ -163,7 +170,18 @@ export function PortfolioHero({
           <div className="portfolio-toolbar__divider" aria-hidden />
 
           <div className="portfolio-toolbar__pnl-row">
-            <PortfolioStat label="Est PNL">
+            <PortfolioStat
+              label="Est. PnL"
+              labelSuffix={
+                !guestMode ? (
+                  <PctChange
+                    value={portfolioValuePct}
+                    toneClassName={pnlPctTone}
+                    className="portfolio-stat__label-pct md:hidden"
+                  />
+                ) : null
+              }
+            >
               <span
                 className={`portfolio-stat__pnl-inline ${guestMode ? "" : pnlFlashClass}`.trim()}
               >
@@ -176,7 +194,7 @@ export function PortfolioHero({
                   <PctChange
                     value={portfolioValuePct}
                     toneClassName={pnlPctTone}
-                    className="portfolio-stat__inline-pct"
+                    className="portfolio-stat__inline-pct hidden md:inline-flex"
                   />
                 ) : null}
               </span>
