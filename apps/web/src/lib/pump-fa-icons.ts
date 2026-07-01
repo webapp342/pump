@@ -12,6 +12,7 @@ export {
   faChartColumn,
   faChartLine,
   faCheck,
+  faCircleInfo,
   faChevronDown,
   faChevronLeft,
   faChevronRight,
@@ -155,6 +156,9 @@ export { faEnvelope as faMail } from "@fortawesome/free-solid-svg-icons";
 
 /** Lucide AlertTriangle */
 export { faTriangleExclamation as faAlertTriangle } from "@fortawesome/free-solid-svg-icons";
+
+/** Lucide Info / CircleHelp */
+export { faCircleInfo as faInfo } from "@fortawesome/free-solid-svg-icons";
 
 /** Custom airdrop nav icon */
 export { faParachuteBox as faAirdropParachute } from "@fortawesome/free-solid-svg-icons";

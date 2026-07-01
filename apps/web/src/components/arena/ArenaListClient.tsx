@@ -999,42 +999,51 @@ export function ArenaListClient({
   }
 
   return (
-    <div
-      className="min-w-0 space-y-3 md:space-y-4"
-      aria-busy={boardRefreshing}
-    >
-      <ArenaMcapTicker tokens={mcapRankedTokens} />
-
+    <div className="arena-page min-w-0" aria-busy={boardRefreshing}>
       <ArenaShortcutsModal open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
 
-      <div className="space-y-2 md:space-y-3">
-        <div className="flex items-center justify-between gap-2">
-          <SectionHeadingIcon icon={MetricIcons.exploreCoins}>Explore coins</SectionHeadingIcon>
-          <ArenaSwipeTradeBar />
-        </div>
+      <div className="arena-page__sticky">
+        <ArenaMcapTicker tokens={mcapRankedTokens} />
 
-        <div className="arena-toolbar">
-          <div className="arena-search-group">
-            <div className="arena-toolbar-search">
-              <FieldSearchInput
-                ref={searchInputRef}
-                embedded
-                fieldOnly
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search coins"
+        <div className="arena-page__controls space-y-2 md:space-y-3">
+          <div className="flex items-center justify-between gap-2">
+            <SectionHeadingIcon icon={MetricIcons.exploreCoins}>Explore coins</SectionHeadingIcon>
+            <ArenaSwipeTradeBar />
+          </div>
+
+          <div className="arena-toolbar">
+            <div className="arena-search-group">
+              <div className="arena-toolbar-search">
+                <FieldSearchInput
+                  ref={searchInputRef}
+                  embedded
+                  fieldOnly
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search coins"
+                />
+              </div>
+            </div>
+            <div className="arena-toolbar-watchlist shrink-0 md:hidden">
+              <ArenaWatchlistSheet
+                tokens={arenaTokenPool}
+                bnbUsd={effectiveBnbUsd}
+                flashes={flashes}
+                animatedCaps={animatedCaps}
               />
             </div>
+            <div className="arena-filter-bar-wrap hidden md:block">
+              <div className="arena-filter-bar" role="tablist" aria-label="Arena filters">
+                <ArenaFilterChips
+                  activeFilter={activeFilter}
+                  filterCounts={filterCounts}
+                  onSelect={setArenaFilter}
+                />
+              </div>
+            </div>
           </div>
-          <div className="arena-toolbar-watchlist shrink-0 md:hidden">
-            <ArenaWatchlistSheet
-              tokens={arenaTokenPool}
-              bnbUsd={effectiveBnbUsd}
-              flashes={flashes}
-              animatedCaps={animatedCaps}
-            />
-          </div>
-          <div className="arena-filter-bar-wrap hidden md:block">
+
+          <div className="arena-filter-bar-wrap md:hidden">
             <div className="arena-filter-bar" role="tablist" aria-label="Arena filters">
               <ArenaFilterChips
                 activeFilter={activeFilter}
@@ -1043,60 +1052,52 @@ export function ArenaListClient({
               />
             </div>
           </div>
-        </div>
 
-        <div className="arena-filter-bar-wrap md:hidden">
-          <div className="arena-filter-bar" role="tablist" aria-label="Arena filters">
-            <ArenaFilterChips
-              activeFilter={activeFilter}
-              filterCounts={filterCounts}
-              onSelect={setArenaFilter}
-            />
+          <div className="arena-page__sort-row flex flex-wrap items-center gap-2">
+            <label className="flex items-center gap-2 text-caption text-pump-muted">
+              <span className="hidden sm:inline">Sort</span>
+              <select
+                value={cardsSort}
+                onChange={(event) =>
+                  setCardsSortPreference(event.target.value as ArenaCardsSortKey)
+                }
+                className="field-input h-8 min-w-[9rem] bg-pump-surface/75 py-1 text-caption"
+                aria-label="Sort cards by"
+              >
+                {(Object.keys(ARENA_CARDS_SORT_LABELS) as ArenaCardsSortKey[]).map((key) => (
+                  <option key={key} value={key}>
+                    {ARENA_CARDS_SORT_LABELS[key]}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div className="arena-view-toggle" role="group" aria-label="Card density">
+              <button
+                type="button"
+                onClick={() => setCardsDensityPreference("comfortable")}
+                className={`px-3 py-1.5 text-caption ${
+                  cardsDensity === "comfortable" ? "chip-button-active" : "chip-button"
+                }`}
+                aria-pressed={cardsDensity === "comfortable"}
+              >
+                Comfortable
+              </button>
+              <button
+                type="button"
+                onClick={() => setCardsDensityPreference("compact")}
+                className={`px-3 py-1.5 text-caption ${
+                  cardsDensity === "compact" ? "chip-button-active" : "chip-button"
+                }`}
+                aria-pressed={cardsDensity === "compact"}
+              >
+                Compact
+              </button>
+            </div>
           </div>
         </div>
+      </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <label className="flex items-center gap-2 text-caption text-pump-muted">
-            <span className="hidden sm:inline">Sort</span>
-            <select
-              value={cardsSort}
-              onChange={(event) =>
-                setCardsSortPreference(event.target.value as ArenaCardsSortKey)
-              }
-              className="field-input h-8 min-w-[9rem] bg-pump-surface/75 py-1 text-caption"
-              aria-label="Sort cards by"
-            >
-              {(Object.keys(ARENA_CARDS_SORT_LABELS) as ArenaCardsSortKey[]).map((key) => (
-                <option key={key} value={key}>
-                  {ARENA_CARDS_SORT_LABELS[key]}
-                </option>
-              ))}
-            </select>
-          </label>
-          <div className="arena-view-toggle" role="group" aria-label="Card density">
-            <button
-              type="button"
-              onClick={() => setCardsDensityPreference("comfortable")}
-              className={`px-3 py-1.5 text-caption ${
-                cardsDensity === "comfortable" ? "chip-button-active" : "chip-button"
-              }`}
-              aria-pressed={cardsDensity === "comfortable"}
-            >
-              Comfortable
-            </button>
-            <button
-              type="button"
-              onClick={() => setCardsDensityPreference("compact")}
-              className={`px-3 py-1.5 text-caption ${
-                cardsDensity === "compact" ? "chip-button-active" : "chip-button"
-              }`}
-              aria-pressed={cardsDensity === "compact"}
-            >
-              Compact
-            </button>
-          </div>
-        </div>
-
+      <div className="arena-page__scroll">
         {exploreBoardTokens.length === 0 ? (
           <div className="panel-surface empty-state py-8">
             <p className="empty-state-copy text-caption">

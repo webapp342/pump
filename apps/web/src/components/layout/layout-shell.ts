@@ -22,10 +22,26 @@ export function isPortfolioRoute(pathname: string): boolean {
   return pathname === "/portfolio" || pathname.startsWith("/portfolio/");
 }
 
+/** Arena discovery — sticky toolbar, scrollable coin grid. */
+export function isArenaRoute(pathname: string): boolean {
+  return pathname === "/arena" || pathname.startsWith("/arena/");
+}
+
+/** Missions hub — same terminal width and mobile flush as portfolio. */
+export function isMissionsRoute(pathname: string): boolean {
+  return pathname === "/missions" || pathname.startsWith("/missions/");
+}
+
 /** Main padding: portfolio mobile flush; token fully flush; default inset. */
 export function shellMainPaddingClass(pathname: string): string {
   if (isTokenRoute(pathname)) return shellTokenPagePaddingClass;
   if (isPortfolioRoute(pathname)) {
+    return `max-md:p-0 md:py-8 md:pb-8 ${shellPaddingXClass}`;
+  }
+  if (isArenaRoute(pathname)) {
+    return `max-md:py-0 md:py-8 md:pb-8 ${shellPaddingXClass}`;
+  }
+  if (isMissionsRoute(pathname)) {
     return `max-md:p-0 md:py-8 md:pb-8 ${shellPaddingXClass}`;
   }
   return `py-5 md:py-8 md:pb-8 ${shellPaddingXClass}`;
@@ -39,6 +55,12 @@ export function shellMainLayoutClass(pathname: string, wide: boolean): string {
   const maxWidth = wide ? shellWideMaxWidthClass : shellMaxWidthClassForPath(pathname);
   if (isPortfolioRoute(pathname)) {
     return `portfolio-page-main mx-auto w-full flex-1 max-md:max-w-none ${maxWidth}`;
+  }
+  if (isArenaRoute(pathname)) {
+    return `arena-page-main mx-auto w-full flex-1 max-md:max-w-none ${maxWidth}`;
+  }
+  if (isMissionsRoute(pathname)) {
+    return `missions-page-main mx-auto w-full flex-1 max-md:max-w-none ${maxWidth}`;
   }
   return `mx-auto w-full flex-1 ${maxWidth}`;
 }
