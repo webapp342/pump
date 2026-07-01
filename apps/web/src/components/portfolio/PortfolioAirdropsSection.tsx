@@ -129,8 +129,8 @@ export function PortfolioAirdropsSection({
 
   return (
     <>
-      <div className={embedded ? "portfolio-rewards-section space-y-3" : "space-y-2 md:space-y-3"}>
-        <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className={embedded ? "portfolio-rewards-section portfolio-tab-panel__surface space-y-3" : "space-y-2 md:space-y-3"}>
+        <div className="portfolio-tab-scroll-header flex flex-wrap items-center justify-between gap-3">
           <h3
             className={
               embedded
@@ -159,7 +159,9 @@ export function PortfolioAirdropsSection({
           </button>
         </div>
 
+        <div className={embedded ? "portfolio-tab-scroll" : undefined}>
         <JoinedAirdropsList items={visibleItems} bnbUsd={bnbUsd} />
+        </div>
       </div>
 
       <ClaimAllAirdropsModal

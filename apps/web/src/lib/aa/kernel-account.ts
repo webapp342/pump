@@ -5,12 +5,14 @@ import { getEntryPoint, KERNEL_V3_1 } from "@zerodev/sdk/constants";
 import { prepareUserOperation as viemPrepareUserOperation } from "viem/account-abstraction";
 import {
   createPublicClient,
+  encodeFunctionData,
   http,
   type Address,
   type Hex,
   type PublicClient,
 } from "viem";
 import { pumpChain, rpcUrl } from "@/config/chain";
+import { erc20Abi } from "@/lib/abis/erc20";
 import { createBundlerTransport } from "@/lib/aa/bundler-transport";
 import { resolveTradeUserOpGasPrice, resolveUserOpGasPrice } from "@/lib/aa/pimlico-gas-price";
 import { sendKernelTransaction } from "@/lib/aa/send-kernel-transaction";
@@ -111,5 +113,27 @@ export async function withdrawFromKernelClient(
     to,
     value,
     data: "0x",
+  }).then((r) => r.hash);
+}
+
+export async function withdrawTokenFromKernelClient(
+  client: KernelAccountClient,
+  token: Address,
+  to: Address,
+  amount: bigint
+): Promise<Hex> {
+  if (!client.account) {
+    throw new Error("Smart account not ready.");
+  }
+
+  await assertScwReadyForUserOp(client.account.address, 0n);
+
+  return sendKernelTransaction(client, createPumpPublicClient(), {
+    to: token,
+    data: encodeFunctionData({
+      abi: erc20Abi,
+      functionName: "transfer",
+      args: [to, amount],
+    }),
   }).then((r) => r.hash);
 }

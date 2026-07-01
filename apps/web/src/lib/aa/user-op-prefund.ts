@@ -11,6 +11,8 @@ const DEFAULT_PRE_VERIFICATION_GAS_ESTIMATE = 21_000n;
 export const DEFAULT_BUY_CALL_GAS = 130_000n;
 export const DEFAULT_SELL_CALL_GAS = 150_000n;
 export const DEFAULT_APPROVE_CALL_GAS = 55_000n;
+/** Simple native or ERC20 transfer via smart wallet UserOp. */
+export const DEFAULT_WITHDRAW_CALL_GAS = 65_000n;
 
 export type UserOpGasLimits = {
   verificationGasLimit: bigint;

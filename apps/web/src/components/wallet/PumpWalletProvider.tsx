@@ -17,7 +17,7 @@ import {
   restorePumpKernelSession,
   type PumpAccountSession,
 } from "@/lib/aa/pump-account";
-import { withdrawFromKernelClient } from "@/lib/aa/kernel-account";
+import { withdrawFromKernelClient, withdrawTokenFromKernelClient } from "@/lib/aa/kernel-account";
 import {
   clearPumpConnectorSession,
   clearPumpWagmiPersistence,
@@ -39,6 +39,7 @@ type PumpWalletContextValue = {
   login: () => void;
   logout: () => Promise<void>;
   withdraw: (to: Address, value: bigint) => Promise<`0x${string}`>;
+  withdrawToken: (token: Address, to: Address, amount: bigint) => Promise<`0x${string}`>;
 };
 
 const PumpWalletContext = createContext<PumpWalletContextValue | null>(null);
@@ -69,6 +70,7 @@ const stubPumpWallet: PumpWalletContextValue = {
   login: () => {},
   logout: noopAsync,
   withdraw: noopAsync,
+  withdrawToken: noopAsync,
 };
 
 export function PumpWalletProviderStub({ children }: { children: ReactNode }) {
@@ -152,6 +154,16 @@ export function PumpWalletProvider({ children }: { children: ReactNode }) {
     [kernelClient]
   );
 
+  const withdrawToken = useCallback(
+    async (token: Address, to: Address, amount: bigint) => {
+      if (!kernelClient) {
+        throw new Error("Sign in to withdraw.");
+      }
+      return withdrawTokenFromKernelClient(kernelClient, token, to, amount);
+    },
+    [kernelClient]
+  );
+
   const value = useMemo(
     () => ({
       ready,
@@ -167,6 +179,7 @@ export function PumpWalletProvider({ children }: { children: ReactNode }) {
       login,
       logout,
       withdraw,
+      withdrawToken,
     }),
     [
       ready,
@@ -182,6 +195,7 @@ export function PumpWalletProvider({ children }: { children: ReactNode }) {
       login,
       logout,
       withdraw,
+      withdrawToken,
     ]
   );
 

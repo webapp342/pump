@@ -2,15 +2,14 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import QRCode from "qrcode";
-import { isAddress, parseEther } from "viem";
 import { pumpChain, shortAddress } from "@/config/chain";
 import { FUNDING_CHAIN_LABEL } from "@/lib/wallet-funding";
 import { copyToClipboard } from "@/lib/copy-to-clipboard";
 import { ModalPortal } from "@/components/ui/ModalPortal";
 import { usePumpWallet } from "@/components/wallet/PumpWalletProvider";
-import { formatTradeError } from "@/lib/trade-errors";
+import { WithdrawForm } from "@/components/wallet/WithdrawForm";
 import type { WalletFundingOptions, WalletFundingView } from "@/components/wallet/WalletFundingProvider";
-import { invalidateScwBalance, startScwDepositWatch } from "@/lib/scw-balance-sync";
+import { startScwDepositWatch } from "@/lib/scw-balance-sync";
 import { PumpIcon, faArrowLeft, faArrowUpRight, faCopy, faWallet, faX } from "@/lib/icons";
 
 type WalletFundingModalProps = {
@@ -118,108 +117,6 @@ function DepositView({ address, onClose }: { address: string; onClose: () => voi
   );
 }
 
-function WithdrawForm({ onClose }: { onClose: () => void }) {
-  const { withdraw } = usePumpWallet();
-  const [destination, setDestination] = useState("");
-  const [amount, setAmount] = useState("");
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [txHash, setTxHash] = useState<string | null>(null);
-
-  async function onSubmit(event: React.FormEvent) {
-    event.preventDefault();
-    setError(null);
-    setTxHash(null);
-
-    const trimmed = destination.trim();
-    if (!isAddress(trimmed)) {
-      setError("Enter a valid destination address.");
-      return;
-    }
-
-    let value: bigint;
-    try {
-      value = parseEther(amount.trim() || "0");
-    } catch {
-      setError(`Enter a valid ${pumpChain.nativeCurrency.symbol} amount.`);
-      return;
-    }
-    if (value <= 0n) {
-      setError("Amount must be greater than zero.");
-      return;
-    }
-
-    setPending(true);
-    try {
-      const hash = await withdraw(trimmed, value);
-      setTxHash(hash);
-      invalidateScwBalance();
-    } catch (err) {
-      setError(formatTradeError(err));
-    } finally {
-      setPending(false);
-    }
-  }
-
-  return (
-    <form onSubmit={(e) => void onSubmit(e)} className="wallet-funding-withdraw">
-      <div>
-        <label className="field-label" htmlFor="withdraw-destination">
-          Destination address
-        </label>
-        <input
-          id="withdraw-destination"
-          className="field-input mt-1.5 w-full"
-          value={destination}
-          onChange={(e) => setDestination(e.target.value)}
-          placeholder="0x…"
-          autoComplete="off"
-        />
-      </div>
-
-      <div>
-        <label className="field-label" htmlFor="withdraw-amount">
-          Amount ({pumpChain.nativeCurrency.symbol})
-        </label>
-        <input
-          id="withdraw-amount"
-          className="field-input mt-1.5 w-full"
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
-          placeholder="0.01"
-          inputMode="decimal"
-          autoComplete="off"
-        />
-        <p className="field-hint mt-1.5">Gas is paid from your smart wallet balance.</p>
-      </div>
-
-      {error ? <p className="notice-warning leading-snug">{error}</p> : null}
-      {txHash ? (
-        <p className="text-caption text-pump-success">
-          Withdrawal submitted.{" "}
-          <a
-            href={`${pumpChain.blockExplorers.default.url}/tx/${txHash}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-pump-accent hover:underline"
-          >
-            View tx
-          </a>
-        </p>
-      ) : null}
-
-      <div className="wallet-funding-withdraw__actions">
-        <button type="button" onClick={onClose} className="secondary-button w-full">
-          Cancel
-        </button>
-        <button type="submit" className="primary-button w-full" disabled={pending}>
-          {pending ? "Sending…" : "Withdraw"}
-        </button>
-      </div>
-    </form>
-  );
-}
-
 export function WalletFundingModal({
   open,
   view,
@@ -240,14 +137,14 @@ export function WalletFundingModal({
 
   const title =
     view === "withdraw"
-      ? `Withdraw ${pumpChain.nativeCurrency.symbol}`
+      ? "Withdraw"
       : view === "deposit"
         ? `Deposit ${pumpChain.nativeCurrency.symbol}`
         : (options.title ?? "Add funds");
 
   const subtitle =
     view === "withdraw"
-      ? "Send to an external wallet address."
+      ? "Send assets to an external wallet address."
       : view === "deposit"
         ? `Smart wallet on ${FUNDING_CHAIN_LABEL}.`
         : (options.message ?? `Fund your wallet on ${FUNDING_CHAIN_LABEL}.`);
@@ -291,7 +188,7 @@ export function WalletFundingModal({
                     <span className="min-w-0">
                       <span className="block text-body-sm font-semibold text-pump-text">Withdraw</span>
                       <span className="mt-0.5 block text-caption leading-snug text-pump-muted">
-                        Send {pumpChain.nativeCurrency.symbol} to an external address.
+                        Send {pumpChain.nativeCurrency.symbol} or tokens to an external address.
                       </span>
                     </span>
                   </button>

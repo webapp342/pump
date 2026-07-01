@@ -1375,7 +1375,7 @@ export function PortfolioPanel({
 
         <div className="portfolio-hub__body">
         {activeTab === "holdings" ? (
-          <div className="portfolio-holdings-panel">
+          <div className="portfolio-holdings-panel portfolio-tab-panel">
             {dustHoldingsCount > 0 && !awaitingDustFilter ? (
               <div className="portfolio-tab-toolbar flex flex-wrap items-center justify-end gap-2">
                 <button
@@ -1403,7 +1403,7 @@ export function PortfolioPanel({
                   </Link>
                 </div>
               ) : (
-                <section className="panel-surface portfolio-section-surface">
+                <section className="panel-surface portfolio-section-surface portfolio-tab-panel__surface">
                   {showDustOnlyNotice ? (
                     <div className="border-b border-pump-border/10 px-4 py-3">
                       <p className="text-body-sm text-pump-muted">
@@ -1624,7 +1624,7 @@ export function PortfolioPanel({
         ) : null}
 
         {activeTab === "launched" ? (
-          <div className="space-y-2 md:space-y-3">
+          <div className="portfolio-tab-panel space-y-2 md:space-y-3">
               {data.createdTokens.length === 0 ? (
                 <div className="panel-surface empty-state">
                   <p className="empty-state-copy">
@@ -1635,8 +1635,8 @@ export function PortfolioPanel({
                   </p>
                 </div>
               ) : (
-                <section className="panel-surface portfolio-section-surface">
-                  <div className="lg:hidden divide-y divide-pump-border/10">
+                <section className="panel-surface portfolio-section-surface portfolio-tab-panel__surface">
+                  <div className="portfolio-tab-scroll lg:hidden divide-y divide-pump-border/10">
                     {data.createdTokens.map((token) => {
                       const mcapUsd = bnbToUsd(Number(token.marketCapBnb), bnbUsd);
                       const vol24hUsd = bnbToUsd(Number(token.volume24hBnb ?? 0), bnbUsd);
@@ -1706,6 +1706,7 @@ export function PortfolioPanel({
         ) : null}
 
         {activeTab === "fees" ? (
+          <div className="portfolio-tab-panel">
           <PortfolioFeesTab
             walletAddress={walletAddress}
             creatorClaimedBnb={claimedBnb}
@@ -1716,10 +1717,13 @@ export function PortfolioPanel({
             pendingReferrerWei={pendingReferrerWei}
             onOpenReferrerClaim={() => setReferrerClaimOpen(true)}
           />
+          </div>
         ) : null}
 
         {activeTab === "airdrops" ? (
+          <div className="portfolio-tab-panel">
           <PortfolioAirdropsSection address={walletAddress} embedded />
+          </div>
         ) : null}
         </div>
         </div>
