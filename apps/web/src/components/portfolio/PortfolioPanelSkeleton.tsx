@@ -18,24 +18,27 @@ export function PortfolioPanelSkeleton() {
                     <Skeleton variant="line" className="h-3 w-32" />
                   </div>
                 </div>
-                <div className="space-y-1 text-right">
-                  <Skeleton variant="line" className="ml-auto h-3 w-14" />
-                  <Skeleton className="ml-auto h-5 w-16" />
+              </div>
+              <div className="portfolio-toolbar__hero-row portfolio-toolbar__hero-row--mobile">
+                <div className="portfolio-toolbar__value-block space-y-1">
+                  <Skeleton variant="line" className="h-3 w-20" />
+                  <Skeleton className="h-7 w-24" />
+                </div>
+                <div className="portfolio-toolbar__pnl-stack">
+                  {Array.from({ length: 3 }).map((_, index) => (
+                    <div key={index} className="space-y-1">
+                      <Skeleton variant="line" className="h-3 w-16" />
+                      <Skeleton className="h-4 w-12" />
+                    </div>
+                  ))}
                 </div>
               </div>
-              <div className="portfolio-toolbar__divider" aria-hidden />
-              <div className="portfolio-toolbar__pnl-row">
-                {Array.from({ length: 3 }).map((_, index) => (
-                  <div key={index} className="space-y-1">
-                    <Skeleton variant="line" className="h-3 w-14" />
-                    <Skeleton className="h-4 w-16" />
-                  </div>
-                ))}
-              </div>
-              <div className="portfolio-toolbar__actions-row">
-                {Array.from({ length: 3 }).map((_, index) => (
-                  <Skeleton key={index} variant="line" className="h-9 w-full" />
-                ))}
+              <div className="portfolio-toolbar__pnl-actions">
+                <div className="portfolio-toolbar__actions-row">
+                  {Array.from({ length: 3 }).map((_, index) => (
+                    <Skeleton key={index} variant="line" className="h-9 w-full" />
+                  ))}
+                </div>
               </div>
             </div>
           </div>

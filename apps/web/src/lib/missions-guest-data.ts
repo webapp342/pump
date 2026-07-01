@@ -64,5 +64,5 @@ export const GUEST_MISSION_ROWS: MissionListItem[] = [
 
 export function guestMissionFilterCounts(): Record<MissionFilter, number> {
   const total = GUEST_MISSION_ROWS.length;
-  return { all: total, open: total, done: 0 };
+  return { open: total, done: 0 };
 }

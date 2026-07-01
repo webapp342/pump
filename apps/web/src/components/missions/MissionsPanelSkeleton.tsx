@@ -11,20 +11,19 @@ export function MissionsPanelSkeleton() {
           <div className="missions-toolbar">
             <div className="missions-toolbar__shell">
               <div className="missions-toolbar__hero-row">
-                <div className="space-y-2">
+                <div className="missions-toolbar__points-block space-y-2">
                   <Skeleton variant="line" className="h-3 w-24" />
                   <Skeleton className="h-8 w-20" />
                   <Skeleton variant="line" className="h-3 w-28" />
                 </div>
-              </div>
-              <div className="missions-toolbar__divider" aria-hidden />
-              <div className="missions-toolbar__stats-row">
-                {Array.from({ length: 3 }).map((_, index) => (
-                  <div key={index} className="space-y-1">
-                    <Skeleton variant="line" className="h-3 w-14" />
-                    <Skeleton className="h-4 w-12" />
-                  </div>
-                ))}
+                <div className="missions-toolbar__stats-stack">
+                  {Array.from({ length: 3 }).map((_, index) => (
+                    <div key={index} className="missions-stat-row">
+                      <Skeleton variant="line" className="missions-stat-row__label h-3 w-14" />
+                      <Skeleton variant="line" className="missions-stat-row__value h-4 w-12" />
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
@@ -33,8 +32,7 @@ export function MissionsPanelSkeleton() {
         <div className="missions-filter-bar">
           <div className="flex gap-2 px-3">
             <Skeleton className="h-9 w-20 rounded-md" />
-            <Skeleton className="h-9 w-16 rounded-md" />
-            <Skeleton className="h-9 w-16 rounded-md" />
+            <Skeleton className="h-9 w-24 rounded-md" />
           </div>
           <Skeleton variant="line" className="mr-3 h-8 w-16" />
         </div>

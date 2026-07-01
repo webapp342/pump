@@ -15,27 +15,17 @@ type MissionsHeroProps = {
   guestMode?: boolean;
 };
 
-function MissionsStat({
+function MissionsStatRow({
   label,
   children,
-  hero = false,
-  accent = false,
 }: {
   label: string;
   children: ReactNode;
-  hero?: boolean;
-  accent?: boolean;
 }) {
   return (
-    <div className={`missions-stat${hero ? " missions-stat--hero" : ""}`.trim()}>
-      <span className="missions-stat__label section-label">{label}</span>
-      <span
-        className={`missions-stat__value financial-value${
-          accent ? " missions-stat__value--accent" : ""
-        }`.trim()}
-      >
-        {children}
-      </span>
+    <div className="missions-stat-row">
+      <span className="missions-stat-row__label section-label">{label}</span>
+      <span className="missions-stat-row__value financial-value">{children}</span>
     </div>
   );
 }
@@ -62,7 +52,7 @@ export function MissionsHero({
               <IconLabel
                 icon={MetricIcons.pumpPoints}
                 hideIconMobile
-                className="missions-stat__label section-label"
+                className="missions-stat-row__label section-label"
               >
                 Pump Points
               </IconLabel>
@@ -76,20 +66,20 @@ export function MissionsHero({
                 available
               </p>
             </div>
-          </div>
 
-          <div className="missions-toolbar__divider" aria-hidden />
-
-          <div className="missions-toolbar__stats-row">
-            <MissionsStat label="Completed">
-              {guestMode ? "0" : completedCount}
-              <span className="missions-stat__suffix">/{totalCount}</span>
-            </MissionsStat>
-            <MissionsStat label="Open">{guestMode ? totalCount : openCount}</MissionsStat>
-            <MissionsStat label="Volume">
-              {guestMode ? "0.00" : tradingVolumeBnb.toFixed(2)}{" "}
-              <span className="missions-stat__unit">{NATIVE_SYMBOL}</span>
-            </MissionsStat>
+            <div className="missions-toolbar__stats-stack">
+              <MissionsStatRow label="Completed">
+                {guestMode ? "0" : completedCount}
+                <span className="missions-stat-row__suffix">/{totalCount}</span>
+              </MissionsStatRow>
+              <MissionsStatRow label="Open">
+                {guestMode ? totalCount : openCount}
+              </MissionsStatRow>
+              <MissionsStatRow label="Volume">
+                {guestMode ? "0.00" : tradingVolumeBnb.toFixed(2)}{" "}
+                <span className="missions-stat-row__unit">{NATIVE_SYMBOL}</span>
+              </MissionsStatRow>
+            </div>
           </div>
         </div>
       </div>

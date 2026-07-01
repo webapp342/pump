@@ -5,8 +5,7 @@ import type { MissionFilter } from "@/lib/missions-types";
 
 const MISSION_FILTERS: { key: MissionFilter; label: string }[] = [
   { key: "open", label: "Open" },
-  { key: "all", label: "All" },
-  { key: "done", label: "Done" },
+  { key: "done", label: "Completed" },
 ];
 
 type MissionsFilterNavProps = {
@@ -61,7 +60,7 @@ export function MissionsFilterNav({
         className="chip-button missions-filter-bar__refresh shrink-0 disabled:opacity-50"
         aria-label={loading ? "Refreshing missions" : "Refresh missions"}
       >
-        <PumpIcon icon={faRotateCw} className={`h-3.5 w-3.5${loading ? " animate-spin" : ""}`} />
+        <PumpIcon icon={faRotateCw} className={`h-3.5 w-3.5 shrink-0${loading ? " animate-spin" : ""}`} />
         <span className="hidden sm:inline">{loading ? "Refreshing" : "Refresh"}</span>
       </button>
     </div>

@@ -32,6 +32,11 @@ export function isMissionsRoute(pathname: string): boolean {
   return pathname === "/missions" || pathname.startsWith("/missions/");
 }
 
+/** Airdrops hub — same terminal width and mobile flush as portfolio. */
+export function isAirdropsRoute(pathname: string): boolean {
+  return pathname === "/airdrops" || pathname.startsWith("/airdrops/");
+}
+
 /** Main padding: portfolio mobile flush; token fully flush; default inset. */
 export function shellMainPaddingClass(pathname: string): string {
   if (isTokenRoute(pathname)) return shellTokenPagePaddingClass;
@@ -42,6 +47,9 @@ export function shellMainPaddingClass(pathname: string): string {
     return `max-md:py-0 md:py-8 md:pb-8 ${shellPaddingXClass}`;
   }
   if (isMissionsRoute(pathname)) {
+    return `max-md:p-0 md:py-8 md:pb-8 ${shellPaddingXClass}`;
+  }
+  if (isAirdropsRoute(pathname)) {
     return `max-md:p-0 md:py-8 md:pb-8 ${shellPaddingXClass}`;
   }
   return `py-5 md:py-8 md:pb-8 ${shellPaddingXClass}`;
@@ -61,6 +69,9 @@ export function shellMainLayoutClass(pathname: string, wide: boolean): string {
   }
   if (isMissionsRoute(pathname)) {
     return `missions-page-main mx-auto w-full flex-1 max-md:max-w-none ${maxWidth}`;
+  }
+  if (isAirdropsRoute(pathname)) {
+    return `airdrops-page-main mx-auto w-full flex-1 max-md:max-w-none ${maxWidth}`;
   }
   return `mx-auto w-full flex-1 ${maxWidth}`;
 }

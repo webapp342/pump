@@ -28,8 +28,9 @@ function MissionProgressCell({
   mission: MissionListItem;
 }) {
   const pct = missionProgressPct(mission.progress);
+  const done = mission.completed;
 
-  if (mission.completed) {
+  if (done) {
     return <span className="missions-list__dash">—</span>;
   }
 
@@ -49,7 +50,12 @@ function MissionProgressCell({
     );
   }
 
-  return <span className="missions-list__dash">—</span>;
+  return null;
+}
+
+function missionHasProgressBar(mission: MissionListItem): boolean {
+  if (mission.completed) return false;
+  return mission.progress != null && missionProgressPct(mission.progress) != null;
 }
 
 export function MissionRow({
@@ -65,10 +71,13 @@ export function MissionRow({
   const isLinkTask = isAdminLinkMission(mission) && Boolean(mission.targetUrl);
   const href = guestMode ? null : getMissionHref(mission);
   const interactive = !guestMode && !done && (isLinkTask || href != null);
+  const hasProgressBar = missionHasProgressBar(mission);
+  const kindLabel = MISSION_KIND_LABEL[mission.taskKind];
 
   const rowClassName = [
     "missions-list__row",
     done ? "missions-list__row--done" : "",
+    hasProgressBar ? "missions-list__row--has-progress" : "",
     interactive ? "missions-list__row--interactive" : "",
     guestMode ? "missions-list__row--guest" : "",
   ]
@@ -97,11 +106,22 @@ export function MissionRow({
               {infoText}
             </InfoTip>
           ) : null}
+          <span className="missions-list__kind missions-list__kind--inline">{kindLabel}</span>
         </div>
-        <p className="missions-list__kind">{MISSION_KIND_LABEL[mission.taskKind]}</p>
+        <p
+          className={`missions-list__kind missions-list__kind--mobile${
+            hasProgressBar ? " missions-list__kind--hide-mobile-progress" : ""
+          }`}
+        >
+          {kindLabel}
+        </p>
       </div>
 
-      <div className="missions-list__cell missions-list__cell--progress">
+      <div
+        className={`missions-list__cell missions-list__cell--progress${
+          !hasProgressBar && !done ? " missions-list__cell--progress-empty" : ""
+        }`}
+      >
         <MissionProgressCell mission={mission} />
       </div>
 

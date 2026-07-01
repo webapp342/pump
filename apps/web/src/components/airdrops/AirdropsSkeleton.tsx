@@ -1,60 +1,57 @@
 import { Skeleton } from "@/components/ui/Skeleton";
-import {
-  SkeletonArenaFilterChips,
-  SkeletonArenaToolbar,
-  SkeletonHighlightCards,
-  SkeletonKothBanner,
-} from "@/components/ui/skeleton-parts";
 
 export function AirdropsSkeleton() {
   return (
-    <div className="space-y-3 md:space-y-4" aria-busy="true" aria-label="Loading airdrops">
-      <section className="space-y-2 md:space-y-3">
-        <Skeleton variant="line" className="h-3 w-32" />
-        <SkeletonKothBanner />
-        <div className="scroll-strip-row">
-          <Skeleton variant="line" className="h-3 w-14 shrink-0" />
-          <div className="flex gap-2 overflow-hidden">
-            {Array.from({ length: 4 }).map((_, index) => (
-              <Skeleton key={index} className="h-8 w-20 shrink-0 rounded-full" />
-            ))}
+    <div className="airdrops-page" aria-busy="true" aria-label="Loading airdrops">
+      <div className="airdrops-hub">
+        <header className="airdrops-header">
+          <div className="airdrops-page-head">
+            <Skeleton variant="line" className="h-7 w-28" />
           </div>
-        </div>
-      </section>
-
-      <SkeletonHighlightCards />
-
-      <div className="space-y-2 md:space-y-3">
-        <div className="flex items-center justify-between gap-3">
-          <Skeleton variant="line" className="h-3 w-32" />
-          <Skeleton className="hidden h-9 w-28 rounded-md md:block" />
-        </div>
-
-        <SkeletonArenaToolbar withViewToggle={false} />
-        <SkeletonArenaFilterChips count={8} />
-        <div className="arena-filter-bar-wrap md:hidden">
-          <SkeletonArenaFilterChips count={6} />
-        </div>
-
-        <section className="panel-surface overflow-hidden">
-          <div className="sheet-list">
-            {Array.from({ length: 7 }).map((_, index) => (
-              <div key={index} className="p-3 md:p-4">
-                <div className="flex items-start gap-3">
-                  <Skeleton variant="circle" className="h-10 w-10 shrink-0" />
-                  <div className="min-w-0 flex-1 space-y-2">
-                    <Skeleton className="h-4 w-40 max-w-full" />
-                    <Skeleton variant="line" className="h-3 w-28" />
-                    <div className="flex flex-wrap gap-2 pt-1">
-                      {Array.from({ length: 4 }).map((_, chipIndex) => (
-                        <Skeleton key={chipIndex} variant="line" className="h-3 w-16" />
-                      ))}
+          <div className="airdrops-toolbar">
+            <div className="airdrops-toolbar__shell">
+              <div className="airdrops-toolbar__hero-row">
+                <div className="space-y-2">
+                  <Skeleton variant="line" className="h-3 w-24" />
+                  <Skeleton className="h-8 w-20" />
+                  <Skeleton variant="line" className="h-3 w-32" />
+                </div>
+                <div className="space-y-2.5">
+                  {Array.from({ length: 3 }).map((_, index) => (
+                    <div key={index} className="flex items-center justify-between gap-4">
+                      <Skeleton variant="line" className="h-3 w-14" />
+                      <Skeleton variant="line" className="h-3 w-6" />
                     </div>
-                  </div>
+                  ))}
                 </div>
               </div>
-            ))}
+            </div>
           </div>
+        </header>
+
+        <div className="airdrops-filter-bar">
+          <div className="airdrops-filter-bar__main">
+            <div className="airdrops-filter-bar__search">
+              <Skeleton className="h-9 w-full rounded-md md:h-[2.25rem] md:w-36" />
+            </div>
+            <div className="flex flex-1 gap-2 overflow-hidden px-1 md:px-0">
+              {Array.from({ length: 5 }).map((_, index) => (
+                <Skeleton key={index} className="h-8 w-20 shrink-0 rounded-md md:h-9" />
+              ))}
+            </div>
+          </div>
+          <Skeleton variant="line" className="mr-3 hidden h-8 w-16 sm:block" />
+        </div>
+
+        <section className="airdrops-list">
+          {Array.from({ length: 6 }).map((_, index) => (
+            <div key={index} className="airdrops-list__row airdrops-list__row--skeleton">
+              <Skeleton variant="circle" className="h-7 w-7 shrink-0" />
+              <Skeleton className="h-4 w-24" />
+              <Skeleton variant="line" className="h-3 w-20" />
+              <Skeleton className="h-5 w-16 rounded-full" />
+            </div>
+          ))}
         </section>
       </div>
     </div>

@@ -146,20 +146,17 @@ export function MissionsPanel() {
 
   const filterCounts = useMemo(
     () => ({
-      all: totalCount,
       open: openCount,
       done: completedCount,
     }),
-    [totalCount, openCount, completedCount]
+    [openCount, completedCount]
   );
 
   const boardMissions = useMemo(() => {
     if (!data) return [];
-    return data.missions.filter((mission) => {
-      if (activeFilter === "open") return !mission.completed;
-      if (activeFilter === "done") return mission.completed;
-      return true;
-    });
+    return data.missions.filter((mission) =>
+      activeFilter === "done" ? mission.completed : !mission.completed
+    );
   }, [data, activeFilter]);
 
   if (!isConnected || !address) {
@@ -222,11 +219,7 @@ export function MissionsPanel() {
               ) : (
                 <div className="empty-state missions-empty-state">
                   <p className="empty-state-copy">
-                    {activeFilter === "done"
-                      ? "Nothing completed yet."
-                      : activeFilter === "open"
-                        ? "All caught up."
-                        : "No missions yet."}
+                    {activeFilter === "done" ? "Nothing completed yet." : "All caught up."}
                   </p>
                 </div>
               )}

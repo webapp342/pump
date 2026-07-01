@@ -3,13 +3,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAccount } from "wagmi";
 import type { ArenaFilterCounts, KothSummary, TokenListItem } from "@/lib/db/launchpad";
-import { ArenaMcapTicker } from "@/components/arena/ArenaMcapTicker";
+import { ArenaFilterNav } from "@/components/arena/ArenaFilterNav";
 import { ArenaShortcutsModal } from "@/components/arena/ArenaShortcutsModal";
 import { ArenaTokenCard } from "@/components/arena/ArenaTokenCard";
 import { ArenaWatchlistSheet } from "@/components/arena/ArenaWatchlistSheet";
-import { FieldSearchInput } from "@/components/ui/FieldSearchInput";
-import { SectionHeadingIcon } from "@/components/ui/IconLabel";
-import { MetricIcons } from "@/lib/metric-icons";
 import { useFavorites } from "@/components/favorites/FavoritesProvider";
 import { ArenaSwipeTradeBar } from "@/components/arena/ArenaSwipeTradeBar";
 import { useBnbUsdPrice } from "@/hooks/useBnbUsdPrice";
@@ -45,15 +42,6 @@ import {
 } from "@/lib/arena-client-api";
 import type { ArenaHomePayload } from "@/lib/arena-server";
 import { resolveDisplayNativeUsd } from "@/lib/native-usd-price";
-
-const ARENA_FILTER_ITEMS = [
-  ["new", "New", "Newest"],
-  ["all", "All", "All"],
-  ["movers", "Movers", "Movers"],
-  ["hasAirdrop", "Airdrop", "Has airdrop"],
-  ["kothContenders", "KOTH", "KOTH contenders"],
-  ["favorites", "Favorites", "Favorites"],
-] as const;
 
 const SERVER_BOARD_FILTERS = new Set<BoardFilter>([
   "movers",
@@ -129,58 +117,6 @@ function emptyExploreFilterCopy(
     default:
       return "No coins match this filter.";
   }
-}
-
-function ArenaFilterChips({
-  activeFilter,
-  filterCounts,
-  onSelect,
-}: {
-  activeFilter: BoardFilter;
-  filterCounts: Record<string, number>;
-  onSelect: (filter: BoardFilter) => void;
-}) {
-  return (
-    <>
-      {ARENA_FILTER_ITEMS.map(([key, mobileLabel, desktopLabel]) => {
-        const count = filterCounts[key] ?? 0;
-        const isFavorites = key === "favorites";
-        return (
-          <button
-            key={key}
-            type="button"
-            role="tab"
-            aria-selected={activeFilter === key}
-            onClick={() => onSelect(key)}
-            className={`arena-filter-chip ${
-              activeFilter === key ? "arena-filter-chip-active" : ""
-            }`}
-          >
-            {isFavorites ? (
-              <>
-                <span className="inline-flex items-center gap-1 md:hidden">
-                  <span className="text-lg leading-none">★</span>
-                  <span>({count})</span>
-                </span>
-                <span className="hidden md:inline">
-                  {desktopLabel} ({count})
-                </span>
-              </>
-            ) : (
-              <>
-                <span className="md:hidden">
-                  {mobileLabel} ({count})
-                </span>
-                <span className="hidden md:inline">
-                  {desktopLabel} ({count})
-                </span>
-              </>
-            )}
-          </button>
-        );
-      })}
-    </>
-  );
 }
 
 type FlashTone = "up" | "down";
@@ -654,6 +590,12 @@ export function ArenaListClient({
   const loadMoreRefFn = useRef(loadMore);
   loadMoreRefFn.current = loadMore;
 
+  const handleRefresh = useCallback(async () => {
+    listLimitRef.current = ARENA_PAGE_INITIAL;
+    await load(ARENA_PAGE_INITIAL);
+    await loadFavoriteTokens();
+  }, [load, loadFavoriteTokens]);
+
   const loadFavoriteTokensRef = useRef(loadFavoriteTokens);
   loadFavoriteTokensRef.current = loadFavoriteTokens;
 
@@ -1003,95 +945,72 @@ export function ArenaListClient({
       <ArenaShortcutsModal open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
 
       <div className="arena-page__sticky">
-        <ArenaMcapTicker tokens={mcapRankedTokens} />
+        <div className="arena-hub">
+          <ArenaFilterNav
+            activeFilter={activeFilter}
+            filterCounts={filterCounts}
+            loading={boardRefreshing}
+            search={search}
+            searchInputRef={searchInputRef}
+            onSearchChange={setSearch}
+            onSelect={setArenaFilter}
+            onRefresh={() => {
+              void handleRefresh();
+            }}
+          />
 
-        <div className="arena-page__controls space-y-2 md:space-y-3">
-          <div className="flex items-center justify-between gap-2">
-            <SectionHeadingIcon icon={MetricIcons.exploreCoins}>Explore coins</SectionHeadingIcon>
-            <ArenaSwipeTradeBar />
-          </div>
-
-          <div className="arena-toolbar">
-            <div className="arena-search-group">
-              <div className="arena-toolbar-search">
-                <FieldSearchInput
-                  ref={searchInputRef}
-                  embedded
-                  fieldOnly
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search coins"
-                />
+          <div className="arena-options-bar">
+            <div className="arena-options-bar__controls flex flex-wrap items-center gap-2">
+              <label className="flex items-center gap-2 text-caption text-pump-muted">
+                <span className="hidden sm:inline">Sort</span>
+                <select
+                  value={cardsSort}
+                  onChange={(event) =>
+                    setCardsSortPreference(event.target.value as ArenaCardsSortKey)
+                  }
+                  className="field-input h-8 min-w-[9rem] bg-transparent py-1 text-caption"
+                  aria-label="Sort cards by"
+                >
+                  {(Object.keys(ARENA_CARDS_SORT_LABELS) as ArenaCardsSortKey[]).map((key) => (
+                    <option key={key} value={key}>
+                      {ARENA_CARDS_SORT_LABELS[key]}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <div className="arena-view-toggle" role="group" aria-label="Card density">
+                <button
+                  type="button"
+                  onClick={() => setCardsDensityPreference("comfortable")}
+                  className={`px-3 py-1.5 text-caption ${
+                    cardsDensity === "comfortable" ? "chip-button-active" : "chip-button"
+                  }`}
+                  aria-pressed={cardsDensity === "comfortable"}
+                >
+                  Comfortable
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCardsDensityPreference("compact")}
+                  className={`px-3 py-1.5 text-caption ${
+                    cardsDensity === "compact" ? "chip-button-active" : "chip-button"
+                  }`}
+                  aria-pressed={cardsDensity === "compact"}
+                >
+                  Compact
+                </button>
               </div>
             </div>
-            <div className="arena-toolbar-watchlist shrink-0 md:hidden">
-              <ArenaWatchlistSheet
-                tokens={arenaTokenPool}
-                bnbUsd={effectiveBnbUsd}
-                flashes={flashes}
-                animatedCaps={animatedCaps}
-              />
-            </div>
-            <div className="arena-filter-bar-wrap hidden md:block">
-              <div className="arena-filter-bar" role="tablist" aria-label="Arena filters">
-                <ArenaFilterChips
-                  activeFilter={activeFilter}
-                  filterCounts={filterCounts}
-                  onSelect={setArenaFilter}
+            <div className="arena-options-bar__actions flex shrink-0 items-center gap-2">
+              <div className="md:hidden">
+                <ArenaWatchlistSheet
+                  tokens={arenaTokenPool}
+                  bnbUsd={effectiveBnbUsd}
+                  flashes={flashes}
+                  animatedCaps={animatedCaps}
                 />
               </div>
-            </div>
-          </div>
-
-          <div className="arena-filter-bar-wrap md:hidden">
-            <div className="arena-filter-bar" role="tablist" aria-label="Arena filters">
-              <ArenaFilterChips
-                activeFilter={activeFilter}
-                filterCounts={filterCounts}
-                onSelect={setArenaFilter}
-              />
-            </div>
-          </div>
-
-          <div className="arena-page__sort-row flex flex-wrap items-center gap-2">
-            <label className="flex items-center gap-2 text-caption text-pump-muted">
-              <span className="hidden sm:inline">Sort</span>
-              <select
-                value={cardsSort}
-                onChange={(event) =>
-                  setCardsSortPreference(event.target.value as ArenaCardsSortKey)
-                }
-                className="field-input h-8 min-w-[9rem] bg-pump-surface/75 py-1 text-caption"
-                aria-label="Sort cards by"
-              >
-                {(Object.keys(ARENA_CARDS_SORT_LABELS) as ArenaCardsSortKey[]).map((key) => (
-                  <option key={key} value={key}>
-                    {ARENA_CARDS_SORT_LABELS[key]}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <div className="arena-view-toggle" role="group" aria-label="Card density">
-              <button
-                type="button"
-                onClick={() => setCardsDensityPreference("comfortable")}
-                className={`px-3 py-1.5 text-caption ${
-                  cardsDensity === "comfortable" ? "chip-button-active" : "chip-button"
-                }`}
-                aria-pressed={cardsDensity === "comfortable"}
-              >
-                Comfortable
-              </button>
-              <button
-                type="button"
-                onClick={() => setCardsDensityPreference("compact")}
-                className={`px-3 py-1.5 text-caption ${
-                  cardsDensity === "compact" ? "chip-button-active" : "chip-button"
-                }`}
-                aria-pressed={cardsDensity === "compact"}
-              >
-                Compact
-              </button>
+              <ArenaSwipeTradeBar />
             </div>
           </div>
         </div>

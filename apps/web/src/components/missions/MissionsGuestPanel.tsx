@@ -34,11 +34,9 @@ export function MissionsGuestPanel({ onSignIn }: MissionsGuestPanelProps) {
   const [activeFilter, setActiveFilter] = useState<MissionFilter>("open");
   const filterCounts = guestMissionFilterCounts();
 
-  const previewMissions = GUEST_MISSION_ROWS.filter((mission) => {
-    if (activeFilter === "open") return !mission.completed;
-    if (activeFilter === "done") return mission.completed;
-    return true;
-  });
+  const previewMissions = GUEST_MISSION_ROWS.filter((mission) =>
+    activeFilter === "done" ? mission.completed : !mission.completed
+  );
 
   return (
     <div className="missions-page">

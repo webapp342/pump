@@ -1,4 +1,4 @@
-export type MissionFilter = "all" | "open" | "done";
+export type MissionFilter = "open" | "done";
 
 export type MissionProgress = {
   current: number;
