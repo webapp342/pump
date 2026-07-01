@@ -1,10 +1,8 @@
-import { AppShell } from "@/components/layout/AppShell";
-import { ArenaHomeServer } from "@/components/arena/ArenaHomeServer";
+import { resolveDefaultTradeHref } from "@/lib/trade-default";
+import { TradeRedirectClient } from "@/app/trade/TradeRedirectClient";
 
-export default function HomePage() {
-  return (
-    <AppShell>
-      <ArenaHomeServer />
-    </AppShell>
-  );
+/** App home — last visited token, or top market-cap when none saved yet. */
+export default async function HomePage() {
+  const fallbackHref = await resolveDefaultTradeHref();
+  return <TradeRedirectClient fallbackHref={fallbackHref} />;
 }

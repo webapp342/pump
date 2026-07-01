@@ -7,7 +7,7 @@ import { PumpLogo } from "@/components/brand/PumpLogo";
 import { WalletBar } from "@/components/wallet/WalletBar";
 import { ThemePicker } from "@/components/theme/ThemePicker";
 import { usePumpWallet } from "@/components/wallet/PumpWalletProvider";
-import { APP_NAV_ITEMS } from "@/lib/nav-config";
+import { APP_NAV_ITEMS, isTradeHomeRoute } from "@/lib/nav-config";
 import { PumpIcon, faPlus } from "@/lib/icons";
 import { shellHeaderInnerClass } from "@/components/layout/layout-shell";
 
@@ -37,8 +37,8 @@ export function AppHeaderView({ pathname }: { pathname: string }) {
             {APP_NAV_ITEMS.map((item) => {
               const active =
                 item.href === "/"
-                  ? pathname === "/"
-                  : pathname.startsWith(item.href);
+                  ? isTradeHomeRoute(pathname)
+                  : pathname === item.href || pathname.startsWith(`${item.href}/`);
 
               return (
                 <Link

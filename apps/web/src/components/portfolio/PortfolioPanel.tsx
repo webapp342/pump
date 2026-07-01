@@ -1045,7 +1045,7 @@ export function PortfolioPanel({
         <button
           type="button"
           onClick={() => openConnectModal?.()}
-          className="primary-button mt-4 px-6"
+          className="chip-button chip-button-active mt-4 px-6 py-2 text-sm"
         >
           Connect wallet
         </button>
@@ -1236,6 +1236,7 @@ export function PortfolioPanel({
       <div className="portfolio-hub space-y-3 md:space-y-4">
         <PortfolioHero
           walletAddress={walletAddress}
+          onOpenAvatarPicker={() => setAvatarPickerOpen(true)}
           onOpenFollowing={() => {
             setFollowModalTab("following");
             setFollowModalOpen(true);
@@ -1313,9 +1314,9 @@ export function PortfolioPanel({
                   </p>
                 </div>
               ) : holdingsCount === 0 ? (
-                <div className="panel-surface empty-state">
+                <div className="panel-surface empty-state flex flex-col items-center justify-center py-10">
                   <p className="empty-state-copy">No open positions yet.</p>
-                  <Link href="/" className="primary-button mt-3 px-5 py-2 text-body-sm">
+                  <Link href="/arena" className="chip-button chip-button-active mt-4 px-4 py-1.5 text-caption">
                     Explore Arena
                   </Link>
                 </div>

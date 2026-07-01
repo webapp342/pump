@@ -6,7 +6,7 @@ export default function CreatePage() {
   return (
     <AppShell>
       <div className="space-y-3 md:space-y-4">
-        <PageBackLink href="/" />
+        <PageBackLink href="/arena" />
         <CreateMemeForm />
       </div>
     </AppShell>

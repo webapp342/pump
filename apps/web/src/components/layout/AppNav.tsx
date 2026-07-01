@@ -19,7 +19,7 @@ export function AppNavView({ pathname }: { pathname: string }) {
               prefetch={true}
               aria-current={active ? "page" : undefined}
               className={`bottom-nav-item${active ? " bottom-nav-item-active" : ""}${
-                item.href === "/trade" ? " bottom-nav-item--trade" : ""
+                item.href === "/" ? " bottom-nav-item--trade" : ""
               }`}
             >
               <span className="bottom-nav-item__icon" aria-hidden>
