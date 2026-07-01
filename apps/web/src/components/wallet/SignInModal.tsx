@@ -200,6 +200,23 @@ export function SignInModal({ open, onClose, onSuccess }: SignInModalProps) {
                 </button>
               ) : null}
 
+              {process.env.NODE_ENV === "development" ? (
+                <button
+                  type="button"
+                  className={providerButtonClass}
+                  disabled={Boolean(pending)}
+                  onClick={() => {
+                    setPending("telegram"); // just to show loading state
+                    window.location.assign("/api/auth/guest");
+                  }}
+                >
+                  <div className="flex h-5 w-5 items-center justify-center rounded-full bg-pump-border/20 text-pump-text">
+                    <PumpIcon icon={faShieldCheck} className="h-3 w-3" />
+                  </div>
+                  Continue as Guest (Local)
+                </button>
+              ) : null}
+
               {error ? (
                 <p role="alert" aria-live="polite" className="notice-warning text-left leading-snug">
                   {error}
