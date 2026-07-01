@@ -25,7 +25,7 @@ export function CreatorFeesCard({
       value={formatUsdReadable(totalUsd, { compact: true })}
       actionsInlineFromMd
       actions={
-        <button type="button" onClick={onOpenModal} className="primary-button">
+        <button type="button" onClick={onOpenModal} className="secondary-button">
           Claim
         </button>
       }

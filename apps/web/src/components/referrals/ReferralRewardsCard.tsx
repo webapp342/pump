@@ -50,7 +50,7 @@ export function ReferralRewardsCard({
               <PumpIcon icon={faShare} className="h-4 w-4 shrink-0" />
               Share
             </button>
-            <button type="button" onClick={onOpenModal} className="primary-button">
+            <button type="button" onClick={onOpenModal} className="secondary-button">
               Claim
             </button>
           </>

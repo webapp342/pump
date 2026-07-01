@@ -118,7 +118,7 @@ export function PortfolioAirdropsSection({
     return (
       <section className="panel-surface portfolio-rewards-section empty-state">
         <p className="empty-state-copy">No joined airdrops yet.</p>
-        <Link href="/airdrops" className="primary-button mt-3 px-5 py-2 text-body-sm">
+        <Link href="/airdrops" className="chip-button chip-button-active mt-3 px-4 py-1.5 text-caption">
           Browse airdrops
         </Link>
       </section>

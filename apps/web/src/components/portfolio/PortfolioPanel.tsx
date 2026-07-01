@@ -1038,17 +1038,21 @@ export function PortfolioPanel({
     }
 
     return (
-      <div className="panel-surface empty-state">
-        <p className="empty-state-copy">
-          Connect your wallet to view holdings, creator fees, and launched tokens.
-        </p>
-        <button
-          type="button"
-          onClick={() => openConnectModal?.()}
-          className="chip-button chip-button-active mt-4 px-6 py-2 text-sm"
-        >
-          Connect wallet
-        </button>
+      <div className="portfolio-page">
+        <div className="portfolio-hub">
+          <div className="empty-state py-12">
+            <p className="empty-state-copy">
+              Connect your wallet to view holdings, creator fees, and launched tokens.
+            </p>
+            <button
+              type="button"
+              onClick={() => openConnectModal?.()}
+              className="chip-button chip-button-active mt-4 px-6 py-2 text-sm"
+            >
+              Connect wallet
+            </button>
+          </div>
+        </div>
       </div>
     );
   }
@@ -1233,7 +1237,8 @@ export function PortfolioPanel({
         />
       ) : null}
 
-      <div className="portfolio-hub space-y-3 md:space-y-4">
+      <div className="portfolio-page">
+        <div className="portfolio-hub">
         <PortfolioHero
           walletAddress={walletAddress}
           onOpenAvatarPicker={() => setAvatarPickerOpen(true)}
@@ -1268,6 +1273,7 @@ export function PortfolioPanel({
           rewardsPending={rewardsPending}
         />
 
+        <div className="portfolio-hub__body">
         {activeTab === "holdings" ? (
           <div className="space-y-2 md:space-y-3">
             <div className="portfolio-tab-toolbar flex flex-wrap items-center justify-end gap-2">
@@ -1625,6 +1631,8 @@ export function PortfolioPanel({
             onOpenReferrerClaim={() => setReferrerClaimOpen(true)}
           />
         ) : null}
+        </div>
+        </div>
       </div>
     </>
   );

@@ -24,7 +24,7 @@ export function PortfolioRewardsTab({
   onOpenReferrerClaim,
 }: PortfolioRewardsTabProps) {
   return (
-    <div className="portfolio-rewards-tab space-y-3">
+    <div className="portfolio-rewards-tab">
       <div className="portfolio-rewards-tab__grid">
         <CreatorFeesCard
           totalBnb={creatorFeesTotalBnb}
