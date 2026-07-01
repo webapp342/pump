@@ -6862,6 +6862,45 @@ code,
     padding-bottom: 0.5rem;
   }
 
+  .portfolio-page .portfolio-holdings-grid {
+    table-layout: fixed;
+    width: 100%;
+  }
+
+  .portfolio-page .portfolio-holdings-grid__col-coin {
+    width: 38%;
+  }
+
+  .portfolio-page .portfolio-holdings-grid__col-value {
+    width: 14%;
+  }
+
+  .portfolio-page .portfolio-holdings-grid__col-entry {
+    width: 14%;
+  }
+
+  .portfolio-page .portfolio-holdings-grid__col-pnl {
+    width: 18%;
+  }
+
+  .portfolio-page .portfolio-holdings-grid__col-trade {
+    width: 9rem;
+  }
+
+  .portfolio-page .portfolio-holdings-grid__num,
+  .portfolio-page .portfolio-holdings-grid thead th.portfolio-holdings-grid__num {
+    text-align: right;
+  }
+
+  .portfolio-page .portfolio-holdings-grid__trade,
+  .portfolio-page .portfolio-holdings-grid thead th.portfolio-holdings-grid__trade {
+    text-align: right;
+  }
+
+  .portfolio-page .portfolio-holdings-grid__trade > * {
+    justify-content: flex-end;
+  }
+
   .portfolio-section-surface {
     overflow: hidden;
   }
@@ -6923,6 +6962,15 @@ code,
     outline-offset: 2px;
   }
 
+  .portfolio-page .portfolio-hub-hero__wallet {
+    margin-top: 0.0625rem;
+  }
+
+  .portfolio-page .portfolio-hub-hero__wallet .token-detail-toolbar__age {
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.01em;
+  }
+
   .portfolio-page .portfolio-hub-hero__social {
     display: flex;
     flex-wrap: wrap;
@@ -6949,13 +6997,40 @@ code,
     gap: 0.375rem;
   }
 
-  .portfolio-page .portfolio-hub-hero__actions .chip-button {
+  .portfolio-page .portfolio-hub-hero__action {
+    display: inline-flex;
     min-height: 1.75rem;
-    padding: 0.25rem 0.625rem;
+    align-items: center;
+    justify-content: center;
+    padding: 0.25rem 0.75rem;
+    border: 1px solid rgb(var(--pump-border) / 0.42);
+    border-radius: var(--radius-md);
+    background: rgb(var(--pump-card-soft) / 0.4);
     font-size: var(--text-caption);
     font-weight: 600;
+    line-height: 1.2;
+    color: rgb(var(--pump-text));
     text-decoration: none;
     white-space: nowrap;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  }
+
+  .portfolio-page .portfolio-hub-hero__action:hover {
+    background: rgb(var(--pump-border) / 0.14);
+    border-color: rgb(var(--pump-border) / 0.55);
+    color: rgb(var(--pump-text));
+  }
+
+  .portfolio-page .portfolio-hub-hero__action--primary {
+    border-color: rgb(var(--pump-accent) / 0.55);
+    background: rgb(var(--pump-accent) / 0.16);
+    color: rgb(var(--pump-text));
+  }
+
+  .portfolio-page .portfolio-hub-hero__action--primary:hover {
+    background: rgb(var(--pump-accent) / 0.24);
+    border-color: rgb(var(--pump-accent) / 0.7);
   }
 
   @media (max-width: 1023px) {
@@ -6982,8 +7057,13 @@ code,
 
   .portfolio-page .portfolio-hub__body > .space-y-2,
   .portfolio-page .portfolio-hub__body > .space-y-3,
+  .portfolio-page .portfolio-hub__body > .portfolio-fees-tab,
   .portfolio-page .portfolio-hub__body > .portfolio-rewards-tab {
     padding: 0;
+  }
+
+  .portfolio-page .portfolio-hub__body > .portfolio-rewards-section {
+    border-top: none;
   }
 
   .portfolio-page .portfolio-rewards-section {
@@ -7022,78 +7102,124 @@ code,
     padding: 0.75rem 1rem;
   }
 
+  .portfolio-page .portfolio-fees-tab__grid,
   .portfolio-page .portfolio-rewards-tab__grid {
     gap: 0;
     border-bottom: 1px solid rgb(var(--pump-border) / 0.18);
   }
 
   @media (min-width: 768px) {
+    .portfolio-page .portfolio-fees-tab__grid,
     .portfolio-page .portfolio-rewards-tab__grid {
+      display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
+    .portfolio-page .portfolio-fees-tab__grid > :first-child,
     .portfolio-page .portfolio-rewards-tab__grid > :first-child {
       border-right: 1px solid rgb(var(--pump-border) / 0.18);
     }
   }
 
+  .portfolio-page .portfolio-fees-tab__card,
   .portfolio-page .portfolio-rewards-tab__card {
     border: none;
     border-radius: 0;
   }
 
-  .portfolio-page .portfolio-tab-nav.segment-control {
+  .portfolio-page .portfolio-tab-nav {
     position: sticky;
     top: calc(var(--app-header-height) + 0.125rem);
     z-index: 20;
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    width: 100%;
-    border: none;
+    padding: 0 0.875rem;
     border-bottom: 1px solid rgb(var(--pump-border) / 0.18);
-    border-radius: 0;
     background: rgb(var(--pump-bg));
-    overflow: hidden;
   }
 
-  .portfolio-page .portfolio-tab-nav.segment-control .chip-button,
-  .portfolio-page .portfolio-tab-nav.segment-control .chip-button-active {
-    margin-bottom: 0;
+  @media (min-width: 768px) {
+    .portfolio-page .portfolio-tab-nav {
+      padding-inline: 1rem;
+    }
+  }
+
+  .portfolio-page .portfolio-tab-nav__track {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .portfolio-page .portfolio-tab-nav__track::-webkit-scrollbar {
+    display: none;
+  }
+
+  .portfolio-page .portfolio-tab-nav__item {
+    position: relative;
+    display: inline-flex;
+    flex: 0 0 auto;
+    min-height: 2.625rem;
+    align-items: center;
+    justify-content: center;
+    gap: 0.375rem;
+    padding: 0.625rem 0.875rem;
     border: none;
-    border-right: 1px solid rgb(var(--pump-border) / 0.18);
+    border-bottom: 2px solid transparent;
     border-radius: 0;
+    margin-bottom: -1px;
+    background: transparent;
+    font-size: var(--text-body-sm);
+    font-weight: 500;
+    line-height: 1.25;
+    color: rgb(var(--pump-muted));
+    text-decoration: none;
+    white-space: nowrap;
+    transition: color 0.15s ease, border-color 0.15s ease;
+  }
+
+  .portfolio-page .portfolio-tab-nav__item:hover:not(.portfolio-tab-nav__item--active) {
+    color: rgb(var(--pump-text) / 0.88);
+  }
+
+  .portfolio-page .portfolio-tab-nav__item--active {
+    border-bottom-color: rgb(var(--pump-accent));
+    background: transparent;
+    color: rgb(var(--pump-text));
+    font-weight: 600;
+    box-shadow: none;
+  }
+
+  .portfolio-page .portfolio-tab-nav__item--active:hover {
+    color: rgb(var(--pump-text));
+  }
+
+  .portfolio-page .portfolio-tab-nav__count {
+    display: inline-flex;
+    min-width: 0;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border-radius: 0;
+    background: transparent;
+    font-size: var(--text-caption);
+    font-weight: 500;
+    line-height: 1.25;
+    color: rgb(var(--pump-muted));
+  }
+
+  .portfolio-page .portfolio-tab-nav__item--active .portfolio-tab-nav__count {
     background: transparent;
     color: rgb(var(--pump-muted));
   }
 
-  .portfolio-page .portfolio-tab-nav.segment-control .chip-button:last-child,
-  .portfolio-page .portfolio-tab-nav.segment-control .chip-button-active:last-child {
-    border-right: none;
-  }
-
-  .portfolio-page .portfolio-tab-nav.segment-control .chip-button-active {
-    background: rgb(var(--pump-border) / 0.08);
-    color: rgb(var(--pump-text));
-    font-weight: 600;
-  }
-
-  .portfolio-page .portfolio-tab-nav.segment-control .chip-button-ghost:hover:not(:disabled) {
-    background: rgb(var(--pump-border) / 0.06);
-    color: rgb(var(--pump-text));
-  }
-
-  .portfolio-page .portfolio-tab-nav .portfolio-tab-nav__item {
-    position: relative;
-    display: inline-flex;
-    min-height: 2.125rem;
-    align-items: center;
-    justify-content: center;
-    gap: 0.25rem;
-    margin-bottom: 0;
-    padding: 0.375rem 0.5rem;
-    font-size: var(--text-caption);
-    font-weight: 600;
-    text-decoration: none;
+  .portfolio-page .portfolio-tab-nav__dot {
+    position: absolute;
+    top: 0.3125rem;
+    right: 0.375rem;
+    width: 0.3125rem;
+    height: 0.3125rem;
+    border-radius: 9999px;
+    background: rgb(var(--pump-success));
   }
 
   .portfolio-page .portfolio-holdings-grid thead th {
@@ -7132,6 +7258,7 @@ code,
     display: none;
   }
 
+  .portfolio-fees-tab__grid,
   .portfolio-rewards-tab__grid {
     display: grid;
     grid-template-columns: 1fr;
@@ -7139,6 +7266,7 @@ code,
   }
 
   @media (min-width: 768px) {
+    .portfolio-fees-tab__grid,
     .portfolio-rewards-tab__grid {
       grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 0.75rem;

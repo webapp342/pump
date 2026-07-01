@@ -10,13 +10,15 @@ export function PortfolioPanelSkeleton() {
               <div className="token-detail-toolbar__identity">
                 <Skeleton variant="circle" className="token-detail-toolbar__logo h-7 w-7" />
                 <div className="space-y-1">
-                  <Skeleton variant="line" className="h-3.5 w-24" />
+                  <Skeleton variant="line" className="h-3 w-14" />
+                  <Skeleton variant="line" className="h-5 w-20" />
+                  <Skeleton variant="line" className="h-3 w-24" />
                   <Skeleton variant="line" className="h-3 w-32" />
                 </div>
               </div>
               <div className="token-detail-toolbar__scroll">
                 <div className="token-detail-toolbar__stats">
-                  {Array.from({ length: 5 }).map((_, index) => (
+                  {Array.from({ length: 4 }).map((_, index) => (
                     <div key={index} className="space-y-1">
                       <Skeleton variant="line" className="h-3 w-14" />
                       <Skeleton className="h-4 w-16" />
@@ -28,11 +30,13 @@ export function PortfolioPanelSkeleton() {
           </div>
         </header>
 
-        <div className="portfolio-tab-nav segment-control">
-          {Array.from({ length: 3 }).map((_, index) => (
-            <Skeleton key={index} className="h-8 flex-1 rounded-none" />
-          ))}
-        </div>
+        <nav className="portfolio-tab-nav" aria-hidden>
+          <div className="portfolio-tab-nav__track">
+            {Array.from({ length: 4 }).map((_, index) => (
+              <Skeleton key={index} variant="line" className="mx-2 h-10 w-16 shrink-0" />
+            ))}
+          </div>
+        </nav>
 
         <div className="portfolio-hub__body">
           <section className="overflow-hidden">

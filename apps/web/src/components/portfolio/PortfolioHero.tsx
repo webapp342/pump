@@ -1,10 +1,13 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { PctChange } from "@/components/ui/PctChange";
 import { useWalletFunding } from "@/components/wallet/WalletFundingProvider";
-import { shortAddress } from "@/config/chain";
+import { explorerAddressUrl, shortAddress } from "@/config/chain";
+import { copyToClipboard } from "@/lib/copy-to-clipboard";
 import { formatPortfolioHoldingValueUsd, formatUsdReadable } from "@/lib/format-usd";
+import { PumpIcon, faCheck, faCopy, faExternalLink } from "@/lib/icons";
 import { UserAvatarForAddress } from "@/components/user/UserAvatarForAddress";
 
 type PortfolioHeroProps = {
@@ -64,10 +67,18 @@ export function PortfolioHero({
   pnlFlashClass = "",
 }: PortfolioHeroProps) {
   const { openDeposit, openWithdraw } = useWalletFunding();
+  const [copiedAddress, setCopiedAddress] = useState(false);
   const displayValue =
     totalValueUsd != null && Number.isFinite(totalValueUsd)
       ? formatPortfolioHoldingValueUsd(totalValueUsd)
       : "$0.00";
+
+  async function onCopyAddress() {
+    const ok = await copyToClipboard(walletAddress);
+    if (!ok) return;
+    setCopiedAddress(true);
+    setTimeout(() => setCopiedAddress(false), 2000);
+  }
 
   return (
     <header className="portfolio-hub-hero">
@@ -87,9 +98,36 @@ export function PortfolioHero({
               />
             </button>
             <div className="token-detail-toolbar__pair-meta">
-              <span className="token-detail-toolbar__symbol financial-value">
-                {shortAddress(walletAddress)}
+              <span className="token-detail-toolbar__stat-label">Portfolio</span>
+              <span className={`token-detail-toolbar__symbol financial-value ${valueFlashClass}`}>
+                {displayValue}
               </span>
+              <div className="token-detail-toolbar__contract portfolio-hub-hero__wallet">
+                <span className="token-detail-toolbar__age financial-value">
+                  {shortAddress(walletAddress, true)}
+                </span>
+                <a
+                  href={explorerAddressUrl(walletAddress)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="token-detail-toolbar__contract-btn"
+                  aria-label="View wallet on explorer"
+                >
+                  <PumpIcon icon={faExternalLink} className="h-[14px] w-[14px]" />
+                </a>
+                <button
+                  type="button"
+                  onClick={() => void onCopyAddress()}
+                  className="token-detail-toolbar__contract-btn"
+                  aria-label={copiedAddress ? "Address copied" : "Copy wallet address"}
+                >
+                  {copiedAddress ? (
+                    <PumpIcon icon={faCheck} className="h-[14px] w-[14px]" />
+                  ) : (
+                    <PumpIcon icon={faCopy} className="h-[14px] w-[14px]" />
+                  )}
+                </button>
+              </div>
               <div className="portfolio-hub-hero__social">
                 <button type="button" onClick={onOpenFollowing} className="portfolio-hub-hero__social-link">
                   {followingCount} following
@@ -106,9 +144,6 @@ export function PortfolioHero({
 
           <div className="token-detail-toolbar__scroll">
             <div className="token-detail-toolbar__stats">
-              <Stat label="Portfolio">
-                <span className={`token-detail-toolbar__price-amount ${valueFlashClass}`}>{displayValue}</span>
-              </Stat>
               <Stat label="PnL">
                 <span className={`token-detail-toolbar__price-line ${pnlTone(totalNetPnlUsd)} ${pnlFlashClass}`}>
                   {formatUsdReadable(totalNetPnlUsd, {
@@ -118,7 +153,6 @@ export function PortfolioHero({
                   })}
                   <PctChange
                     value={portfolioValuePct}
-                    className="text-caption"
                     toneClassName={
                       portfolioValuePct != null && portfolioValuePct > 0
                         ? "text-pump-success"
@@ -153,13 +187,13 @@ export function PortfolioHero({
 
           <div className="token-detail-toolbar__actions">
             <div className="portfolio-hub-hero__actions">
-              <button type="button" onClick={openDeposit} className="chip-button chip-button-active">
+              <button type="button" onClick={openDeposit} className="portfolio-hub-hero__action portfolio-hub-hero__action--primary">
                 Deposit
               </button>
-              <button type="button" onClick={openWithdraw} className="chip-button chip-button-ghost">
+              <button type="button" onClick={openWithdraw} className="portfolio-hub-hero__action">
                 Withdraw
               </button>
-              <Link href="/" className="chip-button chip-button-ghost">
+              <Link href="/" className="portfolio-hub-hero__action">
                 Trade
               </Link>
             </div>

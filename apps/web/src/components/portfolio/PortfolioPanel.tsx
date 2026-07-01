@@ -11,14 +11,14 @@ import { contracts, pumpChain } from "@/config/chain";
 import { bondingCurveManagerAbi } from "@/lib/bonding-curve";
 import { ClaimCreatorFeesModal } from "@/components/portfolio/ClaimCreatorFeesModal";
 import { PortfolioHero } from "@/components/portfolio/PortfolioHero";
-import { PortfolioRewardsTab } from "@/components/portfolio/PortfolioRewardsTab";
+import { PortfolioFeesTab } from "@/components/portfolio/PortfolioFeesTab";
+import { PortfolioAirdropsSection } from "@/components/portfolio/PortfolioAirdropsSection";
 import { PortfolioTabNav } from "@/components/portfolio/PortfolioTabNav";
 import { ClaimReferrerFeesModal } from "@/components/portfolio/ClaimReferrerFeesModal";
 import { FollowNetworkModal } from "@/components/portfolio/FollowNetworkModal";
 import { AvatarPickerModal } from "@/components/user/AvatarPickerModal";
 import { useUserAvatar } from "@/components/user/UserAvatarProvider";
 import { TokenBoardTable } from "@/components/arena/TokenBoardTable";
-import { SellAllHoldingsModal } from "@/components/portfolio/SellAllHoldingsModal";
 import { PortfolioPanelSkeleton } from "@/components/portfolio/PortfolioPanelSkeleton";
 import { HoldingSwipeRow } from "@/components/portfolio/HoldingSwipeRow";
 import { HoldingsSwipeHint } from "@/components/portfolio/HoldingsSwipeHint";
@@ -306,20 +306,19 @@ function WalletHoldingMobileRow({
         />
         <Link
           href={`/token/${holding.tokenAddress}`}
-          className="self-center truncate text-body-sm font-medium text-pump-text"
+          className="min-w-0 self-center"
         >
-          ${holding.symbol}
-          <span className="ml-1 text-caption font-normal text-pump-muted">· on-chain</span>
+          <p className="truncate text-body-sm font-medium text-pump-text">${holding.symbol}</p>
+          <p className="truncate text-caption text-pump-muted financial-value">
+            {formatTokenBalance(balance)}
+            <span className="text-pump-muted/80"> · on-chain</span>
+          </p>
         </Link>
         <div className="self-center text-caption text-pump-muted">—</div>
-        <div className="col-span-2 col-start-2 flex w-full items-center justify-between gap-2 text-[11px] leading-tight">
+        <div className="col-span-2 col-start-2 flex w-full items-center justify-between gap-3 text-[11px] leading-tight">
           <span className="financial-value min-w-0 truncate text-pump-text">
-            <span className="text-pump-muted">VAL </span>
+            <span className="text-pump-muted">Value </span>
             {formatPortfolioHoldingValueUsd(positionValueUsd)}
-          </span>
-          <span className="financial-value min-w-0 truncate text-pump-text">
-            <span className="text-pump-muted">BAL </span>
-            {formatTokenBalance(balance)}
           </span>
           <span className="financial-value min-w-0 truncate text-right text-pump-muted">—</span>
         </div>
@@ -357,19 +356,19 @@ function WalletHoldingDesktopRow({
           />
           <div className="min-w-0">
             <p className="truncate text-body-sm font-medium text-pump-text">{holding.name}</p>
-            <p className="truncate text-caption text-pump-muted">
-              ${holding.symbol} · on-chain
+            <p className="truncate text-caption text-pump-muted financial-value">
+              {formatTokenBalance(balance)}
+              <span className="text-pump-muted/80"> · ${holding.symbol} · on-chain</span>
             </p>
           </div>
         </Link>
       </td>
-      <td className="px-4 py-3 financial-value font-semibold text-pump-text">
+      <td className="portfolio-holdings-grid__num px-4 py-3 financial-value font-semibold text-pump-text">
         {formatPortfolioHoldingValueUsd(positionValueUsd)}
       </td>
-      <td className="px-4 py-3 financial-value text-pump-text">{formatTokenBalance(balance)}</td>
-      <td className="px-4 py-3 financial-value text-pump-muted">—</td>
-      <td className="w-[1%] whitespace-nowrap px-4 py-3 text-caption text-pump-muted">—</td>
-      <td className="w-[1%] whitespace-nowrap px-4 py-3">
+      <td className="portfolio-holdings-grid__num px-4 py-3 financial-value text-pump-muted">—</td>
+      <td className="portfolio-holdings-grid__num px-4 py-3 text-caption text-pump-muted">—</td>
+      <td className="portfolio-holdings-grid__trade w-[1%] whitespace-nowrap px-4 py-3">
         <HoldingQuickActions onBuyMax={onBuyMax} onSellMax={onSellMax} />
       </td>
     </tr>
@@ -585,7 +584,6 @@ export function PortfolioPanel({
   const createdLimitRef = useRef(PORTFOLIO_LAUNCHED_INITIAL);
   const [holdingsVisibleLimit, setHoldingsVisibleLimit] = useState(PORTFOLIO_HOLDINGS_INITIAL);
   const [showDustHoldings, setShowDustHoldings] = useState(false);
-  const [sellAllOpen, setSellAllOpen] = useState(false);
   const [loadingMoreCreated, setLoadingMoreCreated] = useState(false);
   const [quickTradeTarget, setQuickTradeTarget] = useState<PortfolioQuickTradeTarget | null>(null);
   const [holdingFlashes, setHoldingFlashes] = useState<Record<string, FlashTone>>({});
@@ -1144,28 +1142,8 @@ export function PortfolioPanel({
   const totalHoldingsCount = allHoldingsRows.length;
   const visibleHoldingsRows = displayHoldingsRows.slice(0, holdingsVisibleLimit);
   const hasMoreHoldings = visibleHoldingsRows.length < displayHoldingsRows.length;
-  const sellAllHoldingsInput = displayHoldingsRows.flatMap((row) => {
-    if (row.kind === "position") {
-      return [
-        {
-          tokenAddress: row.view.position.tokenAddress,
-          symbol: row.view.position.symbol,
-          name: row.view.position.name,
-          logoUrl: row.view.position.logoUrl,
-        },
-      ];
-    }
-    return [
-      {
-        tokenAddress: row.holding.tokenAddress,
-        symbol: row.holding.symbol,
-        name: row.holding.name,
-        logoUrl: row.holding.logoUrl,
-      },
-    ];
-  });
 
-  const rewardsPending =
+  const feesPending =
     pendingBnb > 0 || (pendingReferrerWei != null && pendingReferrerWei > 0n);
 
   return (
@@ -1202,17 +1180,6 @@ export function PortfolioPanel({
       />
 
       <AvatarPickerModal open={avatarPickerOpen} onClose={() => setAvatarPickerOpen(false)} />
-
-      <SellAllHoldingsModal
-        open={sellAllOpen}
-        onClose={() => setSellAllOpen(false)}
-        holdings={sellAllHoldingsInput}
-        address={walletAddress}
-        onSold={() => {
-          void loadPortfolio(walletAddress);
-          window.dispatchEvent(new Event("pump:activity"));
-        }}
-      />
 
       {quickTradeTarget ? (
         <TradeSheet
@@ -1270,7 +1237,7 @@ export function PortfolioPanel({
             holdings: holdingsCount,
             launched: data.createdTokensTotal,
           }}
-          rewardsPending={rewardsPending}
+          feesPending={feesPending}
         />
 
         <div className="portfolio-hub__body">
@@ -1287,15 +1254,6 @@ export function PortfolioPanel({
                   {showDustHoldings
                     ? `Hide dust (<$${PORTFOLIO_DUST_MIN_VALUE_USD})`
                     : portfolioDustLabel(dustHoldingsCount)}
-                </button>
-              ) : null}
-              {holdingsCount > 0 ? (
-                <button
-                  type="button"
-                  onClick={() => setSellAllOpen(true)}
-                  className="secondary-button shrink-0 border-pump-danger/35 px-3 py-1.5 text-caption text-pump-danger hover:bg-pump-danger/10"
-                >
-                  Sell all ({holdingsCount})
                 </button>
               ) : null}
             </div>
@@ -1385,16 +1343,21 @@ export function PortfolioPanel({
                             />
                             <Link
                               href={`/token/${position.tokenAddress}`}
-                              className="self-center truncate text-body-sm font-medium text-pump-text"
+                              className="min-w-0 self-center"
                             >
-                              ${position.symbol}
+                              <p className="truncate text-body-sm font-medium text-pump-text">
+                                ${position.symbol}
+                              </p>
+                              <p className="truncate text-caption text-pump-muted financial-value">
+                                {formatTokenBalance(balance)}
+                              </p>
                             </Link>
                             <div className="self-center">
                               <PnlCell usd={openPnlUsd} pct={openPnlPct} />
                             </div>
-                            <div className="col-span-2 col-start-2 flex w-full items-center justify-between gap-2 text-[11px] leading-tight">
+                            <div className="col-span-2 col-start-2 flex w-full items-center justify-between gap-3 text-[11px] leading-tight">
                               <span className="financial-value min-w-0 truncate text-pump-text">
-                                <span className="text-pump-muted">VAL </span>
+                                <span className="text-pump-muted">Value </span>
                                 <span
                                   className={flashText(
                                     holdingFlashes[position.tokenAddress.toLowerCase()]
@@ -1403,12 +1366,8 @@ export function PortfolioPanel({
                                   {formatPortfolioHoldingValueUsd(positionValueUsd)}
                                 </span>
                               </span>
-                              <span className="financial-value min-w-0 truncate text-pump-text">
-                                <span className="text-pump-muted">BAL </span>
-                                {formatTokenBalance(balance)}
-                              </span>
                               <span className="financial-value min-w-0 truncate text-right text-pump-text">
-                                <span className="text-pump-muted">ENTRY </span>
+                                <span className="text-pump-muted">Entry </span>
                                 {formatUsdReadable(avgEntryUsd, { compact: true })}
                               </span>
                             </div>
@@ -1419,15 +1378,21 @@ export function PortfolioPanel({
                   </div>
 
                   <div className="hidden lg:block overflow-x-auto">
-                    <table className="sheet-grid portfolio-holdings-grid min-w-[820px]">
+                    <table className="sheet-grid portfolio-holdings-grid">
+                      <colgroup>
+                        <col className="portfolio-holdings-grid__col-coin" />
+                        <col className="portfolio-holdings-grid__col-value" />
+                        <col className="portfolio-holdings-grid__col-entry" />
+                        <col className="portfolio-holdings-grid__col-pnl" />
+                        <col className="portfolio-holdings-grid__col-trade" />
+                      </colgroup>
                       <thead>
                         <tr>
                           <th>Coin</th>
-                          <th>Value</th>
-                          <th>Balance</th>
-                          <th>Entry</th>
-                          <th className="w-[1%] whitespace-nowrap">P/L</th>
-                          <th className="w-[1%] whitespace-nowrap text-right">Trade</th>
+                          <th className="portfolio-holdings-grid__num">Value</th>
+                          <th className="portfolio-holdings-grid__num">Entry</th>
+                          <th className="portfolio-holdings-grid__num">P/L</th>
+                          <th className="portfolio-holdings-grid__trade">Trade</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1484,25 +1449,23 @@ export function PortfolioPanel({
                                     <p className="truncate text-body-sm font-medium text-pump-text">
                                       {position.name}
                                     </p>
-                                    <p className="truncate text-caption text-pump-muted">
-                                      ${position.symbol}
+                                    <p className="truncate text-caption text-pump-muted financial-value">
+                                      {formatTokenBalance(balance)}
+                                      <span className="text-pump-muted/80"> · ${position.symbol}</span>
                                     </p>
                                   </div>
                                 </Link>
                               </td>
-                              <td className={`px-4 py-3 financial-value font-semibold text-pump-text ${flashText(holdingFlashes[position.tokenAddress.toLowerCase()])}`}>
+                              <td className={`portfolio-holdings-grid__num px-4 py-3 financial-value font-semibold text-pump-text ${flashText(holdingFlashes[position.tokenAddress.toLowerCase()])}`}>
                                 {formatPortfolioHoldingValueUsd(positionValueUsd)}
                               </td>
-                              <td className="px-4 py-3 financial-value text-pump-text">
-                                {formatTokenBalance(balance)}
-                              </td>
-                              <td className="px-4 py-3 financial-value text-pump-text">
+                              <td className="portfolio-holdings-grid__num px-4 py-3 financial-value text-pump-text">
                                 {formatUsdReadable(avgEntryUsd, { compact: true })}
                               </td>
-                              <td className="w-[1%] whitespace-nowrap px-4 py-3">
-                                <PnlCell usd={openPnlUsd} pct={openPnlPct} align="start" />
+                              <td className="portfolio-holdings-grid__num w-[1%] whitespace-nowrap px-4 py-3">
+                                <PnlCell usd={openPnlUsd} pct={openPnlPct} align="end" />
                               </td>
-                              <td className="w-[1%] whitespace-nowrap px-4 py-3">
+                              <td className="portfolio-holdings-grid__trade w-[1%] whitespace-nowrap px-4 py-3">
                                 <HoldingQuickActions
                                   onBuyMax={() =>
                                     openQuickTrade(position.tokenAddress, position.symbol, "buy")
@@ -1620,8 +1583,8 @@ export function PortfolioPanel({
           </div>
         ) : null}
 
-        {activeTab === "rewards" ? (
-          <PortfolioRewardsTab
+        {activeTab === "fees" ? (
+          <PortfolioFeesTab
             walletAddress={walletAddress}
             creatorFeesTotalBnb={creatorFeesTotalBnb}
             bnbUsd={bnbUsd}
@@ -1630,6 +1593,10 @@ export function PortfolioPanel({
             pendingReferrerWei={pendingReferrerWei}
             onOpenReferrerClaim={() => setReferrerClaimOpen(true)}
           />
+        ) : null}
+
+        {activeTab === "airdrops" ? (
+          <PortfolioAirdropsSection address={walletAddress} embedded />
         ) : null}
         </div>
         </div>
