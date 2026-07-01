@@ -47,6 +47,36 @@ export async function getUserUsername(address: string): Promise<string | null> {
   return result.rows[0]?.username ?? null;
 }
 
+export async function getUsernamesMap(
+  addresses: string[]
+): Promise<Map<string, string | null>> {
+  const normalized = [
+    ...new Set(
+      addresses
+        .map((address) => address.toLowerCase())
+        .filter((address) => /^0x[a-f0-9]{40}$/.test(address))
+    ),
+  ];
+  const map = new Map<string, string | null>();
+  if (normalized.length === 0) return map;
+
+  for (const address of normalized) {
+    map.set(address, null);
+  }
+
+  const db = getLaunchpadPool();
+  const result = await db.query<{ address: string; username: string | null }>(
+    `SELECT address, username FROM users WHERE address = ANY($1::text[])`,
+    [normalized]
+  );
+
+  for (const row of result.rows) {
+    map.set(row.address.toLowerCase(), row.username);
+  }
+
+  return map;
+}
+
 export async function getUserProfile(address: string): Promise<UserProfile> {
   const avatarId = await getOrAssignUserAvatar(address);
   const username = await getUserUsername(address);

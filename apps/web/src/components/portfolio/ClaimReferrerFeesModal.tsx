@@ -9,14 +9,15 @@ import {
   useWriteContract,
 } from "wagmi";
 import { contracts, NATIVE_SYMBOL, pumpChain, shortAddress } from "@/config/chain";
+import { useUserAvatar } from "@/components/user/UserAvatarProvider";
 import { useBnbUsdPrice } from "@/hooks/useBnbUsdPrice";
 import { bondingCurveManagerAbi } from "@/lib/bonding-curve";
 import { buildReferralInviteUrl, truncateReferralInviteUrl } from "@/lib/referral-link";
 import { ShareSheetModal } from "@/components/ui/ShareSheetModal";
 import { ModalPortal } from "@/components/ui/ModalPortal";
-import { PumpIcon, faShare } from "@/lib/icons";
+import { PumpIcon, faInviteLink } from "@/lib/icons";
 import { referralSharePayload } from "@/lib/share-links";
-import { bnbToUsd, formatUsdReadable } from "@/lib/format-usd";
+import { formatPortfolioFeesUsd } from "@/lib/format-usd";
 
 type ClaimReferrerFeesModalProps = {
   open: boolean;
@@ -62,6 +63,7 @@ export function ClaimReferrerFeesModal({
 }: ClaimReferrerFeesModalProps) {
   const { bnbUsd } = useBnbUsdPrice();
   const { address, chain } = useAccount();
+  const { displayUsername } = useUserAvatar();
   const [shareOpen, setShareOpen] = useState(false);
 
   const { data: pendingWei, refetch: refetchPending } = useReadContract({
@@ -84,8 +86,6 @@ export function ClaimReferrerFeesModal({
 
   const pendingBnb = pendingWei != null ? Number(formatEther(pendingWei)) : 0;
   const totalBnb = claimedBnb + pendingBnb;
-  const totalUsd = bnbToUsd(totalBnb, bnbUsd);
-  const volumeUsd = bnbToUsd(referralVolumeBnb, bnbUsd);
   const wrongChain = chain?.id !== pumpChain.id;
   const canClaim = pendingBnb > 0 && !wrongChain && !isPending && !isConfirming;
 
@@ -141,7 +141,9 @@ export function ClaimReferrerFeesModal({
               Fees
             </h2>
             <p className="mt-0.5 text-caption text-pump-muted">
-              {address ? `Referrer ${shortAddress(address)}` : "Referral program"}
+              {address
+                ? `Referrer ${displayUsername ?? shortAddress(address)}`
+                : "Referral program"}
             </p>
           </div>
           <button
@@ -159,7 +161,7 @@ export function ClaimReferrerFeesModal({
             <tr>
               <th scope="row">Total earned</th>
               <td className="financial-value">
-                {formatUsdReadable(totalUsd, { compact: true })}{" "}
+                {formatPortfolioFeesUsd(totalBnb, bnbUsd)}{" "}
                 <span className="text-caption text-pump-muted">
                   ({formatFeeBnb(totalBnb)} {NATIVE_SYMBOL})
                 </span>
@@ -168,7 +170,7 @@ export function ClaimReferrerFeesModal({
             <tr>
               <th scope="row">Claimed</th>
               <td className="financial-value">
-                {formatUsdReadable(bnbToUsd(claimedBnb, bnbUsd), { compact: true })}{" "}
+                {formatPortfolioFeesUsd(claimedBnb, bnbUsd)}{" "}
                 <span className="text-caption text-pump-muted">
                   ({formatFeeBnb(claimedBnb)} {NATIVE_SYMBOL})
                 </span>
@@ -177,7 +179,7 @@ export function ClaimReferrerFeesModal({
             <tr>
               <th scope="row">Pending</th>
               <td className="financial-value">
-                {formatUsdReadable(bnbToUsd(pendingBnb, bnbUsd), { compact: true })}{" "}
+                {formatPortfolioFeesUsd(pendingBnb, bnbUsd)}{" "}
                 <span className="text-caption text-pump-muted">
                   ({formatFeeBnb(pendingBnb)} {NATIVE_SYMBOL})
                 </span>
@@ -190,7 +192,7 @@ export function ClaimReferrerFeesModal({
             <tr>
               <th scope="row">Ref. volume</th>
               <td className="financial-value">
-                {formatUsdReadable(volumeUsd, { compact: true })}{" "}
+                {formatPortfolioFeesUsd(referralVolumeBnb, bnbUsd)}{" "}
                 <span className="text-caption text-pump-muted">
                   ({formatVolumeBnb(referralVolumeBnb)} {NATIVE_SYMBOL})
                 </span>
@@ -213,7 +215,7 @@ export function ClaimReferrerFeesModal({
               onClick={() => setShareOpen(true)}
               className="secondary-button mt-2 inline-flex items-center justify-center gap-1.5"
             >
-              <PumpIcon icon={faShare} className="h-4 w-4 shrink-0" />
+              <PumpIcon icon={faInviteLink} className="h-3.5 w-3.5 shrink-0 opacity-80" />
               Share
             </button>
           </div>

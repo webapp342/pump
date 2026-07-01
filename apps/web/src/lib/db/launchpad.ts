@@ -4,6 +4,14 @@ import { getLaunchpadReadPool, getLaunchpadWritePool } from "@/lib/db/pool";
 import { parseSocialLinksFromDb, type TokenSocialLinks } from "@/lib/token-social";
 import { useBondingStateCounts, useMvTokenStats, useTokenBoardStats } from "@/lib/db/perf-flags";
 import {
+  attachAddressDisplayNames,
+  attachCreatorDisplayNames,
+  attachHolderDisplayNames,
+  attachTraderDisplayNames,
+} from "@/lib/user-display";
+import { resolveDisplayUsername } from "@/lib/username";
+import { getUserUsername } from "@/lib/db/users";
+import {
   BONDING_TOKEN_SUPPLY_HUMAN,
   BONDING_VIRTUAL_BNB_HUMAN,
   spotPriceBnbFromBondingDecimals,
@@ -41,6 +49,8 @@ export type TokenListItem = {
   symbol: string;
   name: string;
   creatorAddress: string;
+  creatorUsername?: string | null;
+  creatorDisplayUsername?: string;
   status: string;
   createdAt: string;
   launchBlockNumber: string;
@@ -566,7 +576,7 @@ export async function listArenaBoardTokens(
   const queryParams =
     filterParams.length > 0 ? [limit, offset, filterParams] : [limit, offset];
   const result = await db.query<TokenListQueryRow>(sql, queryParams);
-  return result.rows.map(mapTokenListRow);
+  return attachCreatorDisplayNames(result.rows.map(mapTokenListRow));
 }
 
 export async function listTokenListItemsByAddresses(
@@ -599,7 +609,7 @@ export async function listTokenListItemsByAddresses(
   const db = getLaunchpadReadPool();
   const sql = `${buildTokenListSelectSql(baseInner)} ORDER BY bt.created_at DESC`;
   const result = await db.query<TokenListQueryRow>(sql, [normalized]);
-  return result.rows.map(mapTokenListRow);
+  return attachCreatorDisplayNames(result.rows.map(mapTokenListRow));
 }
 
 async function countKothContenders(): Promise<number> {
@@ -680,7 +690,7 @@ export async function listTokensPaginated(
   );
   const result = await db.query<TokenListQueryRow>(sql, [limit, offset]);
 
-  return result.rows.map(mapTokenListRow);
+  return attachCreatorDisplayNames(result.rows.map(mapTokenListRow));
 }
 
 export async function listTokens(limit = 50): Promise<TokenListItem[]> {
@@ -847,7 +857,7 @@ export async function listTokensByCreator(
   );
   const result = await db.query<TokenListQueryRow>(sql, params);
 
-  return result.rows.map(mapTokenListRow);
+  return attachCreatorDisplayNames(result.rows.map(mapTokenListRow));
 }
 
 export async function countTokensByCreator(creatorAddress: string): Promise<number> {
@@ -1022,6 +1032,8 @@ export type TradeItem = {
   id: string;
   side: string;
   traderAddress: string;
+  traderUsername?: string | null;
+  traderDisplayUsername?: string;
   /** Gross native BNB from Trade event. */
   nativeAmount: string;
   feeBnb?: string;
@@ -1039,6 +1051,7 @@ export type TradeItem = {
 
 export type TokenHolderSnapshot = {
   address: string;
+  displayUsername?: string;
   tokenBalance: string;
   onChainBalance?: string;
   totalBoughtBnb: string;
@@ -1111,11 +1124,15 @@ export async function getTokenByAddress(address: string): Promise<TokenDetail | 
   const row = result.rows[0];
   if (!row) return null;
 
+  const creatorUsername = await getUserUsername(row.creator_address);
+
   return {
     address: row.address,
     symbol: row.symbol,
     name: row.name,
     creatorAddress: row.creator_address,
+    creatorUsername,
+    creatorDisplayUsername: resolveDisplayUsername(row.creator_address, creatorUsername, true),
     status: row.status,
     launchBlockNumber: row.launch_block_number,
     createdAt: row.created_at.toISOString(),
@@ -1173,24 +1190,26 @@ export async function listTradesForToken(
     [address.toLowerCase(), limit, offset]
   );
 
-  return result.rows.map((row) => {
-    const gross = Number(row.zug_amount);
-    const fee = Number(row.fee_zug);
-    const net = Math.max(0, gross - fee);
-    return {
-      id: row.id,
-      side: row.side,
-      traderAddress: row.trader_address,
-      nativeAmount: row.zug_amount,
-      feeBnb: row.fee_zug,
-      netBnb: String(net),
-      tokenAmount: row.token_amount,
-      priceBnb: row.price_zug,
-      nativeUsdRate: row.native_usd_rate ?? undefined,
-      txHash: row.tx_hash,
-      blockTime: row.block_time.toISOString(),
-    };
-  });
+  return attachTraderDisplayNames(
+    result.rows.map((row) => {
+      const gross = Number(row.zug_amount);
+      const fee = Number(row.fee_zug);
+      const net = Math.max(0, gross - fee);
+      return {
+        id: row.id,
+        side: row.side,
+        traderAddress: row.trader_address,
+        nativeAmount: row.zug_amount,
+        feeBnb: row.fee_zug,
+        netBnb: String(net),
+        tokenAmount: row.token_amount,
+        priceBnb: row.price_zug,
+        nativeUsdRate: row.native_usd_rate ?? undefined,
+        txHash: row.tx_hash,
+        blockTime: row.block_time.toISOString(),
+      };
+    })
+  );
 }
 
 export async function countTradesForToken(address: string): Promise<number> {
@@ -1238,16 +1257,18 @@ export async function listTokenHolders(
     [normalized, limit, offset]
   );
 
-  return result.rows.map((row) => ({
-    address: row.address,
-    tokenBalance: row.token_balance,
-    totalBoughtBnb: row.total_bought_zug,
-    totalSoldBnb: row.total_sold_zug,
-    realizedPnlBnb: row.realized_pnl_zug,
-    remainingCostBasisBnb: row.remaining_cost_basis_zug,
-    remainingCostBasisUsd: row.remaining_cost_basis_usd,
-    realizedPnlUsd: row.realized_pnl_usd,
-  }));
+  return attachHolderDisplayNames(
+    result.rows.map((row) => ({
+      address: row.address,
+      tokenBalance: row.token_balance,
+      totalBoughtBnb: row.total_bought_zug,
+      totalSoldBnb: row.total_sold_zug,
+      realizedPnlBnb: row.realized_pnl_zug,
+      remainingCostBasisBnb: row.remaining_cost_basis_zug,
+      remainingCostBasisUsd: row.remaining_cost_basis_usd,
+      realizedPnlUsd: row.realized_pnl_usd,
+    }))
+  );
 }
 
 export async function countTokenHolders(tokenAddress: string): Promise<number> {
@@ -1570,6 +1591,7 @@ export type PortfolioSnapshot = {
 
 export type CreatorFollowListEntry = {
   address: string;
+  displayUsername?: string;
   followedAt: string;
   latestTokenAddress: string | null;
 };
@@ -2060,20 +2082,28 @@ export async function getCreatorFollowNetwork(
   ]);
 
   const counts = countsResult.rows[0];
-
-  return {
-    followingCount: counts?.following_count ?? 0,
-    followerCount: counts?.follower_count ?? 0,
-    following: followingResult.rows.map((row) => ({
+  const following = await attachAddressDisplayNames(
+    followingResult.rows.map((row) => ({
       address: row.address,
       followedAt: row.followed_at.toISOString(),
       latestTokenAddress: row.latest_token_address,
     })),
-    followers: followersResult.rows.map((row) => ({
+    true
+  );
+  const followers = await attachAddressDisplayNames(
+    followersResult.rows.map((row) => ({
       address: row.address,
       followedAt: row.followed_at.toISOString(),
       latestTokenAddress: null,
     })),
+    true
+  );
+
+  return {
+    followingCount: counts?.following_count ?? 0,
+    followerCount: counts?.follower_count ?? 0,
+    following,
+    followers,
   };
 }
 
@@ -2128,6 +2158,8 @@ export async function toggleTokenFavorite(
 
 export type CreatorCardData = {
   creatorAddress: string;
+  creatorUsername?: string | null;
+  creatorDisplayUsername?: string;
   followerCount: number;
   isFollowing: boolean;
   launchTxHash: string;
@@ -2262,8 +2294,12 @@ export async function getCreatorCardData(
   const row = result.rows[0];
   if (!row) return null;
 
+  const creatorUsername = await getUserUsername(row.creator_address);
+
   return {
     creatorAddress: row.creator_address,
+    creatorUsername,
+    creatorDisplayUsername: resolveDisplayUsername(row.creator_address, creatorUsername, true),
     followerCount: Number(row.follower_count),
     isFollowing: row.is_following,
     launchTxHash: row.launch_tx_hash,
@@ -2295,6 +2331,8 @@ export type CreatorProfileHolding = {
 
 export type CreatorProfile = {
   address: string;
+  username: string | null;
+  displayUsername: string;
   followerCount: number;
   followingCount: number;
   totalVolumeBnb: number;
@@ -2397,9 +2435,12 @@ export async function getCreatorProfile(address: string): Promise<CreatorProfile
     ]);
 
   const counts = countsResult.rows[0];
+  const username = await getUserUsername(normalized);
 
   return {
     address: normalized,
+    username,
+    displayUsername: resolveDisplayUsername(normalized, username),
     followerCount: counts?.follower_count ?? 0,
     followingCount: counts?.following_count ?? 0,
     totalVolumeBnb: Number(volumeResult.rows[0]?.total_volume_zug ?? 0),

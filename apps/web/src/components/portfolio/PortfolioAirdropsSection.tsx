@@ -117,10 +117,12 @@ export function PortfolioAirdropsSection({
     if (!embedded) return null;
     return (
       <section className="panel-surface portfolio-rewards-section empty-state">
-        <p className="empty-state-copy">No joined airdrops yet.</p>
-        <Link href="/airdrops" className="chip-button chip-button-active mt-3 px-4 py-1.5 text-caption">
-          Browse airdrops
-        </Link>
+        <p className="empty-state-copy">
+          No joined airdrops yet.{" "}
+          <Link href="/airdrops" className="text-pump-accent hover:underline">
+            Browse airdrops
+          </Link>
+        </p>
       </section>
     );
   }

@@ -53,6 +53,7 @@ import { AirdropDetailSkeleton } from "@/components/airdrops/AirdropsSkeleton";
 import { CreatorProfileModal } from "@/components/creators/CreatorProfileModal";
 import { TokenAvatar } from "@/components/token/TokenAvatar";
 import { BnbLogo } from "@/components/token/BnbLogo";
+import { UserDisplayName } from "@/components/user/UserDisplayName";
 import { UserAvatarForAddress } from "@/components/user/UserAvatarForAddress";
 import { useBnbUsdPrice } from "@/hooks/useBnbUsdPrice";
 import { formatUsdReadable, tokenAmountUsd } from "@/lib/format-usd";
@@ -565,7 +566,9 @@ function LeaderboardWalletCell({
         <span
           className={`flex flex-wrap items-center ${compact ? "gap-x-1 gap-y-0.5 text-caption" : "gap-x-1.5 gap-y-1"}`}
         >
-          <span className="font-medium text-pump-text">{shortAddress(walletAddress)}</span>
+          <span className="font-medium text-pump-text">
+            <UserDisplayName address={walletAddress} compact={compact} />
+          </span>
           {isYou ? <span className="text-caption text-pump-accent">(you)</span> : null}
           {claimed ? <span className="text-caption text-pump-accent">✓</span> : null}
           {isCreator ? <CreatorBadge /> : null}

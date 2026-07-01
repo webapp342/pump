@@ -1,11 +1,7 @@
 "use client";
 
-import { useState, type MouseEvent } from "react";
-import { NATIVE_SYMBOL, shortAddress } from "@/config/chain";
+import { NATIVE_SYMBOL } from "@/config/chain";
 import { ThemePicker } from "@/components/theme/ThemePicker";
-import { PumpIcon, faCopy } from "@/lib/icons";
-import { copyToClipboard } from "@/lib/copy-to-clipboard";
-import { startScwDepositWatch } from "@/lib/scw-balance-sync";
 import { useWalletFunding } from "@/components/wallet/WalletFundingProvider";
 
 function formatHeaderBalanceUsd(usd: number | null): string {
@@ -46,19 +42,8 @@ export function WalletAccountPanel({
   variant = "dropdown",
 }: WalletAccountPanelProps) {
   const { openDeposit, openWithdraw } = useWalletFunding();
-  const [copied, setCopied] = useState(false);
   const rootClass =
     variant === "sheet" ? "wallet-account-panel wallet-account-panel--sheet" : "wallet-account-panel";
-
-  async function onCopyAddress(event: MouseEvent<HTMLButtonElement>) {
-    event.stopPropagation();
-    const ok = await copyToClipboard(address);
-    setCopied(ok);
-    if (ok) {
-      startScwDepositWatch();
-      setTimeout(() => setCopied(false), 2000);
-    }
-  }
 
   if (variant === "sheet") {
     return (
@@ -106,20 +91,6 @@ export function WalletAccountPanel({
         </div>
 
         <div className="wallet-account-panel__menu">
-          <button
-            type="button"
-            onClick={(event) => void onCopyAddress(event)}
-            className="wallet-account-panel__menu-item wallet-account-panel__menu-item--button"
-            aria-label={copied ? "Address copied" : "Copy smart wallet address"}
-          >
-            <span className="wallet-account-panel__menu-leading">
-              <span className="section-label text-pump-muted">Wallet</span>
-              <span className="financial-value text-body-sm text-pump-text">{shortAddress(address)}</span>
-            </span>
-            <span className="wallet-account-panel__address-copy">
-              {copied ? "Copied" : <PumpIcon icon={faCopy} className="h-3.5 w-3.5" />}
-            </span>
-          </button>
           <div className="wallet-account-panel__menu-item wallet-account-panel__menu-item--static">
             <span className="wallet-account-panel__menu-leading">
               <span className="text-body-sm text-pump-text">Appearance</span>
@@ -160,19 +131,6 @@ export function WalletAccountPanel({
           ? `${formatHeaderBalanceUsd(usdAmount)} available`
           : `${formatNativeAvailable(bnbAmount)} available`}
       </p>
-
-      <button
-        type="button"
-        onClick={(event) => void onCopyAddress(event)}
-        className="wallet-account-panel__address"
-        aria-label={copied ? "Address copied" : "Copy smart wallet address"}
-      >
-        <span className="financial-value">{shortAddress(address)}</span>
-        <span className="flex items-center gap-1 text-pump-muted">
-          {copied ? "Copied" : <PumpIcon icon={faCopy} className="h-3.5 w-3.5" />}
-        </span>
-      </button>
-      <p className="mt-1 text-caption text-pump-muted">Smart wallet · deposit address</p>
 
       <div className="wallet-account-panel__actions">
         <button

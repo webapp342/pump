@@ -29,6 +29,7 @@ export {
   faGlobe,
   faGripVertical,
   faHourglassHalf,
+  faLink,
   faListUl,
   faMagnifyingGlass,
   faMoon,
@@ -76,6 +77,9 @@ export { faShieldHalved as faShieldCheck } from "@fortawesome/free-solid-svg-ico
 
 /** Lucide Share2 → FA share-nodes */
 export { faShareNodes as faShare } from "@fortawesome/free-solid-svg-icons";
+
+/** Invite / referral link — cleaner for fees & referral UI */
+export { faLink as faInviteLink } from "@fortawesome/free-solid-svg-icons";
 
 /** Lucide Search → FA magnifying-glass */
 export { faMagnifyingGlass as faSearch } from "@fortawesome/free-solid-svg-icons";

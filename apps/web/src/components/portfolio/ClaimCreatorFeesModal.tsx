@@ -12,7 +12,7 @@ import { contracts, NATIVE_SYMBOL, pumpChain } from "@/config/chain";
 import { useBnbUsdPrice } from "@/hooks/useBnbUsdPrice";
 import { bondingCurveManagerAbi } from "@/lib/bonding-curve";
 import { ModalPortal } from "@/components/ui/ModalPortal";
-import { bnbToUsd, formatUsdReadable } from "@/lib/format-usd";
+import { formatPortfolioFeesUsd } from "@/lib/format-usd";
 
 type ClaimCreatorFeesModalProps = {
   open: boolean;
@@ -65,7 +65,6 @@ export function ClaimCreatorFeesModal({
 
   const pendingBnb = pendingWei != null ? Number(formatEther(pendingWei)) : 0;
   const totalBnb = claimedBnb + pendingBnb;
-  const totalUsd = bnbToUsd(totalBnb, bnbUsd);
   const wrongChain = chain?.id !== pumpChain.id;
   const canClaim = pendingBnb > 0 && !wrongChain && !isPending && !isConfirming;
 
@@ -138,7 +137,7 @@ export function ClaimCreatorFeesModal({
             <tr>
               <th scope="row">Total earned</th>
               <td className="financial-value">
-                {formatUsdReadable(totalUsd, { compact: true })}{" "}
+                {formatPortfolioFeesUsd(totalBnb, bnbUsd)}{" "}
                 <span className="text-caption text-pump-muted">
                   ({formatFeeBnb(totalBnb)} {NATIVE_SYMBOL})
                 </span>
@@ -147,7 +146,7 @@ export function ClaimCreatorFeesModal({
             <tr>
               <th scope="row">Claimed</th>
               <td className="financial-value">
-                {formatUsdReadable(bnbToUsd(claimedBnb, bnbUsd), { compact: true })}{" "}
+                {formatPortfolioFeesUsd(claimedBnb, bnbUsd)}{" "}
                 <span className="text-caption text-pump-muted">
                   ({formatFeeBnb(claimedBnb)} {NATIVE_SYMBOL})
                 </span>
@@ -156,7 +155,7 @@ export function ClaimCreatorFeesModal({
             <tr>
               <th scope="row">Pending</th>
               <td className="financial-value">
-                {formatUsdReadable(bnbToUsd(pendingBnb, bnbUsd), { compact: true })}{" "}
+                {formatPortfolioFeesUsd(pendingBnb, bnbUsd)}{" "}
                 <span className="text-caption text-pump-muted">
                   ({formatFeeBnb(pendingBnb)} {NATIVE_SYMBOL})
                 </span>

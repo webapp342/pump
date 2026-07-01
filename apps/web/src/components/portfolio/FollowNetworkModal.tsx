@@ -2,10 +2,10 @@
 
 import { useEffect, useState } from "react";
 import type { CreatorFollowNetwork } from "@/lib/db/launchpad";
-import { shortAddress } from "@/config/chain";
 import { CreatorProfileModal } from "@/components/creators/CreatorProfileModal";
 import { ModalPortal } from "@/components/ui/ModalPortal";
 import { UserAvatarForAddress } from "@/components/user/UserAvatarForAddress";
+import { UserDisplayName } from "@/components/user/UserDisplayName";
 
 type FollowTab = "following" | "followers";
 
@@ -46,7 +46,11 @@ function FollowList({
             <UserAvatarForAddress address={entry.address} size={36} />
             <div className="min-w-0">
               <span className="financial-value text-body-sm font-medium text-pump-text">
-                {shortAddress(entry.address)}
+                {entry.displayUsername ? (
+                  entry.displayUsername
+                ) : (
+                  <UserDisplayName address={entry.address} compact />
+                )}
               </span>
               <p className="mt-0.5 text-caption text-pump-muted">
                 {formatFollowDate(entry.followedAt)}

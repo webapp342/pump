@@ -9,6 +9,7 @@ import { TokenSocialLinksBar } from "@/components/token/TokenSocialLinksBar";
 import { UserAvatarForAddress } from "@/components/user/UserAvatarForAddress";
 import { PumpIcon, faChevronDown, faChevronUp } from "@/lib/icons";
 import { shortAddress } from "@/config/chain";
+import { UserDisplayName } from "@/components/user/UserDisplayName";
 import { hapticTap } from "@/lib/haptic";
 import {
   readTokenMobileStatsExpanded,
@@ -238,7 +239,11 @@ export function TokenMobileHero({
                     size={14}
                     className="token-mobile-hero__creator-avatar shrink-0 !ring-0"
                   />
-                  <span className="truncate">{shortAddress(creatorAddress, true)}</span>
+                  <span className="truncate">
+                    {token.creatorDisplayUsername ?? (
+                      <UserDisplayName address={creatorAddress} compact />
+                    )}
+                  </span>
                 </button>
               ) : (
                 <span>—</span>

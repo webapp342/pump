@@ -1031,6 +1031,7 @@ export function TokenDetailLive({
           </div>
           <CreatorRewardsCard
               creatorAddress={liveToken.creatorAddress}
+              creatorDisplayUsername={liveToken.creatorDisplayUsername}
               launchTxHash={liveToken.launchTxHash}
               followerCount={liveToken.creatorFollowerCount}
               onAddressClick={setProfileAddress}

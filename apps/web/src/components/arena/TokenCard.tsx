@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import type { TokenListItem } from "@/lib/db/launchpad";
 import { TokenAvatar } from "@/components/token/TokenAvatar";
 import { NATIVE_SYMBOL } from "@/config/chain";
+import { UserDisplayName } from "@/components/user/UserDisplayName";
 import { useBnbUsdPrice } from "@/hooks/useBnbUsdPrice";
 import { bnbToUsd, formatUsd } from "@/lib/format-usd";
 
@@ -16,9 +17,10 @@ function formatCompactNative(value: number): string {
   return `0 ${NATIVE_SYMBOL}`;
 }
 
-function shortenAddress(address: string): string {
-  if (address.length <= 10) return address;
-  return `${address.slice(0, 6)}...${address.slice(-4)}`;
+function creatorLabel(token: TokenListItem): React.ReactNode {
+  if (token.creatorDisplayUsername) return token.creatorDisplayUsername;
+  if (token.creatorUsername) return token.creatorUsername;
+  return <UserDisplayName address={token.creatorAddress} compact />;
 }
 
 export function TokenCard({ token }: { token: TokenListItem }) {
@@ -67,7 +69,7 @@ export function TokenCard({ token }: { token: TokenListItem }) {
       </div>
 
       <div className="mt-4 flex items-center justify-between gap-3 border-t border-pump-border/10 pt-3 text-xs">
-        <span className="truncate text-pump-muted">Creator {shortenAddress(token.creatorAddress)}</span>
+        <span className="truncate text-pump-muted">Creator {creatorLabel(token)}</span>
         <span className="font-medium text-pump-accent">View details</span>
       </div>
     </Link>

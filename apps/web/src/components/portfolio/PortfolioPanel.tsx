@@ -10,7 +10,9 @@ import { useReadContract } from "wagmi";
 import { contracts, pumpChain, NATIVE_SYMBOL } from "@/config/chain";
 import { bondingCurveManagerAbi } from "@/lib/bonding-curve";
 import { ClaimCreatorFeesModal } from "@/components/portfolio/ClaimCreatorFeesModal";
+import { PortfolioGuestPanel } from "@/components/portfolio/PortfolioGuestPanel";
 import { PortfolioHero } from "@/components/portfolio/PortfolioHero";
+import { PortfolioHoldingMobileCard } from "@/components/portfolio/PortfolioHoldingMobileCard";
 import { PortfolioFeesTab } from "@/components/portfolio/PortfolioFeesTab";
 import { PortfolioAirdropsSection } from "@/components/portfolio/PortfolioAirdropsSection";
 import { PortfolioTabNav } from "@/components/portfolio/PortfolioTabNav";
@@ -321,8 +323,6 @@ function NativeCashFundingActions({
 function NativeCashMobileRow({
   nativeBnb,
   bnbUsd,
-  onDeposit,
-  onWithdraw,
 }: {
   nativeBnb: number;
   bnbUsd: number | null;
@@ -332,24 +332,12 @@ function NativeCashMobileRow({
   const nativeUsd = bnbToUsd(nativeBnb, bnbUsd);
 
   return (
-    <article className="grid grid-cols-[1.75rem_1fr_auto] gap-x-2 gap-y-2 p-2.5">
-      <NativeLogo size={28} className="row-span-2 self-start" />
-      <div className="min-w-0 self-center">
-        <p className="truncate text-body-sm font-medium text-pump-text">{NATIVE_SYMBOL}</p>
-      </div>
-      <div className="self-center text-caption text-pump-muted">—</div>
-      <div className="col-span-2 col-start-2 flex w-full flex-wrap items-center justify-between gap-x-3 gap-y-1 text-[11px] leading-tight">
-        <span className="financial-value min-w-0 truncate text-pump-text">
-          <span className="text-pump-muted">Amount </span>
-          {formatTokenBalance(nativeBnb)}
-        </span>
-        <span className="financial-value min-w-0 truncate text-pump-text">
-          <span className="text-pump-muted">Value </span>
-          {formatPortfolioHoldingValueUsd(nativeUsd)}
-        </span>
-        <NativeCashFundingActions onDeposit={onDeposit} onWithdraw={onWithdraw} />
-      </div>
-    </article>
+    <PortfolioHoldingMobileCard
+      logo={<NativeLogo size={28} />}
+      title={<p className="truncate">{NATIVE_SYMBOL}</p>}
+      amount={formatTokenBalance(nativeBnb)}
+      value={formatPortfolioHoldingValueUsd(nativeUsd)}
+    />
   );
 }
 
@@ -407,33 +395,23 @@ function WalletHoldingMobileRow({
 
   return (
     <HoldingSwipeRow onBuyMax={onBuyMax} onSellMax={onSellMax} peekOnMount={peekOnMount}>
-      <article className="grid grid-cols-[1.75rem_1fr_auto] gap-x-2 gap-y-2 p-2.5">
-        <TokenAvatar
-          address={holding.tokenAddress}
-          symbol={holding.symbol}
-          logoUrl={holding.logoUrl}
-          size={28}
-          className="row-span-2 self-start"
-        />
-        <Link
-          href={`/token/${holding.tokenAddress}`}
-          className="min-w-0 self-center"
-        >
-          <p className="truncate text-body-sm font-medium text-pump-text">${holding.symbol}</p>
-        </Link>
-        <div className="self-center text-caption text-pump-muted">—</div>
-        <div className="col-span-2 col-start-2 flex w-full flex-wrap items-center justify-between gap-x-3 gap-y-1 text-[11px] leading-tight">
-          <span className="financial-value min-w-0 truncate text-pump-text">
-            <span className="text-pump-muted">Amount </span>
-            {formatTokenBalance(balance)}
-          </span>
-          <span className="financial-value min-w-0 truncate text-pump-text">
-            <span className="text-pump-muted">Value </span>
-            {formatPortfolioHoldingValueUsd(positionValueUsd)}
-          </span>
-          <span className="financial-value min-w-0 truncate text-right text-pump-muted">—</span>
-        </div>
-      </article>
+      <PortfolioHoldingMobileCard
+        logo={
+          <TokenAvatar
+            address={holding.tokenAddress}
+            symbol={holding.symbol}
+            logoUrl={holding.logoUrl}
+            size={28}
+          />
+        }
+        title={
+          <Link href={`/token/${holding.tokenAddress}`} className="truncate">
+            ${holding.symbol}
+          </Link>
+        }
+        amount={formatTokenBalance(balance)}
+        value={formatPortfolioHoldingValueUsd(positionValueUsd)}
+      />
     </HoldingSwipeRow>
   );
 }
@@ -1189,22 +1167,10 @@ export function PortfolioPanel({
     }
 
     return (
-      <div className="portfolio-page">
-        <div className="portfolio-hub">
-          <div className="empty-state py-12">
-            <p className="empty-state-copy">
-              Connect your wallet to view holdings, creator fees, and launched tokens.
-            </p>
-            <button
-              type="button"
-              onClick={() => openConnectModal?.()}
-              className="chip-button chip-button-active mt-4 px-6 py-2 text-sm"
-            >
-              Connect wallet
-            </button>
-          </div>
-        </div>
-      </div>
+      <PortfolioGuestPanel
+        activeTab={activeTab}
+        onSignIn={() => openConnectModal?.()}
+      />
     );
   }
 
@@ -1293,7 +1259,6 @@ export function PortfolioPanel({
     totalCostBasisUsd > 0 ? (totalUnrealizedPnlUsd / totalCostBasisUsd) * 100 : null;
   const claimedBnb = data.creatorFeesClaimedBnb ?? 0;
   const pendingBnb = pendingWei != null ? Number(formatEther(pendingWei)) : 0;
-  const creatorFeesTotalBnb = claimedBnb + pendingBnb;
   const tokenHoldingsCount = displayHoldingsRows.length;
   const holdingsCount = tokenHoldingsCount + 1;
   const totalHoldingsCount = allHoldingsRows.length;
@@ -1389,7 +1354,6 @@ export function PortfolioPanel({
           followingCount={data.followingCount ?? 0}
           followerCount={data.followerCount ?? 0}
           totalValueUsd={totalEstimatedUsd}
-          totalValueNative={holdingsBnbTotal + nativeBnb}
           totalNetPnlUsd={totalNetPnlUsd}
           portfolioValuePct={portfolioValuePct}
           totalUnrealizedPnlUsd={totalUnrealizedPnlUsd}
@@ -1456,7 +1420,13 @@ export function PortfolioPanel({
                       </p>
                     </div>
                   ) : null}
-                  <div className="lg:hidden divide-y divide-pump-border/10">
+                  <div className="lg:hidden portfolio-holdings-mobile">
+                    <div className="portfolio-holdings-mobile__header">
+                      <span>Coin</span>
+                      <span className="portfolio-holdings-mobile__num">Amount</span>
+                      <span className="portfolio-holdings-mobile__num">Value</span>
+                    </div>
+                    <div className="portfolio-holdings-mobile__body">
                     <NativeCashMobileRow
                       nativeBnb={nativeBnb}
                       bnbUsd={bnbUsd}
@@ -1481,22 +1451,9 @@ export function PortfolioPanel({
                         );
                       }
 
-                      const { position, balance, remainingCostBasis, remainingCostBasisUsd } = row.view;
-                      const avgEntryUsd = positionAvgEntryUsd(
-                        balance,
-                        remainingCostBasisUsd,
-                        remainingCostBasis,
-                        bnbUsd
-                      );
+                      const { position, balance } = row.view;
                       const positionValueUsd = bnbToUsd(
                         balance * Number(position.lastPriceBnb),
-                        bnbUsd
-                      );
-                      const openPnlUsd = holdingOpenPnlUsd(row.view, bnbUsd);
-                      const openPnlPct = positionUnrealizedPct(
-                        openPnlUsd,
-                        remainingCostBasisUsd,
-                        remainingCostBasis,
                         bnbUsd
                       );
 
@@ -1509,49 +1466,35 @@ export function PortfolioPanel({
                             openQuickTrade(position.tokenAddress, position.symbol, "sell")
                           }
                         >
-                          <article className="grid grid-cols-[1.75rem_1fr_auto] gap-x-2 gap-y-2 p-2.5">
-                            <TokenAvatar
-                              address={position.tokenAddress}
-                              symbol={position.symbol}
-                              logoUrl={position.logoUrl}
-                              size={28}
-                              className="row-span-2 self-start"
-                            />
-                            <Link
-                              href={`/token/${position.tokenAddress}`}
-                              className="min-w-0 self-center"
-                            >
-                              <p className="truncate text-body-sm font-medium text-pump-text">
+                          <PortfolioHoldingMobileCard
+                            logo={
+                              <TokenAvatar
+                                address={position.tokenAddress}
+                                symbol={position.symbol}
+                                logoUrl={position.logoUrl}
+                                size={28}
+                              />
+                            }
+                            title={
+                              <Link href={`/token/${position.tokenAddress}`} className="truncate">
                                 ${position.symbol}
-                              </p>
-                            </Link>
-                            <div className="self-center">
-                              <PnlCell usd={openPnlUsd} pct={openPnlPct} />
-                            </div>
-                            <div className="col-span-2 col-start-2 flex w-full flex-wrap items-center justify-between gap-x-3 gap-y-1 text-[11px] leading-tight">
-                              <span className="financial-value min-w-0 truncate text-pump-text">
-                                <span className="text-pump-muted">Amount </span>
-                                {formatTokenBalance(balance)}
+                              </Link>
+                            }
+                            amount={formatTokenBalance(balance)}
+                            value={
+                              <span
+                                className={flashText(
+                                  holdingFlashes[position.tokenAddress.toLowerCase()]
+                                )}
+                              >
+                                {formatPortfolioHoldingValueUsd(positionValueUsd)}
                               </span>
-                              <span className="financial-value min-w-0 truncate text-pump-text">
-                                <span className="text-pump-muted">Value </span>
-                                <span
-                                  className={flashText(
-                                    holdingFlashes[position.tokenAddress.toLowerCase()]
-                                  )}
-                                >
-                                  {formatPortfolioHoldingValueUsd(positionValueUsd)}
-                                </span>
-                              </span>
-                              <span className="financial-value min-w-0 truncate text-right text-pump-text">
-                                <span className="text-pump-muted">Entry </span>
-                                {formatUsdReadable(avgEntryUsd, { compact: true })}
-                              </span>
-                            </div>
-                          </article>
+                            }
+                          />
                         </HoldingSwipeRow>
                       );
                     })}
+                    </div>
                   </div>
 
                   <div className="hidden lg:block overflow-x-auto">
@@ -1768,7 +1711,8 @@ export function PortfolioPanel({
         {activeTab === "fees" ? (
           <PortfolioFeesTab
             walletAddress={walletAddress}
-            creatorFeesTotalBnb={creatorFeesTotalBnb}
+            creatorClaimedBnb={claimedBnb}
+            creatorPendingBnb={pendingBnb}
             bnbUsd={bnbUsd}
             onOpenCreatorClaim={() => setClaimOpen(true)}
             referralClaimedBnb={referralStats?.claimedBnb ?? 0}

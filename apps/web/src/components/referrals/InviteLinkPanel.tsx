@@ -2,6 +2,7 @@
 
 import { useCallback, useState } from "react";
 import { NATIVE_SYMBOL, shortAddress } from "@/config/chain";
+import { useUserAvatar } from "@/components/user/UserAvatarProvider";
 import { formatUsdReadable } from "@/lib/format-usd";
 import { bnbToUsd } from "@/lib/format-usd";
 
@@ -25,6 +26,7 @@ export function InviteLinkPanel({
   referralVolumeBnb,
   bnbUsd,
 }: InviteLinkPanelProps) {
+  const { displayUsername } = useUserAvatar();
   const [copied, setCopied] = useState(false);
 
   const inviteUrl =
@@ -59,7 +61,7 @@ export function InviteLinkPanel({
         {formatVolumeBnb(referralVolumeBnb)} {NATIVE_SYMBOL})
       </p>
       <p className="mt-0.5 text-caption text-pump-muted">
-        Share with {shortAddress(address)} as referrer — friends must link before their first trade.
+        Share with {displayUsername ?? shortAddress(address)} as referrer — friends must link before their first trade.
       </p>
     </div>
   );

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import type { TokenListItem } from "@/lib/db/launchpad";
 import { TokenAvatar } from "@/components/token/TokenAvatar";
 import { TokenDetailLink } from "@/components/token/TokenDetailLink";
-import { shortAddress } from "@/config/chain";
+import { UserDisplayName } from "@/components/user/UserDisplayName";
 import { resolveLaunchpadLogoUri } from "@/lib/assets";
 import { formatAge, formatCapForBoard } from "@/lib/arena-board-format";
 import { PumpIcon, faBolt } from "@/lib/icons";
@@ -85,7 +85,15 @@ export function ArenaTokenCard({
   ];
   const trendPositive = (token.change24hPct ?? 0) >= 0;
   const mcapLabel = formatCapForBoard(mcapUsd);
-  const creatorLabel = shortAddress(token.creatorAddress, true);
+  const creatorLabel =
+    token.creatorDisplayUsername ??
+    token.creatorUsername ?? (
+      <UserDisplayName address={token.creatorAddress} compact />
+    );
+  const creatorAvatarSymbol =
+    token.creatorDisplayUsername ??
+    token.creatorUsername ??
+    token.creatorAddress.slice(0, 1).toUpperCase();
 
   return (
     <TokenDetailLink
@@ -141,7 +149,7 @@ export function ArenaTokenCard({
         <div className="arena-token-card__meta">
           <TokenAvatar
             address={token.creatorAddress}
-            symbol={creatorLabel}
+            symbol={creatorAvatarSymbol}
             size={18}
             className="!ring-0"
           />

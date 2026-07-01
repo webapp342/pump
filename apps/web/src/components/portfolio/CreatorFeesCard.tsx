@@ -1,28 +1,35 @@
 "use client";
 
+import { PortfolioFeesBreakdown } from "@/components/portfolio/PortfolioFeesBreakdown";
 import { PortfolioMetricBox } from "@/components/portfolio/PortfolioMetricBox";
-import { bnbToUsd, formatUsdReadable } from "@/lib/format-usd";
 
 type CreatorFeesCardProps = {
-  totalBnb: number;
+  claimedBnb: number;
+  pendingBnb: number;
   bnbUsd: number | null;
   onOpenModal: () => void;
   className?: string;
 };
 
 export function CreatorFeesCard({
-  totalBnb,
+  claimedBnb,
+  pendingBnb,
   bnbUsd,
   onOpenModal,
   className = "",
 }: CreatorFeesCardProps) {
-  const totalUsd = bnbToUsd(totalBnb, bnbUsd);
-
   return (
     <PortfolioMetricBox
       className={className}
       label="Creator fees"
-      value={formatUsdReadable(totalUsd, { compact: true })}
+      value={
+        <PortfolioFeesBreakdown
+          availableBnb={pendingBnb}
+          claimedBnb={claimedBnb}
+          bnbUsd={bnbUsd}
+        />
+      }
+      valueClassName=""
       actionsInlineFromMd
       actions={
         <button type="button" onClick={onOpenModal} className="secondary-button">

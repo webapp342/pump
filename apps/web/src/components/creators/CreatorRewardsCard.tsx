@@ -1,7 +1,8 @@
 "use client";
 
 import { useAccount } from "wagmi";
-import { explorerTxUrl, shortAddress } from "@/config/chain";
+import { explorerTxUrl } from "@/config/chain";
+import { UserDisplayName } from "@/components/user/UserDisplayName";
 import { useCreatorFollows } from "@/components/creators/CreatorFollowsProvider";
 import { CREATOR_FEE_SHARE_PCT } from "@/lib/bonding-curve";
 import { PumpIcon, faCoins } from "@/lib/icons";
@@ -9,6 +10,7 @@ import { UserAvatarForAddress } from "@/components/user/UserAvatarForAddress";
 
 type CreatorRewardsCardProps = {
   creatorAddress: string;
+  creatorDisplayUsername?: string;
   launchTxHash: string;
   followerCount: number;
   onAddressClick?: (address: string) => void;
@@ -16,6 +18,7 @@ type CreatorRewardsCardProps = {
 
 export function CreatorRewardsCard({
   creatorAddress,
+  creatorDisplayUsername,
   launchTxHash,
   followerCount,
   onAddressClick,
@@ -49,13 +52,15 @@ export function CreatorRewardsCard({
           onClick={() => onAddressClick?.(creatorAddress)}
           disabled={!onAddressClick}
           className="flex min-w-0 flex-1 items-center gap-3 text-left transition hover:opacity-90 disabled:cursor-default disabled:hover:opacity-100"
-          aria-label={`View creator profile ${shortAddress(creatorAddress)}`}
+          aria-label={`View creator profile ${creatorDisplayUsername ?? creatorAddress}`}
         >
           <UserAvatarForAddress address={creatorAddress} size={44} />
           <div className="min-w-0 flex-1">
             <div className="flex min-w-0 items-center gap-2">
               <span className="truncate text-body-sm font-semibold financial-value text-pump-text">
-                {shortAddress(creatorAddress)}
+                {creatorDisplayUsername ?? (
+                  <UserDisplayName address={creatorAddress} compact />
+                )}
               </span>
               <span className="shrink-0 rounded-full bg-pump-accent/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-pump-accent">
                 Creator

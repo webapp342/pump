@@ -2,11 +2,11 @@
 
 import { useMemo, useState } from "react";
 import { formatEther } from "viem";
+import { PortfolioFeesBreakdown } from "@/components/portfolio/PortfolioFeesBreakdown";
 import { PortfolioMetricBox } from "@/components/portfolio/PortfolioMetricBox";
 import { ShareSheetModal } from "@/components/ui/ShareSheetModal";
-import { PumpIcon, faShare } from "@/lib/icons";
+import { PumpIcon, faInviteLink } from "@/lib/icons";
 import { referralSharePayload } from "@/lib/share-links";
-import { bnbToUsd, formatUsdReadable } from "@/lib/format-usd";
 
 type ReferralRewardsCardProps = {
   address: string;
@@ -28,8 +28,6 @@ export function ReferralRewardsCard({
   const [shareOpen, setShareOpen] = useState(false);
 
   const pendingBnb = pendingWei != null ? Number(formatEther(pendingWei)) : 0;
-  const totalBnb = claimedBnb + pendingBnb;
-  const totalUsd = bnbToUsd(totalBnb, bnbUsd);
   const sharePayload = useMemo(() => referralSharePayload(address), [address]);
 
   return (
@@ -37,7 +35,14 @@ export function ReferralRewardsCard({
       <PortfolioMetricBox
         className={className}
         label="Referral fees"
-        value={formatUsdReadable(totalUsd, { compact: true })}
+        value={
+          <PortfolioFeesBreakdown
+            availableBnb={pendingBnb}
+            claimedBnb={claimedBnb}
+            bnbUsd={bnbUsd}
+          />
+        }
+        valueClassName=""
         actionsLayout="split"
         actionsInlineFromMd
         actions={
@@ -47,7 +52,7 @@ export function ReferralRewardsCard({
               onClick={() => setShareOpen(true)}
               className="secondary-button inline-flex items-center justify-center gap-1.5"
             >
-              <PumpIcon icon={faShare} className="h-4 w-4 shrink-0" />
+              <PumpIcon icon={faInviteLink} className="h-3.5 w-3.5 shrink-0 opacity-80" />
               Share
             </button>
             <button type="button" onClick={onOpenModal} className="secondary-button">

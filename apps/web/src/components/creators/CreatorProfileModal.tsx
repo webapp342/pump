@@ -8,7 +8,8 @@ import type {
   CreatorProfileHolding,
   CreatorProfileToken,
 } from "@/lib/db/launchpad";
-import { explorerAddressUrl, shortAddress } from "@/config/chain";
+import { explorerAddressUrl } from "@/config/chain";
+import { UserDisplayName } from "@/components/user/UserDisplayName";
 import { TokenAvatar } from "@/components/token/TokenAvatar";
 import { UserAvatarForAddress } from "@/components/user/UserAvatarForAddress";
 import { useCreatorFollows } from "@/components/creators/CreatorFollowsProvider";
@@ -261,7 +262,9 @@ export function CreatorProfileModal({ open, onClose, creatorAddress }: CreatorPr
                       id="creator-profile-title"
                       className="financial-value text-h2 font-semibold text-pump-text"
                     >
-                      {shortAddress(creatorAddress)}
+                      {profile?.displayUsername ?? (
+                        <UserDisplayName address={creatorAddress} />
+                      )}
                     </h2>
                     <span className="rounded-full bg-pump-accent/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-pump-accent">
                       Creator

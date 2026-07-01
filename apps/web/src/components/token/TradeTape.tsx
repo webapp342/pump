@@ -25,6 +25,7 @@ import {
 } from "@/lib/onchain-balance";
 import { useLiveTradeAnimations } from "@/hooks/useLiveTradeAnimations";
 import { useInfiniteScrollSentinel } from "@/hooks/useInfiniteScrollSentinel";
+import { useUserDisplayNames } from "@/hooks/useUserDisplayNames";
 
 type ActivityTab = "holders" | "trades";
 
@@ -32,6 +33,7 @@ export type TradeTapeTab = ActivityTab;
 
 type HolderRow = {
   address: string;
+  displayUsername?: string;
   netTokens: number;
   remainingCostBasisBnb: number;
   remainingCostBasisUsd: number;
@@ -151,7 +153,7 @@ function mergeTradesByTxHash(...groups: TradeItem[][]): TradeItem[] {
 
 function mapApiHoldersToRows(holders: TokenHolderSnapshot[]): HolderRow[] {
   return holders
-    .map((holder) => {
+    .flatMap((holder) => {
       const indexedBalance = Number(holder.tokenBalance);
       const onChainBalance =
         holder.onChainBalance != null ? Number(holder.onChainBalance) : undefined;
@@ -159,7 +161,7 @@ function mapApiHoldersToRows(holders: TokenHolderSnapshot[]): HolderRow[] {
         indexedBalance,
         onChainBalance
       );
-      if (hidden) return null;
+      if (hidden) return [];
 
       const fullCostBasis = Math.max(0, Number(holder.remainingCostBasisBnb));
       const fullCostBasisUsd = Math.max(0, Number(holder.remainingCostBasisUsd ?? 0));
@@ -174,7 +176,7 @@ function mapApiHoldersToRows(holders: TokenHolderSnapshot[]): HolderRow[] {
         displayBalance
       );
 
-      return {
+      const row: HolderRow = {
         address: holder.address,
         netTokens: displayBalance,
         remainingCostBasisBnb,
@@ -182,8 +184,11 @@ function mapApiHoldersToRows(holders: TokenHolderSnapshot[]): HolderRow[] {
         avgEntryBnb:
           displayBalance > 0 ? remainingCostBasisBnb / displayBalance : null,
       };
+      if (holder.displayUsername) {
+        row.displayUsername = holder.displayUsername;
+      }
+      return [row];
     })
-    .filter((row): row is HolderRow => row != null)
     .sort((a, b) => b.netTokens - a.netTokens);
 }
 
@@ -220,16 +225,20 @@ function CreatorBadge({ iconOnly = false }: { iconOnly?: boolean }) {
 
 function IdentityPill({
   address,
+  displayUsername,
   showCreatorBadge = false,
   onAddressClick,
   compact = false,
 }: {
   address: string;
+  displayUsername?: string;
   showCreatorBadge?: boolean;
   onAddressClick: (address: string) => void;
   compact?: boolean;
 }) {
-  const label = compact ? ultraShortAddress(address) : shortAddress(address, true);
+  const label =
+    displayUsername ??
+    (compact ? ultraShortAddress(address) : shortAddress(address, true));
   return (
     <button
       type="button"
@@ -334,6 +343,15 @@ export function TradeTape({
     () => mergeTradesByTxHash(headTrades, olderTrades),
     [headTrades, olderTrades]
   );
+
+  const displayNameAddresses = useMemo(
+    () => [
+      ...displayedTrades.map((trade) => trade.traderAddress),
+      ...holderRows.map((holder) => holder.address),
+    ],
+    [displayedTrades, holderRows]
+  );
+  const displayNameLookup = useUserDisplayNames(displayNameAddresses, true);
 
   const tradeIds = useMemo(() => displayedTrades.map((t) => t.id), [displayedTrades]);
   const { rowClass: tradeRowClass } = useLiveTradeAnimations(tradeIds);
@@ -547,6 +565,10 @@ export function TradeTape({
                           <td className="token-tape-table__account">
                             <IdentityPill
                               address={row.address}
+                              displayUsername={
+                                row.displayUsername ??
+                                displayNameLookup.get(row.address.toLowerCase())
+                              }
                               showCreatorBadge={row.address.toLowerCase() === creatorKey}
                               onAddressClick={onAddressClick}
                               compact
@@ -578,6 +600,10 @@ export function TradeTape({
                         <td className="token-tape-table__account">
                           <IdentityPill
                             address={row.address}
+                            displayUsername={
+                              row.displayUsername ??
+                              displayNameLookup.get(row.address.toLowerCase())
+                            }
                             showCreatorBadge={row.address.toLowerCase() === creatorKey}
                             onAddressClick={onAddressClick}
                           />
@@ -655,6 +681,10 @@ export function TradeTape({
                       <td className="token-tape-table__account">
                         <IdentityPill
                           address={trade.traderAddress}
+                          displayUsername={
+                            trade.traderDisplayUsername ??
+                            displayNameLookup.get(trade.traderAddress.toLowerCase())
+                          }
                           showCreatorBadge={
                             trade.traderAddress.toLowerCase() === creatorKey
                           }
@@ -727,6 +757,10 @@ export function TradeTape({
                       <td className="token-tape-table__account">
                         <IdentityPill
                           address={trade.traderAddress}
+                          displayUsername={
+                            trade.traderDisplayUsername ??
+                            displayNameLookup.get(trade.traderAddress.toLowerCase())
+                          }
                           showCreatorBadge={trade.traderAddress.toLowerCase() === creatorKey}
                           onAddressClick={onAddressClick}
                         />

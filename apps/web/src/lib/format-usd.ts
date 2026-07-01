@@ -29,6 +29,27 @@ export function formatPortfolioHoldingValueUsd(
   return formatUsdReadable(value, PORTFOLIO_HOLDING_VALUE_USD_OPTS);
 }
 
+/** Portfolio fees cards — zero BNB shows $0, not em dash. */
+export function formatPortfolioFeesUsd(
+  bnbAmount: number,
+  bnbUsd: number | null | undefined
+): string {
+  if (!Number.isFinite(bnbAmount) || bnbAmount <= 0) {
+    return formatUsdReadable(0, { compact: true, fallback: "$0" });
+  }
+  return formatUsdReadable(bnbToUsd(bnbAmount, bnbUsd), { compact: true, fallback: "—" });
+}
+
+/** Signed USD for portfolio PNL stats — always two decimals, no compact/subscript. */
+export function formatUsdSignedTwoDecimals(
+  value: number | null | undefined,
+  fallback = "$0.00"
+): string {
+  if (value == null || !Number.isFinite(value)) return fallback;
+  const sign = value > 0 ? "+" : value < 0 ? "-" : "";
+  return `${sign}$${Math.abs(value).toFixed(2)}`;
+}
+
 export function formatUsd(
   value: number | null | undefined,
   opts?: { compact?: boolean }

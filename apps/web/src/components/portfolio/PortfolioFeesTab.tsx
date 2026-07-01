@@ -5,7 +5,8 @@ import { ReferralRewardsCard } from "@/components/referrals/ReferralRewardsCard"
 
 type PortfolioFeesTabProps = {
   walletAddress: string;
-  creatorFeesTotalBnb: number;
+  creatorClaimedBnb: number;
+  creatorPendingBnb: number;
   bnbUsd: number | null;
   onOpenCreatorClaim: () => void;
   referralClaimedBnb: number;
@@ -15,7 +16,8 @@ type PortfolioFeesTabProps = {
 
 export function PortfolioFeesTab({
   walletAddress,
-  creatorFeesTotalBnb,
+  creatorClaimedBnb,
+  creatorPendingBnb,
   bnbUsd,
   onOpenCreatorClaim,
   referralClaimedBnb,
@@ -26,7 +28,8 @@ export function PortfolioFeesTab({
     <div className="portfolio-fees-tab">
       <div className="portfolio-fees-tab__grid">
         <CreatorFeesCard
-          totalBnb={creatorFeesTotalBnb}
+          claimedBnb={creatorClaimedBnb}
+          pendingBnb={creatorPendingBnb}
           bnbUsd={bnbUsd}
           onOpenModal={onOpenCreatorClaim}
           className="portfolio-fees-tab__card"
