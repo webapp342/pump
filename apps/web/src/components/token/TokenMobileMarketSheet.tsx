@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   releaseMobileViewportAfterKeyboard,
@@ -28,7 +28,14 @@ export function TokenMobileMarketSheet({
   const [mounted, setMounted] = useState(false);
   const [searchFocused, setSearchFocused] = useState(false);
   const wasOpenRef = useRef(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const handleClose = useMobileModalClose(onClose);
+
+  const handleSearchDismiss = useCallback(() => {
+    searchInputRef.current?.blur();
+    setSearchFocused(false);
+    releaseMobileViewportAfterKeyboard();
+  }, []);
 
   const handleTokenSelect = () => {
     const active = document.activeElement;
@@ -77,6 +84,13 @@ export function TokenMobileMarketSheet({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [open, handleClose]);
 
+  useEffect(() => {
+    if (!open) return;
+    const shell = document.querySelector(".app-shell");
+    shell?.setAttribute("inert", "");
+    return () => shell?.removeAttribute("inert");
+  }, [open]);
+
   if (!open || !mounted) return null;
 
   return createPortal(
@@ -98,21 +112,31 @@ export function TokenMobileMarketSheet({
         aria-modal="true"
         aria-label="Explore coins"
       >
-        <div className="token-mobile-market-sheet token-mobile-market-sheet--full modal-panel modal-sheet-panel pointer-events-auto flex flex-col overflow-hidden border-x-0 border-b-0 rounded-t-2xl">
-          <div className="shrink-0 border-b border-pump-border/32 px-4 pb-3 pt-2">
-            <div className="mx-auto mb-3 h-1 w-9 bg-pump-border/45" aria-hidden />
-            <div className="flex items-center justify-between gap-3">
-              <h2 className="text-h3 font-semibold text-pump-text">Explore coins</h2>
-              <button
-                type="button"
-                onClick={handleClose}
-                className="inline-flex h-9 w-9 shrink-0 items-center justify-center text-pump-muted transition hover:bg-pump-border/10 hover:text-pump-text"
-                aria-label="Close"
-              >
-                <PumpIcon icon={faX} className="h-4 w-4" />
-              </button>
+        <div
+          className={`token-mobile-market-sheet token-mobile-market-sheet--full modal-panel modal-sheet-panel pointer-events-auto flex flex-col overflow-hidden border-x-0 border-b-0 rounded-t-2xl${
+            searchFocused ? " token-mobile-market-sheet--search-active" : ""
+          }`}
+        >
+          {searchFocused ? (
+            <div className="token-mobile-market-sheet__search-grip shrink-0 px-4 pb-1 pt-2">
+              <div className="mx-auto h-1 w-9 bg-pump-border/45" aria-hidden />
             </div>
-          </div>
+          ) : (
+            <div className="shrink-0 border-b border-pump-border/32 px-4 pb-3 pt-2">
+              <div className="mx-auto mb-3 h-1 w-9 bg-pump-border/45" aria-hidden />
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="text-h3 font-semibold text-pump-text">Explore coins</h2>
+                <button
+                  type="button"
+                  onClick={handleClose}
+                  className="inline-flex h-9 w-9 shrink-0 items-center justify-center text-pump-muted transition hover:bg-pump-border/10 hover:text-pump-text"
+                  aria-label="Close"
+                >
+                  <PumpIcon icon={faX} className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          )}
           <div className="token-mobile-market-sheet__body min-h-0 flex-1 overflow-hidden">
             <TokenMarketSidebar
               id="token-mobile-market-sidebar"
@@ -120,6 +144,9 @@ export function TokenMobileMarketSheet({
               density="compact"
               onTokenSelect={handleTokenSelect}
               onSearchFocusChange={setSearchFocused}
+              searchActive={searchFocused}
+              onSearchDismiss={handleSearchDismiss}
+              searchInputRef={searchInputRef}
             />
           </div>
         </div>
