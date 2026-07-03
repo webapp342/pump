@@ -1090,6 +1090,7 @@ export function TokenDetailLive({
         onTradeConfirmed={handleMobileTradeConfirmed}
         chainCurveSnapshot={tradeCurveSnapshot}
         changePct={changeTone}
+        priceUsd={priceUsd}
         logoUrl={liveToken.logoUrl}
         onOpenMarket={openMarketFromTradeSheet}
       />

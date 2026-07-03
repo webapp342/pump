@@ -27,6 +27,8 @@ type TradeSheetProps = {
   chainCurveSnapshot?: BondingCurveSnapshot;
   /** 24h price change for mobile Quick Order header. */
   changePct?: number | null;
+  /** Live spot for mobile Quick Order header. */
+  priceUsd?: number | null;
   /** Token logo for mobile Quick Order header. */
   logoUrl?: string | null;
   /** Opens explore-coins sheet from trade header. */
@@ -50,6 +52,7 @@ export function TradeSheet({
   onTradeConfirmed,
   chainCurveSnapshot,
   changePct = null,
+  priceUsd = null,
   logoUrl = null,
   onOpenMarket,
   presentation = "sheet",
@@ -137,6 +140,7 @@ export function TradeSheet({
               onTradeConfirmed={onTradeConfirmed}
               chainCurveSnapshot={chainCurveSnapshot}
               changePct={changePct}
+              priceUsd={priceUsd}
               logoUrl={logoUrl}
               onOpenMarket={onOpenMarket}
               sheetOnClose={isModal ? undefined : handleClose}

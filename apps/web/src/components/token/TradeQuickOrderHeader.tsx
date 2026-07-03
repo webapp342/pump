@@ -1,6 +1,7 @@
 "use client";
 
 import { TokenAvatar } from "@/components/token/TokenAvatar";
+import { PumpSubscriptPrice } from "@/components/ui/PumpSubscriptPrice";
 import { PumpIcon, faList, faX } from "@/lib/icons";
 
 type TradeQuickOrderSide = "buy" | "sell";
@@ -9,6 +10,7 @@ type TradeQuickOrderHeaderProps = {
   tokenAddress: string;
   symbol: string;
   logoUrl?: string | null;
+  priceUsd?: number | null;
   changePct?: number | null;
   side: TradeQuickOrderSide;
   onSideChange: (side: TradeQuickOrderSide) => void;
@@ -30,10 +32,31 @@ function changeBadgeClass(pct: number | null | undefined): string {
     : "trade-quick-order-header__change trade-quick-order-header__change--down";
 }
 
+function InstrumentPrice({ priceUsd }: { priceUsd: number | null | undefined }) {
+  if (priceUsd == null || !Number.isFinite(priceUsd)) {
+    return <span className="trade-quick-order-header__price financial-value">—</span>;
+  }
+
+  if (priceUsd >= 1) {
+    return (
+      <span className="trade-quick-order-header__price financial-value">
+        $
+        {priceUsd.toLocaleString(undefined, {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        })}
+      </span>
+    );
+  }
+
+  return <PumpSubscriptPrice value={priceUsd} className="trade-quick-order-header__price financial-value" />;
+}
+
 export function TradeQuickOrderHeader({
   tokenAddress,
   symbol,
   logoUrl = null,
+  priceUsd = null,
   changePct = null,
   side,
   onSideChange,
@@ -86,26 +109,32 @@ export function TradeQuickOrderHeader({
       </div>
 
       <div className="trade-quick-order-header__instrument">
-        {onOpenMarket ? (
-          <button
-            type="button"
-            className="trade-quick-order-header__list-btn"
-            onClick={onOpenMarket}
-            aria-label="Explore coins"
-          >
-            <PumpIcon icon={faList} className="h-3.5 w-3.5" />
-          </button>
-        ) : null}
-        <TokenAvatar
-          address={tokenAddress}
-          symbol={symbol}
-          logoUrl={logoUrl}
-          size={28}
-          className="trade-quick-order-header__logo !ring-0"
-        />
-        <div className="trade-quick-order-header__instrument-copy min-w-0">
-          <span className="trade-quick-order-header__pair financial-value">{symbol}/USD</span>
-          <span className={changeBadgeClass(changePct)}>{formatChangePct(changePct)}</span>
+        <div className="trade-quick-order-header__instrument-lead">
+          {onOpenMarket ? (
+            <button
+              type="button"
+              className="trade-quick-order-header__list-btn"
+              onClick={onOpenMarket}
+              aria-label="Explore coins"
+            >
+              <PumpIcon icon={faList} className="h-3.5 w-3.5" />
+            </button>
+          ) : null}
+          <TokenAvatar
+            address={tokenAddress}
+            symbol={symbol}
+            logoUrl={logoUrl}
+            size={28}
+            className="trade-quick-order-header__logo !ring-0"
+          />
+          <div className="trade-quick-order-header__instrument-copy min-w-0">
+            <span className="trade-quick-order-header__pair financial-value">{symbol}/USD</span>
+            <span className={changeBadgeClass(changePct)}>{formatChangePct(changePct)}</span>
+          </div>
+        </div>
+        <div className="trade-quick-order-header__quote">
+          <span className="trade-quick-order-header__quote-label">Last</span>
+          <InstrumentPrice priceUsd={priceUsd} />
         </div>
       </div>
     </header>

@@ -1,6 +1,6 @@
 "use client";
 
-import { PumpIcon, faCheck, faChevronDown, faRightLeft } from "@/lib/icons";
+import { PumpIcon, faCheck, faChevronDown } from "@/lib/icons";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { encodeFunctionData, formatEther, formatUnits, parseEther, parseSignature, parseUnits } from "viem";
 import type { Address, TransactionReceipt } from "viem";
@@ -167,6 +167,8 @@ type TradePanelProps = {
   chainCurveSnapshot?: BondingCurveSnapshot;
   /** Mobile trade sheet — 24h price change for Quick Order header. */
   changePct?: number | null;
+  /** Mobile trade sheet — live spot for Quick Order header. */
+  priceUsd?: number | null;
   /** Mobile trade sheet — close handler for Quick Order header. */
   sheetOnClose?: () => void;
   /** Token logo for mobile Quick Order header. */
@@ -324,6 +326,7 @@ export function TradePanel({
   onTradeConfirmed,
   chainCurveSnapshot,
   changePct = null,
+  priceUsd = null,
   sheetOnClose,
   logoUrl = null,
   onOpenMarket,
@@ -2349,6 +2352,7 @@ export function TradePanel({
             tokenAddress={tokenAddress}
             symbol={symbol}
             logoUrl={logoUrl}
+            priceUsd={priceUsd}
             changePct={changePct}
             side={side}
             onSideChange={switchTradeSide}
@@ -2432,13 +2436,30 @@ export function TradePanel({
                   <button
                     type="button"
                     onClick={toggleInputMode}
-                    className="trade-asset-select trade-asset-select--swap"
+                    className="trade-unit-chip"
                     aria-label={
                       activeInputMode === "usd" ? `Switch to ${symbol}` : "Switch to USD"
                     }
                   >
-                    <span className="text-body-sm font-medium text-pump-text">{currencyLabel}</span>
-                    <PumpIcon icon={faRightLeft} className="h-3.5 w-3.5 opacity-70" />
+                    <span
+                      className={
+                        activeInputMode === "usd"
+                          ? "trade-unit-chip__seg trade-unit-chip__seg--active"
+                          : "trade-unit-chip__seg"
+                      }
+                    >
+                      USD
+                    </span>
+                    <span className="trade-unit-chip__divider" aria-hidden />
+                    <span
+                      className={
+                        activeInputMode === "token"
+                          ? "trade-unit-chip__seg trade-unit-chip__seg--active"
+                          : "trade-unit-chip__seg"
+                      }
+                    >
+                      {symbol}
+                    </span>
                   </button>
                 ) : (
                   <>
