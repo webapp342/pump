@@ -11,10 +11,6 @@ import { contracts, pumpChain, NATIVE_SYMBOL } from "@/config/chain";
 import { bondingCurveManagerAbi } from "@/lib/bonding-curve";
 import { ClaimCreatorFeesModal } from "@/components/portfolio/ClaimCreatorFeesModal";
 import { PortfolioGuestPanel } from "@/components/portfolio/PortfolioGuestPanel";
-import {
-  PortfolioAllocationStrip,
-  buildPortfolioAllocationItems,
-} from "@/components/portfolio/PortfolioAllocationStrip";
 import { PortfolioHero } from "@/components/portfolio/PortfolioHero";
 import { PortfolioHoldingMobileCard } from "@/components/portfolio/PortfolioHoldingMobileCard";
 import { PortfolioFeesTab } from "@/components/portfolio/PortfolioFeesTab";
@@ -1274,26 +1270,6 @@ export function PortfolioPanel({
   const showEmptyHoldings =
     tokenHoldingsCount === 0 && totalHoldingsCount === 0 && nativeBnb <= 0;
 
-  const allocationItems = buildPortfolioAllocationItems(
-    displayHoldingsRows.map((row) => {
-      if (row.kind === "position") {
-        return {
-          key: row.view.position.tokenAddress.toLowerCase(),
-          symbol: row.view.position.symbol,
-          estimatedValueBnb: row.estimatedValueBnb,
-        };
-      }
-      return {
-        key: row.holding.tokenAddress.toLowerCase(),
-        symbol: row.holding.symbol,
-        estimatedValueBnb: row.estimatedValueBnb,
-      };
-    }),
-    nativeBnb,
-    NATIVE_SYMBOL,
-    bnbUsd
-  );
-
   const isOwnPortfolio =
     Boolean(address) && address!.toLowerCase() === walletAddress.toLowerCase();
   const displayUsername = isOwnPortfolio
@@ -1399,10 +1375,6 @@ export function PortfolioPanel({
           feesPending={feesPending}
         />
 
-        {activeTab === "holdings" && allocationItems.length > 0 ? (
-          <PortfolioAllocationStrip items={allocationItems} totalValueUsd={totalEstimatedUsd} />
-        ) : null}
-
         <div className="portfolio-hub__body">
         {activeTab === "holdings" ? (
           <div className="portfolio-holdings-panel portfolio-tab-panel">
@@ -1426,21 +1398,11 @@ export function PortfolioPanel({
                   <p className="text-body-sm text-pump-muted">Applying dust filter…</p>
                 </section>
               ) : showEmptyHoldings ? (
-                <div className="panel-surface portfolio-empty-state portfolio-section-surface flex flex-col items-center justify-center py-12 px-6 text-center">
-                  <p className="portfolio-empty-state__title text-h3 font-semibold text-pump-text">
-                    No positions yet
-                  </p>
-                  <p className="portfolio-empty-state__copy mt-2 max-w-sm text-body-sm text-pump-muted">
-                    Deposit funds or explore trending coins to start building your portfolio.
-                  </p>
-                  <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
-                    <button type="button" onClick={openDeposit} className="primary-button px-4 py-2">
-                      Deposit
-                    </button>
-                    <Link href="/arena" className="secondary-button px-4 py-2 no-underline">
-                      Explore Arena
-                    </Link>
-                  </div>
+                <div className="panel-surface empty-state flex flex-col items-center justify-center py-10">
+                  <p className="empty-state-copy">No open positions yet.</p>
+                  <Link href="/arena" className="chip-button chip-button-active mt-4 px-4 py-1.5 text-caption">
+                    Explore Arena
+                  </Link>
                 </div>
               ) : (
                 <section className="panel-surface portfolio-section-surface portfolio-tab-panel__surface">

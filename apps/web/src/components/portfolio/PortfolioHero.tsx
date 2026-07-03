@@ -1,14 +1,16 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { PctChange } from "@/components/ui/PctChange";
+import { IconLabel } from "@/components/ui/IconLabel";
 import { useWalletFunding } from "@/components/wallet/WalletFundingProvider";
 import {
   formatPortfolioHoldingValueUsd,
   formatUsdSignedTwoDecimals,
 } from "@/lib/format-usd";
-import { PumpIcon, faChevronDown, faPen } from "@/lib/icons";
+import { PumpIcon, faPen } from "@/lib/icons";
+import { MetricIcons } from "@/lib/metric-icons";
 import { UserAvatarForAddress } from "@/components/user/UserAvatarForAddress";
 
 type PortfolioHeroProps = {
@@ -39,16 +41,25 @@ function pnlTone(value: number): string {
 
 function PortfolioStat({
   label,
+  labelSuffix,
   children,
+  hero = false,
   className = "",
 }: {
   label: string;
+  labelSuffix?: ReactNode;
   children: ReactNode;
+  hero?: boolean;
   className?: string;
 }) {
   return (
-    <div className={`portfolio-stat ${className}`.trim()}>
-      <span className="portfolio-stat__label">{label}</span>
+    <div className={`portfolio-stat${hero ? " portfolio-stat--hero" : ""} ${className}`.trim()}>
+      <div className="portfolio-stat__label-row">
+        <span className="portfolio-stat__label">{label}</span>
+        {labelSuffix != null ? (
+          <span className="portfolio-stat__label-suffix">{labelSuffix}</span>
+        ) : null}
+      </div>
       <div className="portfolio-stat__value financial-value">{children}</div>
     </div>
   );
@@ -74,9 +85,7 @@ export function PortfolioHero({
   onSignIn,
 }: PortfolioHeroProps) {
   const { openDeposit, openWithdraw } = useWalletFunding();
-  const [pnlDetailsOpen, setPnlDetailsOpen] = useState(false);
   const guestZeroUsd = formatUsdSignedTwoDecimals(0);
-
   const displayValue =
     guestMode || (totalValueUsd != null && Number.isFinite(totalValueUsd))
       ? guestMode
@@ -91,143 +100,196 @@ export function PortfolioHero({
         ? "text-pump-danger"
         : "text-pump-muted";
 
-  const estPnlRow = guestMode ? (
+  const estPnlValue = guestMode ? (
     guestZeroUsd
   ) : (
-    <span className={`portfolio-summary-card__change-row ${pnlFlashClass}`.trim()}>
-      <span className={`financial-value ${pnlTone(totalNetPnlUsd)}`}>
+    <span className={`portfolio-stat__pnl-inline ${pnlFlashClass}`.trim()}>
+      <span className={pnlTone(totalNetPnlUsd)}>
         {formatUsdSignedTwoDecimals(totalNetPnlUsd)}
       </span>
       <PctChange
         value={portfolioValuePct}
         toneClassName={pnlPctTone}
-        className="portfolio-summary-card__change-pct"
+        className="portfolio-stat__inline-pct hidden md:inline-flex"
       />
-      <span className="portfolio-summary-card__change-label">est. PnL</span>
+    </span>
+  );
+
+  const estPnlMobileValue = guestMode ? (
+    guestZeroUsd
+  ) : (
+    <span className={pnlFlashClass}>
+      <span className={pnlTone(totalNetPnlUsd)}>
+        {formatUsdSignedTwoDecimals(totalNetPnlUsd)}
+      </span>
     </span>
   );
 
   return (
     <header className="portfolio-header">
       <div className="portfolio-toolbar">
-        <div className="portfolio-summary-card panel-surface">
-          <div className="portfolio-summary-card__identity">
-            {guestMode ? (
-              <div className="portfolio-toolbar__guest-avatar" aria-hidden />
-            ) : (
-              <UserAvatarForAddress
-                address={walletAddress}
-                size={36}
-                className="token-detail-toolbar__logo shrink-0 !ring-0"
-              />
-            )}
-            <div className="portfolio-toolbar__identity-meta">
-              <div className="portfolio-toolbar__name-line">
-                <span
-                  className={
-                    guestMode
-                      ? "portfolio-toolbar__display-name portfolio-toolbar__display-name--guest"
-                      : "portfolio-toolbar__display-name"
-                  }
-                >
-                  {guestMode ? "—" : displayUsername}
-                </span>
-                {canEditProfile ? (
-                  <button
-                    type="button"
-                    onClick={onOpenProfileEditor}
-                    className="portfolio-toolbar__edit-profile"
-                    aria-label="Edit profile"
+        <div className="portfolio-toolbar__shell">
+          <div className="portfolio-toolbar__identity-row">
+            <div className="portfolio-toolbar__identity">
+              {guestMode ? (
+                <div className="portfolio-toolbar__guest-avatar" aria-hidden />
+              ) : (
+                <UserAvatarForAddress
+                  address={walletAddress}
+                  size={32}
+                  className="token-detail-toolbar__logo shrink-0 !ring-0"
+                />
+              )}
+              <div className="portfolio-toolbar__identity-meta">
+                <div className="portfolio-toolbar__name-line">
+                  <span
+                    className={
+                      guestMode
+                        ? "portfolio-toolbar__display-name portfolio-toolbar__display-name--guest"
+                        : "portfolio-toolbar__display-name"
+                    }
                   >
-                    <PumpIcon icon={faPen} className="h-3 w-3" />
-                    <span>Edit</span>
-                  </button>
-                ) : null}
+                    {guestMode ? "—" : displayUsername}
+                  </span>
+                  {canEditProfile ? (
+                    <button
+                      type="button"
+                      onClick={onOpenProfileEditor}
+                      className="portfolio-toolbar__edit-profile"
+                      aria-label="Edit profile"
+                    >
+                      <PumpIcon icon={faPen} className="h-3 w-3" />
+                      <span>Edit</span>
+                    </button>
+                  ) : null}
+                </div>
+                <span className="token-detail-toolbar__age portfolio-toolbar__social">
+                  {guestMode ? (
+                    <>
+                      <span>0 following</span>
+                      <span aria-hidden>·</span>
+                      <span>0 followers</span>
+                    </>
+                  ) : (
+                    <>
+                      <button type="button" onClick={onOpenFollowing} className="portfolio-toolbar__social-link">
+                        {followingCount} following
+                      </button>
+                      <span aria-hidden>·</span>
+                      <button type="button" onClick={onOpenFollowers} className="portfolio-toolbar__social-link">
+                        {followerCount} followers
+                      </button>
+                    </>
+                  )}
+                </span>
               </div>
-              <span className="token-detail-toolbar__age portfolio-toolbar__social">
+            </div>
+
+            <PortfolioStat
+              label="Total Value"
+              hero
+              className="portfolio-toolbar__total-value portfolio-toolbar__total-value--desktop"
+            >
+              <span className={valueFlashClass}>{displayValue}</span>
+            </PortfolioStat>
+          </div>
+
+          <div className="portfolio-toolbar__hero-row portfolio-toolbar__hero-row--mobile">
+            <div className="portfolio-toolbar__value-block">
+              <IconLabel
+                icon={MetricIcons.portfolioValue}
+                hideIconMobile
+                className="section-label"
+              >
+                Total Value
+              </IconLabel>
+              <p className={`portfolio-toolbar__value-hero financial-value ${valueFlashClass}`.trim()}>
+                {displayValue}
+              </p>
+            </div>
+
+            <div className="portfolio-toolbar__pnl-stack">
+              <PortfolioStat label="Est. PnL" className="portfolio-toolbar__pnl-stack-stat">
+                {estPnlMobileValue}
+              </PortfolioStat>
+              <PortfolioStat label="Unrealized PnL" className="portfolio-toolbar__pnl-stack-stat">
                 {guestMode ? (
-                  <>
-                    <span>0 following</span>
-                    <span aria-hidden>·</span>
-                    <span>0 followers</span>
-                  </>
+                  guestZeroUsd
                 ) : (
-                  <>
-                    <button type="button" onClick={onOpenFollowing} className="portfolio-toolbar__social-link">
-                      {followingCount} following
-                    </button>
-                    <span aria-hidden>·</span>
-                    <button type="button" onClick={onOpenFollowers} className="portfolio-toolbar__social-link">
-                      {followerCount} followers
-                    </button>
-                  </>
+                  <span className={pnlTone(totalUnrealizedPnlUsd)}>
+                    {formatUsdSignedTwoDecimals(totalUnrealizedPnlUsd)}
+                  </span>
                 )}
-              </span>
+              </PortfolioStat>
+              <PortfolioStat label="Realized PnL" className="portfolio-toolbar__pnl-stack-stat">
+                {guestMode ? (
+                  guestZeroUsd
+                ) : (
+                  <span className={pnlTone(totalRealizedPnlUsd)}>
+                    {formatUsdSignedTwoDecimals(totalRealizedPnlUsd)}
+                  </span>
+                )}
+              </PortfolioStat>
             </div>
           </div>
 
-          <div className="portfolio-summary-card__metrics">
-            <p className="section-label portfolio-summary-card__value-label">Total Value</p>
-            <p className={`portfolio-summary-card__value financial-value ${valueFlashClass}`.trim()}>
-              {displayValue}
-            </p>
-            {estPnlRow}
-          </div>
+          <div className="portfolio-toolbar__divider portfolio-toolbar__divider--desktop" aria-hidden />
 
-          {!guestMode ? (
-            <div className="portfolio-summary-card__details">
+          <div className="portfolio-toolbar__pnl-actions">
+            <div className="portfolio-toolbar__pnl-row portfolio-toolbar__pnl-row--desktop">
+              <PortfolioStat
+                label="Est. PnL"
+                labelSuffix={
+                  !guestMode ? (
+                    <PctChange
+                      value={portfolioValuePct}
+                      toneClassName={pnlPctTone}
+                      className="portfolio-stat__label-pct md:hidden"
+                    />
+                  ) : null
+                }
+              >
+                {estPnlValue}
+              </PortfolioStat>
+              <PortfolioStat label="Unrealized Pnl">
+                {guestMode ? (
+                  guestZeroUsd
+                ) : (
+                  <span className={pnlTone(totalUnrealizedPnlUsd)}>
+                    {formatUsdSignedTwoDecimals(totalUnrealizedPnlUsd)}
+                  </span>
+                )}
+              </PortfolioStat>
+              <PortfolioStat label="Realized Pnl">
+                {guestMode ? (
+                  guestZeroUsd
+                ) : (
+                  <span className={pnlTone(totalRealizedPnlUsd)}>
+                    {formatUsdSignedTwoDecimals(totalRealizedPnlUsd)}
+                  </span>
+                )}
+              </PortfolioStat>
+            </div>
+
+            <div className="portfolio-toolbar__actions-row">
               <button
                 type="button"
-                className="portfolio-summary-card__details-toggle"
-                aria-expanded={pnlDetailsOpen}
-                onClick={() => setPnlDetailsOpen((open) => !open)}
+                onClick={guestMode ? () => onSignIn?.() : openDeposit}
+                className="token-toolbar-btn portfolio-toolbar__btn--primary"
               >
-                <span>PnL breakdown</span>
-                <PumpIcon
-                  icon={faChevronDown}
-                  className={`portfolio-summary-card__details-chevron${pnlDetailsOpen ? " portfolio-summary-card__details-chevron--open" : ""}`}
-                  aria-hidden
-                />
+                Deposit
               </button>
-              {pnlDetailsOpen ? (
-                <div className="portfolio-summary-card__details-grid">
-                  <PortfolioStat label="Unrealized PnL">
-                    <span className={pnlTone(totalUnrealizedPnlUsd)}>
-                      {formatUsdSignedTwoDecimals(totalUnrealizedPnlUsd)}
-                    </span>
-                  </PortfolioStat>
-                  <PortfolioStat label="Realized PnL">
-                    <span className={pnlTone(totalRealizedPnlUsd)}>
-                      {formatUsdSignedTwoDecimals(totalRealizedPnlUsd)}
-                    </span>
-                  </PortfolioStat>
-                </div>
-              ) : null}
+              <button
+                type="button"
+                onClick={guestMode ? () => onSignIn?.() : openWithdraw}
+                className="token-toolbar-btn"
+              >
+                Withdraw
+              </button>
+              <Link href="/" className="token-toolbar-btn">
+                Trade
+              </Link>
             </div>
-          ) : null}
-
-          <p className="portfolio-summary-card__footnote text-caption text-pump-muted">
-            Estimated values · not tax or financial advice
-          </p>
-
-          <div className="portfolio-toolbar__actions-row portfolio-summary-card__actions">
-            <button
-              type="button"
-              onClick={guestMode ? () => onSignIn?.() : openDeposit}
-              className="token-toolbar-btn portfolio-toolbar__btn--primary"
-            >
-              Deposit
-            </button>
-            <button
-              type="button"
-              onClick={guestMode ? () => onSignIn?.() : openWithdraw}
-              className="token-toolbar-btn"
-            >
-              Withdraw
-            </button>
-            <Link href="/" className="token-toolbar-btn">
-              Trade
-            </Link>
           </div>
         </div>
       </div>
