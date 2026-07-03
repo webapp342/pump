@@ -60,7 +60,7 @@ import {
 import { TradeTape } from "@/components/token/TradeTape";
 import { TokenMarketSidebar } from "@/components/token/TokenMarketSidebar";
 import { TokenSidebarCollapseToggle } from "@/components/token/TokenSidebarCollapseToggle";
-import { useTokenSidebarWidth } from "@/hooks/useTokenSidebarWidth";
+import { useTokenSidebarWidth, type TokenSidebarDensity } from "@/hooks/useTokenSidebarWidth";
 import { useTokenSidebarHeadAnchor } from "@/hooks/useTokenSidebarHeadAnchor";
 import { PriceChart } from "@/components/token/PriceChart";
 import { FavoriteIcon } from "@/components/icons/FavoriteIcon";
@@ -274,6 +274,7 @@ export function TokenDetailLive({
   const router = useRouter();
   const { bnbUsd } = useBnbUsdPrice();
   const { expanded, sidebarWidth, toggleExpanded, gridStyle } = useTokenSidebarWidth();
+  const sidebarDensity: TokenSidebarDensity = expanded ? "full" : "compact";
   const mainStackRef = useRef<HTMLDivElement>(null);
   const headWrapRef = useRef<HTMLDivElement>(null);
   const toggleTop = useTokenSidebarHeadAnchor(
@@ -948,7 +949,7 @@ export function TokenDetailLive({
           <TokenMarketSidebar
             id="token-market-sidebar"
             activeTokenAddress={tokenAddress}
-            density="compact"
+            density={sidebarDensity}
             headWrapRef={headWrapRef}
             showQuickTrade
           />

@@ -10,7 +10,7 @@ export function TokenMarketSidebarHead({ density }: { density: TokenSidebarDensi
       </div>
       <div className="token-market-sidebar__cell token-market-sidebar__cell--mcap token-market-sidebar__col-mcap">
         <span className="token-market-sidebar__col-label">
-          {compact ? "MCAP(24H)" : "Mcap"}
+          {compact ? "MCAP(24H)" : "MCAP"}
         </span>
       </div>
       {!compact ? (

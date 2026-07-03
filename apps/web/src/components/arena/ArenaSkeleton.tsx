@@ -8,20 +8,19 @@ export function ArenaSkeleton() {
         <div className="arena-hub">
           <div className="arena-filter-bar" aria-hidden>
             <div className="arena-filter-bar__main">
-              <div className="arena-filter-bar__search">
-                <Skeleton className="h-8 w-full min-w-[7.5rem] rounded-sm" />
+              <div className="arena-filter-bar__search-row">
+                <div className="arena-filter-bar__search">
+                  <Skeleton className="h-8 w-full min-w-[7.5rem] rounded-sm" />
+                </div>
+                <Skeleton className="h-8 w-24 shrink-0 rounded-md md:hidden" />
               </div>
               <div className="arena-tab-nav flex min-w-0 flex-1 gap-2 overflow-hidden">
-                {Array.from({ length: 6 }).map((_, index) => (
+                <Skeleton className="h-9 w-9 shrink-0 rounded-none" />
+                {Array.from({ length: 5 }).map((_, index) => (
                   <Skeleton key={index} className="h-9 w-16 shrink-0 rounded-none" />
                 ))}
               </div>
             </div>
-            <Skeleton className="h-8 w-36 shrink-0 rounded-md" />
-          </div>
-
-          <div className="arena-options-bar arena-options-bar--mobile-only md:hidden" aria-hidden>
-            <Skeleton className="h-8 w-28 shrink-0 rounded-md" />
           </div>
         </div>
       </div>

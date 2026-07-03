@@ -7,6 +7,7 @@ import { ArenaFilterNav } from "@/components/arena/ArenaFilterNav";
 import { ArenaShortcutsModal } from "@/components/arena/ArenaShortcutsModal";
 import { ArenaTokenCard } from "@/components/arena/ArenaTokenCard";
 import { ArenaWatchlistSheet } from "@/components/arena/ArenaWatchlistSheet";
+import { useWatchlistTokens } from "@/components/arena/WatchlistContent";
 import { useFavorites } from "@/components/favorites/FavoritesProvider";
 import { ArenaSwipeTradeBar } from "@/components/arena/ArenaSwipeTradeBar";
 import { useBnbUsdPrice } from "@/hooks/useBnbUsdPrice";
@@ -197,6 +198,7 @@ export function ArenaListClient({
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [cardsSort, setCardsSort] = useState<ArenaCardsSortKey>("mcap");
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [watchlistOpen, setWatchlistOpen] = useState(false);
   const [favoriteListTokens, setFavoriteListTokens] = useState<TokenListItem[]>([]);
   const { address, isConnected } = useAccount();
   const { favorites, isFavorite, toggleFavorite } = useFavorites();
@@ -269,6 +271,13 @@ export function ArenaListClient({
 
   useEffect(() => {
     const filter = readArenaFilter();
+    if (filter === "favorites") {
+      setActiveFilter("new");
+      writeArenaFilter("new");
+      setWatchlistOpen(true);
+      setCardsSort(readArenaCardsSort());
+      return;
+    }
     setActiveFilter(filter);
     const defaults = applyBoardFilterDefaults(filter);
     if (defaults.sortKey) setSortKey(defaults.sortKey);
@@ -768,6 +777,8 @@ export function ArenaListClient({
     }
     return [...byAddress.values()];
   }, [topByMcap, resolvedTokens, favoriteListTokens]);
+  const watchlistTokens = useWatchlistTokens(arenaTokenPool);
+  const watchlistCount = isConnected ? favorites.size : watchlistTokens.length;
   const mcapRankedTokens = useMemo(
     () =>
       topByMcap.length > 0
@@ -924,6 +935,14 @@ export function ArenaListClient({
             searchInputRef={searchInputRef}
             onSearchChange={setSearch}
             onSelect={setArenaFilter}
+            onWatchlistOpen={() => setWatchlistOpen(true)}
+            watchlistOpen={watchlistOpen}
+            watchlistCount={watchlistCount}
+            searchTrailing={
+              <div className="arena-filter-bar__quick-trade md:hidden">
+                <ArenaSwipeTradeBar compact />
+              </div>
+            }
             trailing={
               <div className="arena-filter-bar__quick-trade hidden md:flex">
                 <ArenaSwipeTradeBar compact />
@@ -931,14 +950,14 @@ export function ArenaListClient({
             }
           />
 
-          <div className="arena-options-bar arena-options-bar--mobile-only md:hidden">
-            <ArenaWatchlistSheet
-              tokens={arenaTokenPool}
-              bnbUsd={effectiveBnbUsd}
-              flashes={flashes}
-              animatedCaps={animatedCaps}
-            />
-          </div>
+          <ArenaWatchlistSheet
+            open={watchlistOpen}
+            onOpenChange={setWatchlistOpen}
+            tokens={arenaTokenPool}
+            bnbUsd={effectiveBnbUsd}
+            flashes={flashes}
+            animatedCaps={animatedCaps}
+          />
         </div>
       </div>
 

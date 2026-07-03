@@ -15,6 +15,8 @@ type ArenaWatchlistSheetProps = {
   bnbUsd: number | null;
   flashes: Record<string, FlashTone>;
   animatedCaps: Record<string, number>;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 };
 
 export function ArenaWatchlistSheet({
@@ -22,14 +24,25 @@ export function ArenaWatchlistSheet({
   bnbUsd,
   flashes,
   animatedCaps,
+  open: openProp,
+  onOpenChange,
 }: ArenaWatchlistSheetProps) {
-  const [open, setOpen] = useState(false);
+  const [openUncontrolled, setOpenUncontrolled] = useState(false);
+  const open = openProp ?? openUncontrolled;
   const { isConnected } = useAccount();
   const { favorites } = useFavorites();
   const watchlistTokens = useWatchlistTokens(tokens);
   const watchlistCount = isConnected ? favorites.size : watchlistTokens.length;
 
-  const close = useCallback(() => setOpen(false), []);
+  const setOpen = useCallback(
+    (next: boolean) => {
+      if (onOpenChange) onOpenChange(next);
+      else setOpenUncontrolled(next);
+    },
+    [onOpenChange]
+  );
+
+  const close = useCallback(() => setOpen(false), [setOpen]);
 
   useEffect(() => {
     if (!open) return;
@@ -40,40 +53,21 @@ export function ArenaWatchlistSheet({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [open, close]);
 
-  const ariaLabel = `Open watchlist${watchlistCount > 0 ? `, ${watchlistCount} tokens` : ""}`;
-
   return (
-    <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="arena-watchlist-btn toolbar-btn shrink-0 md:hidden"
-        aria-label={ariaLabel}
-      >
-        <PumpIcon icon={faStarSolid} className="h-3.5 w-3.5 shrink-0 text-pump-accent" />
-        <span className="arena-watchlist-btn__label text-caption">Watchlist</span>
-        {watchlistCount > 0 ? (
-          <span className="arena-watchlist-btn__count financial-value text-caption text-pump-muted">
-            ({watchlistCount})
-          </span>
-        ) : null}
-      </button>
-
-      <ToolbarSheet
-        open={open}
-        onClose={close}
-        ariaLabel="Watchlist"
-        title="Watchlist"
-        count={watchlistCount}
-        icon={<PumpIcon icon={faStarSolid} className="h-4 w-4 text-pump-accent" />}
-      >
-        <WatchlistContent
-          tokens={tokens}
-          bnbUsd={bnbUsd}
-          flashes={flashes}
-          animatedCaps={animatedCaps}
-        />
-      </ToolbarSheet>
-    </>
+    <ToolbarSheet
+      open={open}
+      onClose={close}
+      ariaLabel="Watchlist"
+      title="Watchlist"
+      count={watchlistCount}
+      icon={<PumpIcon icon={faStarSolid} className="h-4 w-4 text-pump-accent" />}
+    >
+      <WatchlistContent
+        tokens={tokens}
+        bnbUsd={bnbUsd}
+        flashes={flashes}
+        animatedCaps={animatedCaps}
+      />
+    </ToolbarSheet>
   );
 }
