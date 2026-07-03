@@ -1,13 +1,37 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import type { TokenListItem } from "@/lib/db/launchpad";
 import { TokenAvatar } from "@/components/token/TokenAvatar";
-import { TokenDetailLink } from "@/components/token/TokenDetailLink";
 import { UserDisplayName } from "@/components/user/UserDisplayName";
+import { ArenaBoardRowQuickActions } from "@/components/arena/ArenaBoardRowQuickActions";
 import { resolveLaunchpadLogoUri } from "@/lib/assets";
 import { formatAge, formatCapForBoard } from "@/lib/arena-board-format";
+import { buildArenaQuickTradeHref } from "@/lib/arena-quick-trade";
+import {
+  fetchTokenDetailBundleClient,
+  tokenDetailQueryKey,
+} from "@/lib/token-detail-client";
+import { tokenDetailPath } from "@/lib/token-routes";
 import { PumpIcon, faBolt } from "@/lib/icons";
+
+const TOUCH_CARD_MQ = "(hover: none), (max-width: 767px)";
+
+function useTouchCardUi(): boolean {
+  const [isTouchUi, setIsTouchUi] = useState(false);
+
+  useEffect(() => {
+    const mq = window.matchMedia(TOUCH_CARD_MQ);
+    const update = () => setIsTouchUi(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
+
+  return isTouchUi;
+}
 
 type FlashTone = "up" | "down";
 
@@ -68,6 +92,11 @@ export function ArenaTokenCard({
   onToggleFavorite,
   compact = false,
 }: ArenaTokenCardProps) {
+  const router = useRouter();
+  const queryClient = useQueryClient();
+  const cardRef = useRef<HTMLElement>(null);
+  const isTouchUi = useTouchCardUi();
+  const [actionsOpen, setActionsOpen] = useState(false);
   const [imgError, setImgError] = useState(false);
   const logoSrc = token.logoUrl?.trim()
     ? resolveLaunchpadLogoUri(token.logoUrl, token.address)
@@ -76,6 +105,25 @@ export function ArenaTokenCard({
   useEffect(() => {
     setImgError(false);
   }, [logoSrc]);
+
+  useEffect(() => {
+    if (!actionsOpen) return;
+
+    function onPointerDown(event: MouseEvent | TouchEvent) {
+      if (!cardRef.current?.contains(event.target as Node)) {
+        setActionsOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("touchstart", onPointerDown);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("touchstart", onPointerDown);
+    };
+  }, [actionsOpen]);
+
+  const closeActions = useCallback(() => setActionsOpen(false), []);
 
   const trendPoints = [
     token.change24hPct ?? 0,
@@ -94,16 +142,64 @@ export function ArenaTokenCard({
     token.creatorDisplayUsername ??
     token.creatorUsername ??
     token.creatorAddress.slice(0, 1).toUpperCase();
+  const tokenHref = tokenDetailPath(token.address);
+
+  const prefetchBundle = () => {
+    router.prefetch(tokenHref);
+    void queryClient.prefetchQuery({
+      queryKey: tokenDetailQueryKey(token.address),
+      queryFn: () => fetchTokenDetailBundleClient(token.address),
+      staleTime: 5_000,
+    });
+  };
+
+  const openTokenDetail = () => {
+    closeActions();
+    router.push(tokenHref);
+  };
+
+  const handleMediaClick = (event: React.MouseEvent<HTMLDivElement>) => {
+    if ((event.target as HTMLElement).closest("button")) return;
+
+    if (isTouchUi) {
+      if (!actionsOpen) {
+        event.preventDefault();
+        setActionsOpen(true);
+        return;
+      }
+      openTokenDetail();
+      return;
+    }
+
+    openTokenDetail();
+  };
 
   return (
-    <TokenDetailLink
-      address={token.address}
-      className={`arena-token-card group block cursor-pointer no-underline ${
-        compact ? "arena-token-card--compact" : ""
+    <article
+      ref={cardRef}
+      className={`arena-token-card group ${compact ? "arena-token-card--compact" : ""}${
+        actionsOpen ? " arena-token-card--actions-open" : ""
       }`}
-      aria-label={`View ${token.symbol}`}
+      onMouseEnter={prefetchBundle}
+      onFocus={prefetchBundle}
     >
-      <div className="arena-token-card__media">
+      <div
+        className="arena-token-card__media"
+        role="button"
+        tabIndex={0}
+        aria-label={actionsOpen ? `${token.symbol} quick actions` : `View ${token.symbol}`}
+        onClick={handleMediaClick}
+        onKeyDown={(event) => {
+          if (event.key !== "Enter" && event.key !== " ") return;
+          if ((event.target as HTMLElement).closest("button")) return;
+          event.preventDefault();
+          if (isTouchUi && !actionsOpen) {
+            setActionsOpen(true);
+            return;
+          }
+          openTokenDetail();
+        }}
+      >
         {logoSrc && !imgError ? (
           <img
             src={logoSrc}
@@ -129,7 +225,6 @@ export function ArenaTokenCard({
         <button
           type="button"
           onClick={(event) => {
-            event.preventDefault();
             event.stopPropagation();
             onToggleFavorite(token.address);
           }}
@@ -138,9 +233,45 @@ export function ArenaTokenCard({
         >
           {isFavorite ? "★" : "☆"}
         </button>
+
+        <div className="arena-token-card__overlay">
+          <div className="arena-token-card__actions">
+            <button
+              type="button"
+              className="arena-token-card__view-btn"
+              onClick={(event) => {
+                event.stopPropagation();
+                openTokenDetail();
+              }}
+            >
+              View
+            </button>
+            <ArenaBoardRowQuickActions
+              layout={isTouchUi ? "card-compact" : "card"}
+              onBuy={() => {
+                closeActions();
+                router.push(buildArenaQuickTradeHref(token.address, "buy"));
+              }}
+              onSell={() => {
+                closeActions();
+                router.push(buildArenaQuickTradeHref(token.address, "sell"));
+              }}
+            />
+          </div>
+        </div>
       </div>
 
-      <div className="arena-token-card__body">
+      <div
+        className="arena-token-card__body"
+        role="button"
+        tabIndex={0}
+        onClick={openTokenDetail}
+        onKeyDown={(event) => {
+          if (event.key !== "Enter" && event.key !== " ") return;
+          event.preventDefault();
+          openTokenDetail();
+        }}
+      >
         <p className="arena-token-card__name truncate">{token.name}</p>
         <p className="arena-token-card__symbol truncate">${token.symbol}</p>
         <p className={`arena-token-card__mcap financial-value ${flashText(mcapFlash)}`}>
@@ -160,6 +291,6 @@ export function ArenaTokenCard({
           </span>
         </div>
       </div>
-    </TokenDetailLink>
+    </article>
   );
 }

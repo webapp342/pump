@@ -3934,6 +3934,83 @@ code,
     box-shadow: none;
   }
 
+  .app-header-create-btn__chevron {
+    width: 0.5625rem;
+    height: 0.5625rem;
+    margin-left: 0.0625rem;
+    opacity: 0.72;
+    transition: transform 0.15s ease, opacity 0.15s ease;
+  }
+
+  .app-header-create-btn--open .app-header-create-btn__chevron {
+    transform: rotate(180deg);
+    opacity: 1;
+  }
+
+  .app-header-create-menu__panel {
+    position: absolute;
+    top: calc(100% + 0.375rem);
+    right: 0;
+    z-index: 40;
+    min-width: 15.5rem;
+    overflow: hidden;
+    border: 1px solid rgb(var(--pump-border) / 0.55);
+    border-radius: var(--radius-md);
+    background: rgb(var(--pump-card));
+    box-shadow:
+      0 10px 28px rgb(var(--pump-bg) / 0.45),
+      0 2px 8px rgb(var(--pump-bg) / 0.35);
+    padding: 0.25rem;
+    animation: app-header-menu-in 0.14s ease-out;
+  }
+
+  @keyframes app-header-menu-in {
+    from {
+      opacity: 0;
+      transform: translateY(-0.25rem);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .app-header-create-menu__item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+    border-radius: var(--radius-sm);
+    padding: 0.625rem 0.75rem;
+    text-decoration: none;
+    transition: background-color 0.12s ease, color 0.12s ease;
+  }
+
+  .app-header-create-menu__item:hover {
+    background: rgb(var(--pump-border) / 0.14);
+  }
+
+  .app-header-create-menu__item--active {
+    background: rgb(var(--pump-accent) / 0.1);
+  }
+
+  .app-header-create-menu__label {
+    font-size: var(--text-body-sm);
+    font-weight: 600;
+    line-height: 1.25;
+    color: rgb(var(--pump-text));
+  }
+
+  .app-header-create-menu__desc {
+    font-size: var(--text-caption);
+    line-height: 1.35;
+    color: rgb(var(--pump-muted));
+  }
+
+  .app-header-create-menu__item--active .app-header-create-menu__label {
+    color: rgb(var(--pump-accent));
+  }
+
   .app-header-balance-btn {
     display: inline-flex;
     align-items: center;
@@ -5801,12 +5878,136 @@ code,
     transition: transform 0.12s ease, opacity 0.12s ease;
   }
 
+  .arena-token-card__body {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 0.125rem;
+    padding: 0.5rem 0.125rem 0;
+    cursor: pointer;
+  }
+
   .arena-token-card__media {
     position: relative;
     aspect-ratio: 1 / 1;
     overflow: hidden;
     border-radius: var(--radius-md);
     background: rgb(var(--pump-card));
+    cursor: pointer;
+  }
+
+  .arena-token-card__overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    padding: 0.625rem;
+    background: linear-gradient(
+      180deg,
+      rgb(var(--pump-bg) / 0) 0%,
+      rgb(var(--pump-bg) / 0.35) 42%,
+      rgb(var(--pump-bg) / 0.82) 100%
+    );
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s ease;
+  }
+
+  .arena-token-card__actions {
+    display: flex;
+    width: 100%;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.375rem;
+    pointer-events: auto;
+  }
+
+  @media (max-width: 767px) {
+    .arena-token-card__overlay {
+      padding: 0.375rem;
+      background: linear-gradient(
+        180deg,
+        rgb(var(--pump-bg) / 0) 58%,
+        rgb(var(--pump-bg) / 0.88) 100%
+      );
+    }
+
+    .arena-token-card--actions-open .arena-token-card__actions {
+      flex-direction: row;
+      align-items: center;
+      gap: 0.25rem;
+    }
+
+    .arena-token-card--actions-open .arena-token-card__view-btn {
+      flex: 0 0 auto;
+      min-height: 1.625rem;
+      padding: 0.25rem 0.5rem;
+      font-size: 0.6875rem;
+    }
+
+    .arena-token-card--actions-open .arena-board-quick-actions--card-compact {
+      flex: 1 1 auto;
+      flex-direction: row;
+      gap: 0.25rem;
+      min-width: 0;
+    }
+
+    .arena-token-card--actions-open .arena-board-quick-actions--card-compact .arena-board-quick-btn {
+      flex: 1 1 0;
+      min-width: 0;
+      min-height: 1.625rem;
+      justify-content: center;
+      padding: 0.25rem 0.375rem;
+      font-size: 0.6875rem;
+    }
+
+    .arena-token-card__favorite--active {
+      opacity: 1;
+    }
+  }
+
+  .arena-token-card__view-btn {
+    display: inline-flex;
+    min-height: 1.875rem;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgb(var(--pump-border) / 0.65);
+    border-radius: var(--radius-sm);
+    background: rgb(var(--pump-card) / 0.92);
+    padding: 0.3125rem 0.75rem;
+    font-size: var(--text-caption);
+    font-weight: 600;
+    line-height: 1.2;
+    letter-spacing: 0.01em;
+    color: rgb(var(--pump-text));
+    transition: background-color 0.12s ease, border-color 0.12s ease;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+
+  .arena-token-card__view-btn:hover {
+    background: rgb(var(--pump-card));
+    border-color: rgb(var(--pump-border));
+  }
+
+  @media (hover: hover) and (min-width: 768px) {
+    .arena-token-card:hover .arena-token-card__overlay,
+    .arena-token-card:focus-within .arena-token-card__overlay,
+    .arena-token-card__media:focus-within .arena-token-card__overlay {
+      opacity: 1;
+      pointer-events: auto;
+    }
+  }
+
+  .arena-token-card--actions-open .arena-token-card__overlay {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .arena-token-card--actions-open .arena-token-card__sparkline {
+    opacity: 0;
   }
 
   .arena-token-card__image {
@@ -5832,6 +6033,7 @@ code,
     padding: 0.125rem 0.25rem;
     backdrop-filter: blur(6px);
     -webkit-backdrop-filter: blur(6px);
+    transition: opacity 0.12s ease;
   }
 
   .arena-token-card__favorite {
@@ -5863,14 +6065,6 @@ code,
 
   .arena-token-card__favorite--active {
     color: rgb(var(--pump-accent));
-  }
-
-  .arena-token-card__body {
-    display: flex;
-    min-width: 0;
-    flex-direction: column;
-    gap: 0.125rem;
-    padding: 0.5rem 0.125rem 0;
   }
 
   .arena-token-card__name {
@@ -6101,6 +6295,14 @@ code,
     transition: opacity 0.12s ease;
   }
 
+  .arena-board-quick-actions--card {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.375rem;
+    opacity: 1;
+    pointer-events: auto;
+  }
+
   .sheet-grid tbody tr.arena-board-row--clickable:hover .arena-board-quick-actions,
   .sheet-grid tbody tr.arena-board-row--clickable:focus-within .arena-board-quick-actions,
   .arena-board-quick-cell:hover .arena-board-quick-actions,
@@ -6110,6 +6312,10 @@ code,
   }
 
   .arena-board-quick-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
     min-height: 1.875rem;
     border-radius: var(--radius-sm);
     padding: 0.3125rem 0.75rem;
@@ -6117,7 +6323,24 @@ code,
     line-height: 1.2;
     font-weight: 600;
     white-space: nowrap;
-    transition: background-color 0.12s ease, color 0.12s ease;
+    transition: background-color 0.12s ease, color 0.12s ease, filter 0.12s ease;
+  }
+
+  .arena-board-quick-actions--card .arena-board-quick-btn {
+    width: 100%;
+    justify-content: space-between;
+    padding-inline: 0.625rem;
+    font-size: 0.6875rem;
+    letter-spacing: 0.01em;
+  }
+
+  .arena-board-quick-btn__label {
+    font-weight: 600;
+  }
+
+  .arena-board-quick-btn__value {
+    font-weight: 500;
+    opacity: 0.95;
   }
 
   .arena-board-quick-btn--buy {
@@ -6167,14 +6390,14 @@ code,
     z-index: 2;
   }
 
-  .arena-token-card .arena-board-quick-actions {
+  .arena-token-card .arena-board-quick-actions:not(.arena-board-quick-actions--card) {
     opacity: 0;
     pointer-events: none;
     transition: opacity 0.12s ease;
   }
 
-  .arena-token-card:hover .arena-board-quick-actions,
-  .arena-token-card .arena-board-quick-actions:focus-within {
+  .arena-token-card:hover .arena-board-quick-actions:not(.arena-board-quick-actions--card),
+  .arena-token-card .arena-board-quick-actions:not(.arena-board-quick-actions--card):focus-within {
     opacity: 1;
     pointer-events: auto;
   }
@@ -7074,6 +7297,93 @@ code,
     .arena-page .arena-tab-nav__trailing {
       display: inline-flex;
       padding-right: var(--arena-page-gutter);
+    }
+  }
+
+  .arena-quick-trade-bar {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .arena-quick-trade-bar__summary {
+    margin: 0;
+    font-size: var(--text-caption);
+    font-weight: 500;
+    line-height: 1.35;
+    letter-spacing: 0.01em;
+    color: rgb(var(--pump-muted));
+    white-space: nowrap;
+  }
+
+  .arena-quick-trade-bar__prefix {
+    font-weight: 500;
+    color: rgb(var(--pump-muted));
+  }
+
+  .arena-quick-trade-bar__sep,
+  .arena-quick-trade-bar__divider {
+    color: rgb(var(--pump-muted) / 0.42);
+    font-weight: 400;
+  }
+
+  .arena-quick-trade-bar__buy,
+  .arena-quick-trade-bar__sell {
+    display: inline;
+  }
+
+  .arena-quick-trade-bar__buy-label,
+  .arena-quick-trade-bar__sell-label {
+    font-weight: 500;
+  }
+
+  .arena-quick-trade-bar__buy .arena-quick-trade-bar__value,
+  .arena-quick-trade-bar__buy .arena-quick-trade-bar__native {
+    color: rgb(var(--pump-success));
+  }
+
+  .arena-quick-trade-bar__sell .arena-quick-trade-bar__value {
+    color: rgb(var(--pump-danger));
+  }
+
+  .arena-quick-trade-bar__value {
+    font-weight: 600;
+  }
+
+  .arena-quick-trade-bar__settings {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    gap: 0.3125rem;
+    min-width: 2.25rem;
+    height: 2.25rem;
+    padding-inline: 0.5rem;
+    border: none;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    font-size: var(--text-caption);
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    color: rgb(var(--pump-muted));
+    transition: background-color 0.12s ease, color 0.12s ease;
+  }
+
+  .arena-quick-trade-bar__settings:hover,
+  .arena-quick-trade-bar__settings--open {
+    background: rgb(var(--pump-border) / 0.12);
+    color: rgb(var(--pump-text));
+  }
+
+  @media (min-width: 768px) {
+    .arena-quick-trade-bar__summary {
+      font-size: var(--text-body-sm);
+    }
+
+    .arena-quick-trade-bar__settings {
+      min-width: 0;
+      height: 2rem;
+      padding-inline: 0.625rem;
     }
   }
 

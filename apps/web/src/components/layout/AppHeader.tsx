@@ -8,7 +8,7 @@ import { WalletBar } from "@/components/wallet/WalletBar";
 import { ThemePicker } from "@/components/theme/ThemePicker";
 import { usePumpWallet } from "@/components/wallet/PumpWalletProvider";
 import { APP_NAV_ITEMS, isTradeHomeRoute } from "@/lib/nav-config";
-import { PumpIcon, faPlus } from "@/lib/icons";
+import { AppHeaderCreateMenu } from "@/components/layout/AppHeaderCreateMenu";
 import { shellHeaderInnerClassForPath } from "@/components/layout/layout-shell";
 
 function navLinkClass(active: boolean): string {
@@ -52,17 +52,7 @@ export function AppHeaderView({ pathname }: { pathname: string }) {
         </div>
 
         <div className="app-header-actions">
-          <Link
-            href="/create"
-            prefetch={true}
-            aria-current={pathname.startsWith("/create") ? "page" : undefined}
-            className={`app-header-create-btn${
-              pathname.startsWith("/create") ? " app-header-create-btn--active" : ""
-            }`}
-          >
-            <PumpIcon icon={faPlus} className="app-header-create-btn__icon shrink-0" />
-            Create
-          </Link>
+          <AppHeaderCreateMenu />
           <div className="app-header-actions__account">
             <WalletBar />
           </div>

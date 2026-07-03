@@ -219,24 +219,31 @@ export function ArenaSwipeTradeBar() {
   return (
     <div ref={anchorRef} className="arena-quick-trade-bar relative shrink-0">
       <div className="flex items-center gap-1.5 md:gap-2">
-        <p className="arena-quick-trade-bar__summary text-caption leading-snug text-pump-muted md:text-body-sm">
-          <span className="arena-quick-trade-bar__prefix hidden md:inline">Quick trade: </span>
-          <span className="font-medium text-pump-success">
+        <p className="arena-quick-trade-bar__summary">
+          <span className="arena-quick-trade-bar__prefix hidden md:inline">Quick trade</span>
+          <span className="arena-quick-trade-bar__sep hidden md:inline" aria-hidden>
+            {" "}
+            ·{" "}
+          </span>
+          <span className="arena-quick-trade-bar__buy">
             <span className="arena-quick-trade-bar__buy-label hidden md:inline">Buy </span>
-            {prefs.buyAmountBnb}
+            <span className="arena-quick-trade-bar__value financial-value">{prefs.buyAmountBnb}</span>
             <span className="arena-quick-trade-bar__native hidden md:inline"> {NATIVE_SYMBOL}</span>
           </span>
-          <span className="text-pump-muted/45"> · </span>
-          <span className="font-medium text-pump-danger">
+          <span className="arena-quick-trade-bar__divider" aria-hidden>
+            {" "}
+            ·{" "}
+          </span>
+          <span className="arena-quick-trade-bar__sell">
             <span className="arena-quick-trade-bar__sell-label hidden md:inline">Sell </span>
-            {prefs.sellPercent}%
+            <span className="arena-quick-trade-bar__value financial-value">{prefs.sellPercent}%</span>
           </span>
         </p>
         <button
           type="button"
           onClick={openSettings}
-          className={`arena-quick-trade-bar__settings inline-flex shrink-0 items-center justify-center gap-1 rounded-md text-caption font-semibold text-pump-muted transition hover:bg-pump-border/10 hover:text-pump-text h-9 min-w-9 px-2 md:h-8 md:min-h-0 md:min-w-0 md:px-2.5 ${
-            settingsOpen ? "bg-pump-border/10 text-pump-text" : ""
+          className={`arena-quick-trade-bar__settings${
+            settingsOpen ? " arena-quick-trade-bar__settings--open" : ""
           }`}
           aria-label="Quick trade settings"
           aria-expanded={settingsOpen}

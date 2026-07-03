@@ -61,7 +61,7 @@ export function buildArenaQuickTradePrefill(
   if (side === "buy") {
     return {
       side: "buy",
-      buyMode: "usd",
+      buyMode: "bnb",
       amount: prefs.buyAmountBnb,
       autoSubmit: true,
     };
@@ -71,4 +71,22 @@ export function buildArenaQuickTradePrefill(
     sellPercent: prefs.sellPercent,
     autoSubmit: true,
   };
+}
+
+export function buildArenaQuickTradeHref(
+  tokenAddress: string,
+  side: "buy" | "sell",
+  prefs: ArenaQuickTradePrefs = readArenaQuickTradePrefs()
+): string {
+  const addr = tokenAddress.toLowerCase();
+  const params = new URLSearchParams({ trade: side, auto: "1" });
+
+  if (side === "buy") {
+    params.set("mode", "bnb");
+    params.set("amount", prefs.buyAmountBnb);
+  } else {
+    params.set("sellPct", String(prefs.sellPercent));
+  }
+
+  return `/token/${addr}?${params.toString()}`;
 }

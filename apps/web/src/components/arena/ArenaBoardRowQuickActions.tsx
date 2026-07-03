@@ -12,9 +12,14 @@ import {
 type ArenaBoardRowQuickActionsProps = {
   onBuy: () => void;
   onSell: () => void;
+  layout?: "inline" | "card" | "card-compact";
 };
 
-export function ArenaBoardRowQuickActions({ onBuy, onSell }: ArenaBoardRowQuickActionsProps) {
+export function ArenaBoardRowQuickActions({
+  onBuy,
+  onSell,
+  layout = "inline",
+}: ArenaBoardRowQuickActionsProps) {
   const [prefs, setPrefs] = useState<ArenaQuickTradePrefs>(DEFAULT_ARENA_QUICK_TRADE);
 
   const syncPrefs = useCallback(() => {
@@ -29,7 +34,15 @@ export function ArenaBoardRowQuickActions({ onBuy, onSell }: ArenaBoardRowQuickA
   }, [syncPrefs]);
 
   return (
-    <div className="arena-board-quick-actions">
+    <div
+      className={
+        layout === "card" || layout === "card-compact"
+          ? `arena-board-quick-actions arena-board-quick-actions--card${
+              layout === "card-compact" ? " arena-board-quick-actions--card-compact" : ""
+            }`
+          : "arena-board-quick-actions"
+      }
+    >
       <button
         type="button"
         onClick={(event) => {
@@ -39,7 +52,12 @@ export function ArenaBoardRowQuickActions({ onBuy, onSell }: ArenaBoardRowQuickA
         }}
         className="arena-board-quick-btn arena-board-quick-btn--buy"
       >
-        Buy {prefs.buyAmountBnb} {NATIVE_SYMBOL}
+        <span className="arena-board-quick-btn__label">Buy</span>
+        {layout !== "card-compact" ? (
+          <span className="arena-board-quick-btn__value financial-value">
+            {prefs.buyAmountBnb} {NATIVE_SYMBOL}
+          </span>
+        ) : null}
       </button>
       <button
         type="button"
@@ -50,7 +68,10 @@ export function ArenaBoardRowQuickActions({ onBuy, onSell }: ArenaBoardRowQuickA
         }}
         className="arena-board-quick-btn arena-board-quick-btn--sell"
       >
-        Sell {prefs.sellPercent}%
+        <span className="arena-board-quick-btn__label">Sell</span>
+        {layout !== "card-compact" ? (
+          <span className="arena-board-quick-btn__value financial-value">{prefs.sellPercent}%</span>
+        ) : null}
       </button>
     </div>
   );

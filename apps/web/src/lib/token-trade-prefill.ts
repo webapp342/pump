@@ -62,11 +62,15 @@ export function parseTradePrefillFromSearchParams(
 
   const mode = params.get("mode");
   const amount = params.get("amount")?.trim();
+  const sellPctRaw = params.get("sellPct");
+  const sellPct = sellPctRaw != null ? Number(sellPctRaw) : NaN;
 
   return {
     side: trade,
     buyMode:
       mode === "bnb" || mode === "token" || mode === "usd" ? mode : undefined,
     amount: amount && amount.length > 0 ? amount : undefined,
+    sellPercent: Number.isFinite(sellPct) ? Math.max(1, Math.min(100, Math.round(sellPct))) : undefined,
+    autoSubmit: params.get("auto") === "1",
   };
 }
