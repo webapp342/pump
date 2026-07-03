@@ -6621,7 +6621,8 @@ code,
   .scrollbar-corporate,
   .token-market-sidebar__list,
   .token-trade-tape__scroll,
-  .arena-page__scroll {
+  .arena-page__scroll,
+  .airdrops-page .airdrops-list__scroll {
     scrollbar-width: thin;
     scrollbar-color: rgb(var(--pump-muted) / 0.32) transparent;
   }
@@ -6629,7 +6630,8 @@ code,
   .scrollbar-corporate::-webkit-scrollbar,
   .token-market-sidebar__list::-webkit-scrollbar,
   .token-trade-tape__scroll::-webkit-scrollbar,
-  .arena-page__scroll::-webkit-scrollbar {
+  .arena-page__scroll::-webkit-scrollbar,
+  .airdrops-page .airdrops-list__scroll::-webkit-scrollbar {
     width: 6px;
     height: 6px;
   }
@@ -6637,14 +6639,16 @@ code,
   .scrollbar-corporate::-webkit-scrollbar-track,
   .token-market-sidebar__list::-webkit-scrollbar-track,
   .token-trade-tape__scroll::-webkit-scrollbar-track,
-  .arena-page__scroll::-webkit-scrollbar-track {
+  .arena-page__scroll::-webkit-scrollbar-track,
+  .airdrops-page .airdrops-list__scroll::-webkit-scrollbar-track {
     background: transparent;
   }
 
   .scrollbar-corporate::-webkit-scrollbar-thumb,
   .token-market-sidebar__list::-webkit-scrollbar-thumb,
   .token-trade-tape__scroll::-webkit-scrollbar-thumb,
-  .arena-page__scroll::-webkit-scrollbar-thumb {
+  .arena-page__scroll::-webkit-scrollbar-thumb,
+  .airdrops-page .airdrops-list__scroll::-webkit-scrollbar-thumb {
     border: 2px solid transparent;
     border-radius: 9999px;
     background: rgb(var(--pump-muted) / 0.28);
@@ -6654,7 +6658,8 @@ code,
   .scrollbar-corporate::-webkit-scrollbar-thumb:hover,
   .token-market-sidebar__list::-webkit-scrollbar-thumb:hover,
   .token-trade-tape__scroll::-webkit-scrollbar-thumb:hover,
-  .arena-page__scroll::-webkit-scrollbar-thumb:hover {
+  .arena-page__scroll::-webkit-scrollbar-thumb:hover,
+  .airdrops-page .airdrops-list__scroll::-webkit-scrollbar-thumb:hover {
     background: rgb(var(--pump-muted) / 0.45);
     background-clip: padding-box;
   }
@@ -6663,21 +6668,24 @@ code,
     .scrollbar-corporate,
     .token-market-sidebar__list,
     .token-trade-tape__scroll,
-    .arena-page__scroll {
+    .arena-page__scroll,
+    .airdrops-page .airdrops-list__scroll {
       scrollbar-color: rgb(var(--pump-muted) / 0.38) transparent;
     }
 
     .scrollbar-corporate::-webkit-scrollbar-thumb,
     .token-market-sidebar__list::-webkit-scrollbar-thumb,
     .token-trade-tape__scroll::-webkit-scrollbar-thumb,
-    .arena-page__scroll::-webkit-scrollbar-thumb {
+    .arena-page__scroll::-webkit-scrollbar-thumb,
+    .airdrops-page .airdrops-list__scroll::-webkit-scrollbar-thumb {
       background: rgb(var(--pump-muted) / 0.34);
     }
 
     .scrollbar-corporate::-webkit-scrollbar-thumb:hover,
     .token-market-sidebar__list::-webkit-scrollbar-thumb:hover,
     .token-trade-tape__scroll::-webkit-scrollbar-thumb:hover,
-    .arena-page__scroll::-webkit-scrollbar-thumb:hover {
+    .arena-page__scroll::-webkit-scrollbar-thumb:hover,
+    .airdrops-page .airdrops-list__scroll::-webkit-scrollbar-thumb:hover {
       background: rgb(var(--pump-muted) / 0.52);
     }
   }
@@ -10455,6 +10463,18 @@ code,
     flex-direction: column;
     min-height: 0;
     min-width: 0;
+    flex: 1 1 0;
+  }
+
+  .airdrops-page__sticky {
+    flex-shrink: 0;
+    z-index: 5;
+    background: rgb(var(--pump-bg));
+  }
+
+  .airdrops-page .airdrops-body {
+    padding-top: 0;
+    min-height: 0;
   }
 
   @media (max-width: 767px) {
@@ -10492,6 +10512,33 @@ code,
     }
 
     .airdrops-page .airdrops-body {
+      flex: 1 1 0;
+      min-height: 0;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .airdrops-page .airdrops-body:not(:has(.airdrops-list)) {
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .airdrops-page .airdrops-list {
+      flex: 1 1 0;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .airdrops-page .airdrops-list__head {
+      position: static;
+      flex-shrink: 0;
+    }
+
+    .airdrops-page .airdrops-list__scroll {
       flex: 1 1 0;
       min-height: 0;
       overflow-y: auto;
@@ -10731,10 +10778,6 @@ code,
     gap: 0;
     min-width: 2.25rem;
     padding-inline: 0.5rem;
-  }
-
-  .airdrops-page .airdrops-body {
-    padding-top: 0;
   }
 
   .airdrops-page .airdrops-list {

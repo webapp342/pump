@@ -199,10 +199,12 @@ export function AirdropCampaignList({
           className="airdrops-list__head-cell airdrops-list__head-cell--time"
         />
       </div>
-      <div className="airdrops-list__body">
-        {items.map((item) => (
-          <AirdropCampaignRow key={item.id} item={item} bnbUsd={bnbUsd} />
-        ))}
+      <div className="airdrops-list__scroll">
+        <div className="airdrops-list__body">
+          {items.map((item) => (
+            <AirdropCampaignRow key={item.id} item={item} bnbUsd={bnbUsd} />
+          ))}
+        </div>
       </div>
     </section>
   );

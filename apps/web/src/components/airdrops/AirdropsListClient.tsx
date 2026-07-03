@@ -179,13 +179,15 @@ export function AirdropsListClient({
     return (
       <div className="airdrops-page">
         <div className="airdrops-hub">
-          <AirdropsFilterNav
-            activeFilter={activeFilter}
-            filterCounts={filterCounts}
-            search={search}
-            onSearchChange={setSearch}
-            onSelect={setActiveFilter}
-          />
+          <div className="airdrops-page__sticky">
+            <AirdropsFilterNav
+              activeFilter={activeFilter}
+              filterCounts={filterCounts}
+              search={search}
+              onSearchChange={setSearch}
+              onSelect={setActiveFilter}
+            />
+          </div>
           <div className="airdrops-body">
             <div className="empty-state airdrops-empty-state">
               <p className="empty-state-copy">No active airdrop campaigns yet.</p>
@@ -199,13 +201,15 @@ export function AirdropsListClient({
   return (
     <div className="airdrops-page">
       <div className="airdrops-hub">
-        <AirdropsFilterNav
-          activeFilter={activeFilter}
-          filterCounts={filterCounts}
-          search={search}
-          onSearchChange={setSearch}
-          onSelect={setActiveFilter}
-        />
+        <div className="airdrops-page__sticky">
+          <AirdropsFilterNav
+            activeFilter={activeFilter}
+            filterCounts={filterCounts}
+            search={search}
+            onSearchChange={setSearch}
+            onSelect={setActiveFilter}
+          />
+        </div>
 
         <div className="airdrops-body">
           {walletFilterActive ? (
