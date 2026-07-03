@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
 import { PumpIcon, faChevronDown, faPlus } from "@/lib/icons";
 
 const CREATE_OPTIONS = [
@@ -10,8 +9,11 @@ const CREATE_OPTIONS = [
   { href: "/airdrops/create", label: "Airdrop", description: "Fund and run a reward campaign" },
 ] as const;
 
-export function AppHeaderCreateMenu() {
-  const pathname = usePathname();
+type AppHeaderCreateMenuProps = {
+  pathname: string;
+};
+
+export function AppHeaderCreateMenu({ pathname }: AppHeaderCreateMenuProps) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const isCreateRoute =

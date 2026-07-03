@@ -52,7 +52,7 @@ export function AppHeaderView({ pathname }: { pathname: string }) {
         </div>
 
         <div className="app-header-actions">
-          <AppHeaderCreateMenu />
+          <AppHeaderCreateMenu pathname={pathname} />
           <div className="app-header-actions__account">
             <WalletBar />
           </div>
