@@ -303,7 +303,7 @@ export function ArenaSwipeTradeBar({ variant = "default" }: ArenaSwipeTradeBarPr
       {settingsOpen && useMobileSheet ? (
         <ModalPortal open>
           <div
-            className="modal-backdrop modal-backdrop-shell z-50"
+            className="modal-backdrop modal-backdrop-shell z-[110]"
             role="dialog"
             aria-modal="true"
             aria-label="Quick trade settings"
