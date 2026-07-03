@@ -16,14 +16,28 @@ const config: Config = {
         mono: ["var(--font-geist-mono)", "SFMono-Regular", "Consolas", "monospace"],
       },
       fontSize: {
+        "2xs": ["var(--text-2xs)", { lineHeight: "var(--leading-tight)" }],
+        xs: ["var(--text-xs)", { lineHeight: "var(--leading-tight)" }],
         display: ["var(--text-display)", { lineHeight: "var(--leading-display)" }],
         h1: ["var(--text-h1)", { lineHeight: "var(--leading-heading)" }],
         h2: ["var(--text-h2)", { lineHeight: "var(--leading-heading)" }],
         h3: ["var(--text-h3)", { lineHeight: "var(--leading-heading)" }],
+        title: ["var(--text-title)", { lineHeight: "var(--leading-heading)" }],
         body: ["var(--text-body)", { lineHeight: "var(--leading-body)" }],
         "body-sm": ["var(--text-body-sm)", { lineHeight: "var(--leading-body)" }],
+        "body-lg": ["var(--text-body-lg)", { lineHeight: "var(--leading-tight)" }],
         caption: ["var(--text-caption)", { lineHeight: "var(--leading-caption)" }],
         label: ["var(--text-label)", { lineHeight: "var(--leading-label)" }],
+        nav: ["var(--text-nav)", { lineHeight: "var(--leading-body)" }],
+        "nav-bottom": ["var(--text-nav-bottom)", { lineHeight: "var(--leading-tight)" }],
+        "metric-hero": ["var(--text-metric-hero)", { lineHeight: "var(--leading-tight)" }],
+      },
+      fontWeight: {
+        body: "var(--weight-body)",
+        ui: "var(--weight-ui)",
+        emphasis: "var(--weight-emphasis)",
+        strong: "var(--weight-strong)",
+        metric: "var(--weight-metric)",
       },
       colors: {
         pump: {
