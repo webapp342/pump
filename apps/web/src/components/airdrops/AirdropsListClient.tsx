@@ -35,7 +35,6 @@ export function AirdropsListClient({
   const [activeFilter, setActiveFilter] = useState<AirdropFilter>("all");
   const [sortKey, setSortKey] = useState<AirdropSortKey>("reward");
   const [sortDir, setSortDir] = useState<AirdropSortDir>("desc");
-  const [refreshing, setRefreshing] = useState(false);
   const [mineIds, setMineIds] = useState<Set<string>>(new Set());
   const { bnbUsd } = useBnbUsdPrice();
 
@@ -51,15 +50,6 @@ export function AirdropsListClient({
       setError(err instanceof Error ? err.message : "Failed to load airdrops");
     }
   }, []);
-
-  const handleRefresh = useCallback(async () => {
-    setRefreshing(true);
-    try {
-      await load();
-    } finally {
-      setRefreshing(false);
-    }
-  }, [load]);
 
   const initialPayloadRef = useRef(initialPayload);
 
@@ -198,11 +188,9 @@ export function AirdropsListClient({
           <AirdropsFilterNav
             activeFilter={activeFilter}
             filterCounts={filterCounts}
-            loading={refreshing}
             search={search}
             onSearchChange={setSearch}
             onSelect={setActiveFilter}
-            onRefresh={() => void handleRefresh()}
           />
           <div className="airdrops-body">
             <div className="empty-state airdrops-empty-state">
@@ -220,11 +208,9 @@ export function AirdropsListClient({
         <AirdropsFilterNav
           activeFilter={activeFilter}
           filterCounts={filterCounts}
-          loading={refreshing}
           search={search}
           onSearchChange={setSearch}
           onSelect={setActiveFilter}
-          onRefresh={() => void handleRefresh()}
         />
 
         <div className="airdrops-body">

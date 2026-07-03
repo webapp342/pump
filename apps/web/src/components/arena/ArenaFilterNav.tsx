@@ -23,7 +23,6 @@ type ArenaFilterNavProps = {
   onWatchlistOpen?: () => void;
   watchlistOpen?: boolean;
   watchlistCount?: number;
-  searchTrailing?: ReactNode;
   trailing?: ReactNode;
 };
 
@@ -37,7 +36,6 @@ export function ArenaFilterNav({
   onWatchlistOpen,
   watchlistOpen = false,
   watchlistCount = 0,
-  searchTrailing,
   trailing,
 }: ArenaFilterNavProps) {
   const watchlistAriaLabel = `Open watchlist${watchlistCount > 0 ? `, ${watchlistCount} tokens` : ""}`;
@@ -56,61 +54,60 @@ export function ArenaFilterNav({
               aria-label="Search coins"
             />
           </div>
-          {searchTrailing ? (
-            <div className="arena-filter-bar__search-tools">{searchTrailing}</div>
-          ) : null}
         </div>
 
-        <nav className="arena-tab-nav" aria-label="Explore filters">
-          <div className="arena-tab-nav__track" role="tablist">
-            {onWatchlistOpen ? (
-              <button
-                type="button"
-                className={
-                  watchlistOpen
-                    ? "arena-tab-nav__item arena-tab-nav__item--icon arena-tab-nav__item--active"
-                    : "arena-tab-nav__item arena-tab-nav__item--icon"
-                }
-                onClick={onWatchlistOpen}
-                aria-label={watchlistAriaLabel}
-                aria-expanded={watchlistOpen}
-                aria-haspopup="dialog"
-              >
-                <PumpIcon
-                  icon={faStarSolid}
-                  className={`h-3.5 w-3.5 ${watchlistOpen ? "text-pump-accent" : "text-pump-muted"}`}
-                />
-              </button>
-            ) : null}
-            {ARENA_FILTER_TABS.map(({ key, label }) => {
-              const count = filterCounts[key] ?? 0;
-              const isActive = activeFilter === key;
-              return (
+        <div className="arena-filter-bar__tabs-row">
+          <nav className="arena-tab-nav" aria-label="Explore filters">
+            <div className="arena-tab-nav__track" role="tablist">
+              {onWatchlistOpen ? (
                 <button
-                  key={key}
                   type="button"
-                  role="tab"
-                  aria-selected={isActive}
-                  onClick={() => onSelect(key)}
                   className={
-                    isActive
-                      ? "arena-tab-nav__item arena-tab-nav__item--active"
-                      : "arena-tab-nav__item"
+                    watchlistOpen
+                      ? "arena-tab-nav__item arena-tab-nav__item--icon arena-tab-nav__item--active"
+                      : "arena-tab-nav__item arena-tab-nav__item--icon"
                   }
+                  onClick={onWatchlistOpen}
+                  aria-label={watchlistAriaLabel}
+                  aria-expanded={watchlistOpen}
+                  aria-haspopup="dialog"
                 >
-                  <span>{label}</span>
-                  <span className="arena-tab-nav__count financial-value">{count}</span>
+                  <PumpIcon
+                    icon={faStarSolid}
+                    className={`h-3.5 w-3.5 ${watchlistOpen ? "text-pump-accent" : "text-pump-muted"}`}
+                  />
                 </button>
-              );
-            })}
-            {trailing ? (
-              <>
-                <span className="arena-tab-nav__tools-divider" aria-hidden />
-                <div className="arena-tab-nav__trailing">{trailing}</div>
-              </>
-            ) : null}
-          </div>
-        </nav>
+              ) : null}
+              {ARENA_FILTER_TABS.map(({ key, label }) => {
+                const count = filterCounts[key] ?? 0;
+                const isActive = activeFilter === key;
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    role="tab"
+                    aria-selected={isActive}
+                    onClick={() => onSelect(key)}
+                    className={
+                      isActive
+                        ? "arena-tab-nav__item arena-tab-nav__item--active"
+                        : "arena-tab-nav__item"
+                    }
+                  >
+                    <span>{label}</span>
+                    <span className="arena-tab-nav__count financial-value">{count}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </nav>
+          {trailing ? (
+            <>
+              <span className="arena-tab-nav__tools-divider" aria-hidden />
+              <div className="arena-tab-nav__trailing">{trailing}</div>
+            </>
+          ) : null}
+        </div>
       </div>
     </div>
   );

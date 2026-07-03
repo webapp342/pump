@@ -938,13 +938,8 @@ export function ArenaListClient({
             onWatchlistOpen={() => setWatchlistOpen(true)}
             watchlistOpen={watchlistOpen}
             watchlistCount={watchlistCount}
-            searchTrailing={
-              <div className="arena-filter-bar__quick-trade md:hidden">
-                <ArenaSwipeTradeBar compact />
-              </div>
-            }
             trailing={
-              <div className="arena-filter-bar__quick-trade hidden md:flex">
+              <div className="arena-filter-bar__quick-trade">
                 <ArenaSwipeTradeBar compact />
               </div>
             }

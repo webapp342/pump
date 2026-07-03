@@ -5,26 +5,41 @@ export function AirdropsSkeleton() {
     <div className="airdrops-page" aria-busy="true" aria-label="Loading airdrops">
       <div className="airdrops-hub">
         <div className="airdrops-filter-bar">
-          <div className="airdrops-filter-bar__main">
+          <div className="airdrops-filter-bar__search-row">
             <div className="airdrops-filter-bar__search">
-              <Skeleton className="h-8 w-full rounded-sm md:h-[2.25rem] md:w-36" />
+              <Skeleton className="h-9 w-full rounded-sm" />
             </div>
-            <div className="flex flex-1 gap-2 overflow-hidden px-1 md:px-0">
-              {Array.from({ length: 5 }).map((_, index) => (
-                <Skeleton key={index} className="h-8 w-20 shrink-0 rounded-md md:h-9" />
+          </div>
+          <div className="airdrops-filter-bar__tabs-row">
+            <div className="flex flex-1 gap-2 overflow-hidden py-1">
+              {Array.from({ length: 6 }).map((_, index) => (
+                <Skeleton key={index} className="h-8 w-16 shrink-0 rounded-md" />
               ))}
             </div>
           </div>
-          <Skeleton variant="line" className="mr-3 hidden h-8 w-16 sm:block" />
         </div>
 
         <section className="airdrops-list">
+          <div className="airdrops-list__head" aria-hidden>
+            <span className="airdrops-list__head-save" />
+            <Skeleton variant="line" className="h-3 w-14" />
+            <Skeleton variant="line" className="h-3 w-10 justify-self-end" />
+            <Skeleton variant="line" className="h-3 w-12 justify-self-center" />
+            <Skeleton variant="line" className="h-3 w-10 justify-self-end" />
+          </div>
           {Array.from({ length: 6 }).map((_, index) => (
             <div key={index} className="airdrops-list__row airdrops-list__row--skeleton">
-              <Skeleton variant="circle" className="h-7 w-7 shrink-0" />
-              <Skeleton className="h-4 w-24" />
-              <Skeleton variant="line" className="h-3 w-20" />
-              <Skeleton className="h-5 w-16 rounded-full" />
+              <Skeleton className="h-7 w-7 shrink-0 justify-self-center rounded-sm" />
+              <div className="flex items-center gap-2">
+                <Skeleton variant="circle" className="h-6 w-6 shrink-0" />
+                <div className="space-y-1">
+                  <Skeleton className="h-3.5 w-20" />
+                  <Skeleton variant="line" className="h-3 w-12" />
+                </div>
+              </div>
+              <Skeleton className="h-3.5 w-12 justify-self-end" />
+              <Skeleton className="h-4 w-12 justify-self-center rounded-sm" />
+              <Skeleton variant="line" className="h-3 w-10 justify-self-end" />
             </div>
           ))}
         </section>

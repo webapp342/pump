@@ -8,7 +8,6 @@ import {
 import {
   airdropRewardUsd,
   formatAirdropReward,
-  formatQualifyDateTime,
 } from "@/lib/airdrop-board-format";
 import { formatUsdReadable } from "@/lib/format-usd";
 import { PumpIcon, faBookmarkRegular, faBookmarkSolid } from "@/lib/icons";
@@ -37,12 +36,12 @@ function AirdropSaveButton({ airdropId }: { airdropId: string }) {
         event.stopPropagation();
         toggleSave(airdropId);
       }}
-      className={`airdrops-list__save inline-flex h-8 w-8 shrink-0 items-center justify-center transition ${
+      className={`airdrops-list__save inline-flex h-7 w-7 shrink-0 items-center justify-center transition ${
         saved ? "text-pump-accent" : "text-pump-muted hover:text-pump-text"
       }`}
       aria-label={saved ? "Remove from saved" : "Save campaign"}
     >
-      <PumpIcon icon={saved ? faBookmarkSolid : faBookmarkRegular} className="h-4 w-4" />
+      <PumpIcon icon={saved ? faBookmarkSolid : faBookmarkRegular} className="h-3.5 w-3.5" />
     </button>
   );
 }
@@ -63,9 +62,9 @@ function RewardLabel({
 
   return (
     <span className="airdrops-list__reward financial-value">
-      {amountLabel}
+      <span className="airdrops-list__reward-token">{amountLabel}</span>
       {usd != null ? (
-        <span className="airdrops-list__reward-usd"> · {formatUsdReadable(usd, { compact: true })}</span>
+        <span className="airdrops-list__reward-usd">{formatUsdReadable(usd, { compact: true })}</span>
       ) : null}
     </span>
   );
@@ -82,16 +81,15 @@ function AirdropCampaignRow({
   const title = airdropCampaignTitle(item);
   const timeCaption = airdropTimeCaption(item);
   const href = `/airdrops/${item.id}`;
-  const deadline =
-    item.displayStatus === "UPCOMING"
-      ? formatQualifyDateTime(item.qualifyStart)
-      : formatQualifyDateTime(item.qualifyEnd);
 
   return (
     <Link href={href} className="airdrops-list__row">
-      <div className="airdrops-list__cell airdrops-list__cell--campaign">
+      <div className="airdrops-list__cell airdrops-list__cell--save">
         <AirdropSaveButton airdropId={item.id} />
-        <TokenAvatar address={item.linkedToken} symbol={symbol} size={28} className="shrink-0" />
+      </div>
+
+      <div className="airdrops-list__cell airdrops-list__cell--campaign">
+        <TokenAvatar address={item.linkedToken} symbol={symbol} size={24} className="shrink-0" />
         <div className="min-w-0 flex-1">
           <p className="airdrops-list__title truncate">{title}</p>
           <p className="airdrops-list__symbol truncate">{symbol}</p>
@@ -103,20 +101,16 @@ function AirdropCampaignRow({
       </div>
 
       <div className="airdrops-list__cell airdrops-list__cell--status">
-        <span className={airdropStatusBadgeClass(item.displayStatus)}>
+        <span className={`airdrops-list__status ${airdropStatusBadgeClass(item.displayStatus)}`}>
           {formatAirdropDisplayStatus(item.displayStatus)}
         </span>
-      </div>
-
-      <div className="airdrops-list__cell airdrops-list__cell--deadline financial-value">
-        {deadline}
       </div>
 
       <div className="airdrops-list__cell airdrops-list__cell--time">
         {timeCaption ? (
           <span className="airdrops-list__time financial-value">
             {airdropShowsCountdown(item.displayStatus) ? (
-              <HourglassIcon size={12} aria-hidden />
+              <HourglassIcon size={11} aria-hidden />
             ) : null}
             {timeCaption}
           </span>
@@ -175,14 +169,16 @@ export function AirdropCampaignList({
 }: AirdropCampaignListProps) {
   return (
     <section className="airdrops-list">
-      <div className="airdrops-list__head" aria-hidden>
+      <div className="airdrops-list__head">
+        <span className="airdrops-list__head-save" aria-hidden />
         <span>Campaign</span>
         <SortButton
-          label="Reward"
+          label="Pool"
           sortKey="reward"
           activeKey={sortKey}
           sortDir={sortDir}
           onSort={onSort}
+          alignRight
         />
         <SortButton
           label="Status"
@@ -192,13 +188,13 @@ export function AirdropCampaignList({
           onSort={onSort}
         />
         <SortButton
-          label="Deadline"
+          label="Ends"
           sortKey="end"
           activeKey={sortKey}
           sortDir={sortDir}
           onSort={onSort}
+          alignRight
         />
-        <span className="airdrops-list__head-num">Time left</span>
       </div>
       <div className="airdrops-list__body">
         {items.map((item) => (

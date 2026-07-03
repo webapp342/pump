@@ -16,9 +16,10 @@ export const FieldSearchInput = forwardRef<HTMLInputElement, FieldSearchInputPro
     { className = "", wrapperClassName = "", endAdornment, embedded = false, fieldOnly = false, ...props },
     ref
   ) {
-    const inputClass = embedded
-      ? `arena-search-input h-9 w-full min-w-0 bg-transparent pl-9 pr-2 ${className}`
-      : `field-input h-9 w-full bg-pump-surface/75 pl-9 ${className}`;
+    const inputClass =
+      embedded || fieldOnly
+        ? `arena-search-input h-9 w-full min-w-0 bg-transparent pl-9 pr-2 ${className}`
+        : `field-input h-9 w-full bg-pump-surface/75 pl-9 ${className}`;
 
     const searchField = (
       <div className="arena-search-field relative min-w-0 flex-1">
