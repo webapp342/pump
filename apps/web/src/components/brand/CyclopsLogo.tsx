@@ -7,7 +7,7 @@ import {
 } from "@/lib/cyclops-logo";
 
 type CyclopsLogoProps = {
-  /** Full lockup on desktop; logogram only on mobile. */
+  /** Full lockup (logogram + wordmark) on all breakpoints unless logogram-only. */
   variant?: "lockup" | "logogram" | "auto";
   className?: string;
 };
@@ -54,22 +54,13 @@ function CyclopsLockup({ className = "" }: { className?: string }) {
 }
 
 export function CyclopsLogo({ variant = "auto", className = "" }: CyclopsLogoProps) {
-  if (variant === "logogram") {
-    return (
-      <span className={`cyclops-logo cyclops-logo--logogram-only ${className}`.trim()}>
-        <CyclopsLogogramSvg />
-      </span>
-    );
-  }
-
-  if (variant === "lockup") {
+  if (variant === "lockup" || variant === "auto") {
     return <CyclopsLockup className={className} />;
   }
 
   return (
-    <span className={`cyclops-logo cyclops-logo--auto ${className}`.trim()}>
-      <CyclopsLogogramSvg className="md:hidden" />
-      <CyclopsLockup className="hidden md:inline-flex" />
+    <span className={`cyclops-logo cyclops-logo--logogram-only ${className}`.trim()}>
+      <CyclopsLogogramSvg />
     </span>
   );
 }

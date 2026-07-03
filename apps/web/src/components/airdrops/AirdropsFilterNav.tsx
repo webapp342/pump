@@ -27,6 +27,7 @@ function AirdropFilterChip({
   iconOnly = false,
   showCount = true,
   onSelect,
+  className = "",
 }: {
   filterKey: AirdropFilter;
   label: string;
@@ -35,6 +36,7 @@ function AirdropFilterChip({
   iconOnly?: boolean;
   showCount?: boolean;
   onSelect: (filter: AirdropFilter) => void;
+  className?: string;
 }) {
   const ariaLabel = iconOnly
     ? count > 0
@@ -51,13 +53,13 @@ function AirdropFilterChip({
       aria-selected={isActive}
       aria-label={ariaLabel}
       onClick={() => onSelect(filterKey)}
-      className={
+      className={`${
         isActive
           ? `airdrops-tab-nav__item airdrops-tab-nav__item--active${
               iconOnly ? " airdrops-tab-nav__item--icon" : ""
             }`
           : `airdrops-tab-nav__item${iconOnly ? " airdrops-tab-nav__item--icon" : ""}`
-      }
+      }${className ? ` ${className}` : ""}`}
     >
       {iconOnly ? (
         <PumpIcon
@@ -124,6 +126,7 @@ export function AirdropsFilterNav({
                 count={filterCounts[key] ?? 0}
                 isActive={activeFilter === key}
                 onSelect={onSelect}
+                className={`airdrops-tab-nav__filter airdrops-tab-nav__filter--${key}`}
               />
             ))}
             <div className="airdrops-tab-nav__joined--desktop">

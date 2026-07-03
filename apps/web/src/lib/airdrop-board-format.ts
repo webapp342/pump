@@ -84,8 +84,8 @@ export function formatCampaignAmountLabel(wei: bigint, assetLabel: string): stri
   return `${formatCampaignAmount(wei)} ${assetLabel}`;
 }
 
-/** Adaptive countdown: ≥1w → w d h, ≥1d → d h m, ≥1h → h m, else m s. */
-export function formatCountdownMs(ms: number): string {
+/** Adaptive countdown: ≥1w → w d [h], ≥1d → d h [m], ≥1h → h m, else m s. */
+export function formatCountdownMs(ms: number, maxParts = 3): string {
   if (!Number.isFinite(ms) || ms <= 0) return "0s";
 
   const totalSec = Math.floor(ms / 1000);
@@ -95,41 +95,47 @@ export function formatCountdownMs(ms: number): string {
   const mins = Math.floor((totalSec % 3600) / 60);
   const secs = totalSec % 60;
 
+  const cap = (parts: string[]) => parts.slice(0, maxParts).join(" ");
+
   if (weeks > 0) {
     const parts = [`${weeks}w`];
     if (days > 0) parts.push(`${days}d`);
     if (hours > 0) parts.push(`${hours}h`);
-    return parts.join(" ");
+    return cap(parts);
   }
 
   if (days > 0) {
     const parts = [`${days}d`];
     if (hours > 0) parts.push(`${hours}h`);
     if (mins > 0) parts.push(`${mins}m`);
-    return parts.join(" ");
+    return cap(parts);
   }
 
   if (hours > 0) {
-    return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
+    const parts = [`${hours}h`];
+    if (mins > 0) parts.push(`${mins}m`);
+    return cap(parts);
   }
 
   if (mins > 0) {
-    return secs > 0 ? `${mins}m ${secs}s` : `${mins}m`;
+    const parts = [`${mins}m`];
+    if (secs > 0) parts.push(`${secs}s`);
+    return cap(parts);
   }
 
   return `${Math.max(secs, 1)}s`;
 }
 
-export function formatTimeRemaining(endIso: string): string {
+export function formatTimeRemaining(endIso: string, maxParts = 3): string {
   const ms = new Date(endIso).getTime() - Date.now();
   if (!Number.isFinite(ms) || ms <= 0) return "Ended";
-  return formatCountdownMs(ms);
+  return formatCountdownMs(ms, maxParts);
 }
 
-export function formatDurationUntil(startIso: string): string {
+export function formatDurationUntil(startIso: string, maxParts = 3): string {
   const ms = new Date(startIso).getTime() - Date.now();
   if (!Number.isFinite(ms) || ms <= 0) return "Started";
-  return formatCountdownMs(ms);
+  return formatCountdownMs(ms, maxParts);
 }
 
 export function qualifyWindowProgress(startIso: string, endIso: string): number {

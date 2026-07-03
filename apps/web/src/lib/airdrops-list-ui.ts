@@ -62,6 +62,18 @@ export function airdropCampaignTitle(item: AirdropListItem): string {
   return item.title ?? item.linkedName ?? item.linkedSymbol ?? shortAddress(item.linkedToken);
 }
 
+/** Mobile list row — hard cap with ASCII ellipsis. */
+export const AIRDROP_LIST_TITLE_MAX_LEN = 14;
+
+export function truncateAirdropListTitle(
+  title: string,
+  maxLen = AIRDROP_LIST_TITLE_MAX_LEN
+): string {
+  const trimmed = title.trim();
+  if (trimmed.length <= maxLen) return trimmed;
+  return `${trimmed.slice(0, maxLen)}...`;
+}
+
 export function airdropPoolSymbol(item: AirdropListItem): string {
   return item.linkedSymbol ?? shortAddress(item.linkedToken);
 }
@@ -100,14 +112,14 @@ export function airdropShowsCountdown(status: AirdropDisplayStatus): boolean {
   return status === "UPCOMING" || status === "QUALIFYING" || status === "CLAIMABLE";
 }
 
-export function airdropTimeCaption(item: EnrichedAirdrop): string | null {
+export function airdropTimeCaption(item: EnrichedAirdrop, maxParts = 2): string | null {
   switch (item.displayStatus) {
     case "UPCOMING":
-      return formatDurationUntil(item.qualifyStart);
+      return formatDurationUntil(item.qualifyStart, maxParts);
     case "QUALIFYING":
-      return formatTimeRemaining(item.qualifyEnd);
+      return formatTimeRemaining(item.qualifyEnd, maxParts);
     case "CLAIMABLE":
-      return item.claimEnd ? formatTimeRemaining(item.claimEnd) : "Window open";
+      return item.claimEnd ? formatTimeRemaining(item.claimEnd, maxParts) : "Window open";
     case "FINALIZING":
       return "Finalizing winners";
     case "CLOSED":

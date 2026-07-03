@@ -19,6 +19,7 @@ import {
   airdropPoolSymbol,
   airdropShowsCountdown,
   airdropTimeCaption,
+  truncateAirdropListTitle,
   type AirdropSortDir,
   type AirdropSortKey,
   type EnrichedAirdrop,
@@ -74,7 +75,12 @@ function AirdropCampaignRow({
       <div className="airdrops-list__cell airdrops-list__cell--campaign">
         <TokenAvatar address={item.linkedToken} symbol={symbol} size={24} className="shrink-0" />
         <div className="min-w-0 flex-1">
-          <p className="airdrops-list__title truncate">{title}</p>
+          <p className="airdrops-list__title airdrops-list__title--mobile md:hidden" title={title}>
+            {truncateAirdropListTitle(title)}
+          </p>
+          <p className="airdrops-list__title airdrops-list__title--desktop hidden truncate md:block" title={title}>
+            {title}
+          </p>
           <p className="airdrops-list__symbol truncate">{symbol}</p>
         </div>
       </div>
@@ -163,21 +169,25 @@ export function AirdropCampaignList({
     <section className="airdrops-list">
       <div className="airdrops-list__head">
         <span className="airdrops-list__head-save" aria-hidden />
-        <span>Campaign</span>
+        <span className="airdrops-list__head-cell airdrops-list__head-cell--campaign">Campaign</span>
         <SortButton
           label="Pool"
           sortKey="reward"
           activeKey={sortKey}
           sortDir={sortDir}
           onSort={onSort}
+          className="airdrops-list__head-cell airdrops-list__head-cell--pool"
         />
-        <span className="airdrops-list__head-value">Value</span>
+        <span className="airdrops-list__head-value airdrops-list__head-cell airdrops-list__head-cell--value">
+          Value
+        </span>
         <SortButton
           label="Status"
           sortKey="status"
           activeKey={sortKey}
           sortDir={sortDir}
           onSort={onSort}
+          className="airdrops-list__head-cell airdrops-list__head-cell--status"
         />
         <SortButton
           label="Ends"
@@ -186,6 +196,7 @@ export function AirdropCampaignList({
           sortDir={sortDir}
           onSort={onSort}
           alignRight
+          className="airdrops-list__head-cell airdrops-list__head-cell--time"
         />
       </div>
       <div className="airdrops-list__body">
