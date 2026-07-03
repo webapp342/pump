@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { PumpIcon, faChevronDown, faPlus } from "@/lib/icons";
+import { PumpIcon, faPlus } from "@/lib/icons";
 
 const CREATE_OPTIONS = [
   { href: "/create", label: "Token", description: "Launch a meme on the bonding curve" },
@@ -53,7 +53,6 @@ export function AppHeaderCreateMenu({ pathname }: AppHeaderCreateMenuProps) {
       >
         <PumpIcon icon={faPlus} className="app-header-create-btn__icon shrink-0" />
         Create
-        <PumpIcon icon={faChevronDown} className="app-header-create-btn__chevron shrink-0" aria-hidden />
       </button>
 
       {open ? (

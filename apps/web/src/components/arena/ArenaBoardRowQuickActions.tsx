@@ -1,10 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { NATIVE_SYMBOL } from "@/config/chain";
 import {
   ARENA_QUICK_TRADE_CHANGE_EVENT,
   DEFAULT_ARENA_QUICK_TRADE,
+  formatQuickTradeBuyUsd,
   readArenaQuickTradePrefs,
   type ArenaQuickTradePrefs,
 } from "@/lib/arena-quick-trade";
@@ -59,7 +59,7 @@ export function ArenaBoardRowQuickActions({
         <span className="arena-board-quick-btn__label">Buy</span>
         {layout !== "card-compact" ? (
           <span className="arena-board-quick-btn__value financial-value">
-            {prefs.buyAmountBnb} {NATIVE_SYMBOL}
+            {formatQuickTradeBuyUsd(prefs.buyAmountUsd)}
           </span>
         ) : null}
       </button>

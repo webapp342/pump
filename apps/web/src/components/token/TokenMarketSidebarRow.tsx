@@ -1,6 +1,8 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import type { TokenListItem } from "@/lib/db/launchpad";
+import { ArenaBoardRowQuickActions } from "@/components/arena/ArenaBoardRowQuickActions";
 import { FavoriteIcon } from "@/components/icons/FavoriteIcon";
 import { TokenAvatar } from "@/components/token/TokenAvatar";
 import { TokenDetailLink } from "@/components/token/TokenDetailLink";
@@ -12,6 +14,7 @@ import {
   formatCapForBoard,
   listTokenPriceUsd,
 } from "@/lib/arena-board-format";
+import { buildArenaQuickTradeHref } from "@/lib/arena-quick-trade";
 import { flashText, type FlashTone } from "@/lib/arena-explore-board-core";
 
 import type { TokenSidebarDensity } from "@/hooks/useTokenSidebarWidth";
@@ -31,6 +34,8 @@ type TokenMarketSidebarRowProps = {
   isFavorite: boolean;
   onToggleFavorite: (address: string) => void;
   onTokenSelect?: () => void;
+  /** Desktop sidebar — hover swaps data cell for Buy/Sell (MCAP compact / Last Price full). */
+  showRowQuickActions?: boolean;
 };
 
 export function TokenMarketSidebarRow({
@@ -48,13 +53,21 @@ export function TokenMarketSidebarRow({
   isFavorite,
   onToggleFavorite,
   onTokenSelect,
+  showRowQuickActions = false,
 }: TokenMarketSidebarRowProps) {
+  const router = useRouter();
   const addressKey = token.address.toLowerCase();
   const isActive = activeTokenAddress?.toLowerCase() === addressKey;
   const resolvedPriceUsd =
     priceUsd ?? listTokenPriceUsd(token.marketCapBnb, bnbUsd);
   const volLabel = formatUsdReadable(vol24hUsd, { compact: true });
   const compact = density === "compact";
+
+  const quickBuy = () => router.push(buildArenaQuickTradeHref(token.address, "buy"));
+  const quickSell = () => router.push(buildArenaQuickTradeHref(token.address, "sell"));
+  const quickActions = showRowQuickActions ? (
+    <ArenaBoardRowQuickActions layout="card-compact" onBuy={quickBuy} onSell={quickSell} />
+  ) : null;
 
   return (
     <TokenDetailLink
@@ -102,28 +115,38 @@ export function TokenMarketSidebarRow({
       </div>
 
       <div className="token-market-sidebar__cell token-market-sidebar__cell--mcap token-market-sidebar__col-mcap">
-        <span className={`token-market-sidebar__mcap financial-value ${flashText(mcapFlash)}`}>
-          {formatCapForBoard(mcapUsd)}
-        </span>
-        {compact ? (
-          <PctChange
-            value={token.change24hPct ?? null}
-            className="token-market-sidebar__mcap-chg"
-          />
+        <div className="token-market-sidebar__mcap-stack">
+          <span className={`token-market-sidebar__mcap financial-value ${flashText(mcapFlash)}`}>
+            {formatCapForBoard(mcapUsd)}
+          </span>
+          {compact ? (
+            <PctChange
+              value={token.change24hPct ?? null}
+              className="token-market-sidebar__mcap-chg"
+            />
+          ) : null}
+        </div>
+        {showRowQuickActions && compact ? (
+          <div className="token-market-sidebar__mcap-actions">{quickActions}</div>
         ) : null}
       </div>
 
       {!compact ? (
         <div className="token-market-sidebar__cell token-market-sidebar__cell--price token-market-sidebar__col-last">
-          <span
-            className={`token-market-sidebar__price financial-value ${flashText(priceFlash)}`}
-          >
-            <UsdReadablePrice value={resolvedPriceUsd} compact />
-          </span>
-          <PctChange
-            value={token.change24hPct ?? null}
-            className="token-market-sidebar__price-chg"
-          />
+          <div className="token-market-sidebar__price-stack">
+            <span
+              className={`token-market-sidebar__price financial-value ${flashText(priceFlash)}`}
+            >
+              <UsdReadablePrice value={resolvedPriceUsd} compact />
+            </span>
+            <PctChange
+              value={token.change24hPct ?? null}
+              className="token-market-sidebar__price-chg"
+            />
+          </div>
+          {showRowQuickActions ? (
+            <div className="token-market-sidebar__price-actions">{quickActions}</div>
+          ) : null}
         </div>
       ) : null}
     </TokenDetailLink>

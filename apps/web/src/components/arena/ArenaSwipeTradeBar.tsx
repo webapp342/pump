@@ -1,13 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useSyncExternalStore, useState } from "react";
-import { NATIVE_SYMBOL } from "@/config/chain";
 import { dismissHoldingsSwipeHint } from "@/components/portfolio/HoldingSwipeRow";
 import { ModalPortal } from "@/components/ui/ModalPortal";
 import { PumpIcon, faBolt, faSettings2 } from "@/lib/icons";
 import {
   ARENA_QUICK_TRADE_CHANGE_EVENT,
   DEFAULT_ARENA_QUICK_TRADE,
+  formatQuickTradeBuyUsd,
   readArenaQuickTradePrefs,
   writeArenaQuickTradePrefs,
   type ArenaQuickTradePrefs,
@@ -49,14 +49,14 @@ function QuickTradeSettingsFields({
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-1">
       <label className="space-y-1.5">
-        <span className="field-label">Buy amount ({NATIVE_SYMBOL})</span>
+        <span className="field-label">Buy amount (USD)</span>
         <input
           type="text"
           inputMode="decimal"
           value={draftBuy}
           onChange={(event) => onBuyChange(event.target.value)}
           className="field-input h-10 w-full text-body-sm"
-          placeholder="0.01"
+          placeholder="3"
         />
       </label>
       <label className="space-y-1.5">
@@ -135,19 +135,25 @@ function readPopoverPosition(anchor: HTMLElement): PopoverPosition {
   };
 }
 
-export function ArenaSwipeTradeBar() {
+type ArenaSwipeTradeBarProps = {
+  /** Trade sidebar — icon-only settings, flash + amounts without Buy/Sell labels. */
+  variant?: "default" | "sidebar";
+};
+
+export function ArenaSwipeTradeBar({ variant = "default" }: ArenaSwipeTradeBarProps) {
+  const sidebarCompact = variant === "sidebar";
   const useMobileSheet = useMobileQuickTradeSheet();
   const anchorRef = useRef<HTMLDivElement>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [popoverPos, setPopoverPos] = useState<PopoverPosition | null>(null);
   const [prefs, setPrefs] = useState<ArenaQuickTradePrefs>(DEFAULT_ARENA_QUICK_TRADE);
-  const [draftBuy, setDraftBuy] = useState(DEFAULT_ARENA_QUICK_TRADE.buyAmountBnb);
+  const [draftBuy, setDraftBuy] = useState(DEFAULT_ARENA_QUICK_TRADE.buyAmountUsd);
   const [draftSellPct, setDraftSellPct] = useState(String(DEFAULT_ARENA_QUICK_TRADE.sellPercent));
 
   const syncPrefs = useCallback(() => {
     const next = readArenaQuickTradePrefs();
     setPrefs(next);
-    setDraftBuy(next.buyAmountBnb);
+    setDraftBuy(next.buyAmountUsd);
     setDraftSellPct(String(next.sellPercent));
   }, []);
 
@@ -198,7 +204,7 @@ export function ArenaSwipeTradeBar() {
   const saveSettings = () => {
     const sellPercent = Number(draftSellPct);
     writeArenaQuickTradePrefs({
-      buyAmountBnb: draftBuy,
+      buyAmountUsd: draftBuy,
       sellPercent: Number.isFinite(sellPercent) ? sellPercent : DEFAULT_ARENA_QUICK_TRADE.sellPercent,
     });
     setSettingsOpen(false);
@@ -217,20 +223,28 @@ export function ArenaSwipeTradeBar() {
   );
 
   return (
-    <div ref={anchorRef} className="arena-quick-trade-bar relative shrink-0">
+    <div
+      ref={anchorRef}
+      className={`arena-quick-trade-bar relative shrink-0${
+        sidebarCompact ? " arena-quick-trade-bar--sidebar" : ""
+      }`}
+    >
       <div className="arena-quick-trade-bar__cluster">
         <div className="arena-quick-trade-bar__summary" aria-label="Quick trade amounts">
           <span className="arena-quick-trade-bar__leg arena-quick-trade-bar__buy">
             <PumpIcon icon={faBolt} className="arena-quick-trade-bar__flash" aria-hidden />
-            <span className="arena-quick-trade-bar__label hidden md:inline">Buy</span>
-            <span className="arena-quick-trade-bar__value financial-value">{prefs.buyAmountBnb}</span>
-            <span className="arena-quick-trade-bar__native hidden md:inline financial-value">
-              {NATIVE_SYMBOL}
+            {!sidebarCompact ? (
+              <span className="arena-quick-trade-bar__label hidden md:inline">Buy</span>
+            ) : null}
+            <span className="arena-quick-trade-bar__value financial-value">
+              {formatQuickTradeBuyUsd(prefs.buyAmountUsd)}
             </span>
           </span>
           <span className="arena-quick-trade-bar__leg arena-quick-trade-bar__sell">
             <PumpIcon icon={faBolt} className="arena-quick-trade-bar__flash" aria-hidden />
-            <span className="arena-quick-trade-bar__label hidden md:inline">Sell</span>
+            {!sidebarCompact ? (
+              <span className="arena-quick-trade-bar__label hidden md:inline">Sell</span>
+            ) : null}
             <span className="arena-quick-trade-bar__value financial-value">{prefs.sellPercent}%</span>
           </span>
         </div>
@@ -245,7 +259,9 @@ export function ArenaSwipeTradeBar() {
           aria-haspopup="dialog"
         >
           <PumpIcon icon={faSettings2} className="arena-quick-trade-bar__settings-icon" aria-hidden />
-          <span className="arena-quick-trade-bar__settings-label hidden md:inline">Settings</span>
+          {!sidebarCompact ? (
+            <span className="arena-quick-trade-bar__settings-label hidden md:inline">Settings</span>
+          ) : null}
         </button>
       </div>
 

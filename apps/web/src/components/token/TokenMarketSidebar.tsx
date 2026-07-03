@@ -25,7 +25,7 @@ type TokenMarketSidebarProps = {
   searchActive?: boolean;
   onSearchDismiss?: () => void;
   searchInputRef?: Ref<HTMLInputElement>;
-  /** Desktop trade sidebar — quick trade prefs next to filter chips. */
+  /** Desktop trade sidebar — quick trade prefs to the right of search. */
   showQuickTrade?: boolean;
 };
 
@@ -139,6 +139,11 @@ export function TokenMarketSidebar({
             autoCorrect="off"
             spellCheck={false}
           />
+          {!searchActive && showQuickTrade ? (
+            <div className="token-market-sidebar__search-tools hidden lg:flex">
+              <ArenaSwipeTradeBar variant="sidebar" />
+            </div>
+          ) : null}
           {mobileSearchChrome && searchActive && onSearchDismiss ? (
             <button
               type="button"
@@ -154,13 +159,6 @@ export function TokenMarketSidebar({
           <TokenMarketSidebarFilterStrip
             activeFilter={activeFilter}
             onSelect={setArenaFilter}
-            trailing={
-              showQuickTrade ? (
-                <div className="hidden lg:block">
-                  <ArenaSwipeTradeBar />
-                </div>
-              ) : null
-            }
           />
         ) : null}
       </div>
@@ -206,6 +204,7 @@ export function TokenMarketSidebar({
                 isFavorite={isFavorite(token.address)}
                 onToggleFavorite={toggleFavorite}
                 onTokenSelect={onTokenSelect}
+                showRowQuickActions={showQuickTrade}
               />
             );
           })
