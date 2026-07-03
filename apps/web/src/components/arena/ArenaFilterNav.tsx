@@ -1,7 +1,6 @@
 "use client";
 
-import type { RefObject } from "react";
-import { PumpIcon, faRotateCw } from "@/lib/icons";
+import type { ReactNode, RefObject } from "react";
 import { FieldSearchInput } from "@/components/ui/FieldSearchInput";
 import type { BoardFilter } from "@/lib/arena-filters";
 
@@ -17,23 +16,21 @@ export const ARENA_FILTER_TABS: { key: BoardFilter; label: string }[] = [
 type ArenaFilterNavProps = {
   activeFilter: BoardFilter;
   filterCounts: Record<string, number>;
-  loading: boolean;
   search: string;
   searchInputRef?: RefObject<HTMLInputElement | null>;
   onSearchChange: (value: string) => void;
   onSelect: (filter: BoardFilter) => void;
-  onRefresh: () => void;
+  trailing?: ReactNode;
 };
 
 export function ArenaFilterNav({
   activeFilter,
   filterCounts,
-  loading,
   search,
   searchInputRef,
   onSearchChange,
   onSelect,
-  onRefresh,
+  trailing,
 }: ArenaFilterNavProps) {
   return (
     <div className="arena-filter-bar">
@@ -72,23 +69,15 @@ export function ArenaFilterNav({
                 </button>
               );
             })}
+            {trailing ? (
+              <>
+                <span className="arena-tab-nav__tools-divider" aria-hidden />
+                <div className="arena-tab-nav__trailing">{trailing}</div>
+              </>
+            ) : null}
           </div>
         </nav>
       </div>
-
-      <button
-        type="button"
-        onClick={onRefresh}
-        disabled={loading}
-        className="chip-button arena-filter-bar__refresh shrink-0 disabled:opacity-50"
-        aria-label={loading ? "Refreshing coins" : "Refresh coins"}
-      >
-        <PumpIcon
-          icon={faRotateCw}
-          className={`h-3.5 w-3.5 shrink-0${loading ? " animate-spin" : ""}`}
-        />
-        <span className="hidden sm:inline">{loading ? "Refreshing" : "Refresh"}</span>
-      </button>
     </div>
   );
 }

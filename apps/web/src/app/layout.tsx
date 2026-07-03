@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { RootProviders } from "@/components/layout/RootProviders";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
-import { geistMono, geistSans } from "@/lib/fonts";
+import { geistMono, geistSans, brandWordmark } from "@/lib/fonts";
 import "@/lib/fontawesome-config";
 import "./globals.css";
 
@@ -18,8 +18,13 @@ export const metadata: Metadata = {
   },
   description: defaultDescription,
   icons: {
-    icon: [{ url: "/logos/light.svg", type: "image/svg+xml" }],
-    apple: [{ url: "/logos/light-rounded.svg", type: "image/svg+xml" }],
+    icon: [
+      { url: "/logos/light.svg", type: "image/svg+xml", media: "(prefers-color-scheme: light)" },
+      { url: "/logos/dark.svg", type: "image/svg+xml", media: "(prefers-color-scheme: dark)" },
+      { url: "/logo-mark.svg", type: "image/svg+xml" },
+    ],
+    apple: [{ url: "/logo-mark.svg", type: "image/svg+xml" }],
+    shortcut: ["/logo-mark.svg"],
   },
   openGraph: {
     title: defaultTitle,
@@ -50,7 +55,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       lang="en"
       data-theme="dark"
       suppressHydrationWarning
-      className={`${geistSans.variable} ${geistMono.variable}`}
+      className={`${geistSans.variable} ${geistMono.variable} ${brandWordmark.variable}`}
     >
       <body className={geistSans.className}>
         <script

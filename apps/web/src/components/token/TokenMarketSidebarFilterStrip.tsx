@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { PumpIcon, faChevronLeft, faChevronRight, faStarSolid } from "@/lib/icons";
 import type { BoardFilter } from "@/lib/arena-filters";
@@ -8,11 +9,14 @@ import { SIDEBAR_FILTER_ITEMS } from "@/lib/arena-explore-board-core";
 type TokenMarketSidebarFilterStripProps = {
   activeFilter: BoardFilter;
   onSelect: (filter: BoardFilter) => void;
+  /** Renders inline after filter chips (e.g. quick trade prefs). */
+  trailing?: ReactNode;
 };
 
 export function TokenMarketSidebarFilterStrip({
   activeFilter,
   onSelect,
+  trailing,
 }: TokenMarketSidebarFilterStripProps) {
   const viewportRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
@@ -107,6 +111,12 @@ export function TokenMarketSidebarFilterStrip({
               </button>
             );
           })}
+          {trailing ? (
+            <>
+              <span className="token-market-sidebar__filter-tools-divider" aria-hidden />
+              <div className="token-market-sidebar__filter-trailing">{trailing}</div>
+            </>
+          ) : null}
         </div>
       </div>
 

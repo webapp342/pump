@@ -8,6 +8,7 @@ import { emptyExploreFilterCopy } from "@/lib/arena-explore-board-core";
 import { TokenMarketSidebarRow } from "@/components/token/TokenMarketSidebarRow";
 import { TokenMarketSidebarHead } from "@/components/token/TokenMarketSidebarHead";
 import { TokenMarketSidebarFilterStrip } from "@/components/token/TokenMarketSidebarFilterStrip";
+import { ArenaSwipeTradeBar } from "@/components/arena/ArenaSwipeTradeBar";
 import { FieldSearchInput } from "@/components/ui/FieldSearchInput";
 import { pinMobileWindowScroll } from "@/hooks/useMobileModalScrollLock";
 import type { TokenSidebarDensity } from "@/hooks/useTokenSidebarWidth";
@@ -24,6 +25,8 @@ type TokenMarketSidebarProps = {
   searchActive?: boolean;
   onSearchDismiss?: () => void;
   searchInputRef?: Ref<HTMLInputElement>;
+  /** Desktop trade sidebar — quick trade prefs next to filter chips. */
+  showQuickTrade?: boolean;
 };
 
 export function TokenMarketSidebar({
@@ -37,6 +40,7 @@ export function TokenMarketSidebar({
   searchActive = false,
   onSearchDismiss,
   searchInputRef,
+  showQuickTrade = false,
 }: TokenMarketSidebarProps) {
   const listRef = useRef<HTMLDivElement>(null);
   const mobileSearchChrome = Boolean(onSearchFocusChange);
@@ -150,6 +154,13 @@ export function TokenMarketSidebar({
           <TokenMarketSidebarFilterStrip
             activeFilter={activeFilter}
             onSelect={setArenaFilter}
+            trailing={
+              showQuickTrade ? (
+                <div className="hidden lg:block">
+                  <ArenaSwipeTradeBar compact />
+                </div>
+              ) : null
+            }
           />
         ) : null}
       </div>

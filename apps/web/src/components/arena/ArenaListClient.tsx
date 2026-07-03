@@ -16,15 +16,7 @@ import {
 } from "@/lib/arena-board-format";
 import { useLiveChannel, resolveLivePollDelay } from "@/hooks/useLiveChannel";
 import { useRafMessageQueue } from "@/hooks/useRafMessageQueue";
-import {
-  ARENA_CARDS_SORT_LABELS,
-  readArenaCardsDensity,
-  readArenaCardsSort,
-  writeArenaCardsDensity,
-  writeArenaCardsSort,
-  type ArenaCardsDensity,
-  type ArenaCardsSortKey,
-} from "@/lib/arena-cards-prefs";
+import { readArenaCardsSort, writeArenaCardsSort, type ArenaCardsSortKey } from "@/lib/arena-cards-prefs";
 import {
   readArenaFilter,
   writeArenaFilter,
@@ -204,7 +196,6 @@ export function ArenaListClient({
   const [sortKey, setSortKey] = useState<SortKey>("age");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [cardsSort, setCardsSort] = useState<ArenaCardsSortKey>("mcap");
-  const [cardsDensity, setCardsDensity] = useState<ArenaCardsDensity>("comfortable");
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [favoriteListTokens, setFavoriteListTokens] = useState<TokenListItem[]>([]);
   const { address, isConnected } = useAccount();
@@ -278,7 +269,6 @@ export function ArenaListClient({
 
   useEffect(() => {
     const filter = readArenaFilter();
-    setCardsDensity(readArenaCardsDensity());
     setActiveFilter(filter);
     const defaults = applyBoardFilterDefaults(filter);
     if (defaults.sortKey) setSortKey(defaults.sortKey);
@@ -300,19 +290,6 @@ export function ArenaListClient({
       setCardsSort(defaults.cardsSort);
       writeArenaCardsSort(defaults.cardsSort);
     }
-  }, []);
-
-  const setCardsSortPreference = useCallback((sort: ArenaCardsSortKey) => {
-    setCardsSort(sort);
-    writeArenaCardsSort(sort);
-    if (sort === "mcap") setSortKey("mcap");
-    if (sort === "vol24h") setSortKey("vol24h");
-    if (sort === "h24") setSortKey("h24");
-  }, []);
-
-  const setCardsDensityPreference = useCallback((density: ArenaCardsDensity) => {
-    setCardsDensity(density);
-    writeArenaCardsDensity(density);
   }, []);
 
   useEffect(() => {
@@ -589,12 +566,6 @@ export function ArenaListClient({
   loadRef.current = load;
   const loadMoreRefFn = useRef(loadMore);
   loadMoreRefFn.current = loadMore;
-
-  const handleRefresh = useCallback(async () => {
-    listLimitRef.current = ARENA_PAGE_INITIAL;
-    await load(ARENA_PAGE_INITIAL);
-    await loadFavoriteTokens();
-  }, [load, loadFavoriteTokens]);
 
   const loadFavoriteTokensRef = useRef(loadFavoriteTokens);
   loadFavoriteTokensRef.current = loadFavoriteTokens;
@@ -949,69 +920,24 @@ export function ArenaListClient({
           <ArenaFilterNav
             activeFilter={activeFilter}
             filterCounts={filterCounts}
-            loading={boardRefreshing}
             search={search}
             searchInputRef={searchInputRef}
             onSearchChange={setSearch}
             onSelect={setArenaFilter}
-            onRefresh={() => {
-              void handleRefresh();
-            }}
+            trailing={
+              <div className="arena-filter-bar__quick-trade hidden md:flex">
+                <ArenaSwipeTradeBar compact />
+              </div>
+            }
           />
 
-          <div className="arena-options-bar">
-            <div className="arena-options-bar__controls flex flex-wrap items-center gap-2">
-              <label className="flex items-center gap-2 text-caption text-pump-muted">
-                <span className="hidden sm:inline">Sort</span>
-                <select
-                  value={cardsSort}
-                  onChange={(event) =>
-                    setCardsSortPreference(event.target.value as ArenaCardsSortKey)
-                  }
-                  className="field-input h-8 min-w-[9rem] bg-transparent py-1 text-caption"
-                  aria-label="Sort cards by"
-                >
-                  {(Object.keys(ARENA_CARDS_SORT_LABELS) as ArenaCardsSortKey[]).map((key) => (
-                    <option key={key} value={key}>
-                      {ARENA_CARDS_SORT_LABELS[key]}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <div className="arena-view-toggle" role="group" aria-label="Card density">
-                <button
-                  type="button"
-                  onClick={() => setCardsDensityPreference("comfortable")}
-                  className={`px-3 py-1.5 text-caption ${
-                    cardsDensity === "comfortable" ? "chip-button-active" : "chip-button"
-                  }`}
-                  aria-pressed={cardsDensity === "comfortable"}
-                >
-                  Comfortable
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setCardsDensityPreference("compact")}
-                  className={`px-3 py-1.5 text-caption ${
-                    cardsDensity === "compact" ? "chip-button-active" : "chip-button"
-                  }`}
-                  aria-pressed={cardsDensity === "compact"}
-                >
-                  Compact
-                </button>
-              </div>
-            </div>
-            <div className="arena-options-bar__actions flex shrink-0 items-center gap-2">
-              <div className="md:hidden">
-                <ArenaWatchlistSheet
-                  tokens={arenaTokenPool}
-                  bnbUsd={effectiveBnbUsd}
-                  flashes={flashes}
-                  animatedCaps={animatedCaps}
-                />
-              </div>
-              <ArenaSwipeTradeBar />
-            </div>
+          <div className="arena-options-bar arena-options-bar--mobile-only md:hidden">
+            <ArenaWatchlistSheet
+              tokens={arenaTokenPool}
+              bnbUsd={effectiveBnbUsd}
+              flashes={flashes}
+              animatedCaps={animatedCaps}
+            />
           </div>
         </div>
       </div>
@@ -1029,11 +955,7 @@ export function ArenaListClient({
             </p>
           </div>
         ) : (
-          <div
-            className={`arena-explore-grid${
-              cardsDensity === "compact" ? " arena-explore-grid--compact" : ""
-            }`}
-          >
+          <div className="arena-explore-grid arena-explore-grid--compact">
             {cardsTokens.map((token) => {
               const addressKey = token.address.toLowerCase();
               const mcapUsd =
@@ -1048,7 +970,7 @@ export function ArenaListClient({
                   mcapFlash={flashes[`${addressKey}:mcap`]}
                   isFavorite={isFavorite(token.address)}
                   onToggleFavorite={toggleFavorite}
-                  compact={cardsDensity === "compact"}
+                  compact
                 />
               );
             })}

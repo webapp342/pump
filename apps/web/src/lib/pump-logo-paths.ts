@@ -3,5 +3,7 @@ export const PUMP_LOGO = {
   glyphLight: "/logos/light.svg",
   glyphDark: "/logos/dark.svg",
   rounded: "/logos/light-rounded.svg",
-  favicon: "/logos/light.svg",
+  favicon: "/logo-mark.svg",
+  wordmark: "/logo.svg",
+  mark: "/logo-mark.svg",
 } as const;

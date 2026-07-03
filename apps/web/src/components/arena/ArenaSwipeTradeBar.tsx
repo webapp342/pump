@@ -12,7 +12,7 @@ import {
   type ArenaQuickTradePrefs,
 } from "@/lib/arena-quick-trade";
 
-export function ArenaSwipeTradeBar() {
+export function ArenaSwipeTradeBar({ compact = false }: { compact?: boolean }) {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [prefs, setPrefs] = useState<ArenaQuickTradePrefs>(DEFAULT_ARENA_QUICK_TRADE);
   const [draftBuy, setDraftBuy] = useState(DEFAULT_ARENA_QUICK_TRADE.buyAmountBnb);
@@ -52,29 +52,31 @@ export function ArenaSwipeTradeBar() {
     <div className="relative shrink-0">
       <div className="flex items-center gap-2">
         <p className="text-caption leading-snug text-pump-muted">
-          <span className="hidden lg:inline text-pump-muted">Quick trade: </span>
+          {!compact ? (
+            <span className="hidden lg:inline text-pump-muted">Quick trade: </span>
+          ) : null}
           <span className="font-medium text-pump-success">
-            <span className="hidden lg:inline">Buy </span>
+            {!compact ? <span className="hidden lg:inline">Buy </span> : null}
             {prefs.buyAmountBnb}
-            <span className="hidden lg:inline"> {NATIVE_SYMBOL}</span>
+            {!compact ? <span className="hidden lg:inline"> {NATIVE_SYMBOL}</span> : null}
           </span>
           <span className="text-pump-muted/45"> · </span>
           <span className="font-medium text-pump-danger">
-            <span className="hidden lg:inline">Sell </span>
+            {!compact ? <span className="hidden lg:inline">Sell </span> : null}
             {prefs.sellPercent}%
           </span>
         </p>
         <button
           type="button"
           onClick={openSettings}
-          className={`inline-flex h-7 shrink-0 items-center gap-1 rounded-md px-1.5 text-caption font-semibold text-pump-muted transition hover:bg-pump-border/10 hover:text-pump-text lg:h-8 lg:px-2.5 ${
-            settingsOpen ? "bg-pump-border/10 text-pump-text" : ""
-          }`}
+          className={`inline-flex shrink-0 items-center gap-1 rounded-md text-caption font-semibold text-pump-muted transition hover:bg-pump-border/10 hover:text-pump-text ${
+            compact ? "h-6 px-1" : "h-7 px-1.5 lg:h-8 lg:px-2.5"
+          } ${settingsOpen ? "bg-pump-border/10 text-pump-text" : ""}`}
           aria-label="Quick trade settings"
           aria-expanded={settingsOpen}
         >
           <PumpIcon icon={faSettings2} className="size-3.5" />
-          <span className="hidden lg:inline">Settings</span>
+          {!compact ? <span className="hidden lg:inline">Settings</span> : null}
         </button>
       </div>
 

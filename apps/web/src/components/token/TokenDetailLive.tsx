@@ -60,7 +60,7 @@ import {
 import { TradeTape } from "@/components/token/TradeTape";
 import { TokenMarketSidebar } from "@/components/token/TokenMarketSidebar";
 import { TokenSidebarCollapseToggle } from "@/components/token/TokenSidebarCollapseToggle";
-import { useTokenSidebarWidth, tokenSidebarDensity } from "@/hooks/useTokenSidebarWidth";
+import { useTokenSidebarWidth } from "@/hooks/useTokenSidebarWidth";
 import { useTokenSidebarHeadAnchor } from "@/hooks/useTokenSidebarHeadAnchor";
 import { PriceChart } from "@/components/token/PriceChart";
 import { FavoriteIcon } from "@/components/icons/FavoriteIcon";
@@ -948,8 +948,9 @@ export function TokenDetailLive({
           <TokenMarketSidebar
             id="token-market-sidebar"
             activeTokenAddress={tokenAddress}
-            density={tokenSidebarDensity(sidebarWidth)}
+            density="compact"
             headWrapRef={headWrapRef}
+            showQuickTrade
           />
         </div>
 

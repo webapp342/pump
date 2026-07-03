@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAccount } from "wagmi";
-import { PumpLogo } from "@/components/brand/PumpLogo";
+import { CyclopsLogo } from "@/components/brand/CyclopsLogo";
 import { WalletBar } from "@/components/wallet/WalletBar";
 import { ThemePicker } from "@/components/theme/ThemePicker";
 import { usePumpWallet } from "@/components/wallet/PumpWalletProvider";
@@ -25,12 +25,8 @@ export function AppHeaderView({ pathname }: { pathname: string }) {
     <header className="app-header">
       <div className={`app-header-inner ${shellHeaderInnerClassForPath(pathname)}`}>
         <div className="app-header-start">
-          <Link href="/" className="app-header-brand">
-            <span className="app-header-brand-mark">
-              <PumpLogo size={22} className="md:hidden" />
-              <PumpLogo size={32} className="hidden md:block" />
-            </span>
-            <span className="app-header-brand__name truncate">Pump</span>
+          <Link href="/" className="app-header-brand" aria-label="Cyclops home">
+            <CyclopsLogo variant="auto" />
           </Link>
 
           <nav className="app-header-nav hidden md:flex" aria-label="Primary">

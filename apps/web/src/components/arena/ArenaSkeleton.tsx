@@ -17,15 +17,11 @@ export function ArenaSkeleton() {
                 ))}
               </div>
             </div>
-            <Skeleton className="h-8 w-20 shrink-0 rounded-md" />
+            <Skeleton className="h-8 w-36 shrink-0 rounded-md" />
           </div>
 
-          <div className="arena-options-bar" aria-hidden>
-            <div className="flex flex-wrap items-center gap-2">
-              <Skeleton className="h-8 w-36 rounded-md" />
-              <Skeleton className="h-8 w-44 rounded-md" />
-            </div>
-            <Skeleton className="ml-auto h-8 w-28 shrink-0 rounded-md" />
+          <div className="arena-options-bar arena-options-bar--mobile-only md:hidden" aria-hidden>
+            <Skeleton className="h-8 w-28 shrink-0 rounded-md" />
           </div>
         </div>
       </div>
