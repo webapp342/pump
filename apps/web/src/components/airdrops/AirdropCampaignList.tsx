@@ -46,30 +46,6 @@ function AirdropSaveButton({ airdropId }: { airdropId: string }) {
   );
 }
 
-function RewardLabel({
-  item,
-  bnbUsd,
-}: {
-  item: EnrichedAirdrop;
-  bnbUsd: number | null;
-}) {
-  const isBnb = !item.rewardToken;
-  const amountLabel = formatAirdropReward(item.totalFunded, {
-    isBnb,
-    symbol: item.rewardSymbol,
-  });
-  const usd = airdropRewardUsd(item, bnbUsd);
-
-  return (
-    <span className="airdrops-list__reward financial-value">
-      <span className="airdrops-list__reward-token">{amountLabel}</span>
-      {usd != null ? (
-        <span className="airdrops-list__reward-usd">{formatUsdReadable(usd, { compact: true })}</span>
-      ) : null}
-    </span>
-  );
-}
-
 function AirdropCampaignRow({
   item,
   bnbUsd,
@@ -81,6 +57,13 @@ function AirdropCampaignRow({
   const title = airdropCampaignTitle(item);
   const timeCaption = airdropTimeCaption(item);
   const href = `/airdrops/${item.id}`;
+  const isBnb = !item.rewardToken;
+  const poolLabel = formatAirdropReward(item.totalFunded, {
+    isBnb,
+    symbol: item.rewardSymbol,
+  });
+  const usd = airdropRewardUsd(item, bnbUsd);
+  const usdLabel = usd != null ? formatUsdReadable(usd, { compact: true }) : null;
 
   return (
     <Link href={href} className="airdrops-list__row">
@@ -96,8 +79,15 @@ function AirdropCampaignRow({
         </div>
       </div>
 
-      <div className="airdrops-list__cell airdrops-list__cell--reward">
-        <RewardLabel item={item} bnbUsd={bnbUsd} />
+      <div className="airdrops-list__cell airdrops-list__cell--pool financial-value">
+        <span className="airdrops-list__pool-token">{poolLabel}</span>
+        {usdLabel ? (
+          <span className="airdrops-list__pool-usd airdrops-list__pool-usd--mobile">{usdLabel}</span>
+        ) : null}
+      </div>
+
+      <div className="airdrops-list__cell airdrops-list__cell--value financial-value">
+        {usdLabel ? <span className="airdrops-list__value-usd">{usdLabel}</span> : <span className="airdrops-list__dash">—</span>}
       </div>
 
       <div className="airdrops-list__cell airdrops-list__cell--status">
@@ -129,6 +119,7 @@ function SortButton({
   sortDir,
   onSort,
   alignRight = false,
+  className = "",
 }: {
   label: string;
   sortKey: AirdropSortKey;
@@ -136,6 +127,7 @@ function SortButton({
   sortDir: AirdropSortDir;
   onSort: (key: AirdropSortKey) => void;
   alignRight?: boolean;
+  className?: string;
 }) {
   const active = sortKey === activeKey;
   return (
@@ -144,7 +136,7 @@ function SortButton({
       onClick={() => onSort(sortKey)}
       className={`airdrops-list__sort${active ? " airdrops-list__sort--active" : ""}${
         alignRight ? " airdrops-list__sort--right" : ""
-      }`}
+      } ${className}`.trim()}
     >
       {label}
       {active ? (sortDir === "asc" ? " ↑" : " ↓") : null}
@@ -178,8 +170,8 @@ export function AirdropCampaignList({
           activeKey={sortKey}
           sortDir={sortDir}
           onSort={onSort}
-          alignRight
         />
+        <span className="airdrops-list__head-value">Value</span>
         <SortButton
           label="Status"
           sortKey="status"

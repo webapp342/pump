@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useSyncExternalStore, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useSyncExternalStore, useState } from "react";
 import { NATIVE_SYMBOL } from "@/config/chain";
 import { dismissHoldingsSwipeHint } from "@/components/portfolio/HoldingSwipeRow";
 import { ModalPortal } from "@/components/ui/ModalPortal";
@@ -47,7 +47,7 @@ function QuickTradeSettingsFields({
   onSellPctChange,
 }: QuickTradeSettingsFieldsProps) {
   return (
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-1">
       <label className="space-y-1.5">
         <span className="field-label">Buy amount ({NATIVE_SYMBOL})</span>
         <input
@@ -103,15 +103,13 @@ function QuickTradeSettingsPanel({
   onSellPctChange,
   onCancel,
   onSave,
-  className = "",
 }: QuickTradeSettingsFieldsProps & {
   title?: string;
   onCancel: () => void;
   onSave: () => void;
-  className?: string;
 }) {
   return (
-    <div className={`space-y-4 ${className}`.trim()}>
+    <div className="space-y-4">
       <p className="text-body-sm font-semibold text-pump-text">{title}</p>
       <QuickTradeSettingsFields
         draftBuy={draftBuy}
@@ -124,9 +122,24 @@ function QuickTradeSettingsPanel({
   );
 }
 
-export function ArenaSwipeTradeBar({ compact = false }: { compact?: boolean }) {
+type PopoverPosition = {
+  top: number;
+  right: number;
+};
+
+function readPopoverPosition(anchor: HTMLElement): PopoverPosition {
+  const rect = anchor.getBoundingClientRect();
+  return {
+    top: rect.bottom + 6,
+    right: Math.max(12, window.innerWidth - rect.right),
+  };
+}
+
+export function ArenaSwipeTradeBar() {
   const useMobileSheet = useMobileQuickTradeSheet();
+  const anchorRef = useRef<HTMLDivElement>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [popoverPos, setPopoverPos] = useState<PopoverPosition | null>(null);
   const [prefs, setPrefs] = useState<ArenaQuickTradePrefs>(DEFAULT_ARENA_QUICK_TRADE);
   const [draftBuy, setDraftBuy] = useState(DEFAULT_ARENA_QUICK_TRADE.buyAmountBnb);
   const [draftSellPct, setDraftSellPct] = useState(String(DEFAULT_ARENA_QUICK_TRADE.sellPercent));
@@ -154,6 +167,26 @@ export function ArenaSwipeTradeBar({ compact = false }: { compact?: boolean }) {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [settingsOpen]);
+
+  useEffect(() => {
+    if (!settingsOpen || useMobileSheet) {
+      setPopoverPos(null);
+      return;
+    }
+
+    const updatePosition = () => {
+      if (!anchorRef.current) return;
+      setPopoverPos(readPopoverPosition(anchorRef.current));
+    };
+
+    updatePosition();
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+    return () => {
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+    };
+  }, [settingsOpen, useMobileSheet]);
 
   const closeSettings = () => setSettingsOpen(false);
 
@@ -183,79 +216,76 @@ export function ArenaSwipeTradeBar({ compact = false }: { compact?: boolean }) {
     />
   );
 
-  let settingsChrome: ReactNode = null;
-
-  if (settingsOpen && useMobileSheet) {
-    settingsChrome = (
-      <ModalPortal open>
-        <div
-          className="modal-backdrop modal-backdrop-shell z-50"
-          role="dialog"
-          aria-modal="true"
-          aria-label="Quick trade settings"
-        >
-          <button
-            type="button"
-            className="absolute inset-0 cursor-default"
-            aria-label="Close quick trade settings"
-            onClick={closeSettings}
-          />
-          <div className="modal-panel pointer-events-auto relative w-full max-w-lg p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
-            {settingsPanel}
-          </div>
-        </div>
-      </ModalPortal>
-    );
-  } else if (settingsOpen) {
-    settingsChrome = (
-      <>
-        <button
-          type="button"
-          className="fixed inset-0 z-20 cursor-default"
-          aria-label="Close settings"
-          onClick={closeSettings}
-        />
-        <div className="absolute right-0 top-full z-30 mt-1 w-72 space-y-2 rounded-md border border-pump-border/25 bg-pump-card p-3 shadow-lg">
-          {settingsPanel}
-        </div>
-      </>
-    );
-  }
-
   return (
-    <div className="relative shrink-0">
-      <div className="flex items-center gap-1.5 sm:gap-2">
-        <p className="text-caption leading-snug text-pump-muted">
-          {!compact ? (
-            <span className="hidden lg:inline text-pump-muted">Quick trade: </span>
-          ) : null}
+    <div ref={anchorRef} className="arena-quick-trade-bar relative shrink-0">
+      <div className="flex items-center gap-1.5 md:gap-2">
+        <p className="arena-quick-trade-bar__summary text-caption leading-snug text-pump-muted md:text-body-sm">
+          <span className="arena-quick-trade-bar__prefix hidden md:inline">Quick trade: </span>
           <span className="font-medium text-pump-success">
-            {!compact ? <span className="hidden lg:inline">Buy </span> : null}
+            <span className="arena-quick-trade-bar__buy-label hidden md:inline">Buy </span>
             {prefs.buyAmountBnb}
-            {!compact ? <span className="hidden lg:inline"> {NATIVE_SYMBOL}</span> : null}
+            <span className="arena-quick-trade-bar__native hidden md:inline"> {NATIVE_SYMBOL}</span>
           </span>
           <span className="text-pump-muted/45"> · </span>
           <span className="font-medium text-pump-danger">
-            {!compact ? <span className="hidden lg:inline">Sell </span> : null}
+            <span className="arena-quick-trade-bar__sell-label hidden md:inline">Sell </span>
             {prefs.sellPercent}%
           </span>
         </p>
         <button
           type="button"
           onClick={openSettings}
-          className={`inline-flex shrink-0 items-center justify-center gap-1 rounded-md text-caption font-semibold text-pump-muted transition hover:bg-pump-border/10 hover:text-pump-text ${
-            compact ? "h-9 min-w-9 px-2 md:h-7 md:min-w-0 md:px-1.5" : "h-9 min-w-9 px-2 lg:h-8 lg:min-w-0 lg:px-2.5"
-          } ${settingsOpen ? "bg-pump-border/10 text-pump-text" : ""}`}
+          className={`arena-quick-trade-bar__settings inline-flex shrink-0 items-center justify-center gap-1 rounded-md text-caption font-semibold text-pump-muted transition hover:bg-pump-border/10 hover:text-pump-text h-9 min-w-9 px-2 md:h-8 md:min-h-0 md:min-w-0 md:px-2.5 ${
+            settingsOpen ? "bg-pump-border/10 text-pump-text" : ""
+          }`}
           aria-label="Quick trade settings"
           aria-expanded={settingsOpen}
-          aria-haspopup={useMobileSheet ? "dialog" : undefined}
+          aria-haspopup="dialog"
         >
           <PumpIcon icon={faSettings2} className="size-4 md:size-3.5" />
-          {!compact ? <span className="hidden lg:inline">Settings</span> : null}
+          <span className="arena-quick-trade-bar__settings-label hidden md:inline">Settings</span>
         </button>
       </div>
 
-      {settingsChrome}
+      {settingsOpen && useMobileSheet ? (
+        <ModalPortal open>
+          <div
+            className="modal-backdrop modal-backdrop-shell z-50"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Quick trade settings"
+          >
+            <button
+              type="button"
+              className="absolute inset-0 cursor-default"
+              aria-label="Close quick trade settings"
+              onClick={closeSettings}
+            />
+            <div className="modal-panel pointer-events-auto relative w-full max-w-lg p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+              {settingsPanel}
+            </div>
+          </div>
+        </ModalPortal>
+      ) : null}
+
+      {settingsOpen && !useMobileSheet && popoverPos ? (
+        <ModalPortal open>
+          <div role="dialog" aria-modal="true" aria-label="Quick trade settings">
+            <button
+              type="button"
+              className="fixed inset-0 z-[60] cursor-default bg-transparent"
+              aria-label="Close quick trade settings"
+              onClick={closeSettings}
+            />
+            <div
+              className="modal-panel pointer-events-auto fixed z-[61] w-72 rounded-md border border-pump-border/25 bg-pump-card p-3 shadow-lg"
+              style={{ top: popoverPos.top, right: popoverPos.right }}
+            >
+              {settingsPanel}
+            </div>
+          </div>
+        </ModalPortal>
+      ) : null}
     </div>
   );
 }

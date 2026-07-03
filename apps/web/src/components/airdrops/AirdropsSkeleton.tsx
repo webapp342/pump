@@ -23,8 +23,9 @@ export function AirdropsSkeleton() {
           <div className="airdrops-list__head" aria-hidden>
             <span className="airdrops-list__head-save" />
             <Skeleton variant="line" className="h-3 w-14" />
-            <Skeleton variant="line" className="h-3 w-10 justify-self-end" />
-            <Skeleton variant="line" className="h-3 w-12 justify-self-center" />
+            <Skeleton variant="line" className="h-3 w-10" />
+            <Skeleton variant="line" className="hidden h-3 w-10 md:block" />
+            <Skeleton variant="line" className="h-3 w-12 md:justify-self-start" />
             <Skeleton variant="line" className="h-3 w-10 justify-self-end" />
           </div>
           {Array.from({ length: 6 }).map((_, index) => (
@@ -32,13 +33,11 @@ export function AirdropsSkeleton() {
               <Skeleton className="h-7 w-7 shrink-0 justify-self-center rounded-sm" />
               <div className="flex items-center gap-2">
                 <Skeleton variant="circle" className="h-6 w-6 shrink-0" />
-                <div className="space-y-1">
-                  <Skeleton className="h-3.5 w-20" />
-                  <Skeleton variant="line" className="h-3 w-12" />
-                </div>
+                <Skeleton className="h-3.5 w-20" />
               </div>
-              <Skeleton className="h-3.5 w-12 justify-self-end" />
-              <Skeleton className="h-4 w-12 justify-self-center rounded-sm" />
+              <Skeleton className="h-3.5 w-16 justify-self-end md:justify-self-start" />
+              <Skeleton className="hidden h-3.5 w-10 md:block" />
+              <Skeleton className="h-4 w-12 justify-self-center md:justify-self-start rounded-sm" />
               <Skeleton variant="line" className="h-3 w-10 justify-self-end" />
             </div>
           ))}

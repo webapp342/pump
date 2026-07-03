@@ -32,7 +32,7 @@ export function AirdropsListClient({
   const [items, setItems] = useState<AirdropListItem[] | null>(initialPayload?.data ?? null);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
-  const [activeFilter, setActiveFilter] = useState<AirdropFilter>("all");
+  const [activeFilter, setActiveFilter] = useState<AirdropFilter>("qualifying");
   const [sortKey, setSortKey] = useState<AirdropSortKey>("reward");
   const [sortDir, setSortDir] = useState<AirdropSortDir>("desc");
   const [mineIds, setMineIds] = useState<Set<string>>(new Set());
@@ -140,12 +140,6 @@ export function AirdropsListClient({
     });
 
     const sorted = [...filtered].sort((a, b) => {
-      if (activeFilter === "all") {
-        const aClosed = a.displayStatus === "CLOSED";
-        const bClosed = b.displayStatus === "CLOSED";
-        if (aClosed !== bClosed) return aClosed ? 1 : -1;
-      }
-
       let delta = 0;
       if (sortKey === "reward") delta = a.rewardUsd - b.rewardUsd;
       else if (sortKey === "end") {

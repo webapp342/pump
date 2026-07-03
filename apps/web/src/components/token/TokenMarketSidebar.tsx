@@ -157,7 +157,7 @@ export function TokenMarketSidebar({
             trailing={
               showQuickTrade ? (
                 <div className="hidden lg:block">
-                  <ArenaSwipeTradeBar compact />
+                  <ArenaSwipeTradeBar />
                 </div>
               ) : null
             }

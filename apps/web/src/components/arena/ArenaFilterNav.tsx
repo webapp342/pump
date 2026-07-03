@@ -23,6 +23,7 @@ type ArenaFilterNavProps = {
   onWatchlistOpen?: () => void;
   watchlistOpen?: boolean;
   watchlistCount?: number;
+  searchTrailing?: ReactNode;
   trailing?: ReactNode;
 };
 
@@ -36,6 +37,7 @@ export function ArenaFilterNav({
   onWatchlistOpen,
   watchlistOpen = false,
   watchlistCount = 0,
+  searchTrailing,
   trailing,
 }: ArenaFilterNavProps) {
   const watchlistAriaLabel = `Open watchlist${watchlistCount > 0 ? `, ${watchlistCount} tokens` : ""}`;
@@ -54,6 +56,9 @@ export function ArenaFilterNav({
               aria-label="Search coins"
             />
           </div>
+          {searchTrailing ? (
+            <div className="arena-filter-bar__search-tools">{searchTrailing}</div>
+          ) : null}
         </div>
 
         <div className="arena-filter-bar__tabs-row">

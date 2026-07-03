@@ -4,13 +4,7 @@ import { FieldSearchInput } from "@/components/ui/FieldSearchInput";
 import { PumpIcon, faBookmarkRegular } from "@/lib/icons";
 import type { AirdropFilter } from "@/lib/airdrops-list-ui";
 
-const PINNED_AIRDROP_FILTERS: { key: AirdropFilter; label: string; iconOnly?: boolean }[] = [
-  { key: "saved", label: "Saved", iconOnly: true },
-  { key: "mine", label: "Joined" },
-];
-
-const AIRDROP_FILTERS: { key: AirdropFilter; label: string }[] = [
-  { key: "all", label: "All" },
+const MAIN_AIRDROP_FILTERS: { key: AirdropFilter; label: string }[] = [
   { key: "qualifying", label: "Qualifying" },
   { key: "claimable", label: "Claimable" },
   { key: "upcoming", label: "Upcoming" },
@@ -31,6 +25,7 @@ function AirdropFilterChip({
   count,
   isActive,
   iconOnly = false,
+  showCount = true,
   onSelect,
 }: {
   filterKey: AirdropFilter;
@@ -38,11 +33,16 @@ function AirdropFilterChip({
   count: number;
   isActive: boolean;
   iconOnly?: boolean;
+  showCount?: boolean;
   onSelect: (filter: AirdropFilter) => void;
 }) {
   const ariaLabel = iconOnly
-    ? `Saved campaigns${count > 0 ? `, ${count}` : ""}`
-    : undefined;
+    ? count > 0
+      ? `Saved, ${count} campaigns`
+      : "Saved campaigns"
+    : count > 0
+      ? `${label}, ${count} campaigns`
+      : label;
 
   return (
     <button
@@ -53,8 +53,10 @@ function AirdropFilterChip({
       onClick={() => onSelect(filterKey)}
       className={
         isActive
-          ? "airdrops-tab-nav__item airdrops-tab-nav__item--active"
-          : "airdrops-tab-nav__item"
+          ? `airdrops-tab-nav__item airdrops-tab-nav__item--active${
+              iconOnly ? " airdrops-tab-nav__item--icon" : ""
+            }`
+          : `airdrops-tab-nav__item${iconOnly ? " airdrops-tab-nav__item--icon" : ""}`
       }
     >
       {iconOnly ? (
@@ -65,7 +67,9 @@ function AirdropFilterChip({
       ) : (
         <span>{label}</span>
       )}
-      <span className="airdrops-tab-nav__count financial-value">{count}</span>
+      {showCount && !iconOnly ? (
+        <span className="airdrops-tab-nav__count financial-value">{count}</span>
+      ) : null}
     </button>
   );
 }
@@ -94,19 +98,25 @@ export function AirdropsFilterNav({
       <div className="airdrops-filter-bar__tabs-row">
         <nav className="airdrops-tab-nav" aria-label="Airdrop filters">
           <div className="airdrops-tab-nav__track" role="tablist">
-            {PINNED_AIRDROP_FILTERS.map(({ key, label, iconOnly }) => (
+            <AirdropFilterChip
+              filterKey="saved"
+              label="Saved"
+              count={filterCounts.saved ?? 0}
+              isActive={activeFilter === "saved"}
+              iconOnly
+              showCount={false}
+              onSelect={onSelect}
+            />
+            <div className="airdrops-tab-nav__joined--mobile">
               <AirdropFilterChip
-                key={key}
-                filterKey={key}
-                label={label}
-                count={filterCounts[key] ?? 0}
-                isActive={activeFilter === key}
-                iconOnly={iconOnly}
+                filterKey="mine"
+                label="Joined"
+                count={filterCounts.mine ?? 0}
+                isActive={activeFilter === "mine"}
                 onSelect={onSelect}
               />
-            ))}
-            <span className="airdrops-tab-nav__divider" aria-hidden />
-            {AIRDROP_FILTERS.map(({ key, label }) => (
+            </div>
+            {MAIN_AIRDROP_FILTERS.map(({ key, label }) => (
               <AirdropFilterChip
                 key={key}
                 filterKey={key}
@@ -118,6 +128,15 @@ export function AirdropsFilterNav({
             ))}
           </div>
         </nav>
+        <div className="airdrops-tab-nav__trailing airdrops-tab-nav__joined--desktop">
+          <AirdropFilterChip
+            filterKey="mine"
+            label="Joined"
+            count={filterCounts.mine ?? 0}
+            isActive={activeFilter === "mine"}
+            onSelect={onSelect}
+          />
+        </div>
       </div>
     </div>
   );
