@@ -23,6 +23,7 @@ import { resolveDisplayUsername } from "@/lib/username";
 import { useUserAvatar } from "@/components/user/UserAvatarProvider";
 import { TokenBoardTable } from "@/components/arena/TokenBoardTable";
 import { PortfolioPanelSkeleton } from "@/components/portfolio/PortfolioPanelSkeleton";
+import { HubDiscoveryScrollLock } from "@/components/layout/HubDiscoveryScrollLock";
 import { HoldingSwipeRow } from "@/components/portfolio/HoldingSwipeRow";
 import { HoldingsSwipeHint } from "@/components/portfolio/HoldingsSwipeHint";
 import { TokenAvatar } from "@/components/token/TokenAvatar";
@@ -1337,6 +1338,7 @@ export function PortfolioPanel({
       ) : null}
 
       <div className="portfolio-page">
+        <HubDiscoveryScrollLock />
         <div className="portfolio-hub">
         <PortfolioHero
           walletAddress={walletAddress}

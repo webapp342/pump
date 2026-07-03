@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { InfoTip } from "@/components/ui/InfoTip";
 import { PumpIcon, faCheck } from "@/lib/icons";
@@ -185,6 +186,7 @@ type MissionsListProps = {
   pendingKeys?: string[];
   completingKey?: string | null;
   onAdminLinkClick?: (mission: MissionListItem) => void;
+  footerSlot?: ReactNode;
 };
 
 export function MissionsList({
@@ -193,21 +195,25 @@ export function MissionsList({
   pendingKeys = [],
   completingKey = null,
   onAdminLinkClick,
+  footerSlot,
 }: MissionsListProps) {
   return (
     <section className="missions-list">
       <MissionsListHeader />
-      <div className="missions-list__body">
-        {missions.map((mission) => (
-          <MissionRow
-            key={mission.taskKey}
-            mission={mission}
-            guestMode={guestMode}
-            syncing={pendingKeys.includes(mission.taskKey)}
-            completing={completingKey === mission.taskKey}
-            onAdminLinkClick={onAdminLinkClick}
-          />
-        ))}
+      <div className="missions-list__scroll">
+        <div className="missions-list__body">
+          {missions.map((mission) => (
+            <MissionRow
+              key={mission.taskKey}
+              mission={mission}
+              guestMode={guestMode}
+              syncing={pendingKeys.includes(mission.taskKey)}
+              completing={completingKey === mission.taskKey}
+              onAdminLinkClick={onAdminLinkClick}
+            />
+          ))}
+        </div>
+        {footerSlot}
       </div>
     </section>
   );

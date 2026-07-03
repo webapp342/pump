@@ -1,8 +1,10 @@
 import { Skeleton } from "@/components/ui/Skeleton";
+import { HubDiscoveryScrollLock } from "@/components/layout/HubDiscoveryScrollLock";
 
 export function PortfolioPanelSkeleton() {
   return (
     <div className="portfolio-page" aria-busy="true" aria-label="Loading portfolio">
+      <HubDiscoveryScrollLock />
       <div className="portfolio-hub">
         <header className="portfolio-header">
           <div className="portfolio-toolbar">

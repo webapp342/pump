@@ -1,8 +1,10 @@
 import { Skeleton } from "@/components/ui/Skeleton";
+import { HubDiscoveryScrollLock } from "@/components/layout/HubDiscoveryScrollLock";
 
 export function MissionsPanelSkeleton() {
   return (
     <div className="missions-page" aria-busy="true" aria-label="Loading missions">
+      <HubDiscoveryScrollLock />
       <div className="missions-hub">
         <header className="missions-header">
           <div className="missions-toolbar">
@@ -42,6 +44,7 @@ export function MissionsPanelSkeleton() {
               <Skeleton variant="line" className="ml-auto h-3 w-10" />
               <Skeleton variant="line" className="ml-auto h-3 w-10" />
             </div>
+            <div className="missions-list__scroll">
             <div className="missions-list__body">
               {Array.from({ length: 5 }).map((_, index) => (
                 <div key={index} className="missions-list__row missions-list__row--skeleton">
@@ -54,6 +57,7 @@ export function MissionsPanelSkeleton() {
                   <Skeleton variant="line" className="ml-auto h-8 w-16" />
                 </div>
               ))}
+            </div>
             </div>
           </section>
         </div>

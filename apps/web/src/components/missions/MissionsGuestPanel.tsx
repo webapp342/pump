@@ -9,6 +9,7 @@ import {
   guestMissionFilterCounts,
 } from "@/lib/missions-guest-data";
 import type { MissionFilter } from "@/lib/missions-types";
+import { HubDiscoveryScrollLock } from "@/components/layout/HubDiscoveryScrollLock";
 
 type MissionsGuestPanelProps = {
   onSignIn: () => void;
@@ -40,6 +41,7 @@ export function MissionsGuestPanel({ onSignIn }: MissionsGuestPanelProps) {
 
   return (
     <div className="missions-page">
+      <HubDiscoveryScrollLock />
       <div className="missions-hub">
         <MissionsHero
           guestMode
@@ -60,8 +62,11 @@ export function MissionsGuestPanel({ onSignIn }: MissionsGuestPanelProps) {
         />
 
         <div className="missions-body">
-          <MissionsList missions={previewMissions} guestMode />
-          <GuestSignInFooter onSignIn={onSignIn} />
+          <MissionsList
+            missions={previewMissions}
+            guestMode
+            footerSlot={<GuestSignInFooter onSignIn={onSignIn} />}
+          />
         </div>
       </div>
     </div>

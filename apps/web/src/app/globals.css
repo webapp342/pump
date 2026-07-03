@@ -1180,7 +1180,7 @@ code,
     }
   }
 
-  /* Arena / Airdrops mobile — document locked; only token/list panes scroll */
+  /* Hub terminal mobile — document locked; only designated list panes scroll */
   @media (max-width: 767px) {
     html.hub-discovery-scroll-lock,
     html.hub-discovery-scroll-lock body {
@@ -1205,7 +1205,9 @@ code,
     }
 
     html.hub-discovery-scroll-lock main.arena-page-main,
-    html.hub-discovery-scroll-lock main.airdrops-page-main {
+    html.hub-discovery-scroll-lock main.airdrops-page-main,
+    html.hub-discovery-scroll-lock main.missions-page-main,
+    html.hub-discovery-scroll-lock main.portfolio-page-main {
       flex: 1 1 0;
       min-height: 0;
       overflow: hidden;
@@ -1213,7 +1215,9 @@ code,
     }
 
     html.hub-discovery-scroll-lock .arena-page,
-    html.hub-discovery-scroll-lock .airdrops-page {
+    html.hub-discovery-scroll-lock .airdrops-page,
+    html.hub-discovery-scroll-lock .missions-page,
+    html.hub-discovery-scroll-lock .portfolio-page {
       display: flex;
       flex-direction: column;
       flex: 1 1 0;
@@ -1224,15 +1228,24 @@ code,
     }
 
     html.hub-discovery-scroll-lock .arena-page .arena-hub,
-    html.hub-discovery-scroll-lock .airdrops-page .airdrops-hub {
+    html.hub-discovery-scroll-lock .airdrops-page .airdrops-hub,
+    html.hub-discovery-scroll-lock .missions-page .missions-hub,
+    html.hub-discovery-scroll-lock .portfolio-page .portfolio-hub {
       flex: 1 1 0;
       min-height: 0;
       overflow: hidden;
+      display: flex;
+      flex-direction: column;
     }
 
     html.hub-discovery-scroll-lock .arena-page__sticky,
     html.hub-discovery-scroll-lock .airdrops-page__sticky,
-    html.hub-discovery-scroll-lock .airdrops-page .airdrops-filter-bar {
+    html.hub-discovery-scroll-lock .airdrops-page .airdrops-filter-bar,
+    html.hub-discovery-scroll-lock .missions-page .missions-filter-bar,
+    html.hub-discovery-scroll-lock .portfolio-page .portfolio-header,
+    html.hub-discovery-scroll-lock .portfolio-page .portfolio-tab-nav,
+    html.hub-discovery-scroll-lock .portfolio-page .portfolio-holdings-mobile__header,
+    html.hub-discovery-scroll-lock .portfolio-page .portfolio-tab-scroll-header {
       flex-shrink: 0;
       overscroll-behavior: none;
     }
@@ -1283,8 +1296,117 @@ code,
       padding-bottom: var(--mobile-bottom-nav-height);
     }
 
+    html.hub-discovery-scroll-lock .missions-page .missions-body {
+      flex: 1 1 0;
+      min-height: 0;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    html.hub-discovery-scroll-lock .missions-page .missions-body:not(:has(.missions-list)) {
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      -webkit-overflow-scrolling: touch;
+      padding-bottom: var(--mobile-bottom-nav-height);
+    }
+
+    html.hub-discovery-scroll-lock .missions-page .missions-list {
+      flex: 1 1 0;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    html.hub-discovery-scroll-lock .missions-page .missions-list__head {
+      flex-shrink: 0;
+      position: static;
+    }
+
+    html.hub-discovery-scroll-lock .missions-page .missions-list__scroll {
+      flex: 1 1 0;
+      min-height: 0;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      -webkit-overflow-scrolling: touch;
+      padding-bottom: var(--mobile-bottom-nav-height);
+    }
+
+    html.hub-discovery-scroll-lock .portfolio-page .portfolio-hub__body {
+      flex: 1 1 0;
+      min-height: 0;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    html.hub-discovery-scroll-lock .portfolio-page .portfolio-tab-panel,
+    html.hub-discovery-scroll-lock .portfolio-page .portfolio-holdings-panel,
+    html.hub-discovery-scroll-lock .portfolio-page .portfolio-holdings-mobile,
+    html.hub-discovery-scroll-lock .portfolio-page .portfolio-tab-panel__surface,
+    html.hub-discovery-scroll-lock .portfolio-page .portfolio-rewards-section.portfolio-tab-panel__surface {
+      flex: 1 1 0;
+      min-height: 0;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    html.hub-discovery-scroll-lock .portfolio-page .portfolio-holdings-mobile__body,
+    html.hub-discovery-scroll-lock .portfolio-page .portfolio-tab-scroll,
+    html.hub-discovery-scroll-lock .portfolio-page .portfolio-fees-tab {
+      flex: 1 1 0;
+      min-height: 0;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      -webkit-overflow-scrolling: touch;
+      padding-bottom: var(--mobile-bottom-nav-height);
+    }
+
     html.hub-discovery-scroll-lock .bottom-nav-host {
       overscroll-behavior: none;
+    }
+
+    html.hub-discovery-scroll-lock .app-header,
+    html.hub-discovery-scroll-lock .arena-page__sticky,
+    html.hub-discovery-scroll-lock .airdrops-page__sticky,
+    html.hub-discovery-scroll-lock .airdrops-page .airdrops-filter-bar,
+    html.hub-discovery-scroll-lock .missions-page .missions-header,
+    html.hub-discovery-scroll-lock .missions-page .missions-filter-bar,
+    html.hub-discovery-scroll-lock .portfolio-page .portfolio-header,
+    html.hub-discovery-scroll-lock .portfolio-page .portfolio-tab-nav,
+    html.hub-discovery-scroll-lock .portfolio-page .portfolio-holdings-mobile__header,
+    html.hub-discovery-scroll-lock .portfolio-page .portfolio-tab-scroll-header,
+    html.hub-discovery-scroll-lock .bottom-nav-host {
+      touch-action: none;
+    }
+
+    html.hub-discovery-scroll-lock .arena-tab-nav__track,
+    html.hub-discovery-scroll-lock .airdrops-tab-nav__track,
+    html.hub-discovery-scroll-lock .portfolio-tab-nav__track {
+      touch-action: pan-x;
+    }
+
+    html.hub-discovery-scroll-lock .arena-page__scroll,
+    html.hub-discovery-scroll-lock .airdrops-list__scroll,
+    html.hub-discovery-scroll-lock .airdrops-page .airdrops-body:not(:has(.airdrops-list)),
+    html.hub-discovery-scroll-lock .missions-list__scroll,
+    html.hub-discovery-scroll-lock .missions-page .missions-body:not(:has(.missions-list)),
+    html.hub-discovery-scroll-lock .portfolio-holdings-mobile__body,
+    html.hub-discovery-scroll-lock .portfolio-tab-scroll,
+    html.hub-discovery-scroll-lock .portfolio-fees-tab {
+      touch-action: pan-y;
+    }
+
+    html.hub-discovery-scroll-lock.hub-discovery-search-focus .arena-filter-bar__search-row,
+    html.hub-discovery-scroll-lock.hub-discovery-search-focus .airdrops-filter-bar__search-row,
+    html.hub-discovery-scroll-lock.hub-discovery-search-focus .airdrops-list__head {
+      touch-action: none;
+    }
+
+    html.hub-discovery-scroll-lock.hub-discovery-search-focus .arena-search-input {
+      touch-action: manipulation;
     }
   }
 
@@ -10067,6 +10189,32 @@ code,
     }
 
     .missions-page .missions-body {
+      flex: 1 1 0;
+      min-height: 0;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .missions-page .missions-body:not(:has(.missions-list)) {
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .missions-page .missions-list {
+      flex: 1 1 0;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .missions-page .missions-list__head {
+      flex-shrink: 0;
+    }
+
+    .missions-page .missions-list__scroll {
       flex: 1 1 0;
       min-height: 0;
       overflow-y: auto;

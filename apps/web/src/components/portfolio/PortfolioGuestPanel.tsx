@@ -7,6 +7,7 @@ import { PortfolioMetricBox } from "@/components/portfolio/PortfolioMetricBox";
 import { PortfolioTabNav } from "@/components/portfolio/PortfolioTabNav";
 import { formatUsdSignedTwoDecimals } from "@/lib/format-usd";
 import type { PortfolioTab } from "@/lib/portfolio-tabs";
+import { HubDiscoveryScrollLock } from "@/components/layout/HubDiscoveryScrollLock";
 
 const GUEST_WALLET = "0x0000000000000000000000000000000000000000";
 const GUEST_ZERO_USD = formatUsdSignedTwoDecimals(0);
@@ -135,6 +136,7 @@ function GuestAirdropsTab({ onSignIn }: { onSignIn: () => void }) {
 export function PortfolioGuestPanel({ activeTab, onSignIn }: PortfolioGuestPanelProps) {
   return (
     <div className="portfolio-page">
+      <HubDiscoveryScrollLock />
       <div className="portfolio-hub">
         <PortfolioHero
           walletAddress={GUEST_WALLET}

@@ -12,6 +12,7 @@ import { MissionsGuestPanel } from "@/components/missions/MissionsGuestPanel";
 import { MissionsHero } from "@/components/missions/MissionsHero";
 import { MissionsList } from "@/components/missions/MissionList";
 import { MissionsPanelSkeleton } from "@/components/missions/MissionsPanelSkeleton";
+import { HubDiscoveryScrollLock } from "@/components/layout/HubDiscoveryScrollLock";
 import type { Mission, MissionFilter, MissionsData } from "@/lib/missions-types";
 
 const BURST_POLL_MS = 1_500;
@@ -169,6 +170,7 @@ export function MissionsPanel() {
 
   return (
     <div className="missions-page">
+      <HubDiscoveryScrollLock />
       <div className="missions-hub">
         {data ? (
           <MissionsHero
