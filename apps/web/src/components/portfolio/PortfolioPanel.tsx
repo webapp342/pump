@@ -11,6 +11,10 @@ import { contracts, pumpChain, NATIVE_SYMBOL } from "@/config/chain";
 import { bondingCurveManagerAbi } from "@/lib/bonding-curve";
 import { ClaimCreatorFeesModal } from "@/components/portfolio/ClaimCreatorFeesModal";
 import { PortfolioGuestPanel } from "@/components/portfolio/PortfolioGuestPanel";
+import {
+  PortfolioAllocationStrip,
+  buildPortfolioAllocationItems,
+} from "@/components/portfolio/PortfolioAllocationStrip";
 import { PortfolioHero } from "@/components/portfolio/PortfolioHero";
 import { PortfolioHoldingMobileCard } from "@/components/portfolio/PortfolioHoldingMobileCard";
 import { PortfolioFeesTab } from "@/components/portfolio/PortfolioFeesTab";
@@ -1270,6 +1274,26 @@ export function PortfolioPanel({
   const showEmptyHoldings =
     tokenHoldingsCount === 0 && totalHoldingsCount === 0 && nativeBnb <= 0;
 
+  const allocationItems = buildPortfolioAllocationItems(
+    displayHoldingsRows.map((row) => {
+      if (row.kind === "position") {
+        return {
+          key: row.view.position.tokenAddress.toLowerCase(),
+          symbol: row.view.position.symbol,
+          estimatedValueBnb: row.estimatedValueBnb,
+        };
+      }
+      return {
+        key: row.holding.tokenAddress.toLowerCase(),
+        symbol: row.holding.symbol,
+        estimatedValueBnb: row.estimatedValueBnb,
+      };
+    }),
+    nativeBnb,
+    NATIVE_SYMBOL,
+    bnbUsd
+  );
+
   const isOwnPortfolio =
     Boolean(address) && address!.toLowerCase() === walletAddress.toLowerCase();
   const displayUsername = isOwnPortfolio
@@ -1374,6 +1398,10 @@ export function PortfolioPanel({
           }}
           feesPending={feesPending}
         />
+
+        {activeTab === "holdings" && allocationItems.length > 0 ? (
+          <PortfolioAllocationStrip items={allocationItems} totalValueUsd={totalEstimatedUsd} />
+        ) : null}
 
         <div className="portfolio-hub__body">
         {activeTab === "holdings" ? (
