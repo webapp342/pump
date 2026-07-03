@@ -2416,6 +2416,11 @@ code,
       cursor: grab;
     }
 
+    .token-mobile-market-sheet__header {
+      padding-block: 0.625rem;
+      background: rgb(var(--pump-bg));
+    }
+
     .token-mobile-market-sheet__grip:active {
       cursor: grabbing;
     }

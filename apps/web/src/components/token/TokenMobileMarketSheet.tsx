@@ -10,6 +10,7 @@ import {
 } from "@/hooks/useMobileModalScrollLock";
 import { useMobileSheetDragDismiss } from "@/hooks/useMobileSheetDragDismiss";
 import { TokenMarketSidebar } from "@/components/token/TokenMarketSidebar";
+import { PumpIcon, faList, faX } from "@/lib/icons";
 
 type TokenMobileMarketSheetProps = {
   open: boolean;
@@ -97,7 +98,7 @@ export function TokenMobileMarketSheet({
         className="modal-sheet-host z-[101] lg:hidden"
         role="dialog"
         aria-modal="true"
-        aria-label="Token markets"
+        aria-labelledby="token-mobile-market-sheet-title"
       >
         <div
           ref={panelRef}
@@ -108,6 +109,24 @@ export function TokenMobileMarketSheet({
             {...gripProps}
           >
             <div className="mx-auto h-1 w-9 rounded-full bg-pump-border/45" aria-hidden />
+          </div>
+          <div className="token-mobile-market-sheet__header toolbar-sheet-header shrink-0">
+            <div className="toolbar-sheet-header__title">
+              <span className="toolbar-sheet-header__icon" aria-hidden>
+                <PumpIcon icon={faList} className="h-4 w-4 text-pump-accent" />
+              </span>
+              <h2 id="token-mobile-market-sheet-title" className="toolbar-sheet-header__label">
+                Explore coins
+              </h2>
+            </div>
+            <button
+              type="button"
+              onClick={handleClose}
+              className="toolbar-sheet-header__close"
+              aria-label="Close"
+            >
+              <PumpIcon icon={faX} className="h-4 w-4" aria-hidden />
+            </button>
           </div>
           <div className="token-mobile-market-sheet__body min-h-0 flex-1 overflow-hidden">
             <TokenMarketSidebar
