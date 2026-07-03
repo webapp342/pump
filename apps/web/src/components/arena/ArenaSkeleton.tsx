@@ -1,9 +1,11 @@
 import { Skeleton } from "@/components/ui/Skeleton";
 import { SkeletonBoardTable } from "@/components/ui/skeleton-parts";
+import { HubDiscoveryScrollLock } from "@/components/layout/HubDiscoveryScrollLock";
 
 export function ArenaSkeleton() {
   return (
     <div className="arena-page min-w-0" aria-busy="true" aria-label="Loading arena">
+      <HubDiscoveryScrollLock />
       <div className="arena-page__sticky">
         <div className="arena-hub">
           <div className="arena-filter-bar" aria-hidden>

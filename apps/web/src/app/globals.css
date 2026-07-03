@@ -1180,6 +1180,114 @@ code,
     }
   }
 
+  /* Arena / Airdrops mobile — document locked; only token/list panes scroll */
+  @media (max-width: 767px) {
+    html.hub-discovery-scroll-lock,
+    html.hub-discovery-scroll-lock body {
+      overflow: hidden;
+      height: 100dvh;
+      max-height: 100dvh;
+      overscroll-behavior: none;
+    }
+
+    html.hub-discovery-scroll-lock .app-shell--hub-terminal {
+      height: 100dvh;
+      max-height: 100dvh;
+      min-height: 0;
+      overflow: hidden;
+      overscroll-behavior: none;
+    }
+
+    html.hub-discovery-scroll-lock .app-shell--hub-terminal .app-header {
+      position: relative;
+      top: auto;
+      flex-shrink: 0;
+    }
+
+    html.hub-discovery-scroll-lock main.arena-page-main,
+    html.hub-discovery-scroll-lock main.airdrops-page-main {
+      flex: 1 1 0;
+      min-height: 0;
+      overflow: hidden;
+      padding-bottom: 0 !important;
+    }
+
+    html.hub-discovery-scroll-lock .arena-page,
+    html.hub-discovery-scroll-lock .airdrops-page {
+      display: flex;
+      flex-direction: column;
+      flex: 1 1 0;
+      min-height: 0;
+      height: auto;
+      max-width: none;
+      overflow: hidden;
+    }
+
+    html.hub-discovery-scroll-lock .arena-page .arena-hub,
+    html.hub-discovery-scroll-lock .airdrops-page .airdrops-hub {
+      flex: 1 1 0;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    html.hub-discovery-scroll-lock .arena-page__sticky,
+    html.hub-discovery-scroll-lock .airdrops-page__sticky,
+    html.hub-discovery-scroll-lock .airdrops-page .airdrops-filter-bar {
+      flex-shrink: 0;
+      overscroll-behavior: none;
+    }
+
+    html.hub-discovery-scroll-lock .arena-page__scroll {
+      flex: 1 1 0;
+      min-height: 0;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      -webkit-overflow-scrolling: touch;
+      padding-bottom: calc(var(--mobile-bottom-nav-height) + 0.5rem);
+    }
+
+    html.hub-discovery-scroll-lock .airdrops-page .airdrops-body {
+      flex: 1 1 0;
+      min-height: 0;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    html.hub-discovery-scroll-lock .airdrops-page .airdrops-body:not(:has(.airdrops-list)) {
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      -webkit-overflow-scrolling: touch;
+      padding-bottom: var(--mobile-bottom-nav-height);
+    }
+
+    html.hub-discovery-scroll-lock .airdrops-page .airdrops-list {
+      flex: 1 1 0;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    html.hub-discovery-scroll-lock .airdrops-page .airdrops-list__head {
+      flex-shrink: 0;
+      position: static;
+    }
+
+    html.hub-discovery-scroll-lock .airdrops-page .airdrops-list__scroll {
+      flex: 1 1 0;
+      min-height: 0;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      -webkit-overflow-scrolling: touch;
+      padding-bottom: var(--mobile-bottom-nav-height);
+    }
+
+    html.hub-discovery-scroll-lock .bottom-nav-host {
+      overscroll-behavior: none;
+    }
+  }
+
   .token-page-grid {
     display: grid;
     min-height: 0;
@@ -7630,8 +7738,19 @@ code,
     }
 
     .arena-page {
-      height: 100%;
+      flex: 1 1 0;
+      min-height: 0;
+      height: auto;
       max-width: none;
+      overflow: hidden;
+    }
+
+    .arena-page .arena-hub {
+      flex: 1 1 0;
+      min-height: 0;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
     }
   }
 

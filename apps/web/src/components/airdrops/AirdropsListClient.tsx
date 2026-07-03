@@ -8,6 +8,7 @@ import { useAccount } from "wagmi";
 import { AirdropsSkeleton } from "@/components/airdrops/AirdropsSkeleton";
 import { useBnbUsdPrice } from "@/hooks/useBnbUsdPrice";
 import { AirdropsFilterNav } from "@/components/airdrops/AirdropsFilterNav";
+import { HubDiscoveryScrollLock } from "@/components/layout/HubDiscoveryScrollLock";
 import { AirdropCampaignList } from "@/components/airdrops/AirdropCampaignList";
 import {
   airdropCampaignTitle,
@@ -178,6 +179,7 @@ export function AirdropsListClient({
   if (resolvedItems.length === 0) {
     return (
       <div className="airdrops-page">
+        <HubDiscoveryScrollLock />
         <div className="airdrops-hub">
           <div className="airdrops-page__sticky">
             <AirdropsFilterNav
@@ -200,6 +202,7 @@ export function AirdropsListClient({
 
   return (
     <div className="airdrops-page">
+      <HubDiscoveryScrollLock />
       <div className="airdrops-hub">
         <div className="airdrops-page__sticky">
           <AirdropsFilterNav

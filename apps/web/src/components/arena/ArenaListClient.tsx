@@ -10,6 +10,7 @@ import { ArenaWatchlistSheet } from "@/components/arena/ArenaWatchlistSheet";
 import { useWatchlistTokens } from "@/components/arena/WatchlistContent";
 import { useFavorites } from "@/components/favorites/FavoritesProvider";
 import { ArenaSwipeTradeBar } from "@/components/arena/ArenaSwipeTradeBar";
+import { HubDiscoveryScrollLock } from "@/components/layout/HubDiscoveryScrollLock";
 import { useBnbUsdPrice } from "@/hooks/useBnbUsdPrice";
 import { bnbToUsd } from "@/lib/format-usd";
 import {
@@ -924,6 +925,7 @@ export function ArenaListClient({
 
   return (
     <div className="arena-page min-w-0" aria-busy={boardRefreshing}>
+      <HubDiscoveryScrollLock />
       <ArenaShortcutsModal open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
 
       <div className="arena-page__sticky">

@@ -1,8 +1,10 @@
 import { Skeleton } from "@/components/ui/Skeleton";
+import { HubDiscoveryScrollLock } from "@/components/layout/HubDiscoveryScrollLock";
 
 export function AirdropsSkeleton() {
   return (
     <div className="airdrops-page" aria-busy="true" aria-label="Loading airdrops">
+      <HubDiscoveryScrollLock />
       <div className="airdrops-hub">
         <div className="airdrops-page__sticky">
           <div className="airdrops-filter-bar">
