@@ -107,10 +107,7 @@ export function ArenaFilterNav({
             </div>
           </nav>
           {trailing ? (
-            <>
-              <span className="arena-tab-nav__tools-divider" aria-hidden />
-              <div className="arena-tab-nav__trailing">{trailing}</div>
-            </>
+            <div className="arena-tab-nav__trailing">{trailing}</div>
           ) : null}
         </div>
       </div>

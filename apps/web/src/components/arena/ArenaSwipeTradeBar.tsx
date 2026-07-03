@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useSyncExternalStore, useState } from "
 import { NATIVE_SYMBOL } from "@/config/chain";
 import { dismissHoldingsSwipeHint } from "@/components/portfolio/HoldingSwipeRow";
 import { ModalPortal } from "@/components/ui/ModalPortal";
-import { PumpIcon, faSettings2 } from "@/lib/icons";
+import { PumpIcon, faBolt, faSettings2 } from "@/lib/icons";
 import {
   ARENA_QUICK_TRADE_CHANGE_EVENT,
   DEFAULT_ARENA_QUICK_TRADE,
@@ -218,27 +218,22 @@ export function ArenaSwipeTradeBar() {
 
   return (
     <div ref={anchorRef} className="arena-quick-trade-bar relative shrink-0">
-      <div className="flex items-center gap-1.5 md:gap-2">
-        <p className="arena-quick-trade-bar__summary">
-          <span className="arena-quick-trade-bar__prefix hidden md:inline">Quick trade</span>
-          <span className="arena-quick-trade-bar__sep hidden md:inline" aria-hidden>
-            {" "}
-            ·{" "}
-          </span>
-          <span className="arena-quick-trade-bar__buy">
-            <span className="arena-quick-trade-bar__buy-label hidden md:inline">Buy </span>
+      <div className="arena-quick-trade-bar__cluster">
+        <div className="arena-quick-trade-bar__summary" aria-label="Quick trade amounts">
+          <span className="arena-quick-trade-bar__leg arena-quick-trade-bar__buy">
+            <PumpIcon icon={faBolt} className="arena-quick-trade-bar__flash" aria-hidden />
+            <span className="arena-quick-trade-bar__label hidden md:inline">Buy</span>
             <span className="arena-quick-trade-bar__value financial-value">{prefs.buyAmountBnb}</span>
-            <span className="arena-quick-trade-bar__native hidden md:inline"> {NATIVE_SYMBOL}</span>
+            <span className="arena-quick-trade-bar__native hidden md:inline financial-value">
+              {NATIVE_SYMBOL}
+            </span>
           </span>
-          <span className="arena-quick-trade-bar__divider" aria-hidden>
-            {" "}
-            ·{" "}
-          </span>
-          <span className="arena-quick-trade-bar__sell">
-            <span className="arena-quick-trade-bar__sell-label hidden md:inline">Sell </span>
+          <span className="arena-quick-trade-bar__leg arena-quick-trade-bar__sell">
+            <PumpIcon icon={faBolt} className="arena-quick-trade-bar__flash" aria-hidden />
+            <span className="arena-quick-trade-bar__label hidden md:inline">Sell</span>
             <span className="arena-quick-trade-bar__value financial-value">{prefs.sellPercent}%</span>
           </span>
-        </p>
+        </div>
         <button
           type="button"
           onClick={openSettings}
@@ -249,7 +244,7 @@ export function ArenaSwipeTradeBar() {
           aria-expanded={settingsOpen}
           aria-haspopup="dialog"
         >
-          <PumpIcon icon={faSettings2} className="size-4 md:size-3.5" />
+          <PumpIcon icon={faSettings2} className="arena-quick-trade-bar__settings-icon" aria-hidden />
           <span className="arena-quick-trade-bar__settings-label hidden md:inline">Settings</span>
         </button>
       </div>

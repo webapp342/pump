@@ -126,17 +126,17 @@ export function AirdropsFilterNav({
                 onSelect={onSelect}
               />
             ))}
+            <div className="airdrops-tab-nav__joined--desktop">
+              <AirdropFilterChip
+                filterKey="mine"
+                label="Joined"
+                count={filterCounts.mine ?? 0}
+                isActive={activeFilter === "mine"}
+                onSelect={onSelect}
+              />
+            </div>
           </div>
         </nav>
-        <div className="airdrops-tab-nav__trailing airdrops-tab-nav__joined--desktop">
-          <AirdropFilterChip
-            filterKey="mine"
-            label="Joined"
-            count={filterCounts.mine ?? 0}
-            isActive={activeFilter === "mine"}
-            onSelect={onSelect}
-          />
-        </div>
       </div>
     </div>
   );

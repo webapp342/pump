@@ -158,16 +158,12 @@ export function ArenaTokenCard({
     router.push(tokenHref);
   };
 
-  const handleMediaClick = (event: React.MouseEvent<HTMLDivElement>) => {
+  const handleBodyClick = (event: React.MouseEvent<HTMLDivElement>) => {
     if ((event.target as HTMLElement).closest("button")) return;
 
-    if (isTouchUi) {
-      if (!actionsOpen) {
-        event.preventDefault();
-        setActionsOpen(true);
-        return;
-      }
-      openTokenDetail();
+    if (isTouchUi && !actionsOpen) {
+      event.preventDefault();
+      setActionsOpen(true);
       return;
     }
 
@@ -181,22 +177,16 @@ export function ArenaTokenCard({
         actionsOpen ? " arena-token-card--actions-open" : ""
       }`}
       onMouseEnter={prefetchBundle}
-      onFocus={prefetchBundle}
     >
       <div
         className="arena-token-card__media"
         role="button"
         tabIndex={0}
-        aria-label={actionsOpen ? `${token.symbol} quick actions` : `View ${token.symbol}`}
-        onClick={handleMediaClick}
+        aria-label={`View ${token.symbol}`}
+        onClick={openTokenDetail}
         onKeyDown={(event) => {
           if (event.key !== "Enter" && event.key !== " ") return;
-          if ((event.target as HTMLElement).closest("button")) return;
           event.preventDefault();
-          if (isTouchUi && !actionsOpen) {
-            setActionsOpen(true);
-            return;
-          }
           openTokenDetail();
         }}
       >
@@ -233,21 +223,32 @@ export function ArenaTokenCard({
         >
           {isFavorite ? "★" : "☆"}
         </button>
+      </div>
 
-        <div className="arena-token-card__overlay">
-          <div className="arena-token-card__actions">
-            <button
-              type="button"
-              className="arena-token-card__view-btn"
-              onClick={(event) => {
-                event.stopPropagation();
-                openTokenDetail();
-              }}
-            >
-              View
-            </button>
+      <div
+        className="arena-token-card__body"
+        role="button"
+        tabIndex={0}
+        onClick={handleBodyClick}
+        onKeyDown={(event) => {
+          if (event.key !== "Enter" && event.key !== " ") return;
+          if ((event.target as HTMLElement).closest("button")) return;
+          event.preventDefault();
+          if (isTouchUi && !actionsOpen) {
+            setActionsOpen(true);
+            return;
+          }
+          openTokenDetail();
+        }}
+      >
+        <div className="arena-token-card__header">
+          <div className="arena-token-card__identity">
+            <p className="arena-token-card__name truncate">{token.name}</p>
+            <p className="arena-token-card__symbol truncate">${token.symbol}</p>
+          </div>
+          <div className="arena-token-card__trade-row">
             <ArenaBoardRowQuickActions
-              layout={isTouchUi ? "card-compact" : "card"}
+              layout="card-compact"
               onBuy={() => {
                 closeActions();
                 router.push(buildArenaQuickTradeHref(token.address, "buy"));
@@ -259,21 +260,6 @@ export function ArenaTokenCard({
             />
           </div>
         </div>
-      </div>
-
-      <div
-        className="arena-token-card__body"
-        role="button"
-        tabIndex={0}
-        onClick={openTokenDetail}
-        onKeyDown={(event) => {
-          if (event.key !== "Enter" && event.key !== " ") return;
-          event.preventDefault();
-          openTokenDetail();
-        }}
-      >
-        <p className="arena-token-card__name truncate">{token.name}</p>
-        <p className="arena-token-card__symbol truncate">${token.symbol}</p>
         <p className={`arena-token-card__mcap financial-value ${flashText(mcapFlash)}`}>
           {mcapLabel === "—" ? "—" : `${mcapLabel} MC`}
         </p>
