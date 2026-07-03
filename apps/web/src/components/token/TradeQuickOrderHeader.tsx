@@ -1,7 +1,7 @@
 "use client";
 
 import { TokenAvatar } from "@/components/token/TokenAvatar";
-import { PumpIcon, faList } from "@/lib/icons";
+import { PumpIcon, faList, faX } from "@/lib/icons";
 
 type TradeQuickOrderSide = "buy" | "sell";
 
@@ -42,7 +42,9 @@ export function TradeQuickOrderHeader({
 }: TradeQuickOrderHeaderProps) {
   return (
     <header className="trade-quick-order-header">
-      <div className="trade-quick-order-header__top">
+      <div className="trade-quick-order-header__grip" aria-hidden />
+
+      <div className="trade-quick-order-header__title-row">
         <h2 className="trade-quick-order-header__title">Quick Order</h2>
         <button
           type="button"
@@ -50,60 +52,60 @@ export function TradeQuickOrderHeader({
           className="trade-quick-order-header__close"
           aria-label="Close"
         >
-          <span aria-hidden>×</span>
+          <PumpIcon icon={faX} className="h-4 w-4" aria-hidden />
         </button>
       </div>
 
-      <div className="trade-quick-order-header__meta">
-        <div className="trade-quick-order-header__pair-row">
-          {onOpenMarket ? (
-            <button
-              type="button"
-              className="trade-quick-order-header__list-btn"
-              onClick={onOpenMarket}
-              aria-label="Explore coins"
-            >
-              <PumpIcon icon={faList} className="h-4 w-4" />
-            </button>
-          ) : null}
-          <TokenAvatar
-            address={tokenAddress}
-            symbol={symbol}
-            logoUrl={logoUrl}
-            size={26}
-            className="trade-quick-order-header__logo !ring-0"
-          />
+      <div className="trade-quick-order-header__side-toggle" role="tablist" aria-label="Trade side">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={side === "buy"}
+          className={
+            side === "buy"
+              ? "trade-quick-order-header__side-btn trade-quick-order-header__side-btn--buy-active"
+              : "trade-quick-order-header__side-btn"
+          }
+          onClick={() => onSideChange("buy")}
+        >
+          Buy
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={side === "sell"}
+          className={
+            side === "sell"
+              ? "trade-quick-order-header__side-btn trade-quick-order-header__side-btn--sell-active"
+              : "trade-quick-order-header__side-btn"
+          }
+          onClick={() => onSideChange("sell")}
+        >
+          Sell
+        </button>
+      </div>
+
+      <div className="trade-quick-order-header__instrument">
+        {onOpenMarket ? (
+          <button
+            type="button"
+            className="trade-quick-order-header__list-btn"
+            onClick={onOpenMarket}
+            aria-label="Explore coins"
+          >
+            <PumpIcon icon={faList} className="h-3.5 w-3.5" />
+          </button>
+        ) : null}
+        <TokenAvatar
+          address={tokenAddress}
+          symbol={symbol}
+          logoUrl={logoUrl}
+          size={28}
+          className="trade-quick-order-header__logo !ring-0"
+        />
+        <div className="trade-quick-order-header__instrument-copy min-w-0">
           <span className="trade-quick-order-header__pair financial-value">{symbol}/USD</span>
           <span className={changeBadgeClass(changePct)}>{formatChangePct(changePct)}</span>
-        </div>
-
-        <div className="trade-quick-order-header__side-toggle" role="tablist" aria-label="Trade side">
-          <button
-            type="button"
-            role="tab"
-            aria-selected={side === "buy"}
-            className={
-              side === "buy"
-                ? "trade-quick-order-header__side-btn trade-quick-order-header__side-btn--buy-active"
-                : "trade-quick-order-header__side-btn"
-            }
-            onClick={() => onSideChange("buy")}
-          >
-            Buy
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={side === "sell"}
-            className={
-              side === "sell"
-                ? "trade-quick-order-header__side-btn trade-quick-order-header__side-btn--sell-active"
-                : "trade-quick-order-header__side-btn"
-            }
-            onClick={() => onSideChange("sell")}
-          >
-            Sell
-          </button>
         </div>
       </div>
     </header>

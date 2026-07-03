@@ -1,17 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
-  pinMobileWindowScroll,
   releaseMobileViewportAfterKeyboard,
   settleMobileViewportAfterSheetClose,
   useMobileModalClose,
   useMobileModalScrollLock,
-  usePinMobileWindowScrollWhile,
 } from "@/hooks/useMobileModalScrollLock";
-import { useVisualViewportSheetFrame } from "@/hooks/useVisualViewportSheetFrame";
-import { PumpIcon, faX } from "@/lib/icons";
+import { useMobileSheetDragDismiss } from "@/hooks/useMobileSheetDragDismiss";
 import { TokenMarketSidebar } from "@/components/token/TokenMarketSidebar";
 
 type TokenMobileMarketSheetProps = {
@@ -31,12 +28,7 @@ export function TokenMobileMarketSheet({
   const wasOpenRef = useRef(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const handleClose = useMobileModalClose(onClose);
-
-  const handleSearchDismiss = useCallback(() => {
-    searchInputRef.current?.blur();
-    setSearchFocused(false);
-    releaseMobileViewportAfterKeyboard();
-  }, []);
+  const { panelRef, gripProps, resetDrag } = useMobileSheetDragDismiss(handleClose);
 
   const handleTokenSelect = () => {
     const active = document.activeElement;
@@ -52,7 +44,6 @@ export function TokenMobileMarketSheet({
     }
     settleMobileViewportAfterSheetClose();
   };
-  const sheetFrame = useVisualViewportSheetFrame(open && searchFocused);
 
   useEffect(() => {
     setMounted(true);
@@ -61,19 +52,10 @@ export function TokenMobileMarketSheet({
   useEffect(() => {
     if (open) return;
     setSearchFocused(false);
-  }, [open]);
-
-  useEffect(() => {
-    if (!open || !searchFocused) return;
-    pinMobileWindowScroll();
-    requestAnimationFrame(() => {
-      pinMobileWindowScroll();
-      searchInputRef.current?.scrollIntoView({ block: "nearest", behavior: "instant" });
-    });
-  }, [open, searchFocused]);
+    resetDrag();
+  }, [open, resetDrag]);
 
   useMobileModalScrollLock(open);
-  usePinMobileWindowScrollWhile(open && searchFocused);
 
   useEffect(() => {
     if (open) {
@@ -107,46 +89,26 @@ export function TokenMobileMarketSheet({
     <>
       <button
         type="button"
-        className={`modal-backdrop modal-backdrop-dismiss z-[100] cursor-default lg:hidden${
-          searchFocused || sheetFrame.keyboardOpen ? " modal-backdrop--keyboard-open" : ""
-        }`}
+        className="modal-backdrop modal-backdrop-dismiss z-[100] cursor-default lg:hidden"
         aria-label="Close markets list"
         onClick={handleClose}
       />
       <div
-        className={`modal-sheet-host z-[101] lg:hidden${
-          sheetFrame.useVisualViewport ? " modal-sheet-host--visual-viewport" : ""
-        }`}
-        style={sheetFrame.hostStyle}
+        className="modal-sheet-host z-[101] lg:hidden"
         role="dialog"
         aria-modal="true"
-        aria-label="Explore coins"
+        aria-label="Token markets"
       >
         <div
-          className={`token-mobile-market-sheet token-mobile-market-sheet--full modal-panel modal-sheet-panel pointer-events-auto flex flex-col overflow-hidden border-x-0 border-b-0 rounded-t-2xl${
-            searchFocused ? " token-mobile-market-sheet--search-active" : ""
-          }`}
+          ref={panelRef}
+          className="token-mobile-market-sheet token-mobile-market-sheet--full modal-panel modal-sheet-panel pointer-events-auto flex flex-col overflow-hidden border-x-0 border-b-0 rounded-t-2xl"
         >
-          {searchFocused ? (
-            <div className="token-mobile-market-sheet__search-grip shrink-0 px-4 pb-1 pt-2">
-              <div className="mx-auto h-1 w-9 rounded-full bg-pump-border/45" aria-hidden />
-            </div>
-          ) : (
-            <div className="token-mobile-market-sheet__header shrink-0 px-4 pb-2 pt-2">
-              <div className="mx-auto mb-3 h-1 w-9 rounded-full bg-pump-border/45" aria-hidden />
-              <div className="flex items-center justify-between gap-3">
-                <h2 className="text-h3 font-semibold tracking-tight text-pump-text">Explore coins</h2>
-                <button
-                  type="button"
-                  onClick={handleClose}
-                  className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-pump-muted transition hover:bg-pump-border/10 hover:text-pump-text"
-                  aria-label="Close"
-                >
-                  <PumpIcon icon={faX} className="h-4 w-4" />
-                </button>
-              </div>
-            </div>
-          )}
+          <div
+            className="token-mobile-market-sheet__grip shrink-0 touch-none select-none px-4 pb-1 pt-2"
+            {...gripProps}
+          >
+            <div className="mx-auto h-1 w-9 rounded-full bg-pump-border/45" aria-hidden />
+          </div>
           <div className="token-mobile-market-sheet__body min-h-0 flex-1 overflow-hidden">
             <TokenMarketSidebar
               id="token-mobile-market-sidebar"
@@ -157,7 +119,6 @@ export function TokenMobileMarketSheet({
               onTokenSelect={handleTokenSelect}
               onSearchFocusChange={setSearchFocused}
               searchActive={searchFocused}
-              onSearchDismiss={handleSearchDismiss}
               searchInputRef={searchInputRef}
             />
           </div>

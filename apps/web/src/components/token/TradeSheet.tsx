@@ -99,10 +99,10 @@ export function TradeSheet({
         aria-label={isModal ? tradeTitle : `Trade ${symbol}`}
       >
         <div
-          className={`modal-panel modal-sheet-panel pointer-events-auto flex flex-col overflow-hidden ${
+          className={`trade-sheet modal-panel modal-sheet-panel pointer-events-auto flex flex-col overflow-hidden ${
             isModal
               ? "max-w-md max-h-[min(85dvh,640px)]"
-              : "max-h-full border-x-0 border-b-0 rounded-t-2xl"
+              : "trade-sheet--mobile max-h-full border-x-0 border-b-0 rounded-t-2xl"
           }`}
         >
           {isModal ? (

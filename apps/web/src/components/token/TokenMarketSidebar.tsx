@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, type Ref } from "react";
+import { useEffect, useRef, type FocusEvent, type Ref } from "react";
 import { useArenaExploreBoard } from "@/hooks/useArenaExploreBoard";
 import { bnbToUsd } from "@/lib/format-usd";
 import { listTokenPriceUsd } from "@/lib/arena-board-format";
@@ -23,9 +23,8 @@ type TokenMarketSidebarProps = {
   className?: string;
   onTokenSelect?: () => void;
   onSearchFocusChange?: (focused: boolean) => void;
-  /** Mobile sheet — search mode hides filters/columns and shows Cancel. */
+  /** Mobile sheet — search mode hides filters/columns. */
   searchActive?: boolean;
-  onSearchDismiss?: () => void;
   searchInputRef?: Ref<HTMLInputElement>;
   /** Desktop trade sidebar — quick trade prefs to the right of search. */
   showQuickTrade?: boolean;
@@ -42,13 +41,11 @@ export function TokenMarketSidebar({
   onTokenSelect,
   onSearchFocusChange,
   searchActive = false,
-  onSearchDismiss,
   searchInputRef,
   showQuickTrade = false,
   mobileSheet = false,
 }: TokenMarketSidebarProps) {
   const listRef = useRef<HTMLDivElement>(null);
-  const mobileSearchChrome = Boolean(onSearchFocusChange);
   const effectiveQuickTrade = showQuickTrade || mobileSheet;
   const swipeHintLabels = quickTradeSwipeLabels();
 
@@ -112,9 +109,20 @@ export function TokenMarketSidebar({
 
   const handleSearchFocus = onSearchFocusChange
     ? () => {
-        pinMobileWindowScroll();
-        requestAnimationFrame(() => pinMobileWindowScroll());
+        if (!mobileSheet) {
+          pinMobileWindowScroll();
+          requestAnimationFrame(() => pinMobileWindowScroll());
+        }
         onSearchFocusChange(true);
+      }
+    : undefined;
+
+  const handleSearchBlur = onSearchFocusChange
+    ? (event: FocusEvent<HTMLInputElement>) => {
+        const next = event.relatedTarget;
+        const toolbar = event.currentTarget.closest(".token-market-sidebar__toolbar");
+        if (next instanceof Node && toolbar?.contains(next)) return;
+        onSearchFocusChange(false);
       }
     : undefined;
 
@@ -130,13 +138,18 @@ export function TokenMarketSidebar({
           searchActive ? " token-market-sidebar__toolbar--search-active" : ""
         }`}
       >
-        <div className="token-market-sidebar__search-row">
+        <div
+          className={`token-market-sidebar__search-row${
+            mobileSheet && searchActive ? " token-market-sidebar__search-row--focus" : ""
+          }`}
+        >
           <FieldSearchInput
             ref={assignSearchInputRef}
             embedded
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             onFocus={handleSearchFocus}
+            onBlur={handleSearchBlur}
             placeholder={searchActive ? "Search by name or symbol" : "Search"}
             aria-label="Search coins"
             wrapperClassName="token-market-sidebar__search"
@@ -147,7 +160,7 @@ export function TokenMarketSidebar({
             autoCorrect="off"
             spellCheck={false}
           />
-          {!searchActive && effectiveQuickTrade ? (
+          {effectiveQuickTrade ? (
             <div
               className={
                 mobileSheet
@@ -157,15 +170,6 @@ export function TokenMarketSidebar({
             >
               <ArenaSwipeTradeBar variant={mobileSheet ? "mobile-sheet" : "sidebar"} />
             </div>
-          ) : null}
-          {mobileSearchChrome && searchActive && onSearchDismiss ? (
-            <button
-              type="button"
-              className="token-market-sidebar__search-cancel"
-              onClick={onSearchDismiss}
-            >
-              Cancel
-            </button>
           ) : null}
         </div>
 
