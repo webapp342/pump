@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAccount } from "wagmi";
 import {
   USER_AVATAR_IDS,
@@ -10,6 +10,7 @@ import {
 import { UserAvatar } from "@/components/user/UserAvatar";
 import { ModalPortal } from "@/components/ui/ModalPortal";
 import { useUserAvatar } from "@/components/user/UserAvatarProvider";
+import { PumpIcon, faPen, faX } from "@/lib/icons";
 import { resolveDisplayUsername, USERNAME_MAX_LENGTH } from "@/lib/username";
 
 type AvatarPickerModalProps = {
@@ -24,6 +25,7 @@ export function AvatarPickerModal({ open, onClose }: AvatarPickerModalProps) {
   const [usernameInput, setUsernameInput] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const avatarSectionRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -35,6 +37,10 @@ export function AvatarPickerModal({ open, onClose }: AvatarPickerModalProps) {
   if (!open || !address) return null;
 
   const defaultLabel = resolveDisplayUsername(address, null);
+
+  function focusAvatarPicker() {
+    avatarSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
 
   async function onSave() {
     setError(null);
@@ -61,7 +67,7 @@ export function AvatarPickerModal({ open, onClose }: AvatarPickerModalProps) {
         className="modal-backdrop modal-backdrop-shell z-[70]"
         role="dialog"
         aria-modal="true"
-        aria-labelledby="avatar-picker-title"
+        aria-labelledby="profile-editor-title"
       >
         <button
           type="button"
@@ -69,18 +75,47 @@ export function AvatarPickerModal({ open, onClose }: AvatarPickerModalProps) {
           aria-label="Close"
           onClick={onClose}
         />
-        <div className="panel-surface relative w-full max-w-md p-5 shadow-panel">
-          <h2 id="avatar-picker-title" className="text-h2 font-semibold text-pump-text">
-            Edit profile
-          </h2>
-          <p className="mt-1 text-body-sm text-pump-muted">
-            Choose an avatar and username. Default is your wallet address.
-          </p>
+        <div className="modal-panel profile-editor-modal relative w-full max-w-lg shadow-panel">
+          <div className="profile-editor-modal__header">
+            <button
+              type="button"
+              className="profile-editor-modal__avatar-trigger"
+              onClick={focusAvatarPicker}
+              aria-label="Choose avatar"
+            >
+              <UserAvatar address={address} avatarId={selectedId} size={72} selected />
+              <span className="profile-editor-modal__avatar-badge" aria-hidden>
+                <PumpIcon icon={faPen} className="h-3 w-3" />
+              </span>
+            </button>
 
-          <label className="mt-4 block">
-            <span className="section-label text-pump-muted">Username</span>
-            <div className="mt-1 flex items-center gap-2">
-              <span className="text-body-sm text-pump-muted">@</span>
+            <div className="profile-editor-modal__intro">
+              <h2 id="profile-editor-title" className="profile-editor-modal__title">
+                Update your Pump profile
+              </h2>
+              <p className="profile-editor-modal__subtitle">
+                Don&apos;t be a bot. Complete your profile.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={onClose}
+              className="profile-editor-modal__close"
+              aria-label="Close profile editor"
+            >
+              <PumpIcon icon={faX} className="h-4 w-4" />
+            </button>
+          </div>
+
+          <div className="profile-editor-modal__body">
+            <label className="profile-editor-modal__field">
+              <div className="profile-editor-modal__field-head">
+                <span className="profile-editor-modal__label">
+                  Username<span className="profile-editor-modal__required">*</span>
+                </span>
+                <span className="profile-editor-modal__limit">{USERNAME_MAX_LENGTH} max</span>
+              </div>
               <input
                 type="text"
                 value={usernameInput}
@@ -89,47 +124,49 @@ export function AvatarPickerModal({ open, onClose }: AvatarPickerModalProps) {
                 placeholder={defaultLabel}
                 autoComplete="off"
                 spellCheck={false}
-                className="w-full rounded-md border border-pump-border/50 bg-pump-bg px-3 py-2 text-body-sm text-pump-text outline-none focus:border-pump-accent/50"
+                className="field-input"
               />
-            </div>
-            <span className="mt-1 block text-caption text-pump-muted">
-              {USERNAME_MAX_LENGTH} characters max · letters, numbers, underscores · unique
-            </span>
-          </label>
+              <span className="field-hint mt-1.5 block">
+                {USERNAME_MAX_LENGTH} characters max · letters, numbers, underscores · unique
+              </span>
+            </label>
 
-          <div className="mt-4 grid grid-cols-3 gap-3 sm:grid-cols-4">
-            {USER_AVATAR_IDS.map((id) => {
-              const isSelected = id === selectedId;
-              return (
-                <button
-                  key={id}
-                  type="button"
-                  disabled={saving}
-                  onClick={() => setSelectedId(id)}
-                  className={`flex flex-col items-center gap-1.5 rounded-lg p-2 transition ${
-                    isSelected
-                      ? "bg-pump-accent/10 ring-1 ring-pump-accent/40"
-                      : "hover:bg-pump-surface/50"
-                  }`}
-                  aria-label={`${USER_AVATAR_LABELS[id]} avatar`}
-                  aria-pressed={isSelected}
-                >
-                  <UserAvatar address={address} avatarId={id} size={52} selected={isSelected} />
-                  <span className="text-[10px] font-medium text-pump-muted">
-                    {isSelected ? "Selected" : USER_AVATAR_LABELS[id]}
-                  </span>
-                </button>
-              );
-            })}
+            <div ref={avatarSectionRef} className="profile-editor-modal__avatars">
+              <span className="profile-editor-modal__label">Avatar</span>
+              <div className="profile-editor-modal__avatar-grid">
+                {USER_AVATAR_IDS.map((id) => {
+                  const isSelected = id === selectedId;
+                  return (
+                    <button
+                      key={id}
+                      type="button"
+                      disabled={saving}
+                      onClick={() => setSelectedId(id)}
+                      className={
+                        isSelected
+                          ? "profile-editor-modal__avatar-option profile-editor-modal__avatar-option--active"
+                          : "profile-editor-modal__avatar-option"
+                      }
+                      aria-label={`${USER_AVATAR_LABELS[id]} avatar`}
+                      aria-pressed={isSelected}
+                    >
+                      <UserAvatar address={address} avatarId={id} size={52} selected={isSelected} />
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {error ? <p className="notice-error text-body-sm">{error}</p> : null}
           </div>
 
-          {error ? <p className="notice-error mt-4 text-body-sm">{error}</p> : null}
-
-          <div className="mt-5 flex gap-2">
-            <button type="button" onClick={onClose} className="secondary-button flex-1 py-2.5" disabled={saving}>
-              Cancel
-            </button>
-            <button type="button" onClick={() => void onSave()} className="primary-button flex-1 py-2.5" disabled={saving}>
+          <div className="profile-editor-modal__footer">
+            <button
+              type="button"
+              onClick={() => void onSave()}
+              className="primary-button profile-editor-modal__save"
+              disabled={saving}
+            >
               {saving ? "Saving…" : "Save"}
             </button>
           </div>

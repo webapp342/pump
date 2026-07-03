@@ -9,39 +9,42 @@ export function PortfolioPanelSkeleton() {
         <header className="portfolio-header">
           <div className="portfolio-toolbar">
             <div className="portfolio-toolbar__shell">
-              <div className="portfolio-toolbar__identity-row">
-                <div className="portfolio-toolbar__identity">
-                  <Skeleton variant="circle" className="h-8 w-8 shrink-0" />
-                  <div className="space-y-1">
-                    <Skeleton variant="line" className="h-4 w-24" />
-                    <Skeleton variant="line" className="h-3 w-32" />
-                  </div>
-                </div>
-              </div>
-              <div className="portfolio-toolbar__hero-row portfolio-toolbar__hero-row--mobile">
-                <div className="portfolio-toolbar__value-block space-y-1">
-                  <Skeleton variant="line" className="h-3 w-20" />
-                  <Skeleton className="h-7 w-24" />
-                </div>
-                <div className="portfolio-toolbar__pnl-stack">
-                  {Array.from({ length: 3 }).map((_, index) => (
-                    <div key={index} className="space-y-1">
-                      <Skeleton variant="line" className="h-3 w-16" />
-                      <Skeleton className="h-4 w-12" />
+              <div className="portfolio-toolbar__lead">
+                <Skeleton variant="circle" className="h-12 w-12 shrink-0 rounded-xl" />
+                <div className="flex min-w-0 flex-1 flex-col gap-2">
+                  <div className="flex w-full items-center justify-between gap-2">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <Skeleton variant="line" className="h-4 w-28" />
+                      <Skeleton variant="line" className="h-3 w-20" />
                     </div>
-                  ))}
-                </div>
-              </div>
-              <div className="portfolio-toolbar__pnl-actions">
-                <div className="portfolio-toolbar__actions-row">
-                  {Array.from({ length: 3 }).map((_, index) => (
-                    <Skeleton key={index} variant="line" className="h-9 w-full" />
-                  ))}
+                    <div className="flex items-center gap-2">
+                      <Skeleton variant="circle" className="h-4 w-4" />
+                      <Skeleton variant="circle" className="h-4 w-4" />
+                    </div>
+                  </div>
+                  <div className="flex gap-4">
+                    <Skeleton variant="line" className="h-3 w-16" />
+                    <Skeleton variant="line" className="h-3 w-16" />
+                    <Skeleton variant="line" className="h-3 w-12" />
+                  </div>
                 </div>
               </div>
             </div>
           </div>
         </header>
+
+        <div className="portfolio-summary-strip" aria-hidden>
+          {Array.from({ length: 3 }).map((_, index) => (
+            <div
+              key={index}
+              className={`portfolio-summary-strip__cell${index === 2 ? " portfolio-summary-strip__cell--coins" : ""}`}
+            >
+              <Skeleton variant="line" className="h-3 w-16" />
+              <Skeleton className="h-4 w-20" />
+              <Skeleton variant="line" className="h-3 w-24" />
+            </div>
+          ))}
+        </div>
 
         <nav className="portfolio-tab-nav" aria-hidden>
           <div className="portfolio-tab-nav__track">

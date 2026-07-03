@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { formatEther } from "viem";
 import { useOpenConnectModal } from "@/hooks/useOpenConnectModal";
 import { useAccount } from "wagmi";
@@ -12,9 +12,11 @@ import { bondingCurveManagerAbi } from "@/lib/bonding-curve";
 import { ClaimCreatorFeesModal } from "@/components/portfolio/ClaimCreatorFeesModal";
 import { PortfolioGuestPanel } from "@/components/portfolio/PortfolioGuestPanel";
 import { PortfolioHero } from "@/components/portfolio/PortfolioHero";
+import { PortfolioSummaryStrip } from "@/components/portfolio/PortfolioSummaryStrip";
 import { PortfolioHoldingMobileCard } from "@/components/portfolio/PortfolioHoldingMobileCard";
 import { PortfolioFeesTab } from "@/components/portfolio/PortfolioFeesTab";
 import { PortfolioAirdropsSection } from "@/components/portfolio/PortfolioAirdropsSection";
+import { resolveTopHoldingSummary } from "@/lib/portfolio-summary";
 import { PortfolioTabNav } from "@/components/portfolio/PortfolioTabNav";
 import { ClaimReferrerFeesModal } from "@/components/portfolio/ClaimReferrerFeesModal";
 import { FollowNetworkModal } from "@/components/portfolio/FollowNetworkModal";
@@ -29,7 +31,6 @@ import { HoldingsSwipeHint } from "@/components/portfolio/HoldingsSwipeHint";
 import { TokenAvatar } from "@/components/token/TokenAvatar";
 import { NativeLogo } from "@/components/token/NativeLogo";
 import { TradeSheet } from "@/components/token/TradeSheet";
-import { useWalletFunding } from "@/components/wallet/WalletFundingProvider";
 import type { PortfolioSnapshot, TokenListItem } from "@/lib/db/launchpad";
 import { useBnbUsdPrice } from "@/hooks/useBnbUsdPrice";
 import { useScwBalance } from "@/hooks/useScwBalance";
@@ -229,7 +230,7 @@ function PnlCell({
     <div
       className={`flex items-center gap-2 whitespace-nowrap ${align === "start" ? "justify-start" : "justify-end"}`}
     >
-      <span className={`financial-value text-body-sm font-semibold ${tone}`}>
+      <span className={`financial-value text-caption font-medium ${tone}`}>
         {formatUsdReadable(usd, { compact: true, signed: true })}
       </span>
       <PctChange
@@ -238,6 +239,16 @@ function PnlCell({
         toneClassName={tone}
       />
     </div>
+  );
+}
+
+function HoldingsGridActionsCell({ actions }: { actions?: ReactNode }) {
+  return (
+    <td className="portfolio-holdings-grid__actions-cell px-4 py-3">
+      {actions ? (
+        <div className="portfolio-holdings-grid__hover-actions">{actions}</div>
+      ) : null}
+    </td>
   );
 }
 
@@ -278,42 +289,6 @@ function HoldingQuickActions({
   );
 }
 
-function NativeCashFundingActions({
-  onDeposit,
-  onWithdraw,
-}: {
-  onDeposit: () => void;
-  onWithdraw: () => void;
-}) {
-  return (
-    <div className="portfolio-holdings-grid__actions">
-      <button
-        type="button"
-        title="Deposit"
-        onClick={(event) => {
-          event.preventDefault();
-          event.stopPropagation();
-          onDeposit();
-        }}
-        className="portfolio-holdings-grid__action portfolio-holdings-grid__action--buy"
-      >
-        Deposit
-      </button>
-      <button
-        type="button"
-        title="Withdraw"
-        onClick={(event) => {
-          event.preventDefault();
-          event.stopPropagation();
-          onWithdraw();
-        }}
-        className="portfolio-holdings-grid__action portfolio-holdings-grid__action--sell"
-      >
-        Withdraw
-      </button>
-    </div>
-  );
-}
 
 function NativeCashMobileRow({
   nativeBnb,
@@ -321,8 +296,6 @@ function NativeCashMobileRow({
 }: {
   nativeBnb: number;
   bnbUsd: number | null;
-  onDeposit: () => void;
-  onWithdraw: () => void;
 }) {
   const nativeUsd = bnbToUsd(nativeBnb, bnbUsd);
 
@@ -339,35 +312,29 @@ function NativeCashMobileRow({
 function NativeCashDesktopRow({
   nativeBnb,
   bnbUsd,
-  onDeposit,
-  onWithdraw,
 }: {
   nativeBnb: number;
   bnbUsd: number | null;
-  onDeposit: () => void;
-  onWithdraw: () => void;
 }) {
   const nativeUsd = bnbToUsd(nativeBnb, bnbUsd);
 
   return (
     <tr className="group border-b border-pump-border/10">
       <td className="px-4 py-3">
-        <div className="flex min-w-0 items-center gap-3">
-          <NativeLogo size={30} />
-          <p className="truncate text-body-sm font-medium text-pump-text">{NATIVE_SYMBOL}</p>
+        <div className="portfolio-holdings-grid__coin-row flex min-w-0 items-center gap-2">
+          <NativeLogo size={20} className="portfolio-holdings-grid__coin-mark" />
+          <p className="portfolio-holdings-grid__coin-symbol truncate">{NATIVE_SYMBOL}</p>
         </div>
       </td>
-      <td className="portfolio-holdings-grid__num px-4 py-3 financial-value text-pump-text">
+      <HoldingsGridActionsCell />
+      <td className="portfolio-holdings-grid__num portfolio-holdings-grid__data px-4 py-3 financial-value text-pump-text">
         {formatTokenBalance(nativeBnb)}
       </td>
-      <td className="portfolio-holdings-grid__num px-4 py-3 financial-value font-semibold text-pump-text">
+      <td className="portfolio-holdings-grid__num portfolio-holdings-grid__data portfolio-holdings-grid__value-cell px-4 py-3 financial-value text-pump-text">
         {formatPortfolioHoldingValueUsd(nativeUsd)}
       </td>
       <td className="portfolio-holdings-grid__num px-4 py-3 financial-value text-pump-muted">—</td>
       <td className="portfolio-holdings-grid__num px-4 py-3 text-caption text-pump-muted">—</td>
-      <td className="portfolio-holdings-grid__trade w-[1%] whitespace-nowrap px-4 py-3">
-        <NativeCashFundingActions onDeposit={onDeposit} onWithdraw={onWithdraw} />
-      </td>
     </tr>
   );
 }
@@ -430,28 +397,30 @@ function WalletHoldingDesktopRow({
       <td className="px-4 py-3">
         <Link
           href={`/token/${holding.tokenAddress}`}
-          className="flex min-w-0 items-center gap-3"
+          className="portfolio-holdings-grid__coin-row flex min-w-0 items-center gap-2"
         >
           <TokenAvatar
             address={holding.tokenAddress}
             symbol={holding.symbol}
             logoUrl={holding.logoUrl}
-            size={30}
+            size={20}
+            shape="rounded"
+            className="portfolio-holdings-grid__coin-mark !ring-0"
           />
-          <p className="truncate text-body-sm font-medium text-pump-text">${holding.symbol}</p>
+          <p className="portfolio-holdings-grid__coin-symbol truncate">${holding.symbol}</p>
         </Link>
       </td>
-      <td className="portfolio-holdings-grid__num px-4 py-3 financial-value text-pump-text">
+      <HoldingsGridActionsCell
+        actions={<HoldingQuickActions onBuyMax={onBuyMax} onSellMax={onSellMax} />}
+      />
+      <td className="portfolio-holdings-grid__num portfolio-holdings-grid__data px-4 py-3 financial-value text-pump-text">
         {formatTokenBalance(balance)}
       </td>
-      <td className="portfolio-holdings-grid__num px-4 py-3 financial-value font-semibold text-pump-text">
+      <td className="portfolio-holdings-grid__num portfolio-holdings-grid__data portfolio-holdings-grid__value-cell px-4 py-3 financial-value text-pump-text">
         {formatPortfolioHoldingValueUsd(positionValueUsd)}
       </td>
       <td className="portfolio-holdings-grid__num px-4 py-3 financial-value text-pump-muted">—</td>
       <td className="portfolio-holdings-grid__num px-4 py-3 text-caption text-pump-muted">—</td>
-      <td className="portfolio-holdings-grid__trade w-[1%] whitespace-nowrap px-4 py-3">
-        <HoldingQuickActions onBuyMax={onBuyMax} onSellMax={onSellMax} />
-      </td>
     </tr>
   );
 }
@@ -647,7 +616,6 @@ export function PortfolioPanel({
   const { bnbUsd } = useBnbUsdPrice();
   const scwAddress = (address ?? ssrWalletAddress) as `0x${string}` | undefined;
   const { data: scwBalance } = useScwBalance(scwAddress);
-  const { openDeposit, openWithdraw } = useWalletFunding();
   const [data, setData] = useState<PortfolioData | null>(
     hasSsrPortfolio ? initialPortfolio : null
   );
@@ -1227,6 +1195,9 @@ export function PortfolioPanel({
   );
   const portfolioValuePct =
     totalCostBasisUsd > 0 ? (totalUnrealizedPnlUsd / totalCostBasisUsd) * 100 : null;
+  const portfolioNetPnlPct =
+    totalCostBasisUsd > 0 ? (totalNetPnlUsd / totalCostBasisUsd) * 100 : null;
+  const topHolding = resolveTopHoldingSummary(displayHoldingsRows, nativeBnb, bnbUsd);
   const claimedBnb = data.creatorFeesClaimedBnb ?? 0;
   const pendingBnb = pendingWei != null ? Number(formatEther(pendingWei)) : 0;
   const tokenHoldingsCount = displayHoldingsRows.length;
@@ -1320,13 +1291,16 @@ export function PortfolioPanel({
           }}
           followingCount={data.followingCount ?? 0}
           followerCount={data.followerCount ?? 0}
+          holdingsCount={holdingsCount}
+        />
+
+        <PortfolioSummaryStrip
           totalValueUsd={totalEstimatedUsd}
           totalNetPnlUsd={totalNetPnlUsd}
-          portfolioValuePct={portfolioValuePct}
-          totalUnrealizedPnlUsd={totalUnrealizedPnlUsd}
-          totalRealizedPnlUsd={totalRealizedPnlUsd}
+          totalNetPnlPct={portfolioNetPnlPct}
+          topHolding={topHolding}
+          coinsHeld={tokenHoldingsCount}
           valueFlashClass={flashText(totalValueFlash)}
-          pnlFlashClass={flashText(totalPnlFlash)}
         />
 
         {error ? <div className="notice-error p-4">{error}</div> : null}
@@ -1360,12 +1334,7 @@ export function PortfolioPanel({
                       <span className="portfolio-holdings-mobile__value-col">Value/PNL</span>
                     </div>
                     <div className="portfolio-holdings-mobile__body">
-                    <NativeCashMobileRow
-                      nativeBnb={nativeBnb}
-                      bnbUsd={bnbUsd}
-                      onDeposit={openDeposit}
-                      onWithdraw={openWithdraw}
-                    />
+                    <NativeCashMobileRow nativeBnb={nativeBnb} bnbUsd={bnbUsd} />
                     {visibleHoldingsRows.map((row, index) => {
                       if (row.kind === "wallet") {
                         return (
@@ -1431,29 +1400,24 @@ export function PortfolioPanel({
                     <table className="sheet-grid portfolio-holdings-grid">
                       <colgroup>
                         <col className="portfolio-holdings-grid__col-coin" />
+                        <col className="portfolio-holdings-grid__col-actions" />
                         <col className="portfolio-holdings-grid__col-amount" />
                         <col className="portfolio-holdings-grid__col-value" />
                         <col className="portfolio-holdings-grid__col-entry" />
                         <col className="portfolio-holdings-grid__col-pnl" />
-                        <col className="portfolio-holdings-grid__col-trade" />
                       </colgroup>
                       <thead>
                         <tr>
                           <th>Coin</th>
+                          <th className="portfolio-holdings-grid__actions-head" aria-label="Actions" />
                           <th className="portfolio-holdings-grid__num">Amount</th>
                           <th className="portfolio-holdings-grid__num">Value</th>
                           <th className="portfolio-holdings-grid__num">Entry</th>
                           <th className="portfolio-holdings-grid__num">P/L</th>
-                          <th className="portfolio-holdings-grid__trade">Trade</th>
                         </tr>
                       </thead>
                       <tbody>
-                        <NativeCashDesktopRow
-                          nativeBnb={nativeBnb}
-                          bnbUsd={bnbUsd}
-                          onDeposit={openDeposit}
-                          onWithdraw={openWithdraw}
-                        />
+                        <NativeCashDesktopRow nativeBnb={nativeBnb} bnbUsd={bnbUsd} />
                         {visibleHoldingsRows.map((row) => {
                           if (row.kind === "wallet") {
                             return (
@@ -1492,43 +1456,47 @@ export function PortfolioPanel({
 
                           return (
                             <tr key={position.tokenAddress} className="group">
-                              <td>
+                              <td className="px-4 py-3">
                                 <Link
                                   href={`/token/${position.tokenAddress}`}
-                                  className="flex min-w-0 items-center gap-3"
+                                  className="portfolio-holdings-grid__coin-row flex min-w-0 items-center gap-2"
                                 >
                                   <TokenAvatar
                                     address={position.tokenAddress}
                                     symbol={position.symbol}
                                     logoUrl={position.logoUrl}
-                                    size={30}
+                                    size={20}
+                                    shape="rounded"
+                                    className="portfolio-holdings-grid__coin-mark !ring-0"
                                   />
-                                  <p className="truncate text-body-sm font-medium text-pump-text">
+                                  <p className="portfolio-holdings-grid__coin-symbol truncate">
                                     ${position.symbol}
                                   </p>
                                 </Link>
                               </td>
-                              <td className="portfolio-holdings-grid__num px-4 py-3 financial-value text-pump-text">
+                              <HoldingsGridActionsCell
+                                actions={
+                                  <HoldingQuickActions
+                                    onBuyMax={() =>
+                                      openQuickTrade(position.tokenAddress, position.symbol, "buy")
+                                    }
+                                    onSellMax={() =>
+                                      openQuickTrade(position.tokenAddress, position.symbol, "sell")
+                                    }
+                                  />
+                                }
+                              />
+                              <td className="portfolio-holdings-grid__num portfolio-holdings-grid__data px-4 py-3 financial-value text-pump-text">
                                 {formatTokenBalance(balance)}
                               </td>
-                              <td className={`portfolio-holdings-grid__num px-4 py-3 financial-value font-semibold text-pump-text ${flashText(holdingFlashes[position.tokenAddress.toLowerCase()])}`}>
+                              <td className={`portfolio-holdings-grid__num portfolio-holdings-grid__data portfolio-holdings-grid__value-cell px-4 py-3 financial-value text-pump-text ${flashText(holdingFlashes[position.tokenAddress.toLowerCase()])}`}>
                                 {formatPortfolioHoldingValueUsd(positionValueUsd)}
                               </td>
-                              <td className="portfolio-holdings-grid__num px-4 py-3 financial-value text-pump-text">
+                              <td className="portfolio-holdings-grid__num portfolio-holdings-grid__data px-4 py-3 financial-value text-pump-text">
                                 {formatUsdReadable(avgEntryUsd, { compact: true })}
                               </td>
                               <td className="portfolio-holdings-grid__num w-[1%] whitespace-nowrap px-4 py-3">
                                 <PnlCell usd={openPnlUsd} pct={openPnlPct} align="end" />
-                              </td>
-                              <td className="portfolio-holdings-grid__trade w-[1%] whitespace-nowrap px-4 py-3">
-                                <HoldingQuickActions
-                                  onBuyMax={() =>
-                                    openQuickTrade(position.tokenAddress, position.symbol, "buy")
-                                  }
-                                  onSellMax={() =>
-                                    openQuickTrade(position.tokenAddress, position.symbol, "sell")
-                                  }
-                                />
                               </td>
                             </tr>
                           );

@@ -92,3 +92,21 @@ export function tokenSharePayload(
     text: `Trade $${token.symbol} on Pump — BSC meme launchpad.`,
   };
 }
+
+export function portfolioSharePayload(
+  address: string,
+  displayName?: string,
+  origin?: string
+): SharePayload {
+  const base =
+    origin ??
+    (typeof window !== "undefined" ? window.location.origin : "");
+  const url = `${base}/portfolio?address=${address}`;
+  const label = displayName?.trim() || address.slice(0, 6);
+
+  return {
+    url,
+    title: `${label} on Pump`,
+    text: `View this portfolio on Pump — BSC meme launchpad.`,
+  };
+}

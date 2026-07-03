@@ -2,6 +2,7 @@
 
 import { TokenBoardTable } from "@/components/arena/TokenBoardTable";
 import { PortfolioHero } from "@/components/portfolio/PortfolioHero";
+import { PortfolioSummaryStrip } from "@/components/portfolio/PortfolioSummaryStrip";
 import { PortfolioFeesBreakdown } from "@/components/portfolio/PortfolioFeesBreakdown";
 import { PortfolioMetricBox } from "@/components/portfolio/PortfolioMetricBox";
 import { PortfolioTabNav } from "@/components/portfolio/PortfolioTabNav";
@@ -42,20 +43,20 @@ function GuestHoldingsTable() {
     <table className="sheet-grid portfolio-holdings-grid">
       <colgroup>
         <col className="portfolio-holdings-grid__col-coin" />
+        <col className="portfolio-holdings-grid__col-actions" />
         <col className="portfolio-holdings-grid__col-amount" />
         <col className="portfolio-holdings-grid__col-value" />
         <col className="portfolio-holdings-grid__col-entry" />
         <col className="portfolio-holdings-grid__col-pnl" />
-        <col className="portfolio-holdings-grid__col-trade" />
       </colgroup>
       <thead>
         <tr>
           <th>Coin</th>
+          <th className="portfolio-holdings-grid__actions-head" aria-label="Actions" />
           <th className="portfolio-holdings-grid__num">Amount</th>
           <th className="portfolio-holdings-grid__num">Value</th>
           <th className="portfolio-holdings-grid__num">Entry</th>
           <th className="portfolio-holdings-grid__num">P/L</th>
-          <th className="portfolio-holdings-grid__trade">Trade</th>
         </tr>
       </thead>
       <tbody />
@@ -142,18 +143,21 @@ export function PortfolioGuestPanel({ activeTab, onSignIn }: PortfolioGuestPanel
           walletAddress={GUEST_WALLET}
           displayUsername=""
           guestMode
-          onSignIn={onSignIn}
           canEditProfile={false}
           onOpenProfileEditor={() => {}}
           onOpenFollowing={() => onSignIn()}
           onOpenFollowers={() => onSignIn()}
           followingCount={0}
           followerCount={0}
+        />
+
+        <PortfolioSummaryStrip
           totalValueUsd={0}
           totalNetPnlUsd={0}
-          portfolioValuePct={null}
-          totalUnrealizedPnlUsd={0}
-          totalRealizedPnlUsd={0}
+          totalNetPnlPct={null}
+          topHolding={null}
+          coinsHeld={0}
+          guestMode
         />
 
         <PortfolioTabNav active={activeTab} />

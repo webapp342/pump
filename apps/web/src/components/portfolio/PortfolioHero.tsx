@@ -1,16 +1,11 @@
 "use client";
 
-import type { ReactNode } from "react";
-import Link from "next/link";
-import { PctChange } from "@/components/ui/PctChange";
-import { IconLabel } from "@/components/ui/IconLabel";
-import { useWalletFunding } from "@/components/wallet/WalletFundingProvider";
-import {
-  formatPortfolioHoldingValueUsd,
-  formatUsdSignedTwoDecimals,
-} from "@/lib/format-usd";
-import { PumpIcon, faPen } from "@/lib/icons";
-import { MetricIcons } from "@/lib/metric-icons";
+import { useMemo, useState } from "react";
+import { ShareSheetModal } from "@/components/ui/ShareSheetModal";
+import { shortAddress } from "@/config/chain";
+import { copyToClipboard } from "@/lib/copy-to-clipboard";
+import { PumpIcon, faCheck, faCopy, faPen, faShare } from "@/lib/icons";
+import { portfolioSharePayload } from "@/lib/share-links";
 import { UserAvatarForAddress } from "@/components/user/UserAvatarForAddress";
 
 type PortfolioHeroProps = {
@@ -22,45 +17,121 @@ type PortfolioHeroProps = {
   onOpenFollowers: () => void;
   followingCount: number;
   followerCount: number;
-  totalValueUsd: number | null;
-  totalNetPnlUsd: number;
-  portfolioValuePct: number | null;
-  totalUnrealizedPnlUsd: number;
-  totalRealizedPnlUsd: number;
-  valueFlashClass?: string;
-  pnlFlashClass?: string;
+  holdingsCount?: number;
   guestMode?: boolean;
-  onSignIn?: () => void;
 };
 
-function pnlTone(value: number): string {
-  if (value > 0) return "portfolio-stat__value--up";
-  if (value < 0) return "portfolio-stat__value--down";
-  return "";
+function WalletAddressChip({
+  address,
+  guestMode,
+}: {
+  address: string;
+  guestMode?: boolean;
+}) {
+  const [copied, setCopied] = useState(false);
+
+  if (guestMode) {
+    return (
+      <span className="portfolio-toolbar__wallet-address portfolio-toolbar__wallet-address--static">
+        <span className="financial-value">—</span>
+      </span>
+    );
+  }
+
+  async function onCopy() {
+    const ok = await copyToClipboard(address);
+    setCopied(ok);
+    if (ok) setTimeout(() => setCopied(false), 2000);
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => void onCopy()}
+      className="portfolio-toolbar__wallet-address"
+      aria-label={copied ? "Address copied" : "Copy wallet address"}
+    >
+      <span className="financial-value">{shortAddress(address, true)}</span>
+      <PumpIcon icon={copied ? faCheck : faCopy} className="portfolio-toolbar__wallet-address-icon" />
+    </button>
+  );
 }
 
-function PortfolioStat({
-  label,
-  labelSuffix,
-  children,
-  hero = false,
-  className = "",
+function ProfileStatsRow({
+  guestMode,
+  followingCount,
+  followerCount,
+  holdingsCount,
+  onOpenFollowing,
+  onOpenFollowers,
+  variant,
 }: {
-  label: string;
-  labelSuffix?: ReactNode;
-  children: ReactNode;
-  hero?: boolean;
-  className?: string;
+  guestMode: boolean;
+  followingCount: number;
+  followerCount: number;
+  holdingsCount: number;
+  onOpenFollowing: () => void;
+  onOpenFollowers: () => void;
+  variant: "mobile" | "desktop";
 }) {
-  return (
-    <div className={`portfolio-stat${hero ? " portfolio-stat--hero" : ""} ${className}`.trim()}>
-      <div className="portfolio-stat__label-row">
-        <span className="portfolio-stat__label">{label}</span>
-        {labelSuffix != null ? (
-          <span className="portfolio-stat__label-suffix">{labelSuffix}</span>
-        ) : null}
+  const className =
+    variant === "mobile"
+      ? "portfolio-toolbar__stats portfolio-toolbar__stats--mobile"
+      : "portfolio-toolbar__stats portfolio-toolbar__stats--desktop";
+
+  if (guestMode) {
+    return (
+      <div className={className}>
+        {variant === "desktop" ? (
+          <>
+            <span className="portfolio-toolbar__stat">
+              <strong>0</strong> Followers
+            </span>
+            <span className="portfolio-toolbar__stat">
+              <strong>0</strong> Following
+            </span>
+          </>
+        ) : (
+          <>
+            <span className="portfolio-toolbar__stat">
+              <strong>0</strong> Following
+            </span>
+            <span className="portfolio-toolbar__stat">
+              <strong>0</strong> Followers
+            </span>
+            <span className="portfolio-toolbar__stat portfolio-toolbar__stat--coins">
+              <strong>0</strong> Coins
+            </span>
+          </>
+        )}
       </div>
-      <div className="portfolio-stat__value financial-value">{children}</div>
+    );
+  }
+
+  return (
+    <div className={className}>
+      {variant === "desktop" ? (
+        <>
+          <button type="button" onClick={onOpenFollowers} className="portfolio-toolbar__stat">
+            <strong>{followerCount}</strong> Followers
+          </button>
+          <button type="button" onClick={onOpenFollowing} className="portfolio-toolbar__stat">
+            <strong>{followingCount}</strong> Following
+          </button>
+        </>
+      ) : (
+        <>
+          <button type="button" onClick={onOpenFollowing} className="portfolio-toolbar__stat">
+            <strong>{followingCount}</strong> Following
+          </button>
+          <button type="button" onClick={onOpenFollowers} className="portfolio-toolbar__stat">
+            <strong>{followerCount}</strong> Followers
+          </button>
+          <span className="portfolio-toolbar__stat portfolio-toolbar__stat--coins">
+            <strong>{holdingsCount}</strong> Coins
+          </span>
+        </>
+      )}
     </div>
   );
 }
@@ -74,225 +145,133 @@ export function PortfolioHero({
   onOpenFollowers,
   followingCount,
   followerCount,
-  totalValueUsd,
-  totalNetPnlUsd,
-  portfolioValuePct,
-  totalUnrealizedPnlUsd,
-  totalRealizedPnlUsd,
-  valueFlashClass = "",
-  pnlFlashClass = "",
+  holdingsCount = 0,
   guestMode = false,
-  onSignIn,
 }: PortfolioHeroProps) {
-  const { openDeposit, openWithdraw } = useWalletFunding();
-  const guestZeroUsd = formatUsdSignedTwoDecimals(0);
-  const displayValue =
-    guestMode || (totalValueUsd != null && Number.isFinite(totalValueUsd))
-      ? guestMode
-        ? formatPortfolioHoldingValueUsd(0)
-        : formatPortfolioHoldingValueUsd(totalValueUsd!)
-      : "$0.00";
+  const [shareOpen, setShareOpen] = useState(false);
 
-  const pnlPctTone =
-    portfolioValuePct != null && portfolioValuePct > 0
-      ? "text-pump-success"
-      : portfolioValuePct != null && portfolioValuePct < 0
-        ? "text-pump-danger"
-        : "text-pump-muted";
-
-  const estPnlValue = guestMode ? (
-    guestZeroUsd
-  ) : (
-    <span className={`portfolio-stat__pnl-inline ${pnlFlashClass}`.trim()}>
-      <span className={pnlTone(totalNetPnlUsd)}>
-        {formatUsdSignedTwoDecimals(totalNetPnlUsd)}
-      </span>
-      <PctChange
-        value={portfolioValuePct}
-        toneClassName={pnlPctTone}
-        className="portfolio-stat__inline-pct hidden md:inline-flex"
-      />
-    </span>
-  );
-
-  const estPnlMobileValue = guestMode ? (
-    guestZeroUsd
-  ) : (
-    <span className={pnlFlashClass}>
-      <span className={pnlTone(totalNetPnlUsd)}>
-        {formatUsdSignedTwoDecimals(totalNetPnlUsd)}
-      </span>
-    </span>
+  const sharePayload = useMemo(
+    () =>
+      guestMode
+        ? null
+        : portfolioSharePayload(walletAddress, displayUsername),
+    [displayUsername, guestMode, walletAddress]
   );
 
   return (
-    <header className="portfolio-header">
-      <div className="portfolio-toolbar">
-        <div className="portfolio-toolbar__shell">
-          <div className="portfolio-toolbar__identity-row">
-            <div className="portfolio-toolbar__identity">
-              {guestMode ? (
-                <div className="portfolio-toolbar__guest-avatar" aria-hidden />
-              ) : (
-                <UserAvatarForAddress
-                  address={walletAddress}
-                  size={32}
-                  className="token-detail-toolbar__logo shrink-0 !ring-0"
-                />
-              )}
-              <div className="portfolio-toolbar__identity-meta">
-                <div className="portfolio-toolbar__name-line">
-                  <span
-                    className={
-                      guestMode
-                        ? "portfolio-toolbar__display-name portfolio-toolbar__display-name--guest"
-                        : "portfolio-toolbar__display-name"
-                    }
+    <>
+      <header className="portfolio-header">
+        <div className="portfolio-toolbar">
+          <div className="portfolio-toolbar__shell">
+            <div className="portfolio-toolbar__lead">
+              <div className="portfolio-toolbar__avatar-wrap">
+                {guestMode ? (
+                  <div className="portfolio-toolbar__guest-avatar" aria-hidden />
+                ) : (
+                  <UserAvatarForAddress
+                    address={walletAddress}
+                    size={48}
+                    className="portfolio-toolbar__avatar token-detail-toolbar__logo shrink-0 !ring-0"
+                  />
+                )}
+              </div>
+
+              <div className="portfolio-toolbar__meta">
+                <div className="portfolio-toolbar__name-block">
+                  <div className="portfolio-toolbar__name-row">
+                    <div className="portfolio-toolbar__name-primary">
+                      <p
+                        className={
+                          guestMode
+                            ? "portfolio-toolbar__display-name portfolio-toolbar__display-name--guest"
+                            : "portfolio-toolbar__display-name"
+                        }
+                      >
+                        {guestMode ? "—" : displayUsername}
+                      </p>
+                      <WalletAddressChip address={walletAddress} guestMode={guestMode} />
+                    </div>
+                    {!guestMode ? (
+                      <div className="portfolio-toolbar__name-actions portfolio-toolbar__name-actions--mobile">
+                        <button
+                          type="button"
+                          onClick={() => setShareOpen(true)}
+                          className="portfolio-toolbar__icon-btn"
+                          aria-label="Share profile"
+                        >
+                          <PumpIcon icon={faShare} className="portfolio-toolbar__icon-btn-glyph" />
+                        </button>
+                        {canEditProfile ? (
+                          <button
+                            type="button"
+                            onClick={onOpenProfileEditor}
+                            className="portfolio-toolbar__icon-btn"
+                            aria-label="Edit profile"
+                          >
+                            <PumpIcon icon={faPen} className="portfolio-toolbar__icon-btn-glyph" />
+                          </button>
+                        ) : null}
+                      </div>
+                    ) : null}
+                  </div>
+                  <ProfileStatsRow
+                    guestMode={guestMode}
+                    followingCount={followingCount}
+                    followerCount={followerCount}
+                    holdingsCount={holdingsCount}
+                    onOpenFollowing={onOpenFollowing}
+                    onOpenFollowers={onOpenFollowers}
+                    variant="mobile"
+                  />
+                  <ProfileStatsRow
+                    guestMode={guestMode}
+                    followingCount={followingCount}
+                    followerCount={followerCount}
+                    holdingsCount={holdingsCount}
+                    onOpenFollowing={onOpenFollowing}
+                    onOpenFollowers={onOpenFollowers}
+                    variant="desktop"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {!guestMode ? (
+              <div className="portfolio-toolbar__aside">
+                <div className="portfolio-toolbar__profile-actions">
+                  <button
+                    type="button"
+                    onClick={() => setShareOpen(true)}
+                    className="portfolio-toolbar__share-btn"
                   >
-                    {guestMode ? "—" : displayUsername}
-                  </span>
+                    <PumpIcon icon={faShare} className="h-3.5 w-3.5" />
+                    <span>Share</span>
+                  </button>
                   {canEditProfile ? (
                     <button
                       type="button"
                       onClick={onOpenProfileEditor}
-                      className="portfolio-toolbar__edit-profile"
-                      aria-label="Edit profile"
+                      className="portfolio-toolbar__edit-btn"
                     >
-                      <PumpIcon icon={faPen} className="h-3 w-3" />
-                      <span>Edit</span>
+                      <PumpIcon icon={faPen} className="h-3.5 w-3.5" />
+                      <span>Edit profile</span>
                     </button>
                   ) : null}
                 </div>
-                <span className="token-detail-toolbar__age portfolio-toolbar__social">
-                  {guestMode ? (
-                    <>
-                      <span>0 following</span>
-                      <span aria-hidden>·</span>
-                      <span>0 followers</span>
-                    </>
-                  ) : (
-                    <>
-                      <button type="button" onClick={onOpenFollowing} className="portfolio-toolbar__social-link">
-                        {followingCount} following
-                      </button>
-                      <span aria-hidden>·</span>
-                      <button type="button" onClick={onOpenFollowers} className="portfolio-toolbar__social-link">
-                        {followerCount} followers
-                      </button>
-                    </>
-                  )}
-                </span>
               </div>
-            </div>
-
-            <PortfolioStat
-              label="Total Value"
-              hero
-              className="portfolio-toolbar__total-value portfolio-toolbar__total-value--desktop"
-            >
-              <span className={valueFlashClass}>{displayValue}</span>
-            </PortfolioStat>
-          </div>
-
-          <div className="portfolio-toolbar__hero-row portfolio-toolbar__hero-row--mobile">
-            <div className="portfolio-toolbar__value-block">
-              <IconLabel
-                icon={MetricIcons.portfolioValue}
-                hideIconMobile
-                className="section-label"
-              >
-                Total Value
-              </IconLabel>
-              <p className={`portfolio-toolbar__value-hero financial-value ${valueFlashClass}`.trim()}>
-                {displayValue}
-              </p>
-            </div>
-
-            <div className="portfolio-toolbar__pnl-stack">
-              <PortfolioStat label="Est. PnL" className="portfolio-toolbar__pnl-stack-stat">
-                {estPnlMobileValue}
-              </PortfolioStat>
-              <PortfolioStat label="Unrealized PnL" className="portfolio-toolbar__pnl-stack-stat">
-                {guestMode ? (
-                  guestZeroUsd
-                ) : (
-                  <span className={pnlTone(totalUnrealizedPnlUsd)}>
-                    {formatUsdSignedTwoDecimals(totalUnrealizedPnlUsd)}
-                  </span>
-                )}
-              </PortfolioStat>
-              <PortfolioStat label="Realized PnL" className="portfolio-toolbar__pnl-stack-stat">
-                {guestMode ? (
-                  guestZeroUsd
-                ) : (
-                  <span className={pnlTone(totalRealizedPnlUsd)}>
-                    {formatUsdSignedTwoDecimals(totalRealizedPnlUsd)}
-                  </span>
-                )}
-              </PortfolioStat>
-            </div>
-          </div>
-
-          <div className="portfolio-toolbar__divider portfolio-toolbar__divider--desktop" aria-hidden />
-
-          <div className="portfolio-toolbar__pnl-actions">
-            <div className="portfolio-toolbar__pnl-row portfolio-toolbar__pnl-row--desktop">
-              <PortfolioStat
-                label="Est. PnL"
-                labelSuffix={
-                  !guestMode ? (
-                    <PctChange
-                      value={portfolioValuePct}
-                      toneClassName={pnlPctTone}
-                      className="portfolio-stat__label-pct md:hidden"
-                    />
-                  ) : null
-                }
-              >
-                {estPnlValue}
-              </PortfolioStat>
-              <PortfolioStat label="Unrealized Pnl">
-                {guestMode ? (
-                  guestZeroUsd
-                ) : (
-                  <span className={pnlTone(totalUnrealizedPnlUsd)}>
-                    {formatUsdSignedTwoDecimals(totalUnrealizedPnlUsd)}
-                  </span>
-                )}
-              </PortfolioStat>
-              <PortfolioStat label="Realized Pnl">
-                {guestMode ? (
-                  guestZeroUsd
-                ) : (
-                  <span className={pnlTone(totalRealizedPnlUsd)}>
-                    {formatUsdSignedTwoDecimals(totalRealizedPnlUsd)}
-                  </span>
-                )}
-              </PortfolioStat>
-            </div>
-
-            <div className="portfolio-toolbar__actions-row">
-              <button
-                type="button"
-                onClick={guestMode ? () => onSignIn?.() : openDeposit}
-                className="token-toolbar-btn portfolio-toolbar__btn--primary"
-              >
-                Deposit
-              </button>
-              <button
-                type="button"
-                onClick={guestMode ? () => onSignIn?.() : openWithdraw}
-                className="token-toolbar-btn"
-              >
-                Withdraw
-              </button>
-              <Link href="/" className="token-toolbar-btn">
-                Trade
-              </Link>
-            </div>
+            ) : null}
           </div>
         </div>
-      </div>
-    </header>
+      </header>
+
+      {sharePayload ? (
+        <ShareSheetModal
+          open={shareOpen}
+          onClose={() => setShareOpen(false)}
+          payload={sharePayload}
+          title="Share profile"
+        />
+      ) : null}
+    </>
   );
 }
