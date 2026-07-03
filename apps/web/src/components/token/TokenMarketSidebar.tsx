@@ -9,8 +9,10 @@ import { TokenMarketSidebarRow } from "@/components/token/TokenMarketSidebarRow"
 import { TokenMarketSidebarHead } from "@/components/token/TokenMarketSidebarHead";
 import { TokenMarketSidebarFilterStrip } from "@/components/token/TokenMarketSidebarFilterStrip";
 import { ArenaSwipeTradeBar } from "@/components/arena/ArenaSwipeTradeBar";
+import { HoldingsSwipeHint } from "@/components/portfolio/HoldingsSwipeHint";
 import { FieldSearchInput } from "@/components/ui/FieldSearchInput";
 import { pinMobileWindowScroll } from "@/hooks/useMobileModalScrollLock";
+import { quickTradeSwipeLabels } from "@/lib/arena-quick-trade";
 import type { TokenSidebarDensity } from "@/hooks/useTokenSidebarWidth";
 
 type TokenMarketSidebarProps = {
@@ -27,6 +29,8 @@ type TokenMarketSidebarProps = {
   searchInputRef?: Ref<HTMLInputElement>;
   /** Desktop trade sidebar — quick trade prefs to the right of search. */
   showQuickTrade?: boolean;
+  /** Mobile token picker sheet — swipe trade, search-row quick-trade bar, unified chrome. */
+  mobileSheet?: boolean;
 };
 
 export function TokenMarketSidebar({
@@ -41,9 +45,12 @@ export function TokenMarketSidebar({
   onSearchDismiss,
   searchInputRef,
   showQuickTrade = false,
+  mobileSheet = false,
 }: TokenMarketSidebarProps) {
   const listRef = useRef<HTMLDivElement>(null);
   const mobileSearchChrome = Boolean(onSearchFocusChange);
+  const effectiveQuickTrade = showQuickTrade || mobileSheet;
+  const swipeHintLabels = quickTradeSwipeLabels();
 
   const assignSearchInputRef = (node: HTMLInputElement | null) => {
     if (typeof searchInputRef === "function") {
@@ -95,7 +102,8 @@ export function TokenMarketSidebar({
   }
 
   const sectionClass = [
-    "token-market-sidebar panel-surface",
+    "token-market-sidebar",
+    mobileSheet ? "token-market-sidebar--mobile-sheet" : "panel-surface",
     className,
     searchActive ? "token-market-sidebar--search-active" : "",
   ]
@@ -139,9 +147,15 @@ export function TokenMarketSidebar({
             autoCorrect="off"
             spellCheck={false}
           />
-          {!searchActive && showQuickTrade ? (
-            <div className="token-market-sidebar__search-tools hidden lg:flex">
-              <ArenaSwipeTradeBar variant="sidebar" />
+          {!searchActive && effectiveQuickTrade ? (
+            <div
+              className={
+                mobileSheet
+                  ? "token-market-sidebar__search-tools"
+                  : "token-market-sidebar__search-tools hidden lg:flex"
+              }
+            >
+              <ArenaSwipeTradeBar variant={mobileSheet ? "mobile-sheet" : "sidebar"} />
             </div>
           ) : null}
           {mobileSearchChrome && searchActive && onSearchDismiss ? (
@@ -170,12 +184,20 @@ export function TokenMarketSidebar({
       ) : null}
 
       <div className="token-market-sidebar__list" ref={listRef}>
+        {mobileSheet && !searchActive && exploreBoardTokens.length > 0 ? (
+          <div className="token-market-sidebar__swipe-hint px-2 pt-2">
+            <HoldingsSwipeHint
+              buyLabel={swipeHintLabels.buyLabel}
+              sellLabel={swipeHintLabels.sellLabel}
+            />
+          </div>
+        ) : null}
         {exploreBoardTokens.length === 0 ? (
           <p className="token-market-sidebar__note text-caption text-pump-muted">
             {tokens === null ? "Loading coins…" : emptyCopy}
           </p>
         ) : (
-          exploreBoardTokens.map((token) => {
+          exploreBoardTokens.map((token, index) => {
             const addressKey = token.address.toLowerCase();
             const mcapUsd =
               animatedCaps[`${addressKey}:cap:mcap`] ??
@@ -204,7 +226,9 @@ export function TokenMarketSidebar({
                 isFavorite={isFavorite(token.address)}
                 onToggleFavorite={toggleFavorite}
                 onTokenSelect={onTokenSelect}
-                showRowQuickActions={showQuickTrade}
+                showRowQuickActions={effectiveQuickTrade && !mobileSheet}
+                enableSwipeTrade={mobileSheet && effectiveQuickTrade}
+                peekSwipeOnMount={mobileSheet && index === 0}
               />
             );
           })

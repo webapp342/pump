@@ -1,9 +1,11 @@
 "use client";
 
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { TokenListItem } from "@/lib/db/launchpad";
 import { ArenaBoardRowQuickActions } from "@/components/arena/ArenaBoardRowQuickActions";
 import { FavoriteIcon } from "@/components/icons/FavoriteIcon";
+import { HoldingSwipeRow } from "@/components/portfolio/HoldingSwipeRow";
 import { TokenAvatar } from "@/components/token/TokenAvatar";
 import { TokenDetailLink } from "@/components/token/TokenDetailLink";
 import { seedTokenDetailFromListItem } from "@/lib/token-detail-client";
@@ -14,7 +16,11 @@ import {
   formatCapForBoard,
   listTokenPriceUsd,
 } from "@/lib/arena-board-format";
-import { buildArenaQuickTradeHref } from "@/lib/arena-quick-trade";
+import {
+  ARENA_QUICK_TRADE_CHANGE_EVENT,
+  buildArenaQuickTradeHref,
+  quickTradeSwipeLabels,
+} from "@/lib/arena-quick-trade";
 import { flashText, type FlashTone } from "@/lib/arena-explore-board-core";
 
 import type { TokenSidebarDensity } from "@/hooks/useTokenSidebarWidth";
@@ -36,6 +42,9 @@ type TokenMarketSidebarRowProps = {
   onTokenSelect?: () => void;
   /** Desktop sidebar — hover swaps data cell for Buy/Sell (MCAP compact / Last Price full). */
   showRowQuickActions?: boolean;
+  /** Mobile sheet — swipe left/right for flash trade (portfolio pattern). */
+  enableSwipeTrade?: boolean;
+  peekSwipeOnMount?: boolean;
 };
 
 export function TokenMarketSidebarRow({
@@ -54,8 +63,11 @@ export function TokenMarketSidebarRow({
   onToggleFavorite,
   onTokenSelect,
   showRowQuickActions = false,
+  enableSwipeTrade = false,
+  peekSwipeOnMount = false,
 }: TokenMarketSidebarRowProps) {
   const router = useRouter();
+  const [swipeLabels, setSwipeLabels] = useState(quickTradeSwipeLabels);
   const addressKey = token.address.toLowerCase();
   const isActive = activeTokenAddress?.toLowerCase() === addressKey;
   const resolvedPriceUsd =
@@ -63,13 +75,30 @@ export function TokenMarketSidebarRow({
   const volLabel = formatUsdReadable(vol24hUsd, { compact: true });
   const compact = density === "compact";
 
-  const quickBuy = () => router.push(buildArenaQuickTradeHref(token.address, "buy"));
-  const quickSell = () => router.push(buildArenaQuickTradeHref(token.address, "sell"));
+  const syncSwipeLabels = useCallback(() => {
+    setSwipeLabels(quickTradeSwipeLabels());
+  }, []);
+
+  useEffect(() => {
+    if (!enableSwipeTrade) return;
+    syncSwipeLabels();
+    const onChange = () => syncSwipeLabels();
+    window.addEventListener(ARENA_QUICK_TRADE_CHANGE_EVENT, onChange);
+    return () => window.removeEventListener(ARENA_QUICK_TRADE_CHANGE_EVENT, onChange);
+  }, [enableSwipeTrade, syncSwipeLabels]);
+
+  const runQuickTrade = (side: "buy" | "sell") => {
+    router.push(buildArenaQuickTradeHref(token.address, side));
+    onTokenSelect?.();
+  };
+
+  const quickBuy = () => runQuickTrade("buy");
+  const quickSell = () => runQuickTrade("sell");
   const quickActions = showRowQuickActions ? (
     <ArenaBoardRowQuickActions layout="card-compact" onBuy={quickBuy} onSell={quickSell} />
   ) : null;
 
-  return (
+  const rowLink = (
     <TokenDetailLink
       address={token.address}
       onClick={() => {
@@ -150,5 +179,23 @@ export function TokenMarketSidebarRow({
         </div>
       ) : null}
     </TokenDetailLink>
+  );
+
+  if (!enableSwipeTrade) {
+    return rowLink;
+  }
+
+  return (
+    <HoldingSwipeRow
+      onBuyMax={quickBuy}
+      onSellMax={quickSell}
+      buyLabel={swipeLabels.buyLabel}
+      sellLabel={swipeLabels.sellLabel}
+      peekOnMount={peekSwipeOnMount}
+      rowClassName="token-market-sidebar__swipe-row"
+      contentClassName="token-market-sidebar__row-surface"
+    >
+      {rowLink}
+    </HoldingSwipeRow>
   );
 }

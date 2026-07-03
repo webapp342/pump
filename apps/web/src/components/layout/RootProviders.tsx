@@ -8,6 +8,7 @@ import { UserBootstrapProvider } from "@/components/user/UserBootstrapProvider";
 import { ReferralCaptureProvider } from "@/components/referrals/ReferralCaptureProvider";
 import { ToastHost } from "@/components/ui/ToastHost";
 import { RouteWarmup } from "@/components/layout/RouteWarmup";
+import { LastTradeTokenCookieSync } from "@/components/layout/LastTradeTokenCookieSync";
 import { Web3Provider } from "@/components/wallet/Web3Provider";
 
 /** Sync provider tree — wallet cookies hydrate client-side (no root Suspense flash). */
@@ -21,6 +22,7 @@ export function RootProviders({ children }: { children: React.ReactNode }) {
               <UserAvatarProvider>
                 <ReferralCaptureProvider>
                   <RouteWarmup />
+                  <LastTradeTokenCookieSync />
                   {children}
                   <ToastHost />
                 </ReferralCaptureProvider>

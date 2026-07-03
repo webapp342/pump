@@ -2282,6 +2282,15 @@ code,
     .modal-sheet-host .token-mobile-market-sheet--full.modal-sheet-panel {
       height: calc(100dvh - env(safe-area-inset-top, 0px));
       max-height: calc(100dvh - env(safe-area-inset-top, 0px));
+      background: rgb(var(--pump-bg));
+      border-color: rgb(var(--pump-border) / 0.28);
+      box-shadow: 0 -12px 40px rgb(0 0 0 / 0.35);
+    }
+
+    .modal-sheet-host--visual-viewport .token-mobile-market-sheet--full.modal-sheet-panel {
+      height: 100%;
+      max-height: 100%;
+      border-radius: 1rem 1rem 0 0;
     }
 
     @supports (height: 100svh) {
@@ -2295,6 +2304,12 @@ code,
       flex: 1;
       min-height: 0;
       border-radius: 0;
+      background: transparent;
+      border: none;
+    }
+
+    .token-mobile-market-sheet__header {
+      border-bottom: 1px solid rgb(var(--pump-border) / 0.22);
     }
 
     .trade-panel--compact .trade-panel-tabs {
@@ -2839,44 +2854,49 @@ code,
     align-items: center;
   }
 
-  .token-market-sidebar__search-tools .arena-quick-trade-bar--sidebar .arena-quick-trade-bar__cluster {
+  .token-market-sidebar__search-tools .arena-quick-trade-bar--sidebar .arena-quick-trade-bar__cluster,
+  .token-market-sidebar__search-tools .arena-quick-trade-bar--mobile-sheet .arena-quick-trade-bar__cluster {
     display: flex;
     flex-direction: row;
     align-items: center;
     gap: 0.375rem;
   }
 
-  .token-market-sidebar__search-tools .arena-quick-trade-bar--sidebar .arena-quick-trade-bar__summary {
+  .token-market-sidebar__search-tools .arena-quick-trade-bar--sidebar .arena-quick-trade-bar__summary,
+  .token-market-sidebar__search-tools .arena-quick-trade-bar--mobile-sheet .arena-quick-trade-bar__summary {
     display: flex;
     flex-direction: column;
-    align-items: flex-start;
-    gap: 0.0625rem;
+    align-items: stretch;
+    gap: 0.125rem;
   }
 
-  .token-market-sidebar__search-tools .arena-quick-trade-bar--sidebar .arena-quick-trade-bar__leg {
-    gap: 0.1875rem;
+  .token-market-sidebar__search-tools .arena-quick-trade-bar--sidebar .arena-quick-trade-bar__leg,
+  .token-market-sidebar__search-tools .arena-quick-trade-bar--mobile-sheet .arena-quick-trade-bar__leg {
+    gap: 0.375rem;
     font-size: var(--text-caption);
     line-height: 1.2;
     white-space: nowrap;
   }
 
-  .token-market-sidebar__search-tools .arena-quick-trade-bar--sidebar .arena-quick-trade-bar__flash {
+  .token-market-sidebar__search-tools .arena-quick-trade-bar--sidebar .arena-quick-trade-bar__flash,
+  .token-market-sidebar__search-tools .arena-quick-trade-bar--mobile-sheet .arena-quick-trade-bar__flash {
     width: 0.5625rem;
     height: 0.5625rem;
   }
 
-  .token-market-sidebar__search-tools .arena-quick-trade-bar--sidebar .arena-quick-trade-bar__settings {
+  .token-market-sidebar__search-tools .arena-quick-trade-bar--sidebar .arena-quick-trade-bar__edit,
+  .token-market-sidebar__search-tools .arena-quick-trade-bar--mobile-sheet .arena-quick-trade-bar__edit {
     flex-shrink: 0;
-    align-self: center;
-    min-width: 1.625rem;
-    width: 1.625rem;
-    height: 1.625rem;
+    min-width: 1.375rem;
+    width: 1.375rem;
+    height: 1.375rem;
     padding: 0;
   }
 
-  .token-market-sidebar__search-tools .arena-quick-trade-bar--sidebar .arena-quick-trade-bar__settings-icon {
-    width: 0.8125rem;
-    height: 0.8125rem;
+  .token-market-sidebar__search-tools .arena-quick-trade-bar--sidebar .arena-quick-trade-bar__edit-icon,
+  .token-market-sidebar__search-tools .arena-quick-trade-bar--mobile-sheet .arena-quick-trade-bar__edit-icon {
+    width: 0.6875rem;
+    height: 0.6875rem;
   }
 
   .token-market-sidebar__search {
@@ -2948,12 +2968,35 @@ code,
 
     .token-market-sidebar--search-active .token-market-sidebar__search-row .token-market-sidebar__search {
       margin-bottom: 0;
-      border-color: rgb(var(--pump-accent) / 0.42);
+      border-color: rgb(var(--pump-border) / 0.48);
+      background: rgb(var(--pump-border) / 0.08);
+    }
+
+    .token-market-sidebar--mobile-sheet.token-market-sidebar--search-active .token-market-sidebar__search-row .token-market-sidebar__search {
+      border-color: rgb(var(--pump-border) / 0.5);
       background: rgb(var(--pump-border) / 0.1);
+      box-shadow: none;
+      outline: none;
+    }
+
+    .token-market-sidebar--mobile-sheet .token-market-sidebar__search:focus-within {
+      border-color: rgb(var(--pump-border) / 0.55);
+      background: rgb(var(--pump-border) / 0.1);
+      box-shadow: none;
+      outline: none;
+    }
+
+    .token-market-sidebar--mobile-sheet .arena-search-input,
+    .token-market-sidebar--mobile-sheet .arena-search-input:focus,
+    .token-market-sidebar--mobile-sheet .arena-search-input:focus-visible {
+      outline: none;
+      box-shadow: none;
+      -webkit-tap-highlight-color: transparent;
     }
 
     .token-mobile-market-sheet__search-grip {
       border-bottom: 1px solid rgb(var(--pump-border) / 0.22);
+      background: rgb(var(--pump-bg));
     }
 
     .token-mobile-market-sheet--search-active .token-mobile-market-sheet__body .token-market-sidebar {
@@ -3151,6 +3194,77 @@ code,
   .token-market-sidebar__note {
     padding: 0.75rem 0.625rem 1rem;
     text-align: center;
+  }
+
+  .token-market-sidebar--mobile-sheet .token-market-sidebar__toolbar {
+    padding-inline: 0.75rem;
+    border-bottom-color: rgb(var(--pump-border) / 0.2);
+  }
+
+  .token-market-sidebar--mobile-sheet .token-market-sidebar__search-row {
+    gap: 0.5rem;
+    padding-bottom: 0.375rem;
+    border-bottom: 1px solid rgb(var(--pump-border) / 0.12);
+  }
+
+  .token-market-sidebar--mobile-sheet .token-market-sidebar__search {
+    margin-bottom: 0;
+    border-radius: var(--radius-sm);
+    border-color: rgb(var(--pump-border) / 0.28);
+    background: transparent;
+  }
+
+  .token-market-sidebar--mobile-sheet .token-market-sidebar__search-tools {
+    flex-shrink: 0;
+    padding-block: 0;
+  }
+
+  .token-market-sidebar--mobile-sheet .token-market-sidebar__filter-strip {
+    margin-inline: -0.75rem;
+    border-bottom: none;
+  }
+
+  .token-market-sidebar--mobile-sheet .token-market-sidebar__head,
+  .token-market-sidebar--mobile-sheet .token-market-sidebar__row {
+    padding-inline: 0.75rem;
+  }
+
+  .token-market-sidebar--mobile-sheet .token-market-sidebar__head {
+    padding-block: 0.5rem 0.375rem;
+    background: rgb(var(--pump-bg));
+    border-bottom-color: rgb(var(--pump-border) / 0.18);
+  }
+
+  .token-market-sidebar--mobile-sheet .token-market-sidebar__row {
+    padding-block: 0.5rem;
+    border-bottom-color: rgb(var(--pump-border) / 0.08);
+  }
+
+  .token-market-sidebar--mobile-sheet .token-market-sidebar__row--active {
+    background: rgb(var(--pump-border) / 0.06);
+  }
+
+  .token-market-sidebar--mobile-sheet .token-market-sidebar__swipe-row .token-market-sidebar__row {
+    border-bottom: none;
+  }
+
+  .token-market-sidebar--mobile-sheet .token-market-sidebar__swipe-row {
+    border-bottom: 1px solid rgb(var(--pump-border) / 0.08);
+  }
+
+  .token-market-sidebar--mobile-sheet .token-market-sidebar__row-surface {
+    background: rgb(var(--pump-bg));
+  }
+
+  .token-market-sidebar--mobile-sheet .token-market-sidebar__swipe-hint .flex {
+    margin-bottom: 0;
+  }
+
+  .token-market-sidebar--mobile-sheet .token-market-sidebar__list {
+    flex: 1 1 0;
+    min-height: 0;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
   }
 
   .token-page-chart-slot .pump-subscript-price__exp {
@@ -7660,14 +7774,34 @@ code,
     white-space: nowrap;
   }
 
+  .arena-quick-trade-bar__summary--stacked {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.125rem;
+    white-space: normal;
+  }
+
   .arena-quick-trade-bar__leg {
     display: inline-flex;
     align-items: center;
-    gap: 0.3125rem;
+    justify-content: space-between;
+    gap: 0.375rem;
     font-size: var(--text-caption);
     font-weight: 500;
     line-height: 1.25;
     letter-spacing: 0.01em;
+  }
+
+  .arena-quick-trade-bar--stacked .arena-quick-trade-bar__leg {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .arena-quick-trade-bar__leg-main {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3125rem;
+    min-width: 0;
   }
 
   .arena-quick-trade-bar__flash {
@@ -7700,36 +7834,47 @@ code,
     font-weight: 600;
   }
 
-  .arena-quick-trade-bar__settings {
+  .arena-quick-trade-bar__edit {
     display: inline-flex;
     flex-shrink: 0;
     align-items: center;
     justify-content: center;
-    gap: 0.375rem;
-    min-width: 2.25rem;
-    height: 2.25rem;
-    padding-inline: 0.5rem;
+    min-width: 1.5rem;
+    width: 1.5rem;
+    height: 1.5rem;
+    padding: 0;
     border: none;
     border-radius: var(--radius-sm);
     background: transparent;
-    font-size: var(--text-caption);
-    font-weight: 500;
-    line-height: 1.25;
-    letter-spacing: 0.01em;
-    color: rgb(var(--pump-muted));
+    color: rgb(var(--pump-muted) / 0.72);
     transition: background-color 0.12s ease, color 0.12s ease;
   }
 
-  .arena-quick-trade-bar__settings-icon {
-    width: 0.875rem;
-    height: 0.875rem;
+  .arena-quick-trade-bar__edit-icon {
+    width: 0.75rem;
+    height: 0.75rem;
     flex-shrink: 0;
+    color: currentColor;
   }
 
-  .arena-quick-trade-bar__settings:hover,
-  .arena-quick-trade-bar__settings--open {
-    background: rgb(var(--pump-border) / 0.12);
-    color: rgb(var(--pump-text));
+  .arena-quick-trade-bar__buy .arena-quick-trade-bar__edit,
+  .arena-quick-trade-bar__sell .arena-quick-trade-bar__edit,
+  .arena-quick-trade-bar__buy .arena-quick-trade-bar__edit-icon,
+  .arena-quick-trade-bar__sell .arena-quick-trade-bar__edit-icon {
+    color: rgb(var(--pump-muted) / 0.72);
+  }
+
+  .arena-quick-trade-bar__edit:hover,
+  .arena-quick-trade-bar__edit--open {
+    background: rgb(var(--pump-border) / 0.1);
+    color: rgb(var(--pump-muted));
+  }
+
+  .arena-quick-trade-bar__buy .arena-quick-trade-bar__edit:hover,
+  .arena-quick-trade-bar__buy .arena-quick-trade-bar__edit--open,
+  .arena-quick-trade-bar__sell .arena-quick-trade-bar__edit:hover,
+  .arena-quick-trade-bar__sell .arena-quick-trade-bar__edit--open {
+    color: rgb(var(--pump-muted));
   }
 
   @media (min-width: 768px) {
@@ -7737,13 +7882,13 @@ code,
       font-size: var(--text-body-sm);
     }
 
-    .arena-quick-trade-bar__settings {
-      min-width: 0;
-      height: 2rem;
-      padding-inline: 0.625rem;
+    .arena-quick-trade-bar__edit {
+      min-width: 1.625rem;
+      width: 1.625rem;
+      height: 1.625rem;
     }
 
-    .arena-quick-trade-bar__settings-icon {
+    .arena-quick-trade-bar__edit-icon {
       width: 0.8125rem;
       height: 0.8125rem;
     }

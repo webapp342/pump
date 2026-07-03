@@ -47,6 +47,15 @@ function resolveBuyAmountUsd(parsed: LegacyArenaQuickTradePrefs): string {
   return DEFAULT_ARENA_QUICK_TRADE.buyAmountUsd;
 }
 
+export function quickTradeSwipeLabels(
+  prefs: ArenaQuickTradePrefs = readArenaQuickTradePrefs()
+): { buyLabel: string; sellLabel: string } {
+  return {
+    buyLabel: `Buy ${formatQuickTradeBuyUsd(prefs.buyAmountUsd)}`,
+    sellLabel: `Sell ${prefs.sellPercent}%`,
+  };
+}
+
 export function formatQuickTradeBuyUsd(amount: string): string {
   const n = Number(normalizeBuyAmount(amount));
   if (!Number.isFinite(n) || n <= 0) return "$—";
