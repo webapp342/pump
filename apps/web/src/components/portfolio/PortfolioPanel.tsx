@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { formatEther } from "viem";
+import { formatEther, parseUnits } from "viem";
 import { useOpenConnectModal } from "@/hooks/useOpenConnectModal";
 import { useAccount } from "wagmi";
 import { useReadContract } from "wagmi";
@@ -31,6 +31,7 @@ import { HoldingsSwipeHint } from "@/components/portfolio/HoldingsSwipeHint";
 import { TokenAvatar } from "@/components/token/TokenAvatar";
 import { NativeLogo } from "@/components/token/NativeLogo";
 import { TradeSheet } from "@/components/token/TradeSheet";
+import { PortfolioMaxTradeConfirmModal } from "@/components/portfolio/PortfolioMaxTradeConfirmModal";
 import type { PortfolioSnapshot, TokenListItem } from "@/lib/db/launchpad";
 import { useBnbUsdPrice } from "@/hooks/useBnbUsdPrice";
 import { useScwBalance } from "@/hooks/useScwBalance";
@@ -110,7 +111,31 @@ type PortfolioQuickTradeTarget = {
   tokenAddress: `0x${string}`;
   symbol: string;
   side: "buy" | "sell";
+  tokenBalanceWei?: bigint;
 };
+
+function portfolioTokenBalanceWei(
+  tokenAddress: string,
+  onChainBalances: Record<string, string>,
+  fallbackBalance?: number
+): bigint | undefined {
+  const onChain = onChainBalances[tokenAddress.toLowerCase()];
+  if (onChain) {
+    try {
+      return parseUnits(onChain, 18);
+    } catch {
+      // Fall through to numeric fallback.
+    }
+  }
+  if (fallbackBalance != null && Number.isFinite(fallbackBalance) && fallbackBalance > 0) {
+    try {
+      return parseUnits(fallbackBalance.toFixed(18), 18);
+    } catch {
+      return undefined;
+    }
+  }
+  return undefined;
+}
 
 type VerifiedPositionView = {
   position: PortfolioPosition;
@@ -606,6 +631,8 @@ export function PortfolioPanel({
   const [holdingsVisibleLimit, setHoldingsVisibleLimit] = useState(PORTFOLIO_HOLDINGS_INITIAL);
   const [loadingMoreCreated, setLoadingMoreCreated] = useState(false);
   const [quickTradeTarget, setQuickTradeTarget] = useState<PortfolioQuickTradeTarget | null>(null);
+  const [fundingBlockedTradeTarget, setFundingBlockedTradeTarget] =
+    useState<PortfolioQuickTradeTarget | null>(null);
   const [holdingFlashes, setHoldingFlashes] = useState<Record<string, FlashTone>>({});
   const [totalValueFlash, setTotalValueFlash] = useState<FlashTone | undefined>();
   const [totalPnlFlash, setTotalPnlFlash] = useState<FlashTone | undefined>();
@@ -831,7 +858,12 @@ export function PortfolioPanel({
   }, [address, data, loadingMoreCreated]);
 
   const openQuickTrade = useCallback(
-    (tokenAddress: string, symbol: string, side: "buy" | "sell") => {
+    (
+      tokenAddress: string,
+      symbol: string,
+      side: "buy" | "sell",
+      tokenBalanceWei?: bigint
+    ) => {
       if (!isConnected) {
         openConnectModal?.();
         return;
@@ -840,9 +872,22 @@ export function PortfolioPanel({
         tokenAddress: tokenAddress.toLowerCase() as `0x${string}`,
         symbol,
         side,
+        ...(side === "sell" && tokenBalanceWei != null ? { tokenBalanceWei } : {}),
       });
     },
     [isConnected, openConnectModal]
+  );
+
+  const openPortfolioSellMax = useCallback(
+    (tokenAddress: string, symbol: string, fallbackBalance?: number) => {
+      openQuickTrade(
+        tokenAddress,
+        symbol,
+        "sell",
+        portfolioTokenBalanceWei(tokenAddress, onChainBalances, fallbackBalance)
+      );
+    },
+    [onChainBalances, openQuickTrade]
   );
 
   useEffect(() => {
@@ -1209,22 +1254,37 @@ export function PortfolioPanel({
       <AvatarPickerModal open={avatarPickerOpen} onClose={() => setAvatarPickerOpen(false)} />
 
       {quickTradeTarget ? (
+        <PortfolioMaxTradeConfirmModal
+          key={`${quickTradeTarget.tokenAddress}-${quickTradeTarget.side}-confirm`}
+          target={quickTradeTarget}
+          onClose={() => setQuickTradeTarget(null)}
+          onFundingBlocked={() => {
+            setFundingBlockedTradeTarget(quickTradeTarget);
+            setQuickTradeTarget(null);
+          }}
+          onConfirmed={() => {
+            if (address) void loadPortfolio(walletAddress);
+          }}
+        />
+      ) : null}
+
+      {fundingBlockedTradeTarget ? (
         <TradeSheet
-          key={`${quickTradeTarget.tokenAddress}-${quickTradeTarget.side}`}
+          key={`${fundingBlockedTradeTarget.tokenAddress}-${fundingBlockedTradeTarget.side}-sheet`}
           open
           presentation="modal"
-          onClose={() => setQuickTradeTarget(null)}
-          tokenAddress={quickTradeTarget.tokenAddress}
-          symbol={quickTradeTarget.symbol}
+          onClose={() => setFundingBlockedTradeTarget(null)}
+          tokenAddress={fundingBlockedTradeTarget.tokenAddress}
+          symbol={fundingBlockedTradeTarget.symbol}
           status=""
           prefill={{
-            side: quickTradeTarget.side,
-            ...(quickTradeTarget.side === "sell"
-              ? { sellMax: true, autoSubmit: true }
-              : { buyMax: true, autoSubmit: true }),
+            side: fundingBlockedTradeTarget.side,
+            ...(fundingBlockedTradeTarget.side === "sell"
+              ? { sellMax: true }
+              : { buyMax: true }),
           }}
           onTradeConfirmed={() => {
-            setQuickTradeTarget(null);
+            setFundingBlockedTradeTarget(null);
             if (address) void loadPortfolio(walletAddress);
             window.dispatchEvent(new Event("pump:activity"));
           }}
@@ -1305,7 +1365,11 @@ export function PortfolioPanel({
                               openQuickTrade(row.holding.tokenAddress, row.holding.symbol, "buy")
                             }
                             onSellMax={() =>
-                              openQuickTrade(row.holding.tokenAddress, row.holding.symbol, "sell")
+                              openPortfolioSellMax(
+                                row.holding.tokenAddress,
+                                row.holding.symbol,
+                                Number(row.holding.tokenBalance)
+                              )
                             }
                           />
                         );
@@ -1324,9 +1388,7 @@ export function PortfolioPanel({
                           key={position.tokenAddress}
                           peekOnMount={index === 0}
                           onBuyMax={() => openQuickTrade(position.tokenAddress, position.symbol, "buy")}
-                          onSellMax={() =>
-                            openQuickTrade(position.tokenAddress, position.symbol, "sell")
-                          }
+                          onSellMax={() => openPortfolioSellMax(position.tokenAddress, position.symbol, balance)}
                         >
                           <PortfolioHoldingMobileCard
                             logo={
@@ -1388,7 +1450,11 @@ export function PortfolioPanel({
                                   openQuickTrade(row.holding.tokenAddress, row.holding.symbol, "buy")
                                 }
                                 onSellMax={() =>
-                                  openQuickTrade(row.holding.tokenAddress, row.holding.symbol, "sell")
+                                  openPortfolioSellMax(
+                                    row.holding.tokenAddress,
+                                    row.holding.symbol,
+                                    Number(row.holding.tokenBalance)
+                                  )
                                 }
                               />
                             );
@@ -1445,7 +1511,11 @@ export function PortfolioPanel({
                                       openQuickTrade(position.tokenAddress, position.symbol, "buy")
                                     }
                                     onSellMax={() =>
-                                      openQuickTrade(position.tokenAddress, position.symbol, "sell")
+                                      openPortfolioSellMax(
+                                        position.tokenAddress,
+                                        position.symbol,
+                                        balance
+                                      )
                                     }
                                   />
                                 }

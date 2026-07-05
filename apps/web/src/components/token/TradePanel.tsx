@@ -11,6 +11,7 @@ import { PumpAmountNumpad } from "@/components/token/PumpAmountNumpad";
 import { PumpAmountPresets } from "@/components/token/PumpAmountPresets";
 import { TradeQuickOrderHeader } from "@/components/token/TradeQuickOrderHeader";
 import { TradeConfirmModal } from "@/components/token/TradeConfirmModal";
+import { ModalPortal } from "@/components/ui/ModalPortal";
 import { assertScwReadyForUserOp } from "@/lib/aa/scw-preflight";
 import { estimateKernelUserOpPrefundWei } from "@/lib/aa/estimate-kernel-user-op-prefund";
 import { bufferedGasCostWei } from "@/lib/aa/gas-buffer";
@@ -344,6 +345,10 @@ export function TradePanel({
   onOpenMarket,
   persistTokenMobileTradePrefs = false,
   onQuickSubmitBlocked,
+  confirmOnly = false,
+  onConfirmOnlyClose,
+  overrideTokenBalanceWei,
+  onConfirmOnlyFundingBlocked,
 }: TradePanelProps) {
   const { address, isConnected, chain } = useAccount();
   const { data: gasPrice } = useGasPrice({ chainId: pumpChain.id });
@@ -351,6 +356,9 @@ export function TradePanel({
   const { openDeposit } = useWalletFunding();
   const [tradeConfirmOpen, setTradeConfirmOpen] = useState(false);
   const [tradeConfirmError, setTradeConfirmError] = useState<string | null>(null);
+  const [tradeConfirmLoading, setTradeConfirmLoading] = useState(false);
+  const [confirmOnlyPreparing, setConfirmOnlyPreparing] = useState(confirmOnly);
+  const confirmOnlyOpenedRef = useRef(false);
   const [pendingTrade, setPendingTrade] = useState<{
     side: Side;
     spendLabel: string;
@@ -567,6 +575,8 @@ export function TradePanel({
     chainId: pumpChain.id,
     query: { enabled: Boolean(address) },
   });
+
+  const resolvedTokenBalanceWei = overrideTokenBalanceWei ?? tokenBalance;
 
   const { data: allowance, refetch: refetchAllowance } = useReadContract({
     address: tokenAddress,
@@ -897,11 +907,11 @@ export function TradePanel({
   }, [isConnected, bnbBalance, buyGasReserveWei, gasPrice, pendingReservationTick]);
 
   const maxSellTokenWei = useMemo(() => {
-    if (!isConnected || tokenBalance === undefined || tokenBalance === 0n) {
+    if (!isConnected || resolvedTokenBalanceWei === undefined || resolvedTokenBalanceWei === 0n) {
       return 0n;
     }
-    return effectiveTokenBalance(pendingLedgerRef.current, tokenBalance);
-  }, [isConnected, tokenBalance, pendingReservationTick]);
+    return effectiveTokenBalance(pendingLedgerRef.current, resolvedTokenBalanceWei);
+  }, [isConnected, resolvedTokenBalanceWei, pendingReservationTick]);
 
   const maxSellEthOutWei = useMemo(() => {
     if (!isConnected || maxSellTokenWei === 0n || !bondingCurve || protocolFeeBps === undefined) {
@@ -914,7 +924,7 @@ export function TradePanel({
   const insufficientSellTokenBalance =
     side === "sell" &&
     isConnected &&
-    tokenBalance !== undefined &&
+    resolvedTokenBalanceWei !== undefined &&
     sellTokenWei > 0n &&
     sellTokenWei > maxSellTokenWei;
 
@@ -973,7 +983,7 @@ export function TradePanel({
   const balancePending =
     side === "buy"
       ? isConnected && bnbBalance === undefined && buyCostWei > 0n
-      : isConnected && tokenBalance === undefined && sellTokenWei > 0n;
+      : isConnected && resolvedTokenBalanceWei === undefined && sellTokenWei > 0n;
 
   const sellUsesPermit = side === "sell" && needsApproval && sellSupportsPermit;
   const allowanceSufficient =
@@ -987,8 +997,8 @@ export function TradePanel({
         ? effectiveNativeBalance(pendingLedgerRef.current, bnbBalance.value)
         : undefined;
     const availableToken =
-      tokenBalance !== undefined
-        ? effectiveTokenBalance(pendingLedgerRef.current, tokenBalance)
+      resolvedTokenBalanceWei !== undefined
+        ? effectiveTokenBalance(pendingLedgerRef.current, resolvedTokenBalanceWei)
         : undefined;
     const liveMaxBuy =
       availableNative !== undefined
@@ -1007,7 +1017,7 @@ export function TradePanel({
       buyCostWei,
       sellTokenWei,
       bnbBalance: bnbBalance?.value,
-      tokenBalance,
+      tokenBalance: resolvedTokenBalanceWei,
       availableBnbBalance: availableNative,
       availableTokenBalance: availableToken,
       buyGasReserveWei,
@@ -1032,7 +1042,7 @@ export function TradePanel({
     buyCostWei,
     sellTokenWei,
     bnbBalance?.value,
-    tokenBalance,
+    resolvedTokenBalanceWei,
     buyGasReserveWei,
     sellGasReserveWei,
     legacyApproveGasReserveWei,
@@ -1053,13 +1063,13 @@ export function TradePanel({
       return usd != null ? formatUsdReadable(usd) : "…";
     }
 
-    if (tokenBalance === undefined) return "…";
+    if (resolvedTokenBalanceWei === undefined) return "…";
     return `${formatSellAvailTokenBalance(formatUnits(maxSellTokenWei, 18))} ${symbol}`;
   }, [
     isConnected,
     side,
     bnbBalance,
-    tokenBalance,
+    resolvedTokenBalanceWei,
     maxBuySpendWei,
     maxSellTokenWei,
     bnbUsd,
@@ -1741,9 +1751,9 @@ export function TradePanel({
       pendingId
     );
     const tokenWei =
-      tradeSide === "sell" && tokenBalance !== undefined
-        ? availableTokenExcluding(pendingLedgerRef.current, tokenBalance, pendingId)
-        : tokenBalance;
+      tradeSide === "sell" && resolvedTokenBalanceWei !== undefined
+        ? availableTokenExcluding(pendingLedgerRef.current, resolvedTokenBalanceWei, pendingId)
+        : resolvedTokenBalanceWei;
 
     await hardValidateInstantTrade({
       scwAddress: address,
@@ -2040,6 +2050,54 @@ export function TradePanel({
     });
   }
 
+  function openMaxTradeConfirmModal(): void {
+    if (side === "buy") {
+      const gate = evaluateLiveInstantGate();
+      if (!gate.ok || gate.side !== "buy") {
+        if (!gate.ok) notifyInstantGateFailure(gate);
+        else toast.error("Order not sent", instantTradeGateMessage("quote_zero"));
+        onConfirmOnlyClose?.();
+        return;
+      }
+
+      const tradeReferrer = resolvePendingTradeReferrer();
+      setPendingTrade({
+        side: "buy",
+        spendLabel: `${formatBnbReadable(Number(formatEther(buyCostWei)))} ${NATIVE_SYMBOL}`,
+        receiveLabel: `${formatTokenCompact(formatUnits(gate.tokenOut, 18))} ${symbol}`,
+        buyParams: {
+          tokenAddress,
+          minTokenOut: minOutWithSlippage(gate.tokenOut),
+          value: gate.submitValue,
+          referrer: tradeReferrer ?? undefined,
+        },
+      });
+    } else {
+      if (!sellQuoteOut) {
+        toast.error("Quote unavailable", "Could not quote sell. Try a smaller amount.");
+        onConfirmOnlyClose?.();
+        return;
+      }
+
+      const tradeReferrer = resolvePendingTradeReferrer();
+      setPendingTrade({
+        side: "sell",
+        spendLabel: `${formatSellAvailTokenBalance(formatUnits(sellTokenWei, 18))} ${symbol}`,
+        receiveLabel: `${formatBnbReadable(Number(formatEther(sellQuoteOut)))} ${NATIVE_SYMBOL}`,
+        sellParams: {
+          tokenAddress,
+          amountWei: sellTokenWei,
+          minBnbOut: minOutWithSlippage(sellQuoteOut),
+          referrer: tradeReferrer ?? undefined,
+        },
+        usePermit: needsApproval && sellSupportsPermit,
+      });
+    }
+
+    setConfirmOnlyPreparing(false);
+    setTradeConfirmOpen(true);
+  }
+
   async function buildSellParamsWithPermit(
     base: Omit<SessionSellParams, "permit">,
     usePermit: boolean
@@ -2197,6 +2255,7 @@ export function TradePanel({
   async function confirmPendingTrade(rememberAutoConfirm: boolean) {
     if (!pendingTrade) return;
     setTradeConfirmError(null);
+    setTradeConfirmLoading(true);
     saveTradeAutoConfirm(rememberAutoConfirm);
     tradeTraceStep("ux.confirm_modal.accepted", { side: pendingTrade.side });
     try {
@@ -2214,9 +2273,14 @@ export function TradePanel({
       }
       setTradeConfirmOpen(false);
       setPendingTrade(null);
+      if (confirmOnly) {
+        onConfirmOnlyClose?.();
+      }
     } catch (err) {
       setTradeConfirmError(formatTradeError(err));
       failTradeTrace("ux.confirm_modal.failed", err);
+    } finally {
+      setTradeConfirmLoading(false);
     }
   }
 
@@ -2239,7 +2303,7 @@ export function TradePanel({
   const walletDataPending =
     isConnected &&
     hasSubmitAmount &&
-    (side === "buy" ? bnbBalance === undefined : tokenBalance === undefined);
+    (side === "buy" ? bnbBalance === undefined : resolvedTokenBalanceWei === undefined);
 
   const tradeSubmitPending =
     hasSubmitAmount && isConnected && !wrongChain && (walletDataPending || gasEstimatePending);
@@ -2298,6 +2362,96 @@ export function TradePanel({
     protocolFeeBps,
     showDepositCta,
     showInsufficientTokenBalance,
+  ]);
+
+  useEffect(() => {
+    if (!confirmOnly) return;
+
+    if (!isConnected) {
+      openConnectModal?.();
+      setConfirmOnlyPreparing(false);
+      onConfirmOnlyClose?.();
+      return;
+    }
+
+    if (confirmOnlyOpenedRef.current) return;
+
+    if (wrongChain) {
+      confirmOnlyOpenedRef.current = true;
+      setConfirmOnlyPreparing(false);
+      toast.error("Wrong network", "Switch to Base Sepolia to trade.");
+      onConfirmOnlyClose?.();
+      return;
+    }
+
+    if (paused) {
+      confirmOnlyOpenedRef.current = true;
+      setConfirmOnlyPreparing(false);
+      toast.error("Trading paused", "This bonding curve is not accepting trades.");
+      onConfirmOnlyClose?.();
+      return;
+    }
+
+    if (tradeSubmitPending || balancePending) return;
+    if (!bondingCurve || protocolFeeBps === undefined) return;
+
+    if (side === "buy") {
+      if (maxBuySpendWei === 0n || buyCostWei === 0n) {
+        if (showDepositCta || maxBuySpendWei === 0n) {
+          confirmOnlyOpenedRef.current = true;
+          setConfirmOnlyPreparing(false);
+          onConfirmOnlyFundingBlocked?.();
+          onConfirmOnlyClose?.();
+        }
+        return;
+      }
+    } else if (maxSellTokenWei === 0n || sellTokenWei === 0n || !sellQuoteOut) {
+      if (showInsufficientTokenBalance || showDepositCta || maxSellTokenWei === 0n) {
+        confirmOnlyOpenedRef.current = true;
+        setConfirmOnlyPreparing(false);
+        onConfirmOnlyFundingBlocked?.();
+        onConfirmOnlyClose?.();
+      }
+      return;
+    }
+
+    const gate = evaluateLiveInstantGate();
+    if (!gate.ok) {
+      if (isTransientInstantGateReason(gate.reason)) return;
+      confirmOnlyOpenedRef.current = true;
+      setConfirmOnlyPreparing(false);
+      if (isQuickSubmitFundingBlock(gate.reason)) {
+        onConfirmOnlyFundingBlocked?.();
+        onConfirmOnlyClose?.();
+        return;
+      }
+      notifyInstantGateFailure(gate);
+      onConfirmOnlyClose?.();
+      return;
+    }
+
+    confirmOnlyOpenedRef.current = true;
+    openMaxTradeConfirmModal();
+  }, [
+    confirmOnly,
+    isConnected,
+    wrongChain,
+    paused,
+    tradeSubmitPending,
+    balancePending,
+    bondingCurve,
+    protocolFeeBps,
+    side,
+    maxBuySpendWei,
+    buyCostWei,
+    maxSellTokenWei,
+    sellTokenWei,
+    sellQuoteOut,
+    showDepositCta,
+    showInsufficientTokenBalance,
+    openConnectModal,
+    onConfirmOnlyClose,
+    onConfirmOnlyFundingBlocked,
   ]);
 
   const submitActionLabel = (() => {
@@ -2411,6 +2565,52 @@ export function TradePanel({
     if (sliderPct === 25 || sliderPct === 50 || sliderPct === 75) return sliderPct;
     return null;
   })();
+
+  if (confirmOnly) {
+    return (
+      <>
+        {confirmOnlyPreparing ? (
+          <ModalPortal open>
+            <>
+              <button
+                type="button"
+                className="modal-backdrop modal-backdrop-dismiss z-[120] cursor-default"
+                aria-label="Close"
+                onClick={() => onConfirmOnlyClose?.()}
+              />
+              <div
+                className="modal-sheet-host z-[121] items-center p-4"
+                role="dialog"
+                aria-modal="true"
+                aria-busy="true"
+                aria-label="Preparing trade quote"
+              >
+                <div className="modal-panel max-w-md rounded-xl p-5">
+                  <p className="text-body-sm text-pump-muted">Preparing quote…</p>
+                </div>
+              </div>
+            </>
+          </ModalPortal>
+        ) : null}
+        <TradeConfirmModal
+          open={tradeConfirmOpen}
+          side={pendingTrade?.side ?? side}
+          symbol={symbol}
+          spendLabel={pendingTrade?.spendLabel ?? ""}
+          receiveLabel={pendingTrade?.receiveLabel ?? ""}
+          loading={tradeConfirmLoading}
+          error={tradeConfirmError}
+          onClose={() => {
+            setTradeConfirmOpen(false);
+            setTradeConfirmError(null);
+            setPendingTrade(null);
+            onConfirmOnlyClose?.();
+          }}
+          onConfirm={(remember) => void confirmPendingTrade(remember)}
+        />
+      </>
+    );
+  }
 
   return (
     <section
@@ -2798,7 +2998,7 @@ export function TradePanel({
         symbol={symbol}
         spendLabel={pendingTrade?.spendLabel ?? ""}
         receiveLabel={pendingTrade?.receiveLabel ?? ""}
-        loading={false}
+        loading={tradeConfirmLoading}
         error={tradeConfirmError}
         onClose={() => {
           setTradeConfirmOpen(false);
