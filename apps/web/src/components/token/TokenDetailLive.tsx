@@ -802,16 +802,16 @@ export function TokenDetailLive({
   }, []);
 
   const clearQuickTradeRun = useCallback(() => {
+    quickTradeDispatchedKeyRef.current = null;
     setQuickTradeRun(null);
   }, []);
 
   const handleQuickTradeRunnerSubmitted = useCallback(
     (payload: TradeSubmittedPayload) => {
       quickTradeDispatchedKeyRef.current = quickTradeRun?.key ?? null;
-      clearQuickTradeRun();
       handleTradeSubmitted(payload);
     },
-    [quickTradeRun, clearQuickTradeRun, handleTradeSubmitted]
+    [quickTradeRun, handleTradeSubmitted]
   );
 
   const executeQuickTrade = useCallback(
@@ -857,7 +857,7 @@ export function TokenDetailLive({
     const timer = window.setTimeout(() => {
       setQuickTradeRun((current) => {
         if (current?.key !== key) return current;
-        if (quickTradeDispatchedKeyRef.current === key) return null;
+        if (quickTradeDispatchedKeyRef.current === key) return current;
         setTradePrefill({ ...prefill, autoSubmit: false });
         setTradeSheetOpen(true);
         return null;
