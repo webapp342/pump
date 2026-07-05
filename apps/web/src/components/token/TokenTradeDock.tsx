@@ -8,6 +8,7 @@ import {
   TOKEN_MOBILE_TRADE_CHANGE_EVENT,
   type TokenMobileTradePrefs,
 } from "@/lib/token-mobile-trade-prefs";
+import { PumpIcon, faChevronDown } from "@/lib/icons";
 
 type TokenTradeDockProps = {
   disabled?: boolean;
@@ -79,6 +80,7 @@ export function TokenTradeDock({
             <span className="token-trade-dock-pill__amount-value financial-value">
               {orderValueLabel}
             </span>
+            <PumpIcon icon={faChevronDown} className="token-trade-dock-pill__amount-chevron" aria-hidden />
           </button>
 
           <button
