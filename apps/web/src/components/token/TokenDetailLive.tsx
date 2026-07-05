@@ -12,7 +12,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createPublicClient, http } from "viem";
-import { useReadContract } from "wagmi";
+import { useReadContract, useAccount } from "wagmi";
 import type { TokenHolderSnapshot, TokenDetail, TradeItem } from "@/lib/db/launchpad";
 import {
   bondingCurveManagerAbi,
@@ -54,6 +54,12 @@ import { TokenMobileHero } from "@/components/token/TokenMobileHero";
 import { TokenTradeDock } from "@/components/token/TokenTradeDock";
 import { TokenMobileMarketSheet } from "@/components/token/TokenMobileMarketSheet";
 import {
+  buildTokenMobileQuickTradePrefill,
+  buildTokenMobileTradeEditPrefill,
+  readTokenMobileTradeSide,
+  writeTokenMobileTradeSide,
+} from "@/lib/token-mobile-trade-prefs";
+import {
   parseTradePrefillFromSearchParams,
   type TradePrefillConfig,
 } from "@/lib/token-trade-prefill";
@@ -89,6 +95,7 @@ import {
   wsPayloadToTradeItem,
   type TokenTradeWsPayload,
 } from "@/lib/token-live-delta";
+import { hapticTap } from "@/lib/haptic";
 
 const CHAIN_LIVE_POLL_MS = 2_000;
 const BURST_POLL_MS = 1_500;
@@ -269,10 +276,15 @@ export function TokenDetailLive({
   const [shareOpen, setShareOpen] = useState(false);
   const [mobileMarketOpen, setMobileMarketOpen] = useState(false);
   const [tradeSheetOpen, setTradeSheetOpen] = useState(false);
+  const [quickTradeRun, setQuickTradeRun] = useState<{
+    key: string;
+    prefill: TradePrefillConfig;
+  } | null>(null);
   const [, setAgeTick] = useState(0);
   const tradePrefillCapturedRef = useRef(false);
   const searchParams = useSearchParams();
   const router = useRouter();
+  const { isConnected } = useAccount();
   const { bnbUsd } = useBnbUsdPrice();
   const { expanded, sidebarWidth, toggleExpanded, gridStyle } = useTokenSidebarWidth();
   const sidebarDensity: TokenSidebarDensity = expanded ? "full" : "compact";
@@ -787,10 +799,75 @@ export function TokenDetailLive({
     setTradePrefill(null);
   }, []);
 
-  const openMobileTrade = useCallback((side: "buy" | "sell") => {
-    setTradePrefill({ side });
-    setTradeSheetOpen(true);
+  const clearQuickTradeRun = useCallback(() => {
+    setQuickTradeRun(null);
   }, []);
+
+  const executeQuickTrade = useCallback(
+    (side: "buy" | "sell") => {
+      hapticTap();
+      writeTokenMobileTradeSide(side);
+      if (tradeLocked) {
+        setTradePrefill(buildTokenMobileTradeEditPrefill(side));
+        setTradeSheetOpen(true);
+        return;
+      }
+      if (!isConnected) {
+        setTradePrefill(buildTokenMobileTradeEditPrefill(side));
+        setTradeSheetOpen(true);
+        return;
+      }
+      setQuickTradeRun({
+        key: `${side}-${Date.now()}`,
+        prefill: buildTokenMobileQuickTradePrefill(side),
+      });
+    },
+    [isConnected, tradeLocked]
+  );
+
+  const openMobileTradeEdit = useCallback(() => {
+    if (tradeLocked) return;
+    hapticTap(6);
+    setTradePrefill(buildTokenMobileTradeEditPrefill());
+    setTradeSheetOpen(true);
+  }, [tradeLocked]);
+
+  const handleQuickSubmitBlocked = useCallback(() => {
+    const side = quickTradeRun?.prefill.side ?? readTokenMobileTradeSide();
+    clearQuickTradeRun();
+    setTradePrefill(buildTokenMobileTradeEditPrefill(side));
+    setTradeSheetOpen(true);
+  }, [quickTradeRun, clearQuickTradeRun]);
+
+  useEffect(() => {
+    if (!quickTradeRun) return;
+    const { key, prefill } = quickTradeRun;
+    const timer = window.setTimeout(() => {
+      setQuickTradeRun((current) => {
+        if (current?.key !== key) return current;
+        setTradePrefill({ ...prefill, autoSubmit: false });
+        setTradeSheetOpen(true);
+        return null;
+      });
+    }, 5000);
+    return () => window.clearTimeout(timer);
+  }, [quickTradeRun]);
+
+  const handleQuickTradeRunnerConfirmed = useCallback(
+    async (payload: TradeConfirmedPayload) => {
+      clearQuickTradeRun();
+      await handleTradeConfirmed(payload);
+    },
+    [clearQuickTradeRun, handleTradeConfirmed]
+  );
+
+  const handleQuickTradeOptimisticRollback = useCallback(
+    (payload: { pendingId: string }) => {
+      clearQuickTradeRun();
+      handleTradeOptimisticRollback(payload);
+    },
+    [clearQuickTradeRun, handleTradeOptimisticRollback]
+  );
 
   const handleMobileTradeConfirmed = useCallback(
     async (payload: TradeConfirmedPayload) => {
@@ -1055,9 +1132,33 @@ export function TokenDetailLive({
 
       <TokenTradeDock
         disabled={tradeLocked}
-        onBuy={() => openMobileTrade("buy")}
-        onSell={() => openMobileTrade("sell")}
+        pendingSide={quickTradeRun?.prefill.side ?? null}
+        onBuy={() => executeQuickTrade("buy")}
+        onSell={() => executeQuickTrade("sell")}
+        onEditAmount={openMobileTradeEdit}
       />
+
+      {quickTradeRun ? (
+        <div className="token-quick-trade-runner" aria-hidden>
+          <TradePanel
+            key={quickTradeRun.key}
+            embedded
+            compact
+            tokenAddress={streamAddress as `0x${string}`}
+            symbol={liveToken.symbol}
+            status={liveToken.status}
+            reserveBnb={liveToken.reserveBnb}
+            tokenSold={liveToken.tokenSold ?? "0"}
+            prefill={quickTradeRun.prefill}
+            onTradeOptimistic={handleTradeOptimistic}
+            onTradeOptimisticRollback={handleQuickTradeOptimisticRollback}
+            onTradeSubmitted={handleTradeSubmitted}
+            onTradeConfirmed={handleQuickTradeRunnerConfirmed}
+            chainCurveSnapshot={tradeCurveSnapshot}
+            onQuickSubmitBlocked={handleQuickSubmitBlocked}
+          />
+        </div>
+      ) : null}
 
       <CreatorProfileModal
         open={profileAddress != null}
@@ -1097,6 +1198,7 @@ export function TokenDetailLive({
         priceUsd={priceUsd}
         logoUrl={liveToken.logoUrl}
         onOpenMarket={openMarketFromTradeSheet}
+        persistTokenMobileTradePrefs
       />
 
     </div>

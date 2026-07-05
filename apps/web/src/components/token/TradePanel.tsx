@@ -31,6 +31,7 @@ import {
   type InstantTradeGateSell,
 } from "@/lib/trade-optimistic-guard";
 import { loadTradeAutoConfirm, saveTradeAutoConfirm } from "@/lib/trade-confirm-storage";
+import { persistTokenMobileTradeFromPanel } from "@/lib/token-mobile-trade-prefs";
 import { instantTradeGateMessage, isTransientInstantGateReason } from "@/lib/trade-instant-copy";
 import { invalidateScwBalance } from "@/lib/scw-balance-sync";
 import {
@@ -175,6 +176,10 @@ type TradePanelProps = {
   logoUrl?: string | null;
   /** Opens explore-coins sheet from Quick Order header. */
   onOpenMarket?: () => void;
+  /** Persist buy USD / sell % to token mobile dock prefs when sheet unmounts. */
+  persistTokenMobileTradePrefs?: boolean;
+  /** Mobile dock auto-submit failed — open trade sheet instead of toast/connect flows. */
+  onQuickSubmitBlocked?: () => void;
 };
 
 function parseBnbAmount(value: string): bigint {
@@ -330,6 +335,8 @@ export function TradePanel({
   sheetOnClose,
   logoUrl = null,
   onOpenMarket,
+  persistTokenMobileTradePrefs = false,
+  onQuickSubmitBlocked,
 }: TradePanelProps) {
   const { address, isConnected, chain } = useAccount();
   const { data: gasPrice } = useGasPrice({ chainId: pumpChain.id });
@@ -360,6 +367,7 @@ export function TradePanel({
   const buyMaxPendingRef = useRef(false);
   const autoSubmitPendingRef = useRef(false);
   const autoSubmitTriggeredRef = useRef(false);
+  const quickSubmitFallbackUsedRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const [amountInputHint, setAmountInputHint] = useState<string | null>(null);
   const [assetMenuOpen, setAssetMenuOpen] = useState(false);
@@ -413,8 +421,24 @@ export function TradePanel({
     }
     if (prefill.autoSubmit) {
       autoSubmitPendingRef.current = true;
+      quickSubmitFallbackUsedRef.current = false;
     }
   }, [prefill]);
+
+  function openQuickSubmitSheetInstead(): boolean {
+    if (
+      !onQuickSubmitBlocked ||
+      !prefill?.autoSubmit ||
+      quickSubmitFallbackUsedRef.current
+    ) {
+      return false;
+    }
+    quickSubmitFallbackUsedRef.current = true;
+    autoSubmitPendingRef.current = false;
+    autoSubmitTriggeredRef.current = true;
+    onQuickSubmitBlocked();
+    return true;
+  }
 
   const buyTargetTokenWei = useMemo(() => {
     if (side !== "buy" || buyInputMode !== "token") return 0n;
@@ -1187,6 +1211,46 @@ export function TradePanel({
     bnbUsd,
   ]);
 
+  const orderValueUsdNumber = useMemo(() => {
+    if (!hasTradeAmount) return null;
+    if (side === "buy") {
+      if (estimatedOut <= 0n) return null;
+      if (estimatedQuotePriceUsd != null) {
+        return Number(formatUnits(estimatedOut, 18)) * estimatedQuotePriceUsd;
+      }
+      return amountUsdValue;
+    }
+    if (amountUsdValue != null) return amountUsdValue;
+    if (estimatedOut > 0n && bnbUsd != null) {
+      return bnbToUsd(Number(formatEther(estimatedOut)), bnbUsd);
+    }
+    return null;
+  }, [
+    hasTradeAmount,
+    side,
+    estimatedOut,
+    estimatedQuotePriceUsd,
+    amountUsdValue,
+    bnbUsd,
+  ]);
+
+  const mobileTradePersistRef = useRef({
+    hasTradeAmount: false,
+    orderValueUsd: null as number | null,
+  });
+
+  mobileTradePersistRef.current = {
+    hasTradeAmount,
+    orderValueUsd: orderValueUsdNumber,
+  };
+
+  useEffect(() => {
+    if (!persistTokenMobileTradePrefs) return;
+    return () => {
+      persistTokenMobileTradeFromPanel(mobileTradePersistRef.current);
+    };
+  }, [persistTokenMobileTradePrefs]);
+
   useEffect(() => {
     if (side !== "buy" || linkedBuySpendWei == null || maxBuySpendWei === 0n) return;
     if (linkedBuySpendWei <= maxBuySpendWei) return;
@@ -1828,6 +1892,7 @@ export function TradePanel({
       return;
     }
     tradeTraceStep("ux.optimistic.skipped", { reason: gate.reason });
+    if (openQuickSubmitSheetInstead()) return;
     toast.error("Order not sent", instantTradeGateMessage(gate.reason));
   }
 
@@ -2005,26 +2070,32 @@ export function TradePanel({
     tradeTraceStep("ux.submit_trade.start", { side });
 
     if (!isConnected || !address) {
+      if (openQuickSubmitSheetInstead()) return;
       openConnectModal?.();
       return;
     }
     if (showDepositCta) {
+      if (openQuickSubmitSheetInstead()) return;
       openDeposit();
       return;
     }
     if (wrongChain) {
+      if (openQuickSubmitSheetInstead()) return;
       toast.error("Wrong network", "Switch to Base Sepolia to trade.");
       return;
     }
     if (paused) {
+      if (openQuickSubmitSheetInstead()) return;
       toast.error("Trading paused", "This bonding curve is not accepting trades.");
       return;
     }
     if (side === "buy" && buyCostWei === 0n) {
+      if (openQuickSubmitSheetInstead()) return;
       setAmountInputHint("Please input amount");
       return;
     }
     if (side === "sell" && sellTokenWei === 0n) {
+      if (openQuickSubmitSheetInstead()) return;
       setAmountInputHint("Please input amount");
       return;
     }
@@ -2032,6 +2103,7 @@ export function TradePanel({
     try {
       if (side === "buy") {
         if (!bondingCurve || protocolFeeBps === undefined) {
+          if (openQuickSubmitSheetInstead()) return;
           toast.error("Quote unavailable", instantTradeGateMessage("curve_unavailable"));
           return;
         }
@@ -2040,6 +2112,8 @@ export function TradePanel({
         if (!gate.ok || gate.side !== "buy") {
           if (!gate.ok) {
             notifyInstantGateFailure(gate);
+          } else if (openQuickSubmitSheetInstead()) {
+            return;
           } else {
             toast.error("Order not sent", instantTradeGateMessage("quote_zero"));
           }
@@ -2062,6 +2136,7 @@ export function TradePanel({
       }
 
       if (!sellQuoteOut) {
+        if (openQuickSubmitSheetInstead()) return;
         toast.error("Quote unavailable", "Could not quote sell. Try a smaller amount.");
         return;
       }
@@ -2188,6 +2263,57 @@ export function TradePanel({
     !needsBuyEthFunding &&
     !instantTradeGate.ok &&
     !isTransientInstantGateReason(instantTradeGate.reason);
+
+  useEffect(() => {
+    if (!onQuickSubmitBlocked || !autoSubmitPendingRef.current || autoSubmitTriggeredRef.current) {
+      return;
+    }
+    if (quickSubmitFallbackUsedRef.current || balancePending) return;
+
+    if (!isConnected) {
+      openQuickSubmitSheetInstead();
+      return;
+    }
+    if (
+      wrongChain ||
+      paused ||
+      showDepositCta ||
+      showInsufficientTokenBalance ||
+      buyGateBlocked
+    ) {
+      openQuickSubmitSheetInstead();
+      return;
+    }
+    if (side === "buy" && buyCostWei === 0n) {
+      openQuickSubmitSheetInstead();
+      return;
+    }
+    if (side === "sell" && (sellTokenWei === 0n || !sellQuoteOut)) {
+      openQuickSubmitSheetInstead();
+      return;
+    }
+    if (side === "buy" && bondingCurve && protocolFeeBps !== undefined) {
+      const gate = evaluateLiveInstantGate();
+      if (!gate.ok && !isTransientInstantGateReason(gate.reason)) {
+        openQuickSubmitSheetInstead();
+      }
+    }
+  }, [
+    onQuickSubmitBlocked,
+    balancePending,
+    isConnected,
+    wrongChain,
+    paused,
+    showDepositCta,
+    showInsufficientTokenBalance,
+    buyGateBlocked,
+    side,
+    buyCostWei,
+    sellTokenWei,
+    sellQuoteOut,
+    bondingCurve,
+    protocolFeeBps,
+  ]);
 
   const submitActionLabel = (() => {
     if (!isConnected) return "Sign in";

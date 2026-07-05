@@ -91,10 +91,7 @@ export function TokenDetailBodySkeleton() {
 
       <div className="token-trade-dock token-trade-dock--footer lg:hidden" aria-hidden>
         <div className="token-trade-dock-inner">
-          <div className="token-trade-dock-actions">
-            <Skeleton className="h-8 w-full rounded-md" />
-            <Skeleton className="h-8 w-full rounded-md" />
-          </div>
+          <Skeleton className="h-[var(--mobile-trade-dock-bar-height)] w-full rounded-full" />
         </div>
       </div>
     </div>

@@ -35,6 +35,8 @@ type TradeSheetProps = {
   onOpenMarket?: () => void;
   /** Bottom sheet on mobile token page; centered modal for portfolio quick actions. */
   presentation?: "sheet" | "modal";
+  /** Save token-page dock buy/sell prefs when the mobile sheet closes. */
+  persistTokenMobileTradePrefs?: boolean;
 };
 
 export function TradeSheet({
@@ -56,6 +58,7 @@ export function TradeSheet({
   logoUrl = null,
   onOpenMarket,
   presentation = "sheet",
+  persistTokenMobileTradePrefs = false,
 }: TradeSheetProps) {
   const [mounted, setMounted] = useState(false);
   const isModal = presentation === "modal";
@@ -144,6 +147,7 @@ export function TradeSheet({
               logoUrl={logoUrl}
               onOpenMarket={onOpenMarket}
               sheetOnClose={isModal ? undefined : handleClose}
+              persistTokenMobileTradePrefs={persistTokenMobileTradePrefs}
             />
           </div>
         </div>

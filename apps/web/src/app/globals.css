@@ -2542,13 +2542,7 @@ code,
       border-bottom: 1px solid rgb(var(--pump-border) / 0.22);
     }
 
-    .token-trade-dock--inline .token-trade-dock-actions {
-      gap: 0.5rem;
-    }
-
-    .token-trade-dock--inline .token-trade-dock-btn {
-      margin-top: 0;
-      margin-bottom: 0;
+    .token-trade-dock--inline .token-trade-dock-pill {
       min-height: 2rem;
     }
 
@@ -2562,14 +2556,6 @@ code,
       padding-top: 0.375rem;
       padding-bottom: 0.375rem;
       padding-inline: 0.75rem;
-    }
-
-    .token-trade-dock--footer .token-trade-dock-actions {
-      gap: 0.5rem;
-    }
-
-    .token-trade-dock--footer .token-trade-dock-btn {
-      min-height: var(--mobile-trade-dock-bar-height);
     }
 
     .app-shell--token .bottom-nav-host {
@@ -5005,6 +4991,122 @@ code,
     padding-block: var(--mobile-trade-dock-pad-block);
   }
 
+  .token-trade-dock-pill {
+    position: relative;
+    display: grid;
+    width: 100%;
+    min-height: var(--mobile-trade-dock-bar-height);
+    grid-template-columns: 1fr 1fr;
+    align-items: stretch;
+  }
+
+  .token-trade-dock-pill__side {
+    display: inline-flex;
+    min-height: var(--mobile-trade-dock-bar-height);
+    align-items: center;
+    justify-content: center;
+    padding: 0 0.5rem;
+    border: none;
+    font-size: var(--text-trade-cta);
+    font-weight: var(--weight-trade-cta);
+    line-height: 1.1;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    cursor: pointer;
+    transition:
+      background 0.15s ease,
+      opacity 0.15s ease,
+      transform 0.1s ease;
+  }
+
+  .token-trade-dock-pill__side:active:not(:disabled) {
+    transform: scale(0.985);
+  }
+
+  .token-trade-dock-pill__side--buy {
+    padding-right: 2.75rem;
+    border-radius: 9999px 0 0 9999px;
+    background: rgb(var(--pump-success));
+    color: rgb(var(--pump-accent-foreground));
+  }
+
+  .token-trade-dock-pill__side--buy:hover:not(:disabled) {
+    background: rgb(var(--pump-success) / 0.9);
+  }
+
+  .token-trade-dock-pill__side--sell {
+    padding-left: 2.75rem;
+    border-radius: 0 9999px 9999px 0;
+    background: rgb(var(--pump-danger));
+    color: rgb(var(--pump-accent-foreground));
+  }
+
+  .token-trade-dock-pill__side--sell:hover:not(:disabled) {
+    background: rgb(var(--pump-danger) / 0.9);
+  }
+
+  .token-trade-dock-pill__amount {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    z-index: 2;
+    display: inline-flex;
+    min-width: 4.75rem;
+    max-width: calc(100% - 5.5rem);
+    min-height: 2.125rem;
+    align-items: center;
+    justify-content: center;
+    padding: 0 0.875rem;
+    border: 1px solid rgb(var(--pump-border) / 0.55);
+    border-radius: 9999px;
+    background: rgb(var(--pump-bg));
+    color: rgb(var(--pump-text));
+    box-shadow: 0 0 0 1px rgb(var(--pump-bg));
+    cursor: pointer;
+    transform: translate(-50%, -50%);
+    transition:
+      border-color 0.15s ease,
+      background 0.15s ease,
+      transform 0.1s ease;
+  }
+
+  .token-trade-dock-pill__amount:active:not(:disabled) {
+    transform: translate(-50%, -50%) scale(0.985);
+  }
+
+  .token-trade-dock-pill__amount-value {
+    overflow: hidden;
+    font-size: var(--text-body-sm);
+    font-weight: var(--weight-emphasis);
+    line-height: 1;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .token-trade-dock-pill__side--pending,
+  .token-trade-dock-pill__side--pending:hover:not(:disabled) {
+    opacity: 0.72;
+    cursor: wait;
+  }
+
+  .token-trade-dock-pill__side:disabled,
+  .token-trade-dock-pill__amount:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+  }
+
+  .token-quick-trade-runner {
+    position: fixed;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    pointer-events: none;
+  }
+
+  /* Legacy split dock — skeleton only */
   .token-trade-dock-actions {
     display: grid;
     width: 100%;
@@ -11492,6 +11594,21 @@ code,
   .toolbar-sheet-row__action:focus-visible {
     outline: 2px solid rgb(var(--pump-accent) / 0.65);
     outline-offset: 2px;
+  }
+
+  .token-trade-dock-pill__side--buy:focus-visible {
+    outline: 2px solid rgb(var(--pump-success) / 0.65);
+    outline-offset: 2px;
+  }
+
+  .token-trade-dock-pill__side--sell:focus-visible,
+  .token-trade-dock-pill__amount:focus-visible {
+    outline: 2px solid rgb(var(--pump-danger) / 0.65);
+    outline-offset: 2px;
+  }
+
+  .token-trade-dock-pill__amount:focus-visible {
+    outline-color: rgb(var(--pump-accent) / 0.65);
   }
 
   .token-trade-dock-buy:focus-visible {
