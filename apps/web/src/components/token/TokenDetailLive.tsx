@@ -49,6 +49,7 @@ import {
 import { contracts, explorerAddressUrl, pumpChain, shortAddress } from "@/config/chain";
 import { copyToClipboard } from "@/lib/copy-to-clipboard";
 import { TradePanel, type TradeConfirmedPayload, type TradeOptimisticPayload, type TradeSubmittedPayload } from "@/components/token/TradePanel";
+import { QuickTradeConfirmModal } from "@/components/token/QuickTradeConfirmModal";
 import { TradeSheet } from "@/components/token/TradeSheet";
 import { TokenMobileHero } from "@/components/token/TokenMobileHero";
 import { TokenTradeDock } from "@/components/token/TokenTradeDock";
@@ -311,11 +312,21 @@ export function TokenDetailLive({
     if (!parsed) return;
 
     tradePrefillCapturedRef.current = true;
+    router.replace(`/token/${tokenAddress}`, { scroll: false });
+
+    if (parsed.autoSubmit) {
+      const { autoSubmit: _auto, ...prefill } = parsed;
+      setQuickTradeRun({
+        key: `url-${prefill.side}-${Date.now()}`,
+        prefill,
+      });
+      return;
+    }
+
     setTradePrefill(parsed);
     if (typeof window !== "undefined" && window.matchMedia("(max-width: 1023px)").matches) {
       setTradeSheetOpen(true);
     }
-    router.replace(`/token/${tokenAddress}`, { scroll: false });
   }, [searchParams, router, tokenAddress]);
 
   const trades = useMemo(
@@ -1152,25 +1163,24 @@ export function TokenDetailLive({
       />
 
       {quickTradeRun ? (
-        <div className="token-quick-trade-runner" aria-hidden>
-          <TradePanel
-            key={quickTradeRun.key}
-            embedded
-            compact
-            tokenAddress={streamAddress as `0x${string}`}
-            symbol={liveToken.symbol}
-            status={liveToken.status}
-            reserveBnb={liveToken.reserveBnb}
-            tokenSold={liveToken.tokenSold ?? "0"}
-            prefill={quickTradeRun.prefill}
-            onTradeOptimistic={handleTradeOptimistic}
-            onTradeOptimisticRollback={handleQuickTradeOptimisticRollback}
-            onTradeSubmitted={handleQuickTradeRunnerSubmitted}
-            onTradeConfirmed={handleQuickTradeRunnerConfirmed}
-            chainCurveSnapshot={tradeCurveSnapshot}
-            onQuickSubmitBlocked={handleQuickSubmitBlocked}
-          />
-        </div>
+        <QuickTradeConfirmModal
+          key={quickTradeRun.key}
+          target={{
+            tokenAddress: streamAddress as `0x${string}`,
+            symbol: liveToken.symbol,
+            prefill: quickTradeRun.prefill,
+          }}
+          status={liveToken.status}
+          reserveBnb={liveToken.reserveBnb}
+          tokenSold={liveToken.tokenSold ?? "0"}
+          chainCurveSnapshot={tradeCurveSnapshot}
+          onClose={clearQuickTradeRun}
+          onFundingBlocked={handleQuickSubmitBlocked}
+          onTradeOptimistic={handleTradeOptimistic}
+          onTradeOptimisticRollback={handleQuickTradeOptimisticRollback}
+          onTradeSubmitted={handleQuickTradeRunnerSubmitted}
+          onTradeConfirmed={handleQuickTradeRunnerConfirmed}
+        />
       ) : null}
 
       <CreatorProfileModal

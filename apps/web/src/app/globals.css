@@ -358,6 +358,60 @@ code,
     -webkit-overflow-scrolling: touch;
   }
 
+  .trade-confirm-modal {
+    touch-action: none;
+  }
+
+  .trade-confirm-row {
+    display: grid;
+    grid-template-columns: minmax(0, 4.5rem) minmax(0, 1fr);
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .trade-confirm-row__label {
+    align-self: center;
+  }
+
+  .trade-confirm-row__content {
+    min-width: 0;
+  }
+
+  .trade-confirm-row__value {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.625rem;
+    min-width: 0;
+  }
+
+  .trade-confirm-row__asset {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    min-width: 0;
+  }
+
+  .trade-confirm-row__asset .financial-value {
+    white-space: nowrap;
+  }
+
+  .trade-confirm-row__usd {
+    flex-shrink: 0;
+    min-width: 2.75rem;
+    text-align: right;
+  }
+
+  .trade-confirm-row__logo {
+    flex-shrink: 0;
+  }
+
+  @media (min-width: 640px) {
+    .trade-confirm-modal {
+      touch-action: auto;
+    }
+  }
+
   .modal-backdrop-shell {
     display: flex;
     align-items: flex-end;

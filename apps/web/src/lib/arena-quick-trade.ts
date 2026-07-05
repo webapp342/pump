@@ -108,13 +108,11 @@ export function buildArenaQuickTradePrefill(
       side: "buy",
       buyMode: "usd",
       amount: prefs.buyAmountUsd,
-      autoSubmit: true,
     };
   }
   return {
     side: "sell",
     sellPercent: prefs.sellPercent,
-    autoSubmit: true,
   };
 }
 

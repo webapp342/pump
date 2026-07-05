@@ -10,7 +10,7 @@ import { useWalletFunding } from "@/components/wallet/WalletFundingProvider";
 import { PumpAmountNumpad } from "@/components/token/PumpAmountNumpad";
 import { PumpAmountPresets } from "@/components/token/PumpAmountPresets";
 import { TradeQuickOrderHeader } from "@/components/token/TradeQuickOrderHeader";
-import { TradeConfirmModal } from "@/components/token/TradeConfirmModal";
+import { TradeConfirmModal, type TradeConfirmAssetLine } from "@/components/token/TradeConfirmModal";
 import { ModalPortal } from "@/components/ui/ModalPortal";
 import { assertScwReadyForUserOp } from "@/lib/aa/scw-preflight";
 import { estimateKernelUserOpPrefundWei } from "@/lib/aa/estimate-kernel-user-op-prefund";
@@ -361,8 +361,8 @@ export function TradePanel({
   const confirmOnlyOpenedRef = useRef(false);
   const [pendingTrade, setPendingTrade] = useState<{
     side: Side;
-    spendLabel: string;
-    receiveLabel: string;
+    spend: TradeConfirmAssetLine;
+    receive: TradeConfirmAssetLine;
     buyParams?: SessionBuyParams;
     sellParams?: Omit<SessionSellParams, "permit">;
     usePermit?: boolean;
@@ -2050,6 +2050,34 @@ export function TradePanel({
     });
   }
 
+  function buildNativeConfirmLine(
+    amountBnb: number,
+    bnbUsdRate: number | null | undefined
+  ): TradeConfirmAssetLine {
+    return {
+      amount: formatBnbReadable(amountBnb),
+      symbol: NATIVE_SYMBOL,
+      asset: "native",
+      usd: bnbToUsd(amountBnb, bnbUsdRate),
+    };
+  }
+
+  function buildTokenConfirmLine(
+    tokenWei: bigint,
+    tokenSym: string,
+    addr: `0x${string}`,
+    priceUsd: number | null | undefined
+  ): TradeConfirmAssetLine {
+    const qty = Number(formatUnits(tokenWei, 18));
+    return {
+      amount: formatTokenCompact(formatUnits(tokenWei, 18)),
+      symbol: tokenSym,
+      asset: "token",
+      tokenAddress: addr,
+      usd: priceUsd != null && Number.isFinite(priceUsd) ? qty * priceUsd : null,
+    };
+  }
+
   function openMaxTradeConfirmModal(): void {
     if (side === "buy") {
       const gate = evaluateLiveInstantGate();
@@ -2063,8 +2091,13 @@ export function TradePanel({
       const tradeReferrer = resolvePendingTradeReferrer();
       setPendingTrade({
         side: "buy",
-        spendLabel: `${formatBnbReadable(Number(formatEther(buyCostWei)))} ${NATIVE_SYMBOL}`,
-        receiveLabel: `${formatTokenCompact(formatUnits(gate.tokenOut, 18))} ${symbol}`,
+        spend: buildNativeConfirmLine(Number(formatEther(buyCostWei)), bnbUsd),
+        receive: buildTokenConfirmLine(
+          gate.tokenOut,
+          symbol,
+          tokenAddress,
+          estimatedQuotePriceUsd
+        ),
         buyParams: {
           tokenAddress,
           minTokenOut: minOutWithSlippage(gate.tokenOut),
@@ -2082,8 +2115,13 @@ export function TradePanel({
       const tradeReferrer = resolvePendingTradeReferrer();
       setPendingTrade({
         side: "sell",
-        spendLabel: `${formatSellAvailTokenBalance(formatUnits(sellTokenWei, 18))} ${symbol}`,
-        receiveLabel: `${formatBnbReadable(Number(formatEther(sellQuoteOut)))} ${NATIVE_SYMBOL}`,
+        spend: buildTokenConfirmLine(
+          sellTokenWei,
+          symbol,
+          tokenAddress,
+          estimatedQuotePriceUsd
+        ),
+        receive: buildNativeConfirmLine(Number(formatEther(sellQuoteOut)), bnbUsd),
         sellParams: {
           tokenAddress,
           amountWei: sellTokenWei,
@@ -2595,9 +2633,23 @@ export function TradePanel({
         <TradeConfirmModal
           open={tradeConfirmOpen}
           side={pendingTrade?.side ?? side}
-          symbol={symbol}
-          spendLabel={pendingTrade?.spendLabel ?? ""}
-          receiveLabel={pendingTrade?.receiveLabel ?? ""}
+          spend={
+            pendingTrade?.spend ?? {
+              amount: "—",
+              symbol: NATIVE_SYMBOL,
+              asset: "native",
+              usd: null,
+            }
+          }
+          receive={
+            pendingTrade?.receive ?? {
+              amount: "—",
+              symbol,
+              asset: "token",
+              tokenAddress,
+              usd: null,
+            }
+          }
           loading={tradeConfirmLoading}
           error={tradeConfirmError}
           onClose={() => {
@@ -2995,9 +3047,23 @@ export function TradePanel({
       <TradeConfirmModal
         open={tradeConfirmOpen}
         side={pendingTrade?.side ?? side}
-        symbol={symbol}
-        spendLabel={pendingTrade?.spendLabel ?? ""}
-        receiveLabel={pendingTrade?.receiveLabel ?? ""}
+        spend={
+          pendingTrade?.spend ?? {
+            amount: "—",
+            symbol: NATIVE_SYMBOL,
+            asset: "native",
+            usd: null,
+          }
+        }
+        receive={
+          pendingTrade?.receive ?? {
+            amount: "—",
+            symbol,
+            asset: "token",
+            tokenAddress,
+            usd: null,
+          }
+        }
         loading={tradeConfirmLoading}
         error={tradeConfirmError}
         onClose={() => {

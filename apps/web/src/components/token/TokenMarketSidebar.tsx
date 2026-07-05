@@ -31,6 +31,10 @@ type TokenMarketSidebarProps = {
   showQuickTrade?: boolean;
   /** Mobile token picker sheet — swipe trade, search-row quick-trade bar, unified chrome. */
   mobileSheet?: boolean;
+  /** When set, parent owns TradeSheet (survives sheet close). */
+  onOpenQuickTrade?: (tokenAddress: string, symbol: string, side: "buy" | "sell") => void;
+  /** Set false when parent renders quickTradeSheet. */
+  renderQuickTradeSheet?: boolean;
 };
 
 export function TokenMarketSidebar({
@@ -45,9 +49,13 @@ export function TokenMarketSidebar({
   searchInputRef,
   showQuickTrade = false,
   mobileSheet = false,
+  onOpenQuickTrade,
+  renderQuickTradeSheet = true,
 }: TokenMarketSidebarProps) {
   const listRef = useRef<HTMLDivElement>(null);
-  const { openQuickTrade, quickTradeSheet } = useArenaQuickTrade();
+  const internalQuickTrade = useArenaQuickTrade();
+  const openQuickTrade = onOpenQuickTrade ?? internalQuickTrade.openQuickTrade;
+  const quickTradeSheet = renderQuickTradeSheet ? internalQuickTrade.quickTradeSheet : null;
   const effectiveQuickTrade = showQuickTrade || mobileSheet;
   const swipeHintLabels = quickTradeSwipeLabels();
 

@@ -1,6 +1,9 @@
 "use client";
 
-import { TradePanel } from "@/components/token/TradePanel";
+import {
+  QuickTradeConfirmModal,
+  type QuickTradeConfirmTarget,
+} from "@/components/token/QuickTradeConfirmModal";
 
 export type PortfolioMaxTradeTarget = {
   tokenAddress: `0x${string}`;
@@ -16,6 +19,18 @@ type PortfolioMaxTradeConfirmModalProps = {
   onConfirmed: () => void;
 };
 
+function toConfirmTarget(target: PortfolioMaxTradeTarget): QuickTradeConfirmTarget {
+  return {
+    tokenAddress: target.tokenAddress,
+    symbol: target.symbol,
+    tokenBalanceWei: target.tokenBalanceWei,
+    prefill: {
+      side: target.side,
+      ...(target.side === "buy" ? { buyMax: true } : { sellMax: true }),
+    },
+  };
+}
+
 /** Portfolio Buy max / Sell max — confirm-only flow (no full trade sheet). */
 export function PortfolioMaxTradeConfirmModal({
   target,
@@ -24,24 +39,11 @@ export function PortfolioMaxTradeConfirmModal({
   onConfirmed,
 }: PortfolioMaxTradeConfirmModalProps) {
   return (
-    <TradePanel
-      confirmOnly
-      tokenAddress={target.tokenAddress}
-      symbol={target.symbol}
-      status=""
-      prefill={{
-        side: target.side,
-        ...(target.side === "buy" ? { buyMax: true } : { sellMax: true }),
-      }}
-      overrideTokenBalanceWei={
-        target.side === "sell" ? target.tokenBalanceWei : undefined
-      }
-      onConfirmOnlyClose={onClose}
-      onConfirmOnlyFundingBlocked={onFundingBlocked}
-      onTradeConfirmed={() => {
-        onConfirmed();
-        window.dispatchEvent(new Event("pump:activity"));
-      }}
+    <QuickTradeConfirmModal
+      target={toConfirmTarget(target)}
+      onClose={onClose}
+      onFundingBlocked={onFundingBlocked}
+      onConfirmed={onConfirmed}
     />
   );
 }

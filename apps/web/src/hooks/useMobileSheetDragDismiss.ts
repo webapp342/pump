@@ -3,6 +3,8 @@
 import { useCallback, useRef, type PointerEvent as ReactPointerEvent, type RefObject } from "react";
 
 const DISMISS_THRESHOLD_PX = 72;
+const DRAG_LOCK_SELECTOR =
+  "button, input, label, a, textarea, select, [data-sheet-drag-lock]";
 
 type DragState = {
   active: boolean;
@@ -11,18 +13,28 @@ type DragState = {
   pointerId: number | null;
 };
 
+type DragHandlerProps = {
+  onPointerDown: (event: ReactPointerEvent<HTMLElement>) => void;
+  onPointerMove: (event: ReactPointerEvent<HTMLElement>) => void;
+  onPointerUp: (event: ReactPointerEvent<HTMLElement>) => void;
+  onPointerCancel: (event: ReactPointerEvent<HTMLElement>) => void;
+};
+
 type UseMobileSheetDragDismissResult = {
   panelRef: RefObject<HTMLDivElement | null>;
   dragOffsetY: number;
   isDragging: boolean;
-  gripProps: {
-    onPointerDown: (event: ReactPointerEvent<HTMLElement>) => void;
-    onPointerMove: (event: ReactPointerEvent<HTMLElement>) => void;
-    onPointerUp: (event: ReactPointerEvent<HTMLElement>) => void;
-    onPointerCancel: (event: ReactPointerEvent<HTMLElement>) => void;
-  };
+  /** Drag handle only (legacy). */
+  gripProps: DragHandlerProps;
+  /** Full-panel swipe-to-dismiss — skips buttons/inputs. */
+  sheetDragProps: DragHandlerProps;
   resetDrag: () => void;
 };
+
+function isDragLockedTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof Element)) return false;
+  return Boolean(target.closest(DRAG_LOCK_SELECTOR));
+}
 
 export function useMobileSheetDragDismiss(onDismiss: () => void): UseMobileSheetDragDismissResult {
   const panelRef = useRef<HTMLDivElement>(null);
@@ -80,18 +92,21 @@ export function useMobileSheetDragDismiss(onDismiss: () => void): UseMobileSheet
     [applyOffset, onDismiss, resetDrag]
   );
 
-  const onPointerDown = useCallback((event: ReactPointerEvent<HTMLElement>) => {
-    if (event.button !== 0) return;
-    dragRef.current = {
-      active: true,
-      startY: event.clientY,
-      offsetY: 0,
-      pointerId: event.pointerId,
-    };
-    draggingRef.current = true;
-    event.currentTarget.setPointerCapture(event.pointerId);
-    applyOffset(0, false);
-  }, [applyOffset]);
+  const onPointerDown = useCallback(
+    (event: ReactPointerEvent<HTMLElement>) => {
+      if (event.button !== 0) return;
+      dragRef.current = {
+        active: true,
+        startY: event.clientY,
+        offsetY: 0,
+        pointerId: event.pointerId,
+      };
+      draggingRef.current = true;
+      event.currentTarget.setPointerCapture(event.pointerId);
+      applyOffset(0, false);
+    },
+    [applyOffset]
+  );
 
   const onPointerMove = useCallback(
     (event: ReactPointerEvent<HTMLElement>) => {
@@ -106,12 +121,28 @@ export function useMobileSheetDragDismiss(onDismiss: () => void): UseMobileSheet
     [applyOffset]
   );
 
+  const dragHandlers: DragHandlerProps = {
+    onPointerDown,
+    onPointerMove,
+    onPointerUp: finishDrag,
+    onPointerCancel: finishDrag,
+  };
+
+  const onPanelPointerDown = useCallback(
+    (event: ReactPointerEvent<HTMLElement>) => {
+      if (isDragLockedTarget(event.target)) return;
+      onPointerDown(event);
+    },
+    [onPointerDown]
+  );
+
   return {
     panelRef,
     dragOffsetY: offsetRef.current,
     isDragging: draggingRef.current,
-    gripProps: {
-      onPointerDown,
+    gripProps: dragHandlers,
+    sheetDragProps: {
+      onPointerDown: onPanelPointerDown,
       onPointerMove,
       onPointerUp: finishDrag,
       onPointerCancel: finishDrag,

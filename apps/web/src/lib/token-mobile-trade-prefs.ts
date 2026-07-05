@@ -104,7 +104,6 @@ export function buildTokenMobileQuickTradePrefill(
     side,
     buyMode: "usd",
     amount: prefs.orderValueUsd,
-    autoSubmit: true,
   };
 }
 

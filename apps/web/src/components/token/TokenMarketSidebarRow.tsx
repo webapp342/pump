@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import type { TokenListItem } from "@/lib/db/launchpad";
@@ -74,6 +74,7 @@ export function TokenMarketSidebarRow({
 }: TokenMarketSidebarRowProps) {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const suppressNavUntilRef = useRef(0);
   const [swipeLabels, setSwipeLabels] = useState(quickTradeSwipeLabels);
   const addressKey = token.address.toLowerCase();
   const isActive = activeTokenAddress?.toLowerCase() === addressKey;
@@ -96,8 +97,8 @@ export function TokenMarketSidebarRow({
   }, [enableSwipeTrade, syncSwipeLabels]);
 
   const runQuickTrade = (side: "buy" | "sell") => {
+    suppressNavUntilRef.current = Date.now() + 500;
     onQuickTrade?.(side);
-    onTokenSelect?.();
   };
 
   const prefetchBundle = useCallback(() => {
@@ -110,6 +111,7 @@ export function TokenMarketSidebarRow({
   }, [queryClient, router, token.address, tokenHref]);
 
   const navigateToDetail = useCallback(() => {
+    if (Date.now() < suppressNavUntilRef.current) return;
     seedTokenDetailFromListItem(token);
     onTokenSelect?.();
     router.push(tokenHref);
