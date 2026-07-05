@@ -12,6 +12,7 @@ import { useFavorites } from "@/components/favorites/FavoritesProvider";
 import { ArenaSwipeTradeBar } from "@/components/arena/ArenaSwipeTradeBar";
 import { HubDiscoveryScrollLock } from "@/components/layout/HubDiscoveryScrollLock";
 import { useBnbUsdPrice } from "@/hooks/useBnbUsdPrice";
+import { useArenaQuickTrade } from "@/hooks/useArenaQuickTrade";
 import { bnbToUsd } from "@/lib/format-usd";
 import {
   listTokenPriceUsd,
@@ -172,6 +173,7 @@ export function ArenaListClient({
   initialPayload?: ArenaHomePayload | null;
 }) {
   const queryClient = useQueryClient();
+  const { openQuickTrade, quickTradeSheet } = useArenaQuickTrade();
   const initialBoardKey = initialPayload
     ? boardCacheKey("new", "age", "desc", "")
     : "";
@@ -991,6 +993,7 @@ export function ArenaListClient({
                   mcapFlash={flashes[`${addressKey}:mcap`]}
                   isFavorite={isFavorite(token.address)}
                   onToggleFavorite={toggleFavorite}
+                  onQuickTrade={(side) => openQuickTrade(token.address, token.symbol, side)}
                   compact
                 />
               );
@@ -1008,6 +1011,7 @@ export function ArenaListClient({
           </div>
         ) : null}
       </div>
+      {quickTradeSheet}
     </div>
   );
 }

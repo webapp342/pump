@@ -9,7 +9,6 @@ import { UserDisplayName } from "@/components/user/UserDisplayName";
 import { ArenaBoardRowQuickActions } from "@/components/arena/ArenaBoardRowQuickActions";
 import { resolveLaunchpadLogoUri } from "@/lib/assets";
 import { formatAge, formatCapForBoard } from "@/lib/arena-board-format";
-import { buildArenaQuickTradeHref } from "@/lib/arena-quick-trade";
 import {
   fetchTokenDetailBundleClient,
   tokenDetailQueryKey,
@@ -81,6 +80,7 @@ type ArenaTokenCardProps = {
   mcapFlash?: FlashTone;
   isFavorite: boolean;
   onToggleFavorite: (address: string) => void;
+  onQuickTrade: (side: "buy" | "sell") => void;
   compact?: boolean;
 };
 
@@ -90,6 +90,7 @@ export function ArenaTokenCard({
   mcapFlash,
   isFavorite,
   onToggleFavorite,
+  onQuickTrade,
   compact = false,
 }: ArenaTokenCardProps) {
   const router = useRouter();
@@ -251,11 +252,11 @@ export function ArenaTokenCard({
               layout="card-compact"
               onBuy={() => {
                 closeActions();
-                router.push(buildArenaQuickTradeHref(token.address, "buy"));
+                onQuickTrade("buy");
               }}
               onSell={() => {
                 closeActions();
-                router.push(buildArenaQuickTradeHref(token.address, "sell"));
+                onQuickTrade("sell");
               }}
             />
           </div>

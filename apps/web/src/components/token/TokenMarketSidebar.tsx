@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, type FocusEvent, type Ref } from "react";
 import { useArenaExploreBoard } from "@/hooks/useArenaExploreBoard";
+import { useArenaQuickTrade } from "@/hooks/useArenaQuickTrade";
 import { bnbToUsd } from "@/lib/format-usd";
 import { listTokenPriceUsd } from "@/lib/arena-board-format";
 import { emptyExploreFilterCopy } from "@/lib/arena-explore-board-core";
@@ -46,6 +47,7 @@ export function TokenMarketSidebar({
   mobileSheet = false,
 }: TokenMarketSidebarProps) {
   const listRef = useRef<HTMLDivElement>(null);
+  const { openQuickTrade, quickTradeSheet } = useArenaQuickTrade();
   const effectiveQuickTrade = showQuickTrade || mobileSheet;
   const swipeHintLabels = quickTradeSwipeLabels();
 
@@ -230,6 +232,11 @@ export function TokenMarketSidebar({
                 isFavorite={isFavorite(token.address)}
                 onToggleFavorite={toggleFavorite}
                 onTokenSelect={onTokenSelect}
+                onQuickTrade={
+                  effectiveQuickTrade
+                    ? (side) => openQuickTrade(token.address, token.symbol, side)
+                    : undefined
+                }
                 showRowQuickActions={effectiveQuickTrade && !mobileSheet}
                 enableSwipeTrade={mobileSheet && effectiveQuickTrade}
                 peekSwipeOnMount={mobileSheet && index === 0}
@@ -248,6 +255,7 @@ export function TokenMarketSidebar({
           </div>
         ) : null}
       </div>
+      {quickTradeSheet}
     </section>
   );
 }

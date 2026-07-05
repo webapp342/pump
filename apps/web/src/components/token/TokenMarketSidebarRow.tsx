@@ -2,13 +2,18 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import type { TokenListItem } from "@/lib/db/launchpad";
 import { ArenaBoardRowQuickActions } from "@/components/arena/ArenaBoardRowQuickActions";
 import { FavoriteIcon } from "@/components/icons/FavoriteIcon";
 import { HoldingSwipeRow } from "@/components/portfolio/HoldingSwipeRow";
 import { TokenAvatar } from "@/components/token/TokenAvatar";
-import { TokenDetailLink } from "@/components/token/TokenDetailLink";
-import { seedTokenDetailFromListItem } from "@/lib/token-detail-client";
+import {
+  fetchTokenDetailBundleClient,
+  seedTokenDetailFromListItem,
+  tokenDetailQueryKey,
+} from "@/lib/token-detail-client";
+import { tokenDetailPath } from "@/lib/token-routes";
 import { PctChange } from "@/components/ui/PctChange";
 import { UsdReadablePrice } from "@/components/ui/UsdReadablePrice";
 import { formatUsdReadable } from "@/lib/format-usd";
@@ -18,7 +23,6 @@ import {
 } from "@/lib/arena-board-format";
 import {
   ARENA_QUICK_TRADE_CHANGE_EVENT,
-  buildArenaQuickTradeHref,
   quickTradeSwipeLabels,
 } from "@/lib/arena-quick-trade";
 import { flashText, type FlashTone } from "@/lib/arena-explore-board-core";
@@ -40,6 +44,7 @@ type TokenMarketSidebarRowProps = {
   isFavorite: boolean;
   onToggleFavorite: (address: string) => void;
   onTokenSelect?: () => void;
+  onQuickTrade?: (side: "buy" | "sell") => void;
   /** Desktop sidebar — hover swaps data cell for Buy/Sell (MCAP compact / Last Price full). */
   showRowQuickActions?: boolean;
   /** Mobile sheet — swipe left/right for flash trade (portfolio pattern). */
@@ -62,14 +67,17 @@ export function TokenMarketSidebarRow({
   isFavorite,
   onToggleFavorite,
   onTokenSelect,
+  onQuickTrade,
   showRowQuickActions = false,
   enableSwipeTrade = false,
   peekSwipeOnMount = false,
 }: TokenMarketSidebarRowProps) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [swipeLabels, setSwipeLabels] = useState(quickTradeSwipeLabels);
   const addressKey = token.address.toLowerCase();
   const isActive = activeTokenAddress?.toLowerCase() === addressKey;
+  const tokenHref = tokenDetailPath(token.address);
   const resolvedPriceUsd =
     priceUsd ?? listTokenPriceUsd(token.marketCapBnb, bnbUsd);
   const volLabel = formatUsdReadable(vol24hUsd, { compact: true });
@@ -88,8 +96,30 @@ export function TokenMarketSidebarRow({
   }, [enableSwipeTrade, syncSwipeLabels]);
 
   const runQuickTrade = (side: "buy" | "sell") => {
-    router.push(buildArenaQuickTradeHref(token.address, side));
+    onQuickTrade?.(side);
     onTokenSelect?.();
+  };
+
+  const prefetchBundle = useCallback(() => {
+    router.prefetch(tokenHref);
+    void queryClient.prefetchQuery({
+      queryKey: tokenDetailQueryKey(token.address),
+      queryFn: () => fetchTokenDetailBundleClient(token.address),
+      staleTime: 5_000,
+    });
+  }, [queryClient, router, token.address, tokenHref]);
+
+  const navigateToDetail = useCallback(() => {
+    seedTokenDetailFromListItem(token);
+    onTokenSelect?.();
+    router.push(tokenHref);
+  }, [onTokenSelect, router, token, tokenHref]);
+
+  const handleRowKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    if ((event.target as HTMLElement).closest("button")) return;
+    event.preventDefault();
+    navigateToDetail();
   };
 
   const quickBuy = () => runQuickTrade("buy");
@@ -99,12 +129,13 @@ export function TokenMarketSidebarRow({
   ) : null;
 
   const rowLink = (
-    <TokenDetailLink
-      address={token.address}
-      onClick={() => {
-        seedTokenDetailFromListItem(token);
-        onTokenSelect?.();
-      }}
+    <div
+      role="link"
+      tabIndex={0}
+      onClick={navigateToDetail}
+      onKeyDown={handleRowKeyDown}
+      onMouseEnter={prefetchBundle}
+      onFocus={prefetchBundle}
       className={`token-market-sidebar__row ${rowClass} ${
         isActive ? "token-market-sidebar__row--active" : ""
       }`}
@@ -156,7 +187,15 @@ export function TokenMarketSidebarRow({
           ) : null}
         </div>
         {showRowQuickActions && compact ? (
-          <div className="token-market-sidebar__mcap-actions">{quickActions}</div>
+          <div
+            className="token-market-sidebar__mcap-actions"
+            onClick={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+            }}
+          >
+            {quickActions}
+          </div>
         ) : null}
       </div>
 
@@ -174,11 +213,19 @@ export function TokenMarketSidebarRow({
             />
           </div>
           {showRowQuickActions ? (
-            <div className="token-market-sidebar__price-actions">{quickActions}</div>
+            <div
+              className="token-market-sidebar__price-actions"
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+              }}
+            >
+              {quickActions}
+            </div>
           ) : null}
         </div>
       ) : null}
-    </TokenDetailLink>
+    </div>
   );
 
   if (!enableSwipeTrade) {

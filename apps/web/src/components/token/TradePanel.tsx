@@ -180,6 +180,13 @@ type TradePanelProps = {
   persistTokenMobileTradePrefs?: boolean;
   /** Mobile dock auto-submit failed — open trade sheet instead of toast/connect flows. */
   onQuickSubmitBlocked?: () => void;
+  /** Portfolio max trade — show confirm modal only (no trade form). */
+  confirmOnly?: boolean;
+  onConfirmOnlyClose?: () => void;
+  /** Portfolio sell max — prefer verified on-chain balance over ERC20 read lag. */
+  overrideTokenBalanceWei?: bigint;
+  /** Portfolio confirm-only — insufficient balance/gas; open full trade sheet. */
+  onConfirmOnlyFundingBlocked?: () => void;
 };
 
 function parseBnbAmount(value: string): bigint {
