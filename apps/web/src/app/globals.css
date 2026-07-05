@@ -2547,7 +2547,7 @@ code,
     }
 
     .token-trade-dock--footer {
-      border-top: 1px solid rgb(var(--pump-border) / 0.28);
+      border-top: 1px solid rgb(var(--pump-border) / 0.22);
       border-bottom: none;
       background: rgb(var(--pump-bg));
       box-shadow: none;
@@ -4954,7 +4954,7 @@ code,
 
   .token-trade-dock {
     z-index: 41;
-    border-top: 1px solid rgb(var(--pump-border) / 0.28);
+    border-top: 1px solid rgb(var(--pump-border) / 0.22);
     background: rgb(var(--pump-bg));
   }
 
@@ -5000,9 +5000,18 @@ code,
     gap: 0.3125rem;
     align-items: stretch;
     padding: 0.1875rem;
-    border: 1px solid rgb(var(--pump-border) / 0.32);
+    border: 1px solid rgb(var(--pump-border) / 0.24);
     border-radius: 9999px;
-    background: rgb(var(--pump-card));
+    background: rgb(var(--pump-bg));
+    box-shadow:
+      inset 0 1px 2px rgb(0 0 0 / 0.16),
+      inset 0 0 0 1px rgb(var(--pump-border) / 0.06);
+  }
+
+  html[data-theme="light"] .token-trade-dock-pill {
+    box-shadow:
+      inset 0 1px 2px rgb(var(--pump-shadow)),
+      inset 0 0 0 1px rgb(var(--pump-border) / 0.12);
   }
 
   .token-trade-dock-pill__side {
@@ -5060,20 +5069,27 @@ code,
     align-items: center;
     justify-content: center;
     padding: 0 0.875rem;
-    border: 1px solid rgb(var(--pump-border) / 0.38);
+    border: 1px solid rgb(var(--pump-border) / 0.28);
     border-radius: 9999px;
-    background: rgb(var(--pump-bg));
+    background: rgb(var(--pump-card));
     color: rgb(var(--pump-text));
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.1);
     cursor: pointer;
     transition:
       border-color 0.15s ease,
       background 0.15s ease,
+      box-shadow 0.15s ease,
       transform 0.1s ease;
   }
 
+  html[data-theme="light"] .token-trade-dock-pill__amount {
+    box-shadow: 0 1px 2px rgb(var(--pump-shadow));
+  }
+
   .token-trade-dock-pill__amount:hover:not(:disabled) {
-    border-color: rgb(var(--pump-border) / 0.55);
+    border-color: rgb(var(--pump-border) / 0.42);
     background: rgb(var(--pump-card-soft));
+    box-shadow: 0 1px 3px rgb(0 0 0 / 0.12);
   }
 
   .token-trade-dock-pill__amount:active:not(:disabled) {

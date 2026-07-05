@@ -302,6 +302,8 @@ export function TokenDetailLive({
   optimisticRef.current = optimisticTrades;
   const optimisticTokenSnapshotRef = useRef<TokenDetail | null>(null);
   const hydratedRef = useRef(false);
+  /** Set when hidden quick-trade UserOp is submitted — prevents 5s fallback sheet. */
+  const quickTradeDispatchedKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (tradePrefillCapturedRef.current) return;
@@ -803,6 +805,15 @@ export function TokenDetailLive({
     setQuickTradeRun(null);
   }, []);
 
+  const handleQuickTradeRunnerSubmitted = useCallback(
+    (payload: TradeSubmittedPayload) => {
+      quickTradeDispatchedKeyRef.current = quickTradeRun?.key ?? null;
+      clearQuickTradeRun();
+      handleTradeSubmitted(payload);
+    },
+    [quickTradeRun, clearQuickTradeRun, handleTradeSubmitted]
+  );
+
   const executeQuickTrade = useCallback(
     (side: "buy" | "sell") => {
       hapticTap();
@@ -817,6 +828,7 @@ export function TokenDetailLive({
         setTradeSheetOpen(true);
         return;
       }
+      quickTradeDispatchedKeyRef.current = null;
       setQuickTradeRun({
         key: `${side}-${Date.now()}`,
         prefill: buildTokenMobileQuickTradePrefill(side),
@@ -845,6 +857,7 @@ export function TokenDetailLive({
     const timer = window.setTimeout(() => {
       setQuickTradeRun((current) => {
         if (current?.key !== key) return current;
+        if (quickTradeDispatchedKeyRef.current === key) return null;
         setTradePrefill({ ...prefill, autoSubmit: false });
         setTradeSheetOpen(true);
         return null;
@@ -1152,7 +1165,7 @@ export function TokenDetailLive({
             prefill={quickTradeRun.prefill}
             onTradeOptimistic={handleTradeOptimistic}
             onTradeOptimisticRollback={handleQuickTradeOptimisticRollback}
-            onTradeSubmitted={handleTradeSubmitted}
+            onTradeSubmitted={handleQuickTradeRunnerSubmitted}
             onTradeConfirmed={handleQuickTradeRunnerConfirmed}
             chainCurveSnapshot={tradeCurveSnapshot}
             onQuickSubmitBlocked={handleQuickSubmitBlocked}
