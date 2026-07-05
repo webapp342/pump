@@ -6,7 +6,18 @@ export function isTransientInstantGateReason(reason: string): boolean {
     reason === "gas_loading" ||
     reason === "balance_pending" ||
     reason === "bnb_unknown" ||
-    reason === "token_unknown"
+    reason === "token_unknown" ||
+    reason === "gas_reserve_unknown"
+  );
+}
+
+/** Mobile dock quick trade — open sheet only when funding blocks the trade. */
+export function isQuickSubmitFundingBlock(reason: string): boolean {
+  return (
+    reason === "insufficient_bnb" ||
+    reason === "insufficient_bnb_gas" ||
+    reason === "insufficient_token" ||
+    reason === "insufficient_gas"
   );
 }
 

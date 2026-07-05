@@ -115,6 +115,28 @@ export async function logoutPumpSession(): Promise<void> {
   });
 }
 
+export async function fetchWalletPrivateKey(): Promise<Hex> {
+  const response = await fetch("/api/auth/me", {
+    method: "GET",
+    cache: "no-store",
+    credentials: "same-origin",
+  });
+
+  const body = (await response.json()) as {
+    data?: { privateKey?: Hex };
+    error?: string;
+  };
+
+  if (!response.ok || !body.data?.privateKey) {
+    if (response.status === 401) {
+      throw new Error("Not authenticated");
+    }
+    throw new Error(body.error ?? "Could not load wallet key.");
+  }
+
+  return body.data.privateKey;
+}
+
 export function pumpDisplayName(
   session: Pick<PumpAccountSession, "authProvider" | "telegramUsername" | "firstName" | "displayName" | "email">
 ): string {

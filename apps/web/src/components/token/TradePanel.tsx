@@ -32,7 +32,7 @@ import {
 } from "@/lib/trade-optimistic-guard";
 import { loadTradeAutoConfirm, saveTradeAutoConfirm } from "@/lib/trade-confirm-storage";
 import { persistTokenMobileTradeFromPanel } from "@/lib/token-mobile-trade-prefs";
-import { instantTradeGateMessage, isTransientInstantGateReason } from "@/lib/trade-instant-copy";
+import { instantTradeGateMessage, isQuickSubmitFundingBlock, isTransientInstantGateReason } from "@/lib/trade-instant-copy";
 import { invalidateScwBalance } from "@/lib/scw-balance-sync";
 import {
   isTradeOrderSettled,
@@ -1892,7 +1892,10 @@ export function TradePanel({
       return;
     }
     tradeTraceStep("ux.optimistic.skipped", { reason: gate.reason });
-    if (openQuickSubmitSheetInstead()) return;
+    if (prefill?.autoSubmit && isQuickSubmitFundingBlock(gate.reason)) {
+      openQuickSubmitSheetInstead();
+      return;
+    }
     toast.error("Order not sent", instantTradeGateMessage(gate.reason));
   }
 
@@ -2070,7 +2073,6 @@ export function TradePanel({
     tradeTraceStep("ux.submit_trade.start", { side });
 
     if (!isConnected || !address) {
-      if (openQuickSubmitSheetInstead()) return;
       openConnectModal?.();
       return;
     }
@@ -2080,22 +2082,22 @@ export function TradePanel({
       return;
     }
     if (wrongChain) {
-      if (openQuickSubmitSheetInstead()) return;
       toast.error("Wrong network", "Switch to Base Sepolia to trade.");
       return;
     }
     if (paused) {
-      if (openQuickSubmitSheetInstead()) return;
       toast.error("Trading paused", "This bonding curve is not accepting trades.");
       return;
     }
-    if (side === "buy" && buyCostWei === 0n) {
+    if (side === "sell" && showInsufficientTokenBalance) {
       if (openQuickSubmitSheetInstead()) return;
+      return;
+    }
+    if (side === "buy" && buyCostWei === 0n) {
       setAmountInputHint("Please input amount");
       return;
     }
     if (side === "sell" && sellTokenWei === 0n) {
-      if (openQuickSubmitSheetInstead()) return;
       setAmountInputHint("Please input amount");
       return;
     }
@@ -2103,7 +2105,6 @@ export function TradePanel({
     try {
       if (side === "buy") {
         if (!bondingCurve || protocolFeeBps === undefined) {
-          if (openQuickSubmitSheetInstead()) return;
           toast.error("Quote unavailable", instantTradeGateMessage("curve_unavailable"));
           return;
         }
@@ -2112,8 +2113,6 @@ export function TradePanel({
         if (!gate.ok || gate.side !== "buy") {
           if (!gate.ok) {
             notifyInstantGateFailure(gate);
-          } else if (openQuickSubmitSheetInstead()) {
-            return;
           } else {
             toast.error("Order not sent", instantTradeGateMessage("quote_zero"));
           }
@@ -2136,7 +2135,6 @@ export function TradePanel({
       }
 
       if (!sellQuoteOut) {
-        if (openQuickSubmitSheetInstead()) return;
         toast.error("Quote unavailable", "Could not quote sell. Try a smaller amount.");
         return;
       }
@@ -2228,21 +2226,6 @@ export function TradePanel({
     void submitTrade();
   }
 
-  useEffect(() => {
-    if (!autoSubmitPendingRef.current || autoSubmitTriggeredRef.current) return;
-    if (balancePending) return;
-    if (side === "sell") {
-      if (sellTokenWei === 0n || !sellQuoteOut) return;
-    } else if (side === "buy") {
-      if (buyCostWei === 0n) return;
-    } else {
-      return;
-    }
-    autoSubmitPendingRef.current = false;
-    autoSubmitTriggeredRef.current = true;
-    void submitTrade();
-  }, [side, sellTokenWei, sellQuoteOut, buyCostWei, balancePending]);
-
   const gasEstimatePending =
     isConnected && !wrongChain && hasSubmitAmount && userOpPrefundWei === 0n;
 
@@ -2265,54 +2248,49 @@ export function TradePanel({
     !isTransientInstantGateReason(instantTradeGate.reason);
 
   useEffect(() => {
-    if (!onQuickSubmitBlocked || !autoSubmitPendingRef.current || autoSubmitTriggeredRef.current) {
+    if (!autoSubmitPendingRef.current || autoSubmitTriggeredRef.current) return;
+    if (balancePending || tradeSubmitPending) return;
+    if (!bondingCurve || protocolFeeBps === undefined) return;
+    if (side === "sell") {
+      if (sellTokenWei === 0n || !sellQuoteOut) return;
+    } else if (side === "buy") {
+      if (buyCostWei === 0n) return;
+    } else {
       return;
     }
-    if (quickSubmitFallbackUsedRef.current || balancePending) return;
 
-    if (!isConnected) {
+    if (showDepositCta || showInsufficientTokenBalance) {
+      autoSubmitPendingRef.current = false;
+      autoSubmitTriggeredRef.current = true;
       openQuickSubmitSheetInstead();
       return;
     }
-    if (
-      wrongChain ||
-      paused ||
-      showDepositCta ||
-      showInsufficientTokenBalance ||
-      buyGateBlocked
-    ) {
-      openQuickSubmitSheetInstead();
-      return;
-    }
-    if (side === "buy" && buyCostWei === 0n) {
-      openQuickSubmitSheetInstead();
-      return;
-    }
-    if (side === "sell" && (sellTokenWei === 0n || !sellQuoteOut)) {
-      openQuickSubmitSheetInstead();
-      return;
-    }
-    if (side === "buy" && bondingCurve && protocolFeeBps !== undefined) {
-      const gate = evaluateLiveInstantGate();
-      if (!gate.ok && !isTransientInstantGateReason(gate.reason)) {
+
+    const gate = evaluateLiveInstantGate();
+    if (!gate.ok) {
+      if (isTransientInstantGateReason(gate.reason)) return;
+      if (isQuickSubmitFundingBlock(gate.reason)) {
+        autoSubmitPendingRef.current = false;
+        autoSubmitTriggeredRef.current = true;
         openQuickSubmitSheetInstead();
       }
+      return;
     }
+
+    autoSubmitPendingRef.current = false;
+    autoSubmitTriggeredRef.current = true;
+    void submitTrade();
   }, [
-    onQuickSubmitBlocked,
-    balancePending,
-    isConnected,
-    wrongChain,
-    paused,
-    showDepositCta,
-    showInsufficientTokenBalance,
-    buyGateBlocked,
     side,
-    buyCostWei,
     sellTokenWei,
     sellQuoteOut,
+    buyCostWei,
+    balancePending,
+    tradeSubmitPending,
     bondingCurve,
     protocolFeeBps,
+    showDepositCta,
+    showInsufficientTokenBalance,
   ]);
 
   const submitActionLabel = (() => {

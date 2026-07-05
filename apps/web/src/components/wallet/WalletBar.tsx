@@ -9,6 +9,7 @@ import { usePumpWallet } from "@/components/wallet/PumpWalletProvider";
 import { isPumpAuthConfigured } from "@/lib/auth-config";
 import { PumpIcon, faChevronDown } from "@/lib/icons";
 import { NATIVE_SYMBOL } from "@/config/chain";
+import { ExportWalletModal } from "@/components/wallet/ExportWalletModal";
 import { AccountSheet } from "@/components/wallet/AccountSheet";
 import { WalletAccountPanel } from "@/components/wallet/WalletAccountPanel";
 
@@ -43,6 +44,7 @@ function ConnectedWalletButton({ address }: { address: string }) {
   const { logout } = usePumpWallet();
   const isMobileAccountEntry = useMobileAccountEntry();
   const [open, setOpen] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
   const [showBnb, setShowBnb] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const { totalUsd, nativeBnb } = useWalletTotalBalance(address as `0x${string}`);
@@ -59,6 +61,7 @@ function ConnectedWalletButton({ address }: { address: string }) {
     onToggleBalanceUnit: () => setShowBnb((value) => !value),
     onClose: () => setOpen(false),
     onLogout: () => void logout(),
+    onExportWallet: () => setExportOpen(true),
   };
 
   useEffect(() => {
@@ -94,11 +97,13 @@ function ConnectedWalletButton({ address }: { address: string }) {
           )}
         </button>
         <AccountSheet open={open} {...panelProps} />
+        <ExportWalletModal open={exportOpen} onClose={() => setExportOpen(false)} />
       </>
     );
   }
 
   return (
+    <>
     <div className="relative" ref={containerRef}>
       <button
         type="button"
@@ -122,6 +127,8 @@ function ConnectedWalletButton({ address }: { address: string }) {
         </div>
       ) : null}
     </div>
+    <ExportWalletModal open={exportOpen} onClose={() => setExportOpen(false)} />
+    </>
   );
 }
 
