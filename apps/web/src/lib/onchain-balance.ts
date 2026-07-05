@@ -5,20 +5,49 @@ export const ON_CHAIN_BALANCE_EPSILON = 1e-6;
 export function resolveVerifiedTokenBalance(
   indexedBalance: number,
   onChainBalance: number | null | undefined
-): { displayBalance: number; hidden: boolean; verified: boolean } {
+): { displayBalance: number; hidden: boolean; verified: boolean; pending: boolean } {
   if (onChainBalance == null || !Number.isFinite(onChainBalance)) {
+    const hasIndexedHint = indexedBalance > ON_CHAIN_BALANCE_EPSILON;
     return {
-      displayBalance: indexedBalance,
-      hidden: indexedBalance <= ON_CHAIN_BALANCE_EPSILON,
+      displayBalance: 0,
+      hidden: !hasIndexedHint,
       verified: false,
+      pending: hasIndexedHint,
     };
   }
 
   if (onChainBalance <= ON_CHAIN_BALANCE_EPSILON) {
-    return { displayBalance: 0, hidden: true, verified: true };
+    return { displayBalance: 0, hidden: true, verified: true, pending: false };
   }
 
-  return { displayBalance: onChainBalance, hidden: false, verified: true };
+  return { displayBalance: onChainBalance, hidden: false, verified: true, pending: false };
+}
+
+type HoldingsPosition = {
+  tokenAddress: string;
+  tokenBalance: string;
+  lastPriceBnb: string;
+};
+
+/** Sum holdings USD value using on-chain balances; skip pending or hidden rows. */
+export function sumVerifiedHoldingsBnb(
+  positions: HoldingsPosition[],
+  onChainBalances: Record<string, string>
+): number {
+  return positions.reduce((sum, position) => {
+    const indexedBalance = Number(position.tokenBalance);
+    const onChainStr = onChainBalances[position.tokenAddress.toLowerCase()];
+    const onChainBalance = onChainStr != null ? Number(onChainStr) : null;
+    const { displayBalance, hidden, pending } = resolveVerifiedTokenBalance(
+      indexedBalance,
+      onChainBalance
+    );
+    if (hidden || pending) return sum;
+
+    const price = Number(position.lastPriceBnb);
+    if (!Number.isFinite(price)) return sum;
+    return sum + displayBalance * price;
+  }, 0);
 }
 
 /** Scale cost basis when on-chain balance is lower than indexed balance. */
