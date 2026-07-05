@@ -73,6 +73,9 @@ type PriceChartProps = {
   liveOnChainSpotBnb?: number | null;
   /** Fill parent flex slot (token detail fixed viewport). */
   fillContainer?: boolean;
+  /** Controlled USD / MCAP axis — syncs with mobile hero quote when lifted. */
+  currency?: "usd" | "mcap";
+  onCurrencyChange?: (currency: "usd" | "mcap") => void;
 };
 
 const POLL_MS = 4_000;
@@ -246,6 +249,8 @@ export function PriceChart({
   bnbUsd = null,
   liveOnChainSpotBnb = null,
   fillContainer = false,
+  currency: currencyProp,
+  onCurrencyChange,
 }: PriceChartProps) {
   const { theme } = useTheme();
   const [hideTimeAxis, setHideTimeAxis] = useState(isMobileChartViewport);
@@ -262,7 +267,8 @@ export function PriceChart({
   const renderedFingerprintRef = useRef("");
 
   const [timeInterval, setTimeInterval] = useState<CandleInterval>(DEFAULT_CHART_INTERVAL);
-  const [currency, setCurrency] = useState<"usd" | "mcap">("usd");
+  const [internalCurrency, setInternalCurrency] = useState<"usd" | "mcap">("usd");
+  const currency = currencyProp ?? internalCurrency;
   const [seriesState, dispatchSeries] = useReducer(chartSeriesReducer, initialChartSeriesState);
   const [loading, setLoading] = useState(() => !initialCandles?.candles.length);
   const [error, setError] = useState<string | null>(null);
@@ -607,10 +613,16 @@ export function PriceChart({
     prevPriceScaleRef.current = candleUnitScale;
   }, [candleUnitScale]);
 
-  const selectCurrency = useCallback((next: "usd" | "mcap") => {
-    shouldFitViewportRef.current = true;
-    setCurrency(next);
-  }, []);
+  const selectCurrency = useCallback(
+    (next: "usd" | "mcap") => {
+      shouldFitViewportRef.current = true;
+      onCurrencyChange?.(next);
+      if (currencyProp === undefined) {
+        setInternalCurrency(next);
+      }
+    },
+    [currencyProp, onCurrencyChange]
+  );
 
   const scheduleFitViewportRef = useRef(scheduleFitViewport);
   scheduleFitViewportRef.current = scheduleFitViewport;

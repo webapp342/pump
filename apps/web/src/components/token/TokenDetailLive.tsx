@@ -233,6 +233,7 @@ export function TokenDetailLive({
   const [latestWsBonding, setLatestWsBonding] = useState<
     TokenTradeWsPayload["bonding"] | null
   >(null);
+  const [chartCurrency, setChartCurrency] = useState<"usd" | "mcap">("usd");
 
   const streamAddress = contentSynced ? tokenAddress : token.address;
 
@@ -753,6 +754,10 @@ export function TokenDetailLive({
     currentPriceBnb: displayPrice,
     bnbUsd,
     onAddressClick: setProfileAddress,
+    creatorDisplayUsername: liveToken.creatorDisplayUsername,
+    launchTxHash: liveToken.launchTxHash,
+    followerCount: liveToken.creatorFollowerCount,
+    tokenDescription: liveToken.description,
   };
 
   useEffect(() => {
@@ -968,9 +973,9 @@ export function TokenDetailLive({
             <TokenMobileHero
               token={liveToken}
               priceUsd={priceUsd}
+              mcapUsd={fdvUsd}
+              chartCurrency={chartCurrency}
               changePct={changeTone}
-              volume24hLabel={formatToolbarUsdAmount(volume24hUsd)}
-              fdvLabel={formatToolbarUsdAmount(fdvUsd)}
               showSocialLinks={showSocialLinks}
               favorited={favorited}
               tradeLocked={tradeLocked}
@@ -979,7 +984,6 @@ export function TokenDetailLive({
               onOpenMarket={openMobileMarket}
               onToggleFavorite={() => toggleFavorite(streamAddress)}
               onCopyAddress={() => void onCopyAddress()}
-              onOpenCreator={setProfileAddress}
               isRefreshing={isRefreshing}
             />
           </div>
@@ -999,6 +1003,8 @@ export function TokenDetailLive({
                 wsConnected={wsConnected}
                 bnbUsd={bnbUsd}
                 liveOnChainSpotBnb={onChainSpotBnb}
+                currency={chartCurrency}
+                onCurrencyChange={setChartCurrency}
               />
             </div>
 
@@ -1038,14 +1044,12 @@ export function TokenDetailLive({
               followerCount={liveToken.creatorFollowerCount}
               onAddressClick={setProfileAddress}
           />
-          {liveToken.description ? (
-            <section className="panel-surface p-4">
-                <p className="section-label">About</p>
-                <p className="mt-2 text-body-sm leading-relaxed text-pump-muted">
-                  {liveToken.description}
-                </p>
-            </section>
-          ) : null}
+          <section className="panel-surface p-4">
+            <p className="section-label">Description</p>
+            <p className="mt-2 text-body-sm leading-relaxed text-pump-muted">
+              {liveToken.description?.trim() || "No description provided."}
+            </p>
+          </section>
         </aside>
       </div>
 

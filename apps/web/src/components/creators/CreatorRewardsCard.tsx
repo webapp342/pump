@@ -1,12 +1,13 @@
 "use client";
 
 import { useAccount } from "wagmi";
+import type { Address } from "viem";
 import { explorerTxUrl } from "@/config/chain";
 import { UserDisplayName } from "@/components/user/UserDisplayName";
 import { useCreatorFollows } from "@/components/creators/CreatorFollowsProvider";
-import { CREATOR_FEE_SHARE_PCT } from "@/lib/bonding-curve";
-import { PumpIcon, faCoins } from "@/lib/icons";
+import { PumpIcon, faUsers, faWallet } from "@/lib/icons";
 import { UserAvatarForAddress } from "@/components/user/UserAvatarForAddress";
+import { useWalletTotalBalance } from "@/hooks/useWalletTotalBalance";
 
 type CreatorRewardsCardProps = {
   creatorAddress: string;
@@ -14,7 +15,14 @@ type CreatorRewardsCardProps = {
   launchTxHash: string;
   followerCount: number;
   onAddressClick?: (address: string) => void;
+  /** Mobile trade tape About tab — full-bleed bordered body. */
+  layout?: "default" | "tape";
 };
+
+function formatWalletUsdTotal(usd: number): string {
+  if (!Number.isFinite(usd)) return "$0.00";
+  return `$${usd.toFixed(2)}`;
+}
 
 export function CreatorRewardsCard({
   creatorAddress,
@@ -22,18 +30,26 @@ export function CreatorRewardsCard({
   launchTxHash,
   followerCount,
   onAddressClick,
+  layout = "default",
 }: CreatorRewardsCardProps) {
   const { address } = useAccount();
   const { isFollowing, toggleFollow } = useCreatorFollows();
+  const { totalUsd } = useWalletTotalBalance(creatorAddress as Address);
 
   const following = isFollowing(creatorAddress);
   const isSelf = address?.toLowerCase() === creatorAddress.toLowerCase();
   const timelineHref = launchTxHash ? explorerTxUrl(launchTxHash) : undefined;
 
   return (
-    <section className="panel-surface p-4">
-      <div className="flex items-center justify-between gap-3">
-        <p className="section-label">Creator rewards</p>
+    <section
+      className={
+        layout === "tape"
+          ? "creator-rewards-card creator-rewards-card--tape"
+          : "creator-rewards-card"
+      }
+    >
+      <div className="creator-rewards-card__header">
+        <p className="section-label">Coin creator</p>
         {timelineHref ? (
           <a
             href={timelineHref}
@@ -46,52 +62,51 @@ export function CreatorRewardsCard({
         ) : null}
       </div>
 
-      <div className="mt-3 flex items-center gap-3">
-        <button
-          type="button"
-          onClick={() => onAddressClick?.(creatorAddress)}
-          disabled={!onAddressClick}
-          className="flex min-w-0 flex-1 items-center gap-3 text-left transition hover:opacity-90 disabled:cursor-default disabled:hover:opacity-100"
-          aria-label={`View creator profile ${creatorDisplayUsername ?? creatorAddress}`}
-        >
-          <UserAvatarForAddress address={creatorAddress} size={44} />
-          <div className="min-w-0 flex-1">
-            <div className="flex min-w-0 items-center gap-2">
-              <span className="truncate text-body-sm font-semibold financial-value text-pump-text">
+      <div className="creator-rewards-card__body">
+        <div className="creator-rewards-card__row">
+          <button
+            type="button"
+            onClick={() => onAddressClick?.(creatorAddress)}
+            disabled={!onAddressClick}
+            className="creator-rewards-card__identity"
+            aria-label={`View creator profile ${creatorDisplayUsername ?? creatorAddress}`}
+          >
+            <UserAvatarForAddress address={creatorAddress} size={44} />
+            <div className="creator-rewards-card__identity-copy">
+              <span className="creator-rewards-card__name financial-value">
                 {creatorDisplayUsername ?? (
                   <UserDisplayName address={creatorAddress} compact />
                 )}
               </span>
-              <span className="shrink-0 rounded-full bg-pump-accent/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-pump-accent">
-                Creator
-              </span>
-            </div>
-            <div className="mt-0.5 flex items-center gap-1.5 text-caption font-medium text-pump-success">
-              <PumpIcon icon={faCoins} className="h-3.5 w-3.5" />
-              <span>{CREATOR_FEE_SHARE_PCT}%</span>
-              {followerCount > 0 ? (
-                <span className="text-pump-muted">
-                  · {followerCount.toLocaleString()} follower
-                  {followerCount === 1 ? "" : "s"}
+              <div className="creator-rewards-card__meta">
+                <span className="creator-rewards-card__meta-item">
+                  <PumpIcon icon={faWallet} className="creator-rewards-card__meta-icon" aria-hidden />
+                  <span className="financial-value">{formatWalletUsdTotal(totalUsd)}</span>
                 </span>
-              ) : null}
+                <span className="creator-rewards-card__meta-item">
+                  <PumpIcon icon={faUsers} className="creator-rewards-card__meta-icon" aria-hidden />
+                  <span className="financial-value">
+                    {Math.max(0, followerCount).toLocaleString()}
+                  </span>
+                </span>
+              </div>
             </div>
-          </div>
-        </button>
-
-        {!isSelf ? (
-          <button
-            type="button"
-            onClick={() => toggleFollow(creatorAddress)}
-            className={
-              following
-                ? "secondary-button shrink-0 px-4 py-2 text-body-sm font-semibold"
-                : "shrink-0 rounded-md bg-pump-surface/80 px-4 py-2 text-body-sm font-semibold text-pump-text ring-1 ring-pump-border/30 transition hover:bg-pump-surface"
-            }
-          >
-            {following ? "Following" : "Follow"}
           </button>
-        ) : null}
+
+          {!isSelf ? (
+            <button
+              type="button"
+              onClick={() => toggleFollow(creatorAddress)}
+              className={
+                following
+                  ? "secondary-button creator-rewards-card__follow shrink-0"
+                  : "creator-rewards-card__follow shrink-0 rounded-md bg-pump-surface/80 px-4 py-2 text-body-sm font-semibold text-pump-text ring-1 ring-pump-border/30 transition hover:bg-pump-surface"
+              }
+            >
+              {following ? "Following" : "Follow"}
+            </button>
+          ) : null}
+        </div>
       </div>
     </section>
   );

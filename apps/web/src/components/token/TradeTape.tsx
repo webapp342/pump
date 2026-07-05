@@ -26,8 +26,9 @@ import {
 import { useLiveTradeAnimations } from "@/hooks/useLiveTradeAnimations";
 import { useInfiniteScrollSentinel } from "@/hooks/useInfiniteScrollSentinel";
 import { useUserDisplayNames } from "@/hooks/useUserDisplayNames";
+import { CreatorRewardsCard } from "@/components/creators/CreatorRewardsCard";
 
-type ActivityTab = "holders" | "trades";
+type ActivityTab = "holders" | "trades" | "social" | "about";
 
 export type TradeTapeTab = ActivityTab;
 
@@ -46,6 +47,18 @@ type PagedMeta = {
 };
 
 const activityTableScrollClass = "token-tape-table-wrap";
+
+const DESKTOP_TAPE_TABS: ReadonlyArray<{ id: ActivityTab; label: string }> = [
+  { id: "trades", label: "Trades" },
+  { id: "holders", label: "Holders" },
+];
+
+const MOBILE_TAPE_TABS: ReadonlyArray<{ id: ActivityTab; label: string }> = [
+  { id: "trades", label: "Trades" },
+  { id: "holders", label: "Holders" },
+  { id: "social", label: "Social" },
+  { id: "about", label: "About" },
+];
 
 function formatTradeClockTime(iso: string, mobile = false): string {
   return new Date(iso).toLocaleTimeString(
@@ -287,6 +300,10 @@ export function TradeTape({
   hideTabBar = false,
   mobileStickyHead = false,
   flowLayout = false,
+  creatorDisplayUsername,
+  launchTxHash = "",
+  followerCount = 0,
+  tokenDescription,
 }: {
   tokenAddress: string;
   creatorAddress: string;
@@ -307,6 +324,10 @@ export function TradeTape({
   mobileStickyHead?: boolean;
   /** Mobile stacked feed — expand with content; parent scrolls. */
   flowLayout?: boolean;
+  creatorDisplayUsername?: string;
+  launchTxHash?: string;
+  followerCount?: number;
+  tokenDescription?: string | null;
 }) {
   const creatorKey = creatorAddress.toLowerCase();
   const [internalTab, setInternalTab] = useState<ActivityTab>("trades");
@@ -468,45 +489,64 @@ export function TradeTape({
     void fetchHoldersPage(0, false);
   }, [fetchHoldersPage, holdersRefreshKey]);
 
+  const tapeTabs = mobileStickyHead ? MOBILE_TAPE_TABS : DESKTOP_TAPE_TABS;
+
   return (
     <section
       className={`panel-surface token-trade-tape token-trade-tape--sticky-head overflow-hidden${
         flowLayout ? " token-trade-tape--flow" : ""
-      }`}
+      }${mobileStickyHead ? " token-trade-tape--mobile-tabs" : ""}`}
     >
       {hideTabBar ? null : (
-        <div className="trade-panel-mode-tabs shrink-0" role="tablist" aria-label="Trades and holders">
-          <button
-            type="button"
-            role="tab"
-            aria-selected={tab === "trades"}
-            onClick={() => setTab("trades")}
-            className={
-              tab === "trades"
-                ? "trade-panel-mode-tab trade-panel-mode-tab--active"
-                : "trade-panel-mode-tab"
-            }
-          >
-            Trades
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={tab === "holders"}
-            onClick={() => setTab("holders")}
-            className={
-              tab === "holders"
-                ? "trade-panel-mode-tab trade-panel-mode-tab--active"
-                : "trade-panel-mode-tab"
-            }
-          >
-            Holders
-          </button>
+        <div
+          className={
+            mobileStickyHead
+              ? "trade-panel-mode-tabs trade-panel-mode-tabs--scroll shrink-0"
+              : "trade-panel-mode-tabs shrink-0"
+          }
+          role="tablist"
+          aria-label={mobileStickyHead ? "Token activity" : "Trades and holders"}
+        >
+          {tapeTabs.map(({ id, label }) => (
+            <button
+              key={id}
+              type="button"
+              role="tab"
+              aria-selected={tab === id}
+              onClick={() => setTab(id)}
+              className={
+                tab === id
+                  ? "trade-panel-mode-tab trade-panel-mode-tab--active"
+                  : "trade-panel-mode-tab"
+              }
+            >
+              {label}
+            </button>
+          ))}
         </div>
       )}
 
       <div className="token-trade-tape__scroll">
-        {tab === "holders" ? (
+        {tab === "social" ? (
+          <div className="token-tape-social-panel" aria-label="Social" />
+        ) : tab === "about" ? (
+          <div className="token-tape-about-panel">
+            <CreatorRewardsCard
+              creatorAddress={creatorAddress}
+              creatorDisplayUsername={creatorDisplayUsername}
+              launchTxHash={launchTxHash}
+              followerCount={followerCount}
+              onAddressClick={onAddressClick}
+              layout="tape"
+            />
+            <section className="token-tape-about-description">
+              <p className="section-label">Description</p>
+              <p className="token-tape-about-description__copy">
+                {tokenDescription?.trim() || "No description provided."}
+              </p>
+            </section>
+          </div>
+        ) : tab === "holders" ? (
           !holdersReady ? (
             <p className="token-tape-empty">Verifying holders on-chain…</p>
           ) : holderRows.length === 0 ? (
