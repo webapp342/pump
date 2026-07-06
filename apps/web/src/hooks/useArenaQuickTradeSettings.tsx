@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useSyncExternalStore, useState, type RefObject } from "react";
+import { QuickTradeSettingsSheet } from "@/components/arena/QuickTradeSettingsSheet";
 import { dismissHoldingsSwipeHint } from "@/components/portfolio/HoldingSwipeRow";
 import { ModalPortal } from "@/components/ui/ModalPortal";
 import {
@@ -206,24 +207,15 @@ export function useArenaQuickTradeSettings(anchorRef?: RefObject<HTMLElement | n
 
     if (useMobileSheet) {
       return (
-        <ModalPortal open>
-          <div
-            className="modal-backdrop modal-backdrop-shell z-[110]"
-            role="dialog"
-            aria-modal="true"
-            aria-label="Quick trade settings"
-          >
-            <button
-              type="button"
-              className="absolute inset-0 cursor-default"
-              aria-label="Close quick trade settings"
-              onClick={closeSettings}
-            />
-            <div className="modal-panel pointer-events-auto relative w-full max-w-lg p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
-              {settingsPanel}
-            </div>
-          </div>
-        </ModalPortal>
+        <QuickTradeSettingsSheet
+          open={settingsOpen}
+          draftBuy={draftBuy}
+          draftSellPct={draftSellPct}
+          onBuyChange={setDraftBuy}
+          onSellPctChange={setDraftSellPct}
+          onClose={closeSettings}
+          onSave={saveSettings}
+        />
       );
     }
 
