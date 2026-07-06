@@ -3,8 +3,6 @@
 import {
   PumpIcon,
   faCheck,
-  faChevronDown,
-  faList,
   faCopy,
   faExternalLink,
   faShare,
@@ -53,7 +51,6 @@ import { QuickTradeConfirmModal } from "@/components/token/QuickTradeConfirmModa
 import { TradeSheet } from "@/components/token/TradeSheet";
 import { TokenMobileHero } from "@/components/token/TokenMobileHero";
 import { TokenTradeDock } from "@/components/token/TokenTradeDock";
-import { TokenMobileMarketSheet } from "@/components/token/TokenMobileMarketSheet";
 import {
   buildTokenMobileQuickTradePrefill,
   buildTokenMobileTradeEditPrefill,
@@ -275,7 +272,6 @@ export function TokenDetailLive({
   const [profileAddress, setProfileAddress] = useState<string | null>(null);
   const [tradePrefill, setTradePrefill] = useState<TradePrefillConfig | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
-  const [mobileMarketOpen, setMobileMarketOpen] = useState(false);
   const [tradeSheetOpen, setTradeSheetOpen] = useState(false);
   const [quickTradeRun, setQuickTradeRun] = useState<{
     key: string;
@@ -791,21 +787,9 @@ export function TokenDetailLive({
   }, []);
 
   useEffect(() => {
-    setMobileMarketOpen(false);
     setTradeSheetOpen(false);
     setTradePrefill(null);
   }, [tokenAddress]);
-
-  const closeMobileMarket = useCallback(() => setMobileMarketOpen(false), []);
-  const openMobileMarket = useCallback(() => {
-    setMobileMarketOpen(true);
-  }, []);
-
-  const openMarketFromTradeSheet = useCallback(() => {
-    setTradeSheetOpen(false);
-    setTradePrefill(null);
-    setMobileMarketOpen(true);
-  }, []);
 
   const closeTradeSheet = useCallback(() => {
     setTradeSheetOpen(false);
@@ -939,16 +923,6 @@ export function TokenDetailLive({
               <span className="token-detail-toolbar__symbol financial-value">
                 {liveToken.symbol}/USD
               </span>
-              <button
-                type="button"
-                className="token-detail-toolbar__market-toggle lg:hidden"
-                aria-expanded={mobileMarketOpen}
-                aria-controls="token-mobile-market-sheet"
-                aria-label="Explore coins"
-                onClick={openMobileMarket}
-              >
-                <PumpIcon icon={faList} className="h-4 w-4" />
-              </button>
             </div>
             <span className="token-detail-toolbar__age">{formatToolbarAge(liveToken.createdAt)}</span>
           </div>
@@ -1081,8 +1055,6 @@ export function TokenDetailLive({
               favorited={favorited}
               tradeLocked={tradeLocked}
               copiedAddress={copiedAddress}
-              marketSelectorOpen={mobileMarketOpen}
-              onOpenMarket={openMobileMarket}
               onToggleFavorite={() => toggleFavorite(streamAddress)}
               onCopyAddress={() => void onCopyAddress()}
               isRefreshing={isRefreshing}
@@ -1197,12 +1169,6 @@ export function TokenDetailLive({
         description={`Spread the word about $${liveToken.symbol}.`}
       />
 
-      <TokenMobileMarketSheet
-        open={mobileMarketOpen}
-        onClose={closeMobileMarket}
-        activeTokenAddress={tokenAddress}
-      />
-
       <TradeSheet
         open={tradeSheetOpen}
         onClose={closeTradeSheet}
@@ -1220,7 +1186,6 @@ export function TokenDetailLive({
         changePct={changeTone}
         priceUsd={priceUsd}
         logoUrl={liveToken.logoUrl}
-        onOpenMarket={openMarketFromTradeSheet}
         persistTokenMobileTradePrefs
       />
 

@@ -6,7 +6,7 @@ import { PumpSubscriptPrice } from "@/components/ui/PumpSubscriptPrice";
 import { FavoriteIcon } from "@/components/icons/FavoriteIcon";
 import { TokenAvatar } from "@/components/token/TokenAvatar";
 import { TokenSocialLinksBar } from "@/components/token/TokenSocialLinksBar";
-import { PumpIcon, faArrowLeft, faBolt, faCheck, faChevronDown, faCopy } from "@/lib/icons";
+import { PumpIcon, faArrowLeft, faBolt, faCheck, faCopy } from "@/lib/icons";
 import { shortAddress } from "@/config/chain";
 import { formatAge } from "@/lib/arena-board-format";
 import { hapticTap } from "@/lib/haptic";
@@ -21,8 +21,6 @@ type TokenMobileHeroProps = {
   favorited: boolean;
   tradeLocked: boolean;
   copiedAddress: boolean;
-  marketSelectorOpen: boolean;
-  onOpenMarket: () => void;
   onToggleFavorite: () => void;
   onCopyAddress: () => void;
   isRefreshing?: boolean;
@@ -81,7 +79,7 @@ function HeroQuoteMetric({
   return <PriceHero priceUsd={priceUsd} />;
 }
 
-/** Mobile token hero — chrome bar + pair selector. */
+/** Mobile token hero — chrome bar + static pair display. */
 export function TokenMobileHero({
   token,
   priceUsd,
@@ -92,17 +90,10 @@ export function TokenMobileHero({
   favorited,
   tradeLocked,
   copiedAddress,
-  marketSelectorOpen,
-  onOpenMarket,
   onToggleFavorite,
   onCopyAddress,
   isRefreshing = false,
 }: TokenMobileHeroProps) {
-  const handleOpenMarket = () => {
-    hapticTap();
-    onOpenMarket();
-  };
-
   const handleCopyAddress = () => {
     hapticTap(6);
     onCopyAddress();
@@ -156,14 +147,7 @@ export function TokenMobileHero({
 
       <div className="token-mobile-hero__top">
         <div className="token-mobile-hero__lead">
-          <button
-            type="button"
-            className="token-mobile-hero__logo-btn"
-            onClick={handleOpenMarket}
-            aria-expanded={marketSelectorOpen}
-            aria-controls="token-mobile-market-sheet"
-            aria-label="Select token"
-          >
+          <div className="token-mobile-hero__logo-wrap">
             <TokenAvatar
               address={token.address}
               symbol={token.symbol}
@@ -172,20 +156,10 @@ export function TokenMobileHero({
               shape="rounded"
               className="token-mobile-hero__logo shrink-0"
             />
-          </button>
+          </div>
 
           <div className="token-mobile-hero__identity">
-            <button
-              type="button"
-              className="token-mobile-hero__pair-select"
-              onClick={handleOpenMarket}
-              aria-expanded={marketSelectorOpen}
-              aria-controls="token-mobile-market-sheet"
-              aria-label={`Select token, current ${token.name}`}
-            >
-              <span className="token-mobile-hero__token-name">{token.name}</span>
-              <PumpIcon icon={faChevronDown} className="token-mobile-hero__chevron" aria-hidden />
-            </button>
+            <span className="token-mobile-hero__token-name">{token.name}</span>
 
             <div className="token-mobile-hero__address-row">
               <span className="token-mobile-hero__address financial-value">

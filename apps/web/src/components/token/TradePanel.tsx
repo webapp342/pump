@@ -2719,7 +2719,6 @@ export function TradePanel({
             changePct={changePct}
             side={side}
             onSideChange={switchTradeSide}
-            onClose={sheetOnClose!}
             onOpenMarket={onOpenMarket}
           />
         ) : null}
@@ -2893,6 +2892,7 @@ export function TradePanel({
               className={`trade-teeth-slider trade-teeth-slider--${side}${
                 teethDragging ? " trade-teeth-slider--dragging" : ""
               }`}
+              data-sheet-drag-lock
             >
               <div
                 ref={teethFrameRef}

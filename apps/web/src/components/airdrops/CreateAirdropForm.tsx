@@ -52,6 +52,7 @@ import {
   type AirdropSocialTaskInput,
 } from "@/lib/airdrop-rules";
 import type { TokenListItem } from "@/lib/db/launchpad";
+import { EMPTY_SOCIAL_LINKS } from "@/lib/token-social";
 import {
   defaultQualifyEndLocal,
   defaultQualifyStartLocal,
@@ -304,6 +305,9 @@ export function CreateAirdropForm({
           marketCapBnb: "0",
           holderCount: 0,
           logoUrl: null,
+          socialLinks: EMPTY_SOCIAL_LINKS,
+          creatorHoldPct: null,
+          top10HoldPct: null,
         });
       }
     }

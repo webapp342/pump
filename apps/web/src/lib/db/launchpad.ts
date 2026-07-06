@@ -68,6 +68,9 @@ export type TokenListItem = {
   change24hTxnsPct?: number | null;
   holderCount: number;
   logoUrl: string | null;
+  socialLinks: TokenSocialLinks;
+  creatorHoldPct: number | null;
+  top10HoldPct: number | null;
 };
 
 export type KothHistoryItem = {
@@ -153,6 +156,9 @@ type TokenListQueryRow = {
   change_6h_pct: string | null;
   change_24h_pct: string | null;
   holder_count: number;
+  social_links: unknown;
+  creator_hold_pct: string | null;
+  top10_hold_pct: string | null;
 };
 
 function mapTokenListRow(row: TokenListQueryRow): TokenListItem {
@@ -188,8 +194,52 @@ function mapTokenListRow(row: TokenListQueryRow): TokenListItem {
     change24hTxnsPct,
     holderCount: row.holder_count,
     logoUrl: row.logo_url,
+    socialLinks: parseSocialLinksFromDb(row.social_links),
+    creatorHoldPct:
+      row.creator_hold_pct != null && row.creator_hold_pct !== ""
+        ? Number(row.creator_hold_pct)
+        : null,
+    top10HoldPct:
+      row.top10_hold_pct != null && row.top10_hold_pct !== ""
+        ? Number(row.top10_hold_pct)
+        : null,
   };
 }
+
+const TOKEN_LIST_SOCIAL_HOLD_SELECT = `
+      COALESCE(tok.social_links, '{}'::jsonb) AS social_links,
+      CASE
+        WHEN creator_pos.creator_balance IS NOT NULL AND creator_pos.creator_balance > 0
+          THEN ((creator_pos.creator_balance / 1000000000.0) * 100)::text
+        ELSE NULL
+      END AS creator_hold_pct,
+      CASE
+        WHEN top10_pos.top10_balance > 0
+          THEN ((top10_pos.top10_balance / 1000000000.0) * 100)::text
+        ELSE NULL
+      END AS top10_hold_pct`;
+
+const TOKEN_LIST_SOCIAL_HOLD_JOINS = `
+    LEFT JOIN tokens tok ON tok.address = bt.address
+    LEFT JOIN LATERAL (
+      SELECT p.token_balance AS creator_balance
+      FROM user_positions p
+      WHERE p.token_address = bt.address
+        AND p.address = bt.creator_address
+        AND p.token_balance > 0
+      LIMIT 1
+    ) creator_pos ON true
+    LEFT JOIN LATERAL (
+      SELECT COALESCE(SUM(h.token_balance), 0) AS top10_balance
+      FROM (
+        SELECT token_balance
+        FROM user_positions
+        WHERE token_address = bt.address
+          AND token_balance > 0
+        ORDER BY token_balance DESC
+        LIMIT 10
+      ) h
+    ) top10_pos ON true`;
 
 const TOKEN_LIST_SELECT = `
     SELECT
@@ -234,7 +284,8 @@ const TOKEN_LIST_SELECT = `
           )::text
         ELSE NULL
       END AS change_24h_pct,
-      COALESCE(b.holder_count, 0) AS holder_count
+      COALESCE(b.holder_count, 0) AS holder_count,
+      ${TOKEN_LIST_SOCIAL_HOLD_SELECT}
     FROM base_tokens bt
     LEFT JOIN bonding_states b ON b.token_address = bt.address
     LEFT JOIN trade_stats ts ON ts.token_address = bt.address
@@ -269,6 +320,7 @@ const TOKEN_LIST_SELECT = `
       ORDER BY tr.block_time ASC, tr.block_number ASC, tr.log_index ASC
       LIMIT 1
     ) p_first ON true
+    ${TOKEN_LIST_SOCIAL_HOLD_JOINS}
 `;
 
 const TOKEN_LIST_SELECT_BONDING = `
@@ -314,7 +366,8 @@ const TOKEN_LIST_SELECT_BONDING = `
           )::text
         ELSE NULL
       END AS change_24h_pct,
-      COALESCE(b.holder_count, 0) AS holder_count
+      COALESCE(b.holder_count, 0) AS holder_count,
+      ${TOKEN_LIST_SOCIAL_HOLD_SELECT}
     FROM base_tokens bt
     LEFT JOIN bonding_states b ON b.token_address = bt.address
     LEFT JOIN trade_stats ts ON ts.token_address = bt.address
@@ -349,6 +402,7 @@ const TOKEN_LIST_SELECT_BONDING = `
       ORDER BY tr.block_time ASC, tr.block_number ASC, tr.log_index ASC
       LIMIT 1
     ) p_first ON true
+    ${TOKEN_LIST_SOCIAL_HOLD_JOINS}
 `;
 
 const TOKEN_LIST_SELECT_MV = `
@@ -394,11 +448,13 @@ const TOKEN_LIST_SELECT_MV = `
           )::text
         ELSE NULL
       END AS change_24h_pct,
-      COALESCE(b.holder_count, 0) AS holder_count
+      COALESCE(b.holder_count, 0) AS holder_count,
+      ${TOKEN_LIST_SOCIAL_HOLD_SELECT}
     FROM base_tokens bt
     LEFT JOIN bonding_states b ON b.token_address = bt.address
     LEFT JOIN mv_token_trade_stats mts ON mts.token_address = bt.address
     LEFT JOIN mv_token_price_anchors mpa ON mpa.token_address = bt.address
+    ${TOKEN_LIST_SOCIAL_HOLD_JOINS}
 `;
 
 const TOKEN_LIST_SELECT_BOARD_STATS = `
@@ -448,12 +504,14 @@ const TOKEN_LIST_SELECT_BOARD_STATS = `
           )::text
         ELSE NULL
       END AS change_24h_pct,
-      COALESCE(tbs.holder_count, b.holder_count, 0) AS holder_count
+      COALESCE(tbs.holder_count, b.holder_count, 0) AS holder_count,
+      ${TOKEN_LIST_SOCIAL_HOLD_SELECT}
     FROM base_tokens bt
     LEFT JOIN bonding_states b ON b.token_address = bt.address
     LEFT JOIN token_board_stats tbs ON tbs.token_address = bt.address
     LEFT JOIN mv_token_trade_stats mts ON mts.token_address = bt.address
     LEFT JOIN mv_token_price_anchors mpa ON mpa.token_address = bt.address
+    ${TOKEN_LIST_SOCIAL_HOLD_JOINS}
 `;
 
 function buildTokenListSelectSql(baseTokensInner: string): string {
@@ -1145,6 +1203,8 @@ export async function getTokenByAddress(address: string): Promise<TokenDetail | 
     reserveBnb: row.reserve_zug,
     marketCapBnb: row.market_cap_zug,
     holderCount: row.holder_count,
+    creatorHoldPct: null,
+    top10HoldPct: null,
     targetBnb: row.target_zug,
     tokenSold: row.token_sold,
     tradeCount: row.trade_count,

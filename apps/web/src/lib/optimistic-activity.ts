@@ -103,6 +103,8 @@ export function buildOptimisticTokenDetail(
     reserveBnb: "0",
     marketCapBnb: "0",
     holderCount: 1,
+    creatorHoldPct: null,
+    top10HoldPct: null,
     description: activity.tokenDescription ?? null,
     socialLinks: activity.socialLinks ?? EMPTY_SOCIAL_LINKS,
     logoUrl: activity.logoPreviewUrl ?? null,

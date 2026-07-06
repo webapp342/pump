@@ -6,6 +6,7 @@ import {
   useMobileModalClose,
   useMobileModalScrollLock,
 } from "@/hooks/useMobileModalScrollLock";
+import { useMobileSheetDragDismiss } from "@/hooks/useMobileSheetDragDismiss";
 import { useVisualViewportSheetFrame } from "@/hooks/useVisualViewportSheetFrame";
 import { TradePanel, type TradeConfirmedPayload, type TradeOptimisticPayload, type TradeSubmittedPayload } from "@/components/token/TradePanel";
 import type { TradePrefillConfig } from "@/lib/token-trade-prefill";
@@ -64,10 +65,16 @@ export function TradeSheet({
   const isModal = presentation === "modal";
   const handleClose = useMobileModalClose(onClose);
   const sheetFrame = useVisualViewportSheetFrame(false);
+  const { panelRef, sheetDragProps, resetDrag } = useMobileSheetDragDismiss(handleClose);
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  useEffect(() => {
+    if (open) return;
+    resetDrag();
+  }, [open, resetDrag]);
 
   useMobileModalScrollLock(open);
 
@@ -105,12 +112,19 @@ export function TradeSheet({
         aria-label={isModal ? tradeTitle : `Trade ${symbol}`}
       >
         <div
+          ref={panelRef}
           className={`trade-sheet modal-panel modal-sheet-panel pointer-events-auto flex flex-col overflow-hidden ${
             isModal
               ? "max-w-md max-h-[min(85dvh,640px)]"
-              : "trade-sheet--mobile max-h-full border-x-0 border-b-0 rounded-t-2xl"
+              : "trade-sheet--mobile max-h-full select-none border-x-0 border-b-0 rounded-t-2xl"
           }`}
+          {...(!isModal ? sheetDragProps : undefined)}
         >
+          {!isModal ? (
+            <div className="trade-sheet__grip-bar shrink-0" aria-hidden>
+              <div className="trade-sheet__grip" />
+            </div>
+          ) : null}
           {isModal ? (
             <div className="shrink-0 border-b border-pump-border/45 px-4 pb-3 pt-4">
               <div className="flex items-center justify-between gap-3">

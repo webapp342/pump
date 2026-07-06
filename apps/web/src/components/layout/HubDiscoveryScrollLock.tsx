@@ -24,6 +24,10 @@ const INTERACTION_SELECTOR = [
   ".portfolio-tab-nav__track",
   ".arena-search-input",
   ".arena-search-field",
+  ".arena-filter-bar__settings-btn",
+  ".arena-filter-bar__tool-btn",
+  ".arena-filter-bar__mobile-search",
+  ".arena-filter-bar__mobile-search .arena-search-field",
 ].join(", ");
 
 function isMobileHub(): boolean {

@@ -2,7 +2,7 @@
 
 import { TokenAvatar } from "@/components/token/TokenAvatar";
 import { PumpSubscriptPrice } from "@/components/ui/PumpSubscriptPrice";
-import { PumpIcon, faList, faX } from "@/lib/icons";
+import { PumpIcon, faList } from "@/lib/icons";
 
 type TradeQuickOrderSide = "buy" | "sell";
 
@@ -14,7 +14,6 @@ type TradeQuickOrderHeaderProps = {
   changePct?: number | null;
   side: TradeQuickOrderSide;
   onSideChange: (side: TradeQuickOrderSide) => void;
-  onClose: () => void;
   onOpenMarket?: () => void;
 };
 
@@ -60,25 +59,10 @@ export function TradeQuickOrderHeader({
   changePct = null,
   side,
   onSideChange,
-  onClose,
   onOpenMarket,
 }: TradeQuickOrderHeaderProps) {
   return (
     <header className="trade-quick-order-header">
-      <div className="trade-quick-order-header__grip" aria-hidden />
-
-      <div className="trade-quick-order-header__title-row">
-        <h2 className="trade-quick-order-header__title">Quick Order</h2>
-        <button
-          type="button"
-          onClick={onClose}
-          className="trade-quick-order-header__close"
-          aria-label="Close"
-        >
-          <PumpIcon icon={faX} className="h-4 w-4" aria-hidden />
-        </button>
-      </div>
-
       <div className="trade-quick-order-header__side-toggle" role="tablist" aria-label="Trade side">
         <button
           type="button"

@@ -5,14 +5,14 @@ import { useAccount } from "wagmi";
 import type { ArenaFilterCounts, KothSummary, TokenListItem } from "@/lib/db/launchpad";
 import { ArenaFilterNav } from "@/components/arena/ArenaFilterNav";
 import { ArenaShortcutsModal } from "@/components/arena/ArenaShortcutsModal";
+import { ArenaMobileTokenRow } from "@/components/arena/ArenaMobileTokenRow";
 import { ArenaTokenCard } from "@/components/arena/ArenaTokenCard";
-import { ArenaWatchlistSheet } from "@/components/arena/ArenaWatchlistSheet";
-import { useWatchlistTokens } from "@/components/arena/WatchlistContent";
 import { useFavorites } from "@/components/favorites/FavoritesProvider";
 import { ArenaSwipeTradeBar } from "@/components/arena/ArenaSwipeTradeBar";
 import { HubDiscoveryScrollLock } from "@/components/layout/HubDiscoveryScrollLock";
 import { useBnbUsdPrice } from "@/hooks/useBnbUsdPrice";
 import { useArenaQuickTrade } from "@/hooks/useArenaQuickTrade";
+import { useArenaQuickTradeSettings } from "@/hooks/useArenaQuickTradeSettings";
 import { bnbToUsd } from "@/lib/format-usd";
 import {
   listTokenPriceUsd,
@@ -174,6 +174,11 @@ export function ArenaListClient({
 }) {
   const queryClient = useQueryClient();
   const { openQuickTrade, quickTradeSheet } = useArenaQuickTrade();
+  const {
+    openSettings: openQuickTradeSettings,
+    settingsOpen: quickTradeSettingsOpen,
+    QuickTradeSettingsLayer,
+  } = useArenaQuickTradeSettings();
   const initialBoardKey = initialPayload
     ? boardCacheKey("new", "age", "desc", "")
     : "";
@@ -201,7 +206,6 @@ export function ArenaListClient({
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [cardsSort, setCardsSort] = useState<ArenaCardsSortKey>("mcap");
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
-  const [watchlistOpen, setWatchlistOpen] = useState(false);
   const [favoriteListTokens, setFavoriteListTokens] = useState<TokenListItem[]>([]);
   const { address, isConnected } = useAccount();
   const { favorites, isFavorite, toggleFavorite } = useFavorites();
@@ -274,13 +278,6 @@ export function ArenaListClient({
 
   useEffect(() => {
     const filter = readArenaFilter();
-    if (filter === "favorites") {
-      setActiveFilter("new");
-      writeArenaFilter("new");
-      setWatchlistOpen(true);
-      setCardsSort(readArenaCardsSort());
-      return;
-    }
     setActiveFilter(filter);
     const defaults = applyBoardFilterDefaults(filter);
     if (defaults.sortKey) setSortKey(defaults.sortKey);
@@ -767,21 +764,6 @@ export function ArenaListClient({
   }, [tokens, effectiveBnbUsd, animateCap, setAnimatedCap]);
 
   const resolvedTokens = tokens ?? [];
-  const arenaTokenPool = useMemo(() => {
-    const byAddress = new Map<string, TokenListItem>();
-    for (const token of topByMcap) {
-      byAddress.set(token.address.toLowerCase(), token);
-    }
-    for (const token of resolvedTokens) {
-      byAddress.set(token.address.toLowerCase(), token);
-    }
-    for (const token of favoriteListTokens) {
-      byAddress.set(token.address.toLowerCase(), token);
-    }
-    return [...byAddress.values()];
-  }, [topByMcap, resolvedTokens, favoriteListTokens]);
-  const watchlistTokens = useWatchlistTokens(arenaTokenPool);
-  const watchlistCount = isConnected ? favorites.size : watchlistTokens.length;
   const mcapRankedTokens = useMemo(
     () =>
       topByMcap.length > 0
@@ -929,6 +911,7 @@ export function ArenaListClient({
     <div className="arena-page min-w-0" aria-busy={boardRefreshing}>
       <HubDiscoveryScrollLock />
       <ArenaShortcutsModal open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
+      <QuickTradeSettingsLayer />
 
       <div className="arena-page__sticky">
         <div className="arena-hub">
@@ -939,28 +922,13 @@ export function ArenaListClient({
             searchInputRef={searchInputRef}
             onSearchChange={setSearch}
             onSelect={setArenaFilter}
-            onWatchlistOpen={() => setWatchlistOpen(true)}
-            watchlistOpen={watchlistOpen}
-            watchlistCount={watchlistCount}
-            searchTrailing={
-              <div className="arena-filter-bar__quick-trade arena-filter-bar__quick-trade--mobile">
-                <ArenaSwipeTradeBar />
-              </div>
-            }
+            onQuickTradeSettingsOpen={openQuickTradeSettings}
+            quickTradeSettingsOpen={quickTradeSettingsOpen}
             trailing={
               <div className="arena-filter-bar__quick-trade arena-filter-bar__quick-trade--desktop">
                 <ArenaSwipeTradeBar />
               </div>
             }
-          />
-
-          <ArenaWatchlistSheet
-            open={watchlistOpen}
-            onOpenChange={setWatchlistOpen}
-            tokens={arenaTokenPool}
-            bnbUsd={effectiveBnbUsd}
-            flashes={flashes}
-            animatedCaps={animatedCaps}
           />
         </div>
       </div>
@@ -978,27 +946,51 @@ export function ArenaListClient({
             </p>
           </div>
         ) : (
-          <div className="arena-explore-grid arena-explore-grid--compact">
-            {cardsTokens.map((token) => {
-              const addressKey = token.address.toLowerCase();
-              const mcapUsd =
-                animatedCaps[`${addressKey}:cap:mcap`] ??
-                bnbToUsd(Number(token.marketCapBnb), effectiveBnbUsd);
+          <>
+            <div className="arena-mobile-list md:hidden">
+              {cardsTokens.map((token) => {
+                const addressKey = token.address.toLowerCase();
+                const mcapUsd =
+                  animatedCaps[`${addressKey}:cap:mcap`] ??
+                  bnbToUsd(Number(token.marketCapBnb), effectiveBnbUsd);
+                const vol24hUsd =
+                  animatedCaps[`${addressKey}:cap:vol24h`] ??
+                  bnbToUsd(Number(token.volume24hBnb ?? 0), effectiveBnbUsd);
 
-              return (
-                <ArenaTokenCard
-                  key={token.address}
-                  token={token}
-                  mcapUsd={mcapUsd}
-                  mcapFlash={flashes[`${addressKey}:mcap`]}
-                  isFavorite={isFavorite(token.address)}
-                  onToggleFavorite={toggleFavorite}
-                  onQuickTrade={(side) => openQuickTrade(token.address, token.symbol, side)}
-                  compact
-                />
-              );
-            })}
-          </div>
+                return (
+                  <ArenaMobileTokenRow
+                    key={token.address}
+                    token={token}
+                    mcapUsd={mcapUsd}
+                    vol24hUsd={vol24hUsd}
+                    mcapFlash={flashes[`${addressKey}:mcap`]}
+                    onQuickTrade={(side) => openQuickTrade(token.address, token.symbol, side)}
+                  />
+                );
+              })}
+            </div>
+            <div className="arena-explore-grid arena-explore-grid--compact hidden md:grid">
+              {cardsTokens.map((token) => {
+                const addressKey = token.address.toLowerCase();
+                const mcapUsd =
+                  animatedCaps[`${addressKey}:cap:mcap`] ??
+                  bnbToUsd(Number(token.marketCapBnb), effectiveBnbUsd);
+
+                return (
+                  <ArenaTokenCard
+                    key={token.address}
+                    token={token}
+                    mcapUsd={mcapUsd}
+                    mcapFlash={flashes[`${addressKey}:mcap`]}
+                    isFavorite={isFavorite(token.address)}
+                    onToggleFavorite={toggleFavorite}
+                    onQuickTrade={(side) => openQuickTrade(token.address, token.symbol, side)}
+                    compact
+                  />
+                );
+              })}
+            </div>
+          </>
         )}
 
         {showLoadMore ? (

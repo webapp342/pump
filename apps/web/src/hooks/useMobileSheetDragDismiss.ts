@@ -13,7 +13,7 @@ type DragState = {
   pointerId: number | null;
 };
 
-type DragHandlerProps = {
+export type MobileSheetGripProps = {
   onPointerDown: (event: ReactPointerEvent<HTMLElement>) => void;
   onPointerMove: (event: ReactPointerEvent<HTMLElement>) => void;
   onPointerUp: (event: ReactPointerEvent<HTMLElement>) => void;
@@ -25,9 +25,9 @@ type UseMobileSheetDragDismissResult = {
   dragOffsetY: number;
   isDragging: boolean;
   /** Drag handle only (legacy). */
-  gripProps: DragHandlerProps;
+  gripProps: MobileSheetGripProps;
   /** Full-panel swipe-to-dismiss — skips buttons/inputs. */
-  sheetDragProps: DragHandlerProps;
+  sheetDragProps: MobileSheetGripProps;
   resetDrag: () => void;
 };
 
@@ -121,7 +121,7 @@ export function useMobileSheetDragDismiss(onDismiss: () => void): UseMobileSheet
     [applyOffset]
   );
 
-  const dragHandlers: DragHandlerProps = {
+  const dragHandlers: MobileSheetGripProps = {
     onPointerDown,
     onPointerMove,
     onPointerUp: finishDrag,
