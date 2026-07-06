@@ -42,6 +42,8 @@ interface TelegramWebApp {
   setBackgroundColor: (color: string) => void;
   onEvent: (eventType: string, callback: (...args: unknown[]) => void) => void;
   offEvent: (eventType: string, callback: (...args: unknown[]) => void) => void;
+  openLink?: (url: string, options?: { try_instant_view?: boolean }) => void;
+  openTelegramLink?: (url: string) => void;
 }
 
 interface TelegramNamespace {

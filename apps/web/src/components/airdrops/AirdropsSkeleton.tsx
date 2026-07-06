@@ -47,9 +47,10 @@ export function AirdropsSkeleton() {
                   <Skeleton variant="line" className="h-3 w-24" />
                   <Skeleton variant="line" className="h-3 w-20" />
                 </div>
-                <div className="space-y-2">
-                  <Skeleton variant="line" className="h-3 w-10" />
-                  <Skeleton className="h-4 w-12" />
+                <div className="space-y-1.5 text-right">
+                  <Skeleton variant="line" className="ml-auto h-3 w-10" />
+                  <Skeleton variant="line" className="ml-auto h-3 w-12" />
+                  <Skeleton className="ml-auto h-4 w-14" />
                 </div>
               </div>
             ))}
@@ -86,51 +87,72 @@ export function AirdropsSkeleton() {
 
 export function AirdropDetailSkeleton() {
   return (
-    <div className="min-w-0 space-y-4 md:space-y-5" aria-busy="true" aria-label="Loading airdrop">
-      <div className="panel-surface overflow-hidden">
-        <div className="border-b border-pump-border/15 p-4 md:px-5 md:py-4">
-          <div className="flex items-center gap-3">
-            <Skeleton variant="circle" className="h-12 w-12 shrink-0 md:h-14 md:w-14" />
-            <div className="min-w-0 flex-1 space-y-2">
-              <Skeleton className="h-5 w-48 max-w-full" />
-              <Skeleton variant="line" className="h-4 w-full max-w-md" />
-              <Skeleton variant="line" className="h-3.5 w-36" />
-            </div>
-            <Skeleton className="h-8 w-24 shrink-0 rounded-md" />
-          </div>
-        </div>
-        <div className="grid grid-cols-2 gap-3 p-4 sm:grid-cols-3 lg:grid-cols-5 md:p-5">
-          {Array.from({ length: 5 }).map((_, index) => (
-            <div key={index} className="space-y-1.5">
-              <Skeleton variant="line" className="h-3 w-16" />
-              <Skeleton className="h-5 w-20" />
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="grid gap-4 xl:grid-cols-[5fr_7fr]">
-        <div className="panel-surface p-4">
-          <Skeleton variant="line" className="h-3 w-24" />
-          <Skeleton className="mt-4 h-10 w-full rounded-md" />
-          <Skeleton className="mt-3 h-3 w-3/4" />
-        </div>
-        <section className="panel-surface overflow-hidden">
-          <div className="border-b border-pump-border/15 px-4 py-3">
-            <Skeleton variant="line" className="h-3 w-28" />
-          </div>
-          <div className="sheet-list">
-            {Array.from({ length: 5 }).map((_, index) => (
-              <div key={index} className="flex items-center justify-between gap-3 px-4 py-3">
-                <div className="flex items-center gap-2">
-                  <Skeleton variant="circle" className="h-6 w-6" />
-                  <Skeleton className="h-4 w-24" />
+    <div className="airdrops-page airdrop-detail-page" aria-busy="true" aria-label="Loading airdrop">
+      <div className="airdrop-detail-hub">
+        <div className="airdrop-detail-toolbar-band">
+          <Skeleton variant="line" className="mx-3 my-2 h-4 w-14" />
+          <div className="token-detail-toolbar airdrop-detail-toolbar">
+            <div className="token-detail-toolbar__row">
+              <div className="token-detail-toolbar__identity">
+                <Skeleton className="h-5 w-5 shrink-0 rounded-sm" />
+                <Skeleton className="h-7 w-7 shrink-0 rounded-md" />
+                <div className="min-w-0 flex-1 space-y-1.5">
+                  <Skeleton className="h-4 w-36 max-w-full" />
+                  <Skeleton variant="line" className="h-3 w-24" />
                 </div>
-                <Skeleton variant="line" className="h-3 w-14" />
               </div>
-            ))}
+              <Skeleton className="h-6 w-16 shrink-0 rounded-md" />
+            </div>
+            <div className="mt-2 flex gap-3 border-t border-pump-border/10 pt-2 md:mt-0 md:gap-4 md:border-t-0 md:pt-0">
+              {Array.from({ length: 3 }).map((_, index) => (
+                <div key={index} className="space-y-1">
+                  <Skeleton variant="line" className="h-2.5 w-12" />
+                  <Skeleton className="h-4 w-16" />
+                </div>
+              ))}
+            </div>
           </div>
-        </section>
+        </div>
+
+        <div className="airdrop-detail-body">
+          <div className="airdrop-detail-body__grid">
+            <section className="airdrop-detail-section">
+              <div className="airdrop-detail-section__head">
+                <Skeleton variant="line" className="h-3 w-24" />
+                <Skeleton variant="line" className="mt-1.5 h-3 w-48 max-w-full" />
+              </div>
+              <div className="airdrop-detail-task-list">
+                {Array.from({ length: 2 }).map((_, index) => (
+                  <div key={index} className="airdrop-detail-task-row">
+                    <Skeleton className="h-4 w-36 max-w-full" />
+                    <Skeleton className="h-6 w-16 shrink-0 rounded-md" />
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            <section className="airdrop-detail-section airdrop-detail-section--board">
+              <div className="airdrop-detail-section__head">
+                <Skeleton variant="line" className="h-3 w-20" />
+                <Skeleton variant="line" className="mt-1.5 h-3 w-56 max-w-full" />
+              </div>
+              <div className="airdrop-detail-board p-3">
+                {Array.from({ length: 5 }).map((_, index) => (
+                  <div
+                    key={index}
+                    className="flex items-center justify-between gap-3 border-b border-pump-border/10 py-2 last:border-b-0"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Skeleton variant="circle" className="h-6 w-6" />
+                      <Skeleton className="h-4 w-24" />
+                    </div>
+                    <Skeleton variant="line" className="h-3 w-14" />
+                  </div>
+                ))}
+              </div>
+            </section>
+          </div>
+        </div>
       </div>
     </div>
   );

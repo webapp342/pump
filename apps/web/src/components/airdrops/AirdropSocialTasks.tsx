@@ -2,9 +2,9 @@
 
 import {
   AIRDROP_SOCIAL_TASK_TYPES,
+  openSocialTaskParticipantUrl,
   socialTaskActionLabel,
   socialTaskInputPlaceholder,
-  socialTaskParticipantUrl,
   socialTaskPreviewLabel,
   socialTaskUrlHint,
   socialTaskUsesUsernameInput,
@@ -131,10 +131,7 @@ export function AirdropSocialTasksPreview({ tasks }: AirdropSocialTasksPreviewPr
     <div className="border-t border-pump-border/15 pt-2">
       <p className="text-pump-muted">Social</p>
       <ul className="mt-1 space-y-1">
-        {tasks.map((task) => {
-          const participantUrl = socialTaskParticipantUrl(task.taskType, task.targetUrl);
-
-          return (
+        {tasks.map((task) => (
             <li
               key={task.taskType}
               className="flex min-w-0 items-center justify-between gap-1.5 text-[11px]"
@@ -142,17 +139,15 @@ export function AirdropSocialTasksPreview({ tasks }: AirdropSocialTasksPreviewPr
               <span className="min-w-0 truncate font-medium text-pump-text">
                 {socialTaskPreviewLabel(task.taskType, task.targetUrl)}
               </span>
-              <a
-                href={participantUrl}
-                target="_blank"
-                rel="noopener noreferrer"
+              <button
+                type="button"
                 className="shrink-0 text-pump-accent hover:underline"
+                onClick={() => openSocialTaskParticipantUrl(task.taskType, task.targetUrl)}
               >
                 {socialTaskActionLabel(task.taskType)}
-              </a>
+              </button>
             </li>
-          );
-        })}
+        ))}
       </ul>
     </div>
   );

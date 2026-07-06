@@ -489,11 +489,14 @@ export async function completeSocialTask(
   try {
     await client.query("BEGIN");
 
-    const airdrop = await client.query<{ qualify_end: Date }>(
-      "SELECT qualify_end FROM airdrops WHERE id = $1::bigint",
+    const airdrop = await client.query<{ qualify_start: Date; qualify_end: Date }>(
+      "SELECT qualify_start, qualify_end FROM airdrops WHERE id = $1::bigint",
       [airdropId]
     );
     if (!airdrop.rows[0]) throw new Error("Airdrop not found");
+    if (airdrop.rows[0].qualify_start > new Date()) {
+      throw new Error("Qualification has not started");
+    }
     if (airdrop.rows[0].qualify_end <= new Date()) {
       throw new Error("Qualification period ended");
     }

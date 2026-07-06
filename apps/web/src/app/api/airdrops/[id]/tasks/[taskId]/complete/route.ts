@@ -17,7 +17,7 @@ export async function POST(request: Request, context: RouteContext) {
     return NextResponse.json({ data: { completed: true } });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
-    const status = message === "Airdrop not found" || message === "Qualification period ended" ? 400 : 500;
+    const status = message === "Airdrop not found" || message === "Qualification period ended" || message === "Qualification has not started" ? 400 : 500;
     return NextResponse.json({ error: message }, { status });
   }
 }

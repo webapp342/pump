@@ -2,15 +2,11 @@
 
 import Link from "next/link";
 import { HourglassIcon } from "@/components/ui/HourglassIcon";
-import {
-  AirdropMetricsStrip,
-} from "@/components/airdrops/AirdropMetricsStrip";
+import { PageBackLink } from "@/components/ui/PageBackLink";
 import {
   AirdropParticipantsMetric,
-  AirdropPoolTokenMetric,
   AirdropProgressMetric,
   AirdropRewardPoolMetric,
-  AirdropStatusMetric,
   airdropDetailRewardProps,
 } from "@/components/airdrops/AirdropMetricCells";
 import { AirdropTrustBadge } from "@/components/airdrops/AirdropTrustBadge";
@@ -42,11 +38,10 @@ import {
   formatTimeRemaining,
   projectedRankRewardAmount,
   projectedRankRewardUsd,
-  showAirdropProgressBar,
 } from "@/lib/airdrop-board-format";
 import {
+  openSocialTaskParticipantUrl,
   socialTaskActionLabel,
-  socialTaskParticipantUrl,
   socialTaskPreviewLabel,
 } from "@/lib/airdrop-social";
 import { AirdropDetailSkeleton } from "@/components/airdrops/AirdropsSkeleton";
@@ -63,6 +58,7 @@ import {
 } from "@/lib/token-trade-prefill";
 import { useAirdropSaves } from "@/components/airdrops/AirdropSavesProvider";
 import { PumpIcon, faBookmarkRegular, faBookmarkSolid } from "@/lib/icons";
+import { MetricIcons } from "@/lib/metric-icons";
 
 function formatAmount(value: string): string {
   const n = Number(value);
@@ -100,20 +96,40 @@ function timeLeftLabel(status: AirdropDisplayStatus, detail: AirdropDetail): str
   }
 }
 
-function SectionHeader({
-  title,
-  hint,
-  accent,
+function UpcomingTasksLockedNotice({
+  qualifyStart,
+  nowTick,
 }: {
-  title: string;
-  hint?: string;
-  accent?: boolean;
+  qualifyStart: string;
+  nowTick: number;
 }) {
   return (
-    <div className="min-w-0">
-      <p className={`section-label ${accent ? "text-pump-accent" : ""}`}>{title}</p>
-      {hint ? <p className="mt-0.5 text-caption leading-snug text-pump-muted">{hint}</p> : null}
-    </div>
+    <section className="airdrop-detail-section airdrop-detail-section--locked">
+      <SectionHeader
+        title="Tasks locked"
+        hint="Social and on-chain steps open when qualification begins."
+      />
+      <div className="airdrop-detail-section__body">
+        <p className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-body-sm text-pump-muted">
+          <HourglassIcon size={14} className="shrink-0" />
+          <span>
+            Opens in{" "}
+            <span className="font-medium tabular-nums text-pump-text" aria-live="polite">
+              {nowTick >= 0 ? formatDurationUntil(qualifyStart) : "—"}
+            </span>
+          </span>
+        </p>
+      </div>
+    </section>
+  );
+}
+
+function SectionHeader({ title, hint }: { title: string; hint?: string }) {
+  return (
+    <header className="airdrop-detail-section__head">
+      <p className="airdrop-detail-section__title">{title}</p>
+      {hint ? <p className="airdrop-detail-section__hint">{hint}</p> : null}
+    </header>
   );
 }
 
@@ -140,31 +156,37 @@ function BnbRewardIcon({ size = 18 }: { size?: number }) {
   return <BnbLogo size={size} />;
 }
 
-function StepBadge({
-  step,
+function StepTab({
   label,
   state,
+  count,
 }: {
-  step: number;
   label: string;
   state: "done" | "active" | "locked" | "idle";
+  count?: number;
 }) {
-  const tone =
-    state === "done"
-      ? "border-pump-accent/35 bg-pump-accent/15 text-pump-accent"
-      : state === "active"
-        ? "border-pump-accent/45 bg-pump-accent/20 text-pump-accent"
-        : state === "locked"
-          ? "border-pump-border/20 bg-pump-surface/40 text-pump-muted"
-          : "border-pump-border/15 bg-pump-surface/30 text-pump-muted";
+  const active = state === "active";
+  const done = state === "done";
+  const locked = state === "locked";
 
   return (
-    <div className={`flex items-center gap-2 rounded-md border px-2.5 py-1.5 ${tone}`}>
-      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-pump-bg/50 text-[10px] font-bold">
-        {state === "done" ? "✓" : step}
-      </span>
-      <span className="text-caption font-medium">{label}</span>
-    </div>
+    <span
+      role="presentation"
+      className={[
+        "airdrops-tab-nav__item airdrop-detail-step-tab",
+        active ? "airdrops-tab-nav__item--active" : "",
+        done ? "airdrop-detail-step-tab--done" : "",
+        locked ? "airdrop-detail-step-tab--locked" : "",
+      ]
+        .filter(Boolean)
+        .join(" ")}
+    >
+      {done ? <span aria-hidden>✓ </span> : null}
+      <span>{label}</span>
+      {count != null && count > 0 ? (
+        <span className="airdrops-tab-nav__count financial-value">{count}</span>
+      ) : null}
+    </span>
   );
 }
 
@@ -259,17 +281,15 @@ function SocialTaskRow({
   return (
     <li>
       <div
-        className={`mission-card flex min-w-0 items-center justify-between gap-3 ${
-          done ? "mission-card-done" : ""
+        className={`airdrop-detail-task-row ${
+          done ? "airdrop-detail-task-row--done" : ""
         }`}
       >
         <span className="min-w-0 truncate text-body-sm font-semibold text-pump-text">
           {socialTaskPreviewLabel(task.taskType, task.targetUrl)}
         </span>
         {done ? (
-          <span className="status-badge shrink-0 border-pump-success/40 bg-pump-success/10 text-pump-success">
-            Done
-          </span>
+          <span className="status-badge shrink-0 text-pump-muted">Done</span>
         ) : (
           <button
             type="button"
@@ -426,8 +446,8 @@ function ViewerRankBanner({
   const rewardUsd = projectedRankRewardUsd(detail.totalFunded, viewer.rank, rewardMeta, bnbUsd);
 
   return (
-    <div className="mb-3 shrink-0 rounded-md bg-pump-accent/5 px-3 py-2.5 mx-3 mt-3 sm:mx-0 sm:mt-0">
-      <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-body-sm font-semibold text-pump-accent">
+    <div className="airdrop-detail-rank-banner">
+      <p className="airdrop-detail-rank-banner__copy">
         <span className="financial-value">Your rank #{viewer.rank}</span>
         <span>· est.</span>
         <span className="inline-flex items-center gap-1.5">
@@ -1096,6 +1116,11 @@ export function AirdropDetailPanel({ airdropId }: { airdropId: string }) {
       return;
     }
 
+    if (detail && new Date(detail.qualifyStart) > new Date()) {
+      setError("Qualification hasn't started — social tasks are locked.");
+      return;
+    }
+
     if (detail && new Date(detail.qualifyEnd) <= new Date()) {
       setError("Qualification period ended — social tasks are closed.");
       return;
@@ -1105,11 +1130,7 @@ export function AirdropDetailPanel({ airdropId }: { airdropId: string }) {
     setError(null);
 
     try {
-      window.open(
-        socialTaskParticipantUrl(task.taskType, task.targetUrl),
-        "_blank",
-        "noopener,noreferrer"
-      );
+      openSocialTaskParticipantUrl(task.taskType, task.targetUrl);
 
       const res = await fetch(`/api/airdrops/${airdropId}/tasks/${task.id}/complete`, {
         method: "POST",
@@ -1148,8 +1169,13 @@ export function AirdropDetailPanel({ airdropId }: { airdropId: string }) {
 
   if (error && !detail) {
     return (
-      <div className="panel-surface p-5">
-        <p className="notice-error text-body-sm">{error}</p>
+      <div className="airdrops-page airdrop-detail-page">
+        <div className="airdrop-detail-hub">
+          <div className="airdrop-detail-toolbar-band">
+            <PageBackLink href="/airdrops" className="airdrop-detail-back" />
+          </div>
+          <p className="airdrop-detail-notice airdrop-detail-notice--error">{error}</p>
+        </div>
       </div>
     );
   }
@@ -1167,12 +1193,16 @@ export function AirdropDetailPanel({ airdropId }: { airdropId: string }) {
   const requiredSocialTasks = detail.socialTasks.filter((t) => t.isRequired);
   const hasSocialGate = requiredSocialTasks.length > 0;
   const socialDone = !hasSocialGate || requiredSocialTasks.every((t) => t.completed);
-  const qualifyStarted = displayStatus !== "UPCOMING";
+  const isUpcoming = displayStatus === "UPCOMING";
+  const qualifyStarted = !isUpcoming;
   const qualifyEnded = new Date(detail.qualifyEnd) <= new Date();
   const onchainUnlocked = socialDone && qualifyStarted;
   const hasOnchainRules = Boolean(
     detail.rules.onchain?.minHoldWei || detail.rules.onchain?.minBuyBnbWei
   );
+  const showSocialSection = hasSocialGate && !socialDone && qualifyStarted;
+  const showUpcomingLockedPanel =
+    isUpcoming && !detail.merkleRoot && (hasSocialGate || hasOnchainRules);
   const showOnchainSection =
     !detail.merkleRoot && hasOnchainRules && (hasSocialGate ? socialDone : onchainUnlocked);
   const timelineProgress = airdropTimelineProgress(
@@ -1198,7 +1228,8 @@ export function AirdropDetailPanel({ airdropId }: { airdropId: string }) {
     !userAlreadyClaimed;
   const showClaimPanel = userCanClaim || (userAlreadyClaimed && userWinner);
   const hasLeftColumnContent =
-    (hasSocialGate && !socialDone) ||
+    showSocialSection ||
+    showUpcomingLockedPanel ||
     showOnchainSection ||
     showNotQualifiedPanel ||
     showClaimPanel;
@@ -1208,7 +1239,9 @@ export function AirdropDetailPanel({ airdropId }: { airdropId: string }) {
     ? "idle"
     : socialDone
       ? "done"
-      : "active";
+      : isUpcoming
+        ? "locked"
+        : "active";
 
   const onchainStepState: "done" | "active" | "locked" | "idle" =
     !hasOnchainRules || detail.merkleRoot
@@ -1228,268 +1261,286 @@ export function AirdropDetailPanel({ airdropId }: { airdropId: string }) {
   const airdropReturnTo = `/airdrops/${airdropId}`;
   const saved = isSaved(airdropId);
 
+  const rewardProps = airdropDetailRewardProps(detail, bnbUsd);
+  const openSocialCount = requiredSocialTasks.filter((t) => !t.completed).length;
+
   return (
-    <div className="min-w-0 space-y-3 md:space-y-5">
-      {error ? (
-        <div className="notice-error rounded-lg border border-pump-danger/30 bg-pump-danger/5 px-3 py-2 text-body-sm">
-          {error}
-        </div>
-      ) : null}
+    <div className="airdrops-page airdrop-detail-page">
+      <div className="airdrop-detail-hub">
+        {error ? (
+          <div className="airdrop-detail-notice airdrop-detail-notice--error">{error}</div>
+        ) : null}
 
-      <section className="panel-surface overflow-hidden">
-        <div className="airdrop-detail-hero__head border-b border-pump-border/15 bg-gradient-to-br from-pump-accent/10 via-pump-card/80 to-pump-surface/55 p-3 md:p-4 md:px-5">
-          <div className="flex min-w-0 items-start gap-3">
-            <TokenAvatar
-              address={detail.linkedToken}
-              symbol={symbol}
-              size={44}
-              className="koth-banner__logo shrink-0 !ring-0 md:hidden"
-            />
-            <TokenAvatar
-              address={detail.linkedToken}
-              symbol={symbol}
-              size={52}
-              className="koth-banner__logo hidden shrink-0 md:block"
-            />
+        <div className="airdrop-detail-toolbar-band">
+          <PageBackLink href="/airdrops" className="airdrop-detail-back" />
 
-            <div className="min-w-0 flex-1">
-              <div className="flex min-w-0 items-start justify-between gap-3">
-                <div className="min-w-0 flex-1">
-                  <h1 className="featured-airdrop-card__title truncate">{title}</h1>
-                  <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                    <AirdropTrustBadge />
+          <div className="token-detail-toolbar airdrop-detail-toolbar">
+            <div className="token-detail-toolbar__row">
+              <div className="token-detail-toolbar__identity">
+                <button
+                  type="button"
+                  onClick={() => toggleSave(airdropId)}
+                  className={
+                    saved
+                      ? "token-detail-toolbar__fav-btn token-detail-toolbar__fav-btn--active"
+                      : "token-detail-toolbar__fav-btn"
+                  }
+                  aria-label={saved ? "Remove from saved" : "Save campaign"}
+                >
+                  <PumpIcon
+                    icon={saved ? faBookmarkSolid : faBookmarkRegular}
+                    className="token-detail-toolbar__fav-icon"
+                  />
+                </button>
+                <TokenAvatar
+                  address={detail.linkedToken}
+                  symbol={symbol}
+                  size={28}
+                  className="token-detail-toolbar__logo shrink-0 !ring-0"
+                />
+                <div className="token-detail-toolbar__pair-meta">
+                  <div className="token-detail-toolbar__symbol-row">
+                    <h1 className="token-detail-toolbar__symbol truncate">{title}</h1>
                   </div>
-                  {detail.description ? (
-                    <p className="mt-1.5 text-caption leading-snug text-pump-muted line-clamp-2 md:line-clamp-none md:text-body-sm md:leading-relaxed">
-                      {detail.description}
-                    </p>
-                  ) : null}
-                </div>
-
-                <div className="flex shrink-0 items-center gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => toggleSave(airdropId)}
-                    className={`inline-flex h-8 w-8 items-center justify-center rounded-sm border transition ${
-                      saved
-                        ? "border-pump-accent/35 bg-pump-accent/15 text-pump-accent"
-                        : "border-pump-border/25 bg-pump-surface/65 text-pump-muted hover:text-pump-text"
-                    }`}
-                    aria-label={saved ? "Remove from saved" : "Save campaign"}
-                  >
-                    <PumpIcon
-                      icon={saved ? faBookmarkSolid : faBookmarkRegular}
-                      className="h-4 w-4"
-                    />
-                  </button>
-                  <span className={`${airdropStatusBadgeClass(displayStatus)} h-8 items-center`}>
-                    {formatAirdropDisplayStatus(displayStatus)}
+                  <span className="token-detail-toolbar__age inline-flex min-w-0 items-center">
+                    <AirdropTrustBadge />
                   </span>
                 </div>
               </div>
+
+              <div className="token-detail-toolbar__scroll">
+                <div className="token-detail-toolbar__stats">
+                  <div className="token-detail-toolbar__stat airdrop-detail-toolbar__stat--reward">
+                    <span className="token-detail-toolbar__stat-label">
+                      <span className="airdrop-detail-toolbar__stat-label-full">Reward pool</span>
+                      <span className="airdrop-detail-toolbar__stat-label-short">Pool</span>
+                    </span>
+                    <div className="token-detail-toolbar__stat-value">
+                      <AirdropRewardPoolMetric {...rewardProps} />
+                    </div>
+                  </div>
+                  <div className="token-detail-toolbar__stat">
+                    <span className="token-detail-toolbar__stat-label">Progress</span>
+                    <div className="token-detail-toolbar__stat-value">
+                      <AirdropProgressMetric
+                        timeLabel={nowTick >= 0 ? timeLeftLabel(displayStatus, detail) : "—"}
+                        progressPct={timelineProgress}
+                        showBar={false}
+                      />
+                    </div>
+                  </div>
+                  <div className="token-detail-toolbar__stat airdrop-detail-toolbar__stat--participants">
+                    <div
+                      className="airdrop-detail-toolbar__participants"
+                      title="Participants"
+                      aria-label={`Participants: ${detail.participantCount.toLocaleString()}`}
+                    >
+                      <PumpIcon
+                        icon={MetricIcons.participants}
+                        className="airdrop-detail-toolbar__participants-icon"
+                        aria-hidden
+                      />
+                      <div className="token-detail-toolbar__stat-value">
+                        <AirdropParticipantsMetric count={detail.participantCount} />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="token-detail-toolbar__actions">
+                <span className={`${airdropStatusBadgeClass(displayStatus)} airdrop-detail-status`}>
+                  {formatAirdropDisplayStatus(displayStatus)}
+                </span>
+              </div>
             </div>
+
+            {detail.description ? (
+              <p className="airdrop-detail-toolbar__description">{detail.description}</p>
+            ) : null}
           </div>
         </div>
 
-        <div className="airdrop-detail-hero__stats p-3 md:p-4 md:px-5">
-          <AirdropMetricsStrip
-            layout="detail"
-            hideStatus
-            reward={<AirdropRewardPoolMetric {...airdropDetailRewardProps(detail, bnbUsd)} />}
-            progress={
-              <AirdropProgressMetric
-                timeLabel={nowTick >= 0 ? timeLeftLabel(displayStatus, detail) : "—"}
-                progressPct={timelineProgress}
-                showBar={showAirdropProgressBar(displayStatus)}
-              />
-            }
-            participants={<AirdropParticipantsMetric count={detail.participantCount} />}
-            poolToken={
-              <AirdropPoolTokenMetric tokenAddress={detail.linkedToken} symbol={symbol} />
-            }
-            status={<AirdropStatusMetric status={displayStatus} />}
-          />
-        </div>
-      </section>
-
-      {displayStatus === "UPCOMING" ? (
-        <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 rounded-lg border border-pump-border/25 bg-pump-surface/40 px-3 py-2.5 text-body-sm text-pump-muted">
-          <HourglassIcon size={15} className="self-center" />
-          <span>
-            Qualification opens in{" "}
-            <span className="font-medium tabular-nums text-pump-text" aria-live="polite">
-              {nowTick >= 0 ? formatDurationUntil(detail.qualifyStart) : null}
+        {displayStatus === "UPCOMING" ? (
+          <p className="airdrop-detail-notice">
+            <HourglassIcon size={14} className="shrink-0 self-center" />
+            <span>
+              Qualification opens in{" "}
+              <span className="font-medium tabular-nums text-pump-text" aria-live="polite">
+                {nowTick >= 0 ? formatDurationUntil(detail.qualifyStart) : null}
+              </span>
+              {hasSocialGate
+                ? ". Social and on-chain tasks unlock when qualify opens."
+                : hasOnchainRules
+                  ? ". On-chain tracking begins when qualify opens."
+                  : "."}
             </span>
-            {hasSocialGate
-              ? ". Complete social tasks now; on-chain tracking begins when qualify opens."
-              : hasOnchainRules
-                ? ". On-chain tracking begins when qualify opens."
-                : "."}
-          </span>
-        </p>
-      ) : null}
+          </p>
+        ) : null}
 
-      {displayStatus === "FINALIZING" ? (
-        <p className="rounded-lg border border-pump-warning/30 bg-pump-warning/5 px-3 py-2.5 text-body-sm text-pump-muted">
-          Qualification ended. Winners are being ranked and the Merkle root is submitted on-chain — this
-          page refreshes every 12s. When status becomes{" "}
-          <span className="font-medium text-pump-accent">Claimable</span>, winners can claim.
-        </p>
-      ) : null}
+        {displayStatus === "FINALIZING" ? (
+          <p className="airdrop-detail-notice airdrop-detail-notice--warning">
+            Qualification ended. Winners are being ranked and the Merkle root is submitted on-chain —
+            this page refreshes every 12s. When status becomes{" "}
+            <span className="font-medium text-pump-accent">Claimable</span>, winners can claim.
+          </p>
+        ) : null}
 
-      <div className="space-y-4">
         {(hasSocialGate || hasOnchainRules || showClaimPanel) && (
-          <div className="hidden flex-wrap gap-2 md:flex">
-            {hasSocialGate ? (
-              <StepBadge step={1} label="Social" state={socialStepState} />
-            ) : null}
-            {hasOnchainRules && !detail.merkleRoot && onchainUnlocked ? (
-              <StepBadge
-                step={hasSocialGate ? 2 : 1}
-                label="On-chain"
-                state={onchainStepState}
-              />
-            ) : null}
-            {showClaimPanel ? (
-              <StepBadge
-                step={hasSocialGate && hasOnchainRules ? 3 : hasSocialGate || hasOnchainRules ? 2 : 1}
-                label="Claim"
-                state={claimStepState}
-              />
-            ) : null}
+          <div className="airdrop-detail-step-bar">
+            <nav className="airdrops-tab-nav" aria-label="Campaign steps">
+              <div className="airdrops-tab-nav__track">
+                {hasSocialGate ? (
+                  <StepTab
+                    label="Social"
+                    state={socialStepState}
+                    count={openSocialCount > 0 ? openSocialCount : undefined}
+                  />
+                ) : null}
+                {hasOnchainRules && !detail.merkleRoot ? (
+                  <StepTab label="On-chain" state={onchainStepState} />
+                ) : null}
+                {showClaimPanel ? <StepTab label="Claim" state={claimStepState} /> : null}
+              </div>
+            </nav>
           </div>
         )}
 
-        <div className="grid gap-3 md:gap-4 xl:grid-cols-[5fr_7fr] xl:items-start">
-          <div className="flex min-h-0 flex-col gap-3 md:gap-4">
-            {hasSocialGate && !socialDone ? (
-              <div className="space-y-2">
-                <SectionHeader
-                  title="Step 1 — Social tasks"
-                  hint="Complete each task to unlock on-chain requirements."
-                />
-                <section className="panel-surface p-4 md:p-5">
-                  <ul className="space-y-2">
-                    {detail.socialTasks.map((task) => (
-                      <SocialTaskRow
-                        key={task.id}
-                        task={task}
-                        qualifyEnded={qualifyEnded}
-                        completing={completingTaskId === task.id}
-                        onComplete={() => void handleSocialTaskClick(task)}
-                      />
-                    ))}
-                  </ul>
-                </section>
-              </div>
-            ) : null}
-
-            {showOnchainSection ? (
-              <div className="space-y-2">
-                <SectionHeader
-                  title={
-                    hasSocialGate ? "Step 2 — On-chain requirements" : "On-chain requirements"
-                  }
-                  hint="Hold or buy the pool token during the qualify window."
-                />
-                <section className="panel-surface p-4 md:p-5">
-                  <OnchainRequirementsContent
-                    symbol={symbol}
-                    linkedToken={detail.linkedToken}
-                    qualifyStarted={qualifyStarted}
-                    qualifyStart={detail.qualifyStart}
-                    qualifyEnd={detail.qualifyEnd}
-                    isConnected={isConnected}
-                    hasOnchainRules={hasOnchainRules}
-                    progressError={progressError}
-                    progress={progress}
-                    onConnect={() => openConnectModal?.()}
-                    returnTo={airdropReturnTo}
-                  />
-                </section>
-              </div>
-            ) : null}
-
-            {showNotQualifiedPanel ? (
-              <div className="space-y-2">
-                <SectionHeader
-                  title="Not qualified"
-                  hint="Your wallet is not in the top 100 for this round."
-                />
-                <section className="panel-surface p-4 md:p-5">
-                  <p className="text-body-sm text-pump-muted">
-                    Qualification ended — winners were ranked by{" "}
-                    <TokenSymbolInline
-                      address={detail.linkedToken}
-                      symbol={symbol}
-                      size={14}
-                      className="inline-flex text-pump-text"
-                    />{" "}
-                    balance at qualify end. Review the final winners list.
-                  </p>
-                </section>
-              </div>
-            ) : null}
-
-            {showClaimPanel && userAlreadyClaimed && userWinner ? (
-              <div className="space-y-2">
-                <SectionHeader title="Reward claimed" accent />
-                <section className="panel-surface p-4 md:p-5">
-                  <p className="text-body-sm text-pump-text">
-                    <ClaimRewardAmount amount={userWinner.amount} detail={detail} size="sm" /> sent
-                    to your wallet.
-                  </p>
-                </section>
-              </div>
-            ) : showClaimPanel && userCanClaim ? (
-              <div className="space-y-2">
-                <SectionHeader
-                  title="You qualified"
-                  hint={
-                    displayStatus === "CLAIMABLE" && detail.claimEnd
-                      ? `Claim before the window closes · ${nowTick >= 0 ? formatTimeRemaining(detail.claimEnd) : "—"} left`
-                      : "Claim your share before the window closes."
-                  }
-                  accent
-                />
-                <section className="panel-surface border border-pump-accent/25 bg-pump-accent/5 p-4 md:p-5">
-                  <ClaimRewardAmount amount={claimInfo!.amount} detail={detail} />
-                  <button
-                    type="button"
-                    className="primary-button mt-4 flex h-11 w-full items-center justify-center gap-2 sm:w-auto sm:min-w-[10rem]"
-                    disabled={isPending}
-                    onClick={onClaim}
-                  >
-                    {isPending ? (
-                      <span
-                        className="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-current border-t-transparent"
-                        aria-hidden
-                      />
-                    ) : null}
-                    {isPending ? "Claiming…" : "Claim reward"}
-                  </button>
-                </section>
-              </div>
-            ) : null}
-          </div>
-
+        <div className="airdrop-detail-body">
           <div
-            className={`flex min-h-0 flex-col gap-2 ${
-              winnersSpanFull || (!hasLeftColumnContent && !detail.merkleRoot)
-                ? "xl:col-span-2"
-                : ""
-            } xl:sticky xl:top-4 xl:max-h-[calc(100vh-6rem)]`}
+            className={`airdrop-detail-body__grid${
+              winnersSpanFull ? " airdrop-detail-body__grid--full-board" : ""
+            }`}
           >
-            <SectionHeader
-              title={detail.merkleRoot ? "Winners" : "Live leaderboard"}
-              hint={
-                detail.merkleRoot
-                  ? `Final top 100 ranked by ${symbol} balance at qualify end.`
-                  : `Projected rewards by rank · ${symbol} balances refresh every 12s during qualify.`
-              }
-            />
+            {hasLeftColumnContent ? (
+              <div className="airdrop-detail-body__primary">
+                {showUpcomingLockedPanel ? (
+                  <UpcomingTasksLockedNotice qualifyStart={detail.qualifyStart} nowTick={nowTick} />
+                ) : null}
 
-            <section className="panel-surface overflow-hidden p-0 sm:p-4 md:p-5">
+                {showSocialSection ? (
+                  <section className="airdrop-detail-section">
+                    <SectionHeader
+                      title="Social tasks"
+                      hint="Complete each task to unlock on-chain requirements."
+                    />
+                    <ul className="airdrop-detail-task-list">
+                      {detail.socialTasks.map((task) => (
+                        <SocialTaskRow
+                          key={task.id}
+                          task={task}
+                          qualifyEnded={qualifyEnded}
+                          completing={completingTaskId === task.id}
+                          onComplete={() => void handleSocialTaskClick(task)}
+                        />
+                      ))}
+                    </ul>
+                  </section>
+                ) : null}
+
+                {showOnchainSection ? (
+                  <section className="airdrop-detail-section">
+                    <SectionHeader
+                      title={hasSocialGate ? "On-chain requirements" : "On-chain requirements"}
+                      hint="Hold or buy the pool token during the qualify window."
+                    />
+                    <div className="airdrop-detail-section__body">
+                      <OnchainRequirementsContent
+                        symbol={symbol}
+                        linkedToken={detail.linkedToken}
+                        qualifyStarted={qualifyStarted}
+                        qualifyStart={detail.qualifyStart}
+                        qualifyEnd={detail.qualifyEnd}
+                        isConnected={isConnected}
+                        hasOnchainRules={hasOnchainRules}
+                        progressError={progressError}
+                        progress={progress}
+                        onConnect={() => openConnectModal?.()}
+                        returnTo={airdropReturnTo}
+                      />
+                    </div>
+                  </section>
+                ) : null}
+
+                {showNotQualifiedPanel ? (
+                  <section className="airdrop-detail-section">
+                    <SectionHeader
+                      title="Not qualified"
+                      hint="Your wallet is not in the top 100 for this round."
+                    />
+                    <div className="airdrop-detail-section__body">
+                      <p className="text-body-sm text-pump-muted">
+                        Qualification ended — winners were ranked by{" "}
+                        <TokenSymbolInline
+                          address={detail.linkedToken}
+                          symbol={symbol}
+                          size={14}
+                          className="inline-flex text-pump-text"
+                        />{" "}
+                        balance at qualify end. Review the final winners list.
+                      </p>
+                    </div>
+                  </section>
+                ) : null}
+
+                {showClaimPanel && userAlreadyClaimed && userWinner ? (
+                  <section className="airdrop-detail-section">
+                    <SectionHeader title="Reward claimed" />
+                    <div className="airdrop-detail-section__body">
+                      <p className="text-body-sm text-pump-text">
+                        <ClaimRewardAmount amount={userWinner.amount} detail={detail} size="sm" /> sent
+                        to your wallet.
+                      </p>
+                    </div>
+                  </section>
+                ) : showClaimPanel && userCanClaim ? (
+                  <section className="airdrop-detail-section airdrop-detail-section--accent">
+                    <SectionHeader
+                      title="You qualified"
+                      hint={
+                        displayStatus === "CLAIMABLE" && detail.claimEnd
+                          ? `Claim before the window closes · ${nowTick >= 0 ? formatTimeRemaining(detail.claimEnd) : "—"} left`
+                          : "Claim your share before the window closes."
+                      }
+                    />
+                    <div className="airdrop-detail-section__body">
+                      <ClaimRewardAmount amount={claimInfo!.amount} detail={detail} />
+                      <button
+                        type="button"
+                        className="primary-button mt-3 flex h-10 w-full items-center justify-center gap-2 sm:w-auto sm:min-w-[9.5rem]"
+                        disabled={isPending}
+                        onClick={onClaim}
+                      >
+                        {isPending ? (
+                          <span
+                            className="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-current border-t-transparent"
+                            aria-hidden
+                          />
+                        ) : null}
+                        {isPending ? "Claiming…" : "Claim reward"}
+                      </button>
+                    </div>
+                  </section>
+                ) : null}
+              </div>
+            ) : null}
+
+            <section
+              className={`airdrop-detail-section airdrop-detail-section--board${
+                winnersSpanFull || (!hasLeftColumnContent && !detail.merkleRoot)
+                  ? " airdrop-detail-section--full"
+                  : ""
+              }`}
+            >
+              <SectionHeader
+                title={detail.merkleRoot ? "Winners" : "Live leaderboard"}
+                hint={
+                  detail.merkleRoot
+                    ? `Final top 100 ranked by ${symbol} balance at qualify end.`
+                    : `Projected rewards by rank · ${symbol} balances refresh every 12s during qualify.`
+                }
+              />
+
               {!detail.merkleRoot && address && leaderboardViewer ? (
                 <ViewerRankBanner
                   viewer={leaderboardViewer}
@@ -1498,7 +1549,7 @@ export function AirdropDetailPanel({ airdropId }: { airdropId: string }) {
                 />
               ) : null}
 
-              <div className="scrollbar-subtle max-h-[min(70vh,42rem)] overflow-y-auto overscroll-contain">
+              <div className="airdrop-detail-board scrollbar-subtle overflow-y-auto overscroll-contain">
                 {detail.merkleRoot ? (
                   <WinnersTable
                     rows={winners}

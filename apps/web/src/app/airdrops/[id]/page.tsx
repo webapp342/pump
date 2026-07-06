@@ -1,6 +1,5 @@
 import { Suspense } from "react";
 import { AppShellFrame } from "@/components/layout/AppShell";
-import { PageBackLink } from "@/components/ui/PageBackLink";
 import { AirdropDetailPageLoader } from "@/components/airdrops/AirdropDetailPageLoader";
 import { AirdropDetailSkeleton } from "@/components/airdrops/AirdropsSkeleton";
 
@@ -13,10 +12,7 @@ export default async function AirdropDetailPage({ params }: PageProps) {
     <Suspense
       fallback={
         <AppShellFrame pathname="/airdrops">
-          <div className="min-w-0 space-y-3 md:space-y-4">
-            <PageBackLink href="/airdrops" />
-            <AirdropDetailSkeleton />
-          </div>
+          <AirdropDetailSkeleton />
         </AppShellFrame>
       }
     >

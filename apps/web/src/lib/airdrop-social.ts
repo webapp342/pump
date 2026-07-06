@@ -1,3 +1,5 @@
+import { openExternalUrl } from "@/lib/open-external-url";
+
 export const AIRDROP_SOCIAL_TASK_TYPES = [
   { value: "FOLLOW_X", label: "Follow us on X", action: "Follow →" },
   { value: "JOIN_TELEGRAM", label: "Join our Telegram", action: "Join →" },
@@ -10,6 +12,9 @@ const TWEET_URL_PATTERN = /(?:twitter\.com|x\.com)\/[^/]+\/status\/(\d+)/i;
 const TWEET_PATH_PATTERN = /\/status\/(\d+)/i;
 const X_PROFILE_PATH_PATTERN = /^\/([A-Za-z0-9_]{1,15})\/?$/;
 const X_USERNAME_PATTERN = /^[A-Za-z0-9_]{1,15}$/;
+const TELEGRAM_HOSTS = new Set(["t.me", "telegram.me", "www.t.me", "www.telegram.me"]);
+const DISCORD_INVITE_PATH = /(?:^|\/)invite\/([A-Za-z0-9-]+)/i;
+const DISCORD_GG_PATH = /^(?:https?:\/\/)?(?:www\.)?discord\.gg\/([A-Za-z0-9-]+)/i;
 
 const RESERVED_X_PATHS = new Set([
   "intent",
@@ -26,6 +31,12 @@ const RESERVED_X_PATHS = new Set([
 ]);
 
 export type AirdropSocialTaskType = (typeof AIRDROP_SOCIAL_TASK_TYPES)[number]["value"];
+
+export type SocialTaskOpenTarget = {
+  webUrl: string;
+  appUrl?: string;
+  telegramMiniAppLink?: boolean;
+};
 
 export type SocialTaskDraft = {
   taskType: AirdropSocialTaskType;
@@ -109,22 +120,131 @@ export function normalizeSocialTaskTarget(taskType: string, value: string): stri
   return trimmed;
 }
 
-/** URL opened when a participant clicks a social task. */
-export function socialTaskParticipantUrl(taskType: string, targetUrl: string): string {
+function parseDiscordInviteCode(input: string): string | null {
+  const trimmed = input.trim();
+  if (!trimmed) return null;
+
+  const shortMatch = trimmed.match(DISCORD_GG_PATH);
+  if (shortMatch?.[1]) return shortMatch[1];
+
+  try {
+    const parsed = new URL(trimmed);
+    const host = parsed.hostname.replace(/^www\./, "");
+    if (host !== "discord.com" && host !== "discord.gg") return null;
+    const pathMatch = parsed.pathname.match(DISCORD_INVITE_PATH);
+    return pathMatch?.[1] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function parseTelegramTarget(input: string): { webUrl: string; appUrl?: string } | null {
+  const trimmed = input.trim();
+  if (!trimmed) return null;
+
+  if (/^https?:\/\//i.test(trimmed)) {
+    try {
+      const parsed = new URL(trimmed);
+      const host = parsed.hostname.replace(/^www\./, "");
+      if (!TELEGRAM_HOSTS.has(host)) return null;
+
+      const joinChatMatch = parsed.pathname.match(/^\/joinchat\/([A-Za-z0-9_-]+)/i);
+      if (joinChatMatch?.[1]) {
+        return {
+          webUrl: `https://t.me/joinchat/${joinChatMatch[1]}`,
+          appUrl: `tg://join?invite=${joinChatMatch[1]}`,
+        };
+      }
+
+      const plusInviteMatch = parsed.pathname.match(/^\/\+([A-Za-z0-9_-]+)/);
+      if (plusInviteMatch?.[1]) {
+        return {
+          webUrl: `https://t.me/+${plusInviteMatch[1]}`,
+          appUrl: `tg://join?invite=${plusInviteMatch[1]}`,
+        };
+      }
+
+      const usernameMatch = parsed.pathname.match(/^\/([A-Za-z0-9_]{3,})$/);
+      if (usernameMatch?.[1]) {
+        return {
+          webUrl: `https://t.me/${usernameMatch[1]}`,
+          appUrl: `tg://resolve?domain=${usernameMatch[1]}`,
+        };
+      }
+
+      return { webUrl: trimmed };
+    } catch {
+      return null;
+    }
+  }
+
+  const username = trimmed.replace(/^@/, "");
+  if (!/^[A-Za-z0-9_]{3,}$/.test(username)) return null;
+  return {
+    webUrl: `https://t.me/${username}`,
+    appUrl: `tg://resolve?domain=${username}`,
+  };
+}
+
+/** Resolve web + optional native app URLs for a participant social task. */
+export function resolveSocialTaskOpenTarget(
+  taskType: string,
+  targetUrl: string
+): SocialTaskOpenTarget {
   const trimmed = targetUrl.trim();
+
   if (taskType === "FOLLOW_X") {
     const username = parseXUsername(trimmed);
     if (username) {
-      return `https://x.com/intent/follow?screen_name=${encodeURIComponent(username)}`;
+      return {
+        webUrl: `https://x.com/intent/follow?screen_name=${encodeURIComponent(username)}`,
+        appUrl: `twitter://user?screen_name=${encodeURIComponent(username)}`,
+      };
     }
   }
+
   if (taskType === "RETWEET_X") {
     const tweetId = parseTweetIdFromUrl(trimmed);
     if (tweetId) {
-      return `https://x.com/intent/retweet?tweet_id=${tweetId}`;
+      return {
+        webUrl: `https://x.com/intent/retweet?tweet_id=${tweetId}`,
+        appUrl: `twitter://status?id=${tweetId}`,
+      };
     }
   }
-  return trimmed;
+
+  if (taskType === "JOIN_TELEGRAM") {
+    const telegram = parseTelegramTarget(trimmed);
+    if (telegram) {
+      return {
+        webUrl: telegram.webUrl,
+        appUrl: telegram.appUrl,
+        telegramMiniAppLink: true,
+      };
+    }
+  }
+
+  if (taskType === "JOIN_DISCORD") {
+    const inviteCode = parseDiscordInviteCode(trimmed);
+    if (inviteCode) {
+      return {
+        webUrl: `https://discord.gg/${inviteCode}`,
+        appUrl: `discord://discord.com/invite/${inviteCode}`,
+      };
+    }
+  }
+
+  return { webUrl: trimmed };
+}
+
+/** URL opened when a participant clicks a social task (web fallback). */
+export function socialTaskParticipantUrl(taskType: string, targetUrl: string): string {
+  return resolveSocialTaskOpenTarget(taskType, targetUrl).webUrl;
+}
+
+/** Open social task with mobile deep link / Telegram Mini App handling. */
+export function openSocialTaskParticipantUrl(taskType: string, targetUrl: string): void {
+  openExternalUrl(resolveSocialTaskOpenTarget(taskType, targetUrl));
 }
 
 /** Participant-facing task title (preview + airdrop detail). */
