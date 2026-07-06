@@ -45,6 +45,7 @@ import {
   socialTaskPreviewLabel,
 } from "@/lib/airdrop-social";
 import { AirdropDetailSkeleton } from "@/components/airdrops/AirdropsSkeleton";
+import { HubDiscoveryScrollLock } from "@/components/layout/HubDiscoveryScrollLock";
 import { CreatorProfileModal } from "@/components/creators/CreatorProfileModal";
 import { TokenAvatar } from "@/components/token/TokenAvatar";
 import { BnbLogo } from "@/components/token/BnbLogo";
@@ -598,24 +599,6 @@ function LeaderboardWalletCell({
   );
 }
 
-function LeaderboardMetricLabel({
-  children,
-  align = "left",
-}: {
-  children: ReactNode;
-  align?: "left" | "right";
-}) {
-  return (
-    <p
-      className={`mb-1 flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-pump-muted ${
-        align === "right" ? "justify-end" : "justify-start"
-      }`}
-    >
-      {children}
-    </p>
-  );
-}
-
 function LiveLeaderboardTable({
   rows,
   detail,
@@ -648,26 +631,26 @@ function LiveLeaderboardTable({
     };
   }
 
-  function holdCellProps(holdAmount: string | null | undefined, mobile = false) {
+  function holdCellProps(holdAmount: string | null | undefined) {
     return {
       holdAmount,
       linkedToken: detail.linkedToken,
       poolSymbol: symbol,
       linkedPriceBnb: detail.linkedPriceBnb,
       bnbUsd,
-      align: mobile ? ("left" as const) : ("right" as const),
-      showSymbol: !mobile,
+      align: "right" as const,
+      showSymbol: true,
       inlineUsd: true,
     };
   }
 
-  function rewardCellProps(reward: { amount: string; usd: number | null }, mobile = false) {
+  function rewardCellProps(reward: { amount: string; usd: number | null }) {
     return {
       amount: reward.amount,
       usd: reward.usd,
       detail,
       compact: true,
-      align: mobile ? ("left" as const) : ("right" as const),
+      align: "right" as const,
       usdOnly: true,
     };
   }
@@ -686,6 +669,13 @@ function LiveLeaderboardTable({
         <span className="text-right">Est. reward</span>
       </div>
 
+      <div className="airdrop-leaderboard-head sm:hidden" aria-hidden>
+        <span>#</span>
+        <span>Wallet</span>
+        <span className="airdrop-leaderboard-head__cell--right">Held</span>
+        <span className="airdrop-leaderboard-head__cell--right">Est.</span>
+      </div>
+
       <ul className="divide-y divide-pump-border/10">
         {PREVIEW_RANKS.map((rank) => {
           const row = rowByRank.get(rank);
@@ -698,32 +688,26 @@ function LiveLeaderboardTable({
                 key={`filled-${row.rank}-${row.address}`}
                 className={isYou ? "bg-pump-accent/8" : undefined}
               >
-                <div className="space-y-2 py-2.5 sm:hidden">
-                  <div className="flex items-start gap-2.5 px-3">
-                    <span className="financial-value w-5 shrink-0 pt-1 font-semibold tabular-nums text-pump-muted">
-                      {row.rank}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <LeaderboardWalletCell
-                        walletAddress={row.address}
-                        viewerAddress={address}
-                        creatorAddress={detail.creatorAddress}
-                        onWalletClick={onWalletClick}
-                      />
-                    </div>
+                <div className="airdrop-leaderboard-row sm:hidden">
+                  <span className="airdrop-leaderboard-row__rank">{row.rank}</span>
+                  <div className="min-w-0">
+                    <LeaderboardWalletCell
+                      walletAddress={row.address}
+                      viewerAddress={address}
+                      creatorAddress={detail.creatorAddress}
+                      onWalletClick={onWalletClick}
+                      compact
+                    />
                   </div>
-                  <div className="space-y-2 px-3 pl-10">
-                    <div className="flex items-center justify-between gap-3">
-                      <LeaderboardMetricLabel align="right">
-                        <TokenSymbolInline address={detail.linkedToken} symbol={symbol} size={10} />
-                        <span>held</span>
-                      </LeaderboardMetricLabel>
-                      <HoldCell {...holdCellProps(row.holdAmount, true)} />
-                    </div>
-                    <div className="flex items-center justify-between gap-3">
-                      <LeaderboardMetricLabel align="right">Est. reward</LeaderboardMetricLabel>
-                      <RewardCell {...rewardCellProps(reward, true)} />
-                    </div>
+                  <div className="airdrop-leaderboard-row__metric">
+                    <HoldCell
+                      {...holdCellProps(row.holdAmount)}
+                      showSymbol={false}
+                      inlineUsd={false}
+                    />
+                  </div>
+                  <div className="airdrop-leaderboard-row__metric">
+                    <RewardCell {...rewardCellProps(reward)} />
                   </div>
                 </div>
 
@@ -746,25 +730,14 @@ function LiveLeaderboardTable({
 
           return (
             <li key={`open-${rank}`} className="text-pump-muted/90">
-              <div className="space-y-2 py-2.5 sm:hidden">
-                <div className="flex items-start gap-2.5 px-3">
-                  <span className="financial-value w-5 shrink-0 pt-0.5 font-semibold tabular-nums text-pump-muted">
-                    {rank}
-                  </span>
-                  <span className="pt-1 italic text-caption text-pump-muted">Open slot</span>
-                </div>
-                <div className="space-y-2 px-3 pl-10">
-                  <div className="flex items-center justify-between gap-3">
-                    <LeaderboardMetricLabel align="right">
-                      <TokenSymbolInline address={detail.linkedToken} symbol={symbol} size={10} />
-                      <span>held</span>
-                    </LeaderboardMetricLabel>
-                    <HoldCell {...holdCellProps(null, true)} />
-                  </div>
-                  <div className="flex items-center justify-between gap-3">
-                    <LeaderboardMetricLabel align="right">Est. reward</LeaderboardMetricLabel>
-                    <RewardCell {...rewardCellProps(reward, true)} />
-                  </div>
+              <div className="airdrop-leaderboard-row sm:hidden">
+                <span className="airdrop-leaderboard-row__rank">{rank}</span>
+                <span className="airdrop-leaderboard-row__open">Open slot</span>
+                <span className="airdrop-leaderboard-row__metric airdrop-leaderboard-row__metric--muted">
+                  —
+                </span>
+                <div className="airdrop-leaderboard-row__metric">
+                  <RewardCell {...rewardCellProps(reward)} />
                 </div>
               </div>
 
@@ -817,10 +790,13 @@ function WinnersTable({
         <span>Wallet</span>
         <span className="text-right">Reward</span>
       </div>
-      <div className="sticky top-0 z-[1] grid grid-cols-[1.25rem_1fr] gap-x-2 border-b border-pump-border/10 bg-pump-card/95 px-3 py-2 sm:hidden">
-        <span className="koth-banner__tag m-0">#</span>
-        <span className="koth-banner__tag m-0">Wallet</span>
+
+      <div className="airdrop-leaderboard-head airdrop-leaderboard-head--winners sm:hidden" aria-hidden>
+        <span>#</span>
+        <span>Wallet</span>
+        <span className="airdrop-leaderboard-head__cell--right">Reward</span>
       </div>
+
       <ul className="divide-y divide-pump-border/10">
         {rows.map((row) => {
           const isYou = address && row.address.toLowerCase() === address.toLowerCase();
@@ -829,11 +805,9 @@ function WinnersTable({
 
           return (
             <li key={`${row.rank}-${row.address}`} className={isYou ? "bg-pump-accent/8" : undefined}>
-              <div className="grid grid-cols-[1.25rem_1fr] gap-x-2 gap-y-1.5 px-3 py-2.5 sm:hidden">
-                <span className="financial-value self-center text-center text-caption font-semibold tabular-nums text-pump-muted">
-                  {row.rank}
-                </span>
-                <div className="min-w-0 self-center">
+              <div className="airdrop-leaderboard-row airdrop-leaderboard-winners-row sm:hidden">
+                <span className="airdrop-leaderboard-row__rank">{row.rank}</span>
+                <div className="min-w-0">
                   <LeaderboardWalletCell
                     walletAddress={row.address}
                     viewerAddress={address}
@@ -843,15 +817,13 @@ function WinnersTable({
                     compact
                   />
                 </div>
-                <div className="col-start-2 min-w-0 overflow-x-auto">
+                <div className="airdrop-leaderboard-row__metric">
                   <RewardCell
                     amount={rewardCompact}
                     usd={rewardUsd}
                     detail={detail}
                     compact
-                    align="left"
-                    showSymbol
-                    showLabel
+                    usdOnly
                   />
                 </div>
               </div>
@@ -1266,6 +1238,7 @@ export function AirdropDetailPanel({ airdropId }: { airdropId: string }) {
 
   return (
     <div className="airdrops-page airdrop-detail-page">
+      <HubDiscoveryScrollLock />
       <div className="airdrop-detail-hub">
         {error ? (
           <div className="airdrop-detail-notice airdrop-detail-notice--error">{error}</div>
@@ -1326,6 +1299,7 @@ export function AirdropDetailPanel({ airdropId }: { airdropId: string }) {
                         timeLabel={nowTick >= 0 ? timeLeftLabel(displayStatus, detail) : "—"}
                         progressPct={timelineProgress}
                         showBar={false}
+                        showPct={false}
                       />
                     </div>
                   </div>
@@ -1549,7 +1523,7 @@ export function AirdropDetailPanel({ airdropId }: { airdropId: string }) {
                 />
               ) : null}
 
-              <div className="airdrop-detail-board scrollbar-subtle overflow-y-auto overscroll-contain">
+              <div className="airdrop-detail-board scrollbar-subtle max-md:overflow-visible md:overflow-y-auto md:overscroll-contain">
                 {detail.merkleRoot ? (
                   <WinnersTable
                     rows={winners}

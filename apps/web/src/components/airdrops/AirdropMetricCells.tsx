@@ -109,11 +109,13 @@ export function AirdropProgressMetric({
   progressPct,
   showBar = true,
   showIcon = true,
+  showPct = true,
 }: {
   timeLabel: string;
   progressPct?: number;
   showBar?: boolean;
   showIcon?: boolean;
+  showPct?: boolean;
 }) {
   const pct =
     progressPct != null ? Math.max(0, Math.min(100, Math.round(progressPct))) : null;
@@ -126,7 +128,7 @@ export function AirdropProgressMetric({
             {showIcon ? <HourglassIcon size={12} className="shrink-0" /> : null}
             <span className="truncate">{timeLabel}</span>
           </span>
-          {pct != null ? (
+          {showPct && pct != null ? (
             <span className="financial-value shrink-0 text-caption font-semibold tabular-nums text-pump-muted">
               {pct}%
             </span>
