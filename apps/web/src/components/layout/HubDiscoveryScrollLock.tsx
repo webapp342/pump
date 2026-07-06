@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { pinMobileWindowScroll } from "@/hooks/useMobileModalScrollLock";
+import { pinMobileWindowScroll, keyboardLikelyOpenForPin } from "@/hooks/useMobileModalScrollLock";
 
 const LOCK_CLASS = "hub-discovery-scroll-lock";
 const SEARCH_FOCUS_CLASS = "hub-discovery-search-focus";
@@ -86,6 +86,7 @@ export function HubDiscoveryScrollLock() {
     };
 
     const onViewportChange = () => {
+      if (keyboardLikelyOpenForPin()) return;
       pin();
     };
 

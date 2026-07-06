@@ -69,6 +69,18 @@ function keyboardLikelyOpen(): boolean {
   return window.innerHeight - vv.height > 72;
 }
 
+/** iOS dismisses the keyboard when we scroll the window while a modal field is focused. */
+function shouldDeferWindowScrollPin(): boolean {
+  if (!keyboardLikelyOpen()) return false;
+  const active = document.activeElement;
+  if (!(active instanceof HTMLElement)) return true;
+  return Boolean(active.closest(".modal-sheet-panel, [role='dialog']"));
+}
+
+export function keyboardLikelyOpenForPin(): boolean {
+  return keyboardLikelyOpen();
+}
+
 function isStandaloneDisplayMode(): boolean {
   if (typeof window === "undefined") return false;
   return (
@@ -78,8 +90,9 @@ function isStandaloneDisplayMode(): boolean {
 }
 
 /** iOS Safari may scroll the window even when html/body are overflow:hidden. */
-export function pinMobileWindowScroll() {
+export function pinMobileWindowScroll(options?: { force?: boolean }) {
   if (typeof window === "undefined" || !isMobileViewport()) return;
+  if (!options?.force && shouldDeferWindowScrollPin()) return;
 
   window.scrollTo(0, 0);
   document.documentElement.scrollTop = 0;

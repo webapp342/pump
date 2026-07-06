@@ -2,10 +2,7 @@
 
 import { useEffect, useState, type FocusEvent } from "react";
 import { ModalPortal } from "@/components/ui/ModalPortal";
-import {
-  useMobileModalClose,
-  useMobileModalScrollLock,
-} from "@/hooks/useMobileModalScrollLock";
+import { useMobileModalClose } from "@/hooks/useMobileModalScrollLock";
 import { useMobileSheetDragDismiss } from "@/hooks/useMobileSheetDragDismiss";
 import { useVisualViewportSheetFrame } from "@/hooks/useVisualViewportSheetFrame";
 
@@ -33,8 +30,6 @@ export function QuickTradeSettingsSheet({
   const [inputFocused, setInputFocused] = useState(false);
   const sheetFrame = useVisualViewportSheetFrame(open && inputFocused);
 
-  useMobileModalScrollLock(open);
-
   useEffect(() => {
     if (open) return;
     resetDrag();
@@ -52,28 +47,17 @@ export function QuickTradeSettingsSheet({
 
   if (!open) return null;
 
-  const handlePanelFocusIn = (event: FocusEvent<HTMLDivElement>) => {
-    const target = event.target;
-    if (
-      target instanceof HTMLInputElement ||
-      target instanceof HTMLTextAreaElement ||
-      target instanceof HTMLSelectElement
-    ) {
-      setInputFocused(true);
-    }
-  };
-
-  const handlePanelFocusOut = (event: FocusEvent<HTMLDivElement>) => {
-    const next = event.relatedTarget;
-    if (next instanceof Node && panelRef.current?.contains(next)) return;
-    setInputFocused(false);
-  };
-
-  const handleInputFocus = (event: FocusEvent<HTMLInputElement>) => {
+  const handleInputFocus = (_event: FocusEvent<HTMLInputElement>) => {
     setInputFocused(true);
-    requestAnimationFrame(() => {
-      event.currentTarget.scrollIntoView({ block: "center", behavior: "smooth" });
-    });
+  };
+
+  const handleInputBlur = () => {
+    // iOS reports null relatedTarget when the keyboard opens — defer the check.
+    window.setTimeout(() => {
+      const active = document.activeElement;
+      if (panelRef.current?.contains(active)) return;
+      setInputFocused(false);
+    }, 0);
   };
 
   return (
@@ -100,8 +84,6 @@ export function QuickTradeSettingsSheet({
             role="dialog"
             aria-modal="true"
             aria-label="Quick trade amounts"
-            onFocusCapture={handlePanelFocusIn}
-            onBlurCapture={handlePanelFocusOut}
             {...sheetDragProps}
           >
             <div
@@ -120,6 +102,7 @@ export function QuickTradeSettingsSheet({
                   value={draftBuy}
                   onChange={(event) => onBuyChange(event.target.value)}
                   onFocus={handleInputFocus}
+                  onBlur={handleInputBlur}
                   className="field-input h-10 w-full text-body-sm"
                   placeholder="3"
                 />
@@ -134,6 +117,7 @@ export function QuickTradeSettingsSheet({
                   value={draftSellPct}
                   onChange={(event) => onSellPctChange(event.target.value)}
                   onFocus={handleInputFocus}
+                  onBlur={handleInputBlur}
                   className="field-input h-10 w-full text-body-sm"
                   placeholder="50"
                 />
