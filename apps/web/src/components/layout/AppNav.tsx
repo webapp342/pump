@@ -2,12 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  APP_BOTTOM_TAB_CENTER_ITEM,
-  APP_BOTTOM_TAB_SIDE_ITEMS,
-  BOTTOM_NAV_CENTER_HREF,
-  isBottomNavActive,
-} from "@/lib/nav-config";
+import { APP_BOTTOM_TAB_ITEMS, isBottomNavActive } from "@/lib/nav-config";
 import { PumpIcon } from "@/lib/icons";
 
 function BottomNavTab({
@@ -18,7 +13,7 @@ function BottomNavTab({
 }: {
   href: string;
   label: string;
-  icon: (typeof APP_BOTTOM_TAB_SIDE_ITEMS)[number]["icon"];
+  icon: (typeof APP_BOTTOM_TAB_ITEMS)[number]["icon"];
   active: boolean;
 }) {
   return (
@@ -26,48 +21,19 @@ function BottomNavTab({
       href={href}
       prefetch={true}
       aria-current={active ? "page" : undefined}
+      aria-label={label}
       className={`bottom-nav-item${active ? " bottom-nav-item-active" : ""}`}
     >
-      <span className="bottom-nav-item__icon" aria-hidden>
-        <PumpIcon icon={icon} className="bottom-nav-icon" />
-      </span>
-      <span className="bottom-nav-label">{label}</span>
+      <PumpIcon icon={icon} className="bottom-nav-icon" />
     </Link>
   );
 }
 
 export function AppNavView({ pathname }: { pathname: string }) {
-  const leftItems = APP_BOTTOM_TAB_SIDE_ITEMS.slice(0, 2);
-  const rightItems = APP_BOTTOM_TAB_SIDE_ITEMS.slice(2);
-  const centerActive = isBottomNavActive(pathname, BOTTOM_NAV_CENTER_HREF);
-  const centerItem = APP_BOTTOM_TAB_CENTER_ITEM;
-
   return (
     <div className="bottom-nav-host md:hidden">
       <nav className="bottom-nav" aria-label="Primary">
-        {leftItems.map((item) => (
-          <BottomNavTab
-            key={item.href}
-            href={item.href}
-            label={item.label}
-            icon={item.icon}
-            active={isBottomNavActive(pathname, item.href)}
-          />
-        ))}
-
-        <Link
-          href={centerItem.href}
-          prefetch={true}
-          aria-current={centerActive ? "page" : undefined}
-          aria-label={centerItem.label}
-          className={`bottom-nav-fab${centerActive ? " bottom-nav-fab--active" : ""}`}
-        >
-          <span className="bottom-nav-fab__ring">
-            <PumpIcon icon={centerItem.icon} className="bottom-nav-fab__icon" />
-          </span>
-        </Link>
-
-        {rightItems.map((item) => (
+        {APP_BOTTOM_TAB_ITEMS.map((item) => (
           <BottomNavTab
             key={item.href}
             href={item.href}
