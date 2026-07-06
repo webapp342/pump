@@ -6,6 +6,10 @@ interface TelegramWebAppSafeAreaInset {
   right: number;
 }
 
+interface TelegramWebAppFullscreenFailedEvent {
+  error?: "UNSUPPORTED" | "ALREADY_FULLSCREEN" | string;
+}
+
 interface TelegramWebApp {
   initData: string;
   initDataUnsafe: {
@@ -23,17 +27,21 @@ interface TelegramWebApp {
   colorScheme: "light" | "dark";
   themeParams: Record<string, string>;
   isExpanded: boolean;
+  isFullscreen?: boolean;
   viewportHeight: number;
   viewportStableHeight: number;
   safeAreaInset?: TelegramWebAppSafeAreaInset;
   contentSafeAreaInset?: TelegramWebAppSafeAreaInset;
   ready: () => void;
   expand: () => void;
+  requestFullscreen?: () => void;
+  exitFullscreen?: () => void;
+  disableVerticalSwipes?: () => void;
   close: () => void;
   setHeaderColor: (color: string) => void;
   setBackgroundColor: (color: string) => void;
-  onEvent: (eventType: string, callback: () => void) => void;
-  offEvent: (eventType: string, callback: () => void) => void;
+  onEvent: (eventType: string, callback: (...args: unknown[]) => void) => void;
+  offEvent: (eventType: string, callback: (...args: unknown[]) => void) => void;
 }
 
 interface TelegramNamespace {
