@@ -157,12 +157,12 @@ export function AirdropsFilterNav({
           fieldOnly
           value={search}
           onChange={(e) => onSearchChange(e.target.value)}
-          placeholder="Search campaigns"
+          placeholder="Search"
           aria-label="Search campaigns"
         />
       </div>
 
-      <div className="airdrops-filter-bar__main hidden md:flex">
+      <div className="airdrops-filter-bar__main airdrops-filter-bar__main--desktop hidden md:flex">
         <div className="airdrops-filter-bar__search-row">
           <div className="airdrops-filter-bar__search">
             <FieldSearchInput

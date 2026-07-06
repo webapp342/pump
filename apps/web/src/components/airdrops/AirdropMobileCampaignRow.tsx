@@ -1,15 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import {
-  airdropStatusBadgeClass,
-  formatAirdropDisplayStatus,
-} from "@/lib/airdrop-status";
+import { formatAirdropDisplayStatus } from "@/lib/airdrop-status";
 import {
   airdropRewardUsd,
   formatAirdropReward,
 } from "@/lib/airdrop-board-format";
 import { formatUsdReadable } from "@/lib/format-usd";
+import { PumpIcon, faParachuteBox } from "@/lib/icons";
 import { TokenAvatar } from "@/components/token/TokenAvatar";
 import { HourglassIcon } from "@/components/ui/HourglassIcon";
 import {
@@ -19,17 +17,28 @@ import {
   airdropTimeCaption,
   type EnrichedAirdrop,
 } from "@/lib/airdrops-list-ui";
-import { AirdropSaveButton } from "@/components/airdrops/AirdropSaveButton";
+import type { AirdropDisplayStatus } from "@/lib/airdrop-status";
 
 type AirdropMobileCampaignRowProps = {
   item: EnrichedAirdrop;
   bnbUsd: number | null;
 };
 
+function statusToneClass(status: AirdropDisplayStatus): string {
+  if (status === "QUALIFYING" || status === "CLAIMABLE") {
+    return "airdrop-mobile-campaign-row__tone--success";
+  }
+  if (status === "UPCOMING") {
+    return "airdrop-mobile-campaign-row__tone--neutral";
+  }
+  return "airdrop-mobile-campaign-row__tone--muted";
+}
+
 export function AirdropMobileCampaignRow({ item, bnbUsd }: AirdropMobileCampaignRowProps) {
   const symbol = airdropPoolSymbol(item);
   const title = airdropCampaignTitle(item);
   const timeCaption = airdropTimeCaption(item);
+  const statusLabel = formatAirdropDisplayStatus(item.displayStatus);
   const href = `/airdrops/${item.id}`;
   const isBnb = !item.rewardToken;
   const poolLabel = formatAirdropReward(item.totalFunded, {
@@ -38,6 +47,8 @@ export function AirdropMobileCampaignRow({ item, bnbUsd }: AirdropMobileCampaign
   });
   const usd = airdropRewardUsd(item, bnbUsd);
   const usdLabel = usd != null ? formatUsdReadable(usd, { compact: true }) : "—";
+  const footLabel = timeCaption ?? statusLabel;
+  const showCountdown = Boolean(timeCaption && airdropShowsCountdown(item.displayStatus));
 
   return (
     <Link href={href} className="airdrop-mobile-campaign-row" aria-label={`View ${title}`}>
@@ -56,38 +67,42 @@ export function AirdropMobileCampaignRow({ item, bnbUsd }: AirdropMobileCampaign
           <p className="airdrop-mobile-campaign-row__name truncate">{title}</p>
           <div className="airdrop-mobile-campaign-row__meta-line">
             <span className="airdrop-mobile-campaign-row__symbol">{symbol}</span>
-            <span
-              className={`airdrop-mobile-campaign-row__status ${airdropStatusBadgeClass(item.displayStatus)}`}
-            >
-              {formatAirdropDisplayStatus(item.displayStatus)}
-            </span>
-            <AirdropSaveButton airdropId={item.id} className="airdrop-mobile-campaign-row__save" />
+            {timeCaption ? (
+              <span
+                className={`airdrop-mobile-campaign-row__status financial-value ${statusToneClass(item.displayStatus)}`}
+              >
+                {statusLabel}
+              </span>
+            ) : null}
           </div>
         </div>
-        <p className="airdrop-mobile-campaign-row__pool financial-value">{poolLabel}</p>
+        <div className="airdrop-mobile-campaign-row__stats">
+          <span className="airdrop-mobile-campaign-row__stat">
+            <PumpIcon icon={faParachuteBox} className="airdrop-mobile-campaign-row__stat-icon" aria-hidden />
+            <span className="financial-value">{poolLabel}</span>
+          </span>
+        </div>
       </div>
 
       <div className="airdrop-mobile-campaign-row__aside">
         <div className="airdrop-mobile-campaign-row__quote">
           <div className="airdrop-mobile-campaign-row__metric">
             <span className="airdrop-mobile-campaign-row__metric-label">Pool</span>
-            <span className="airdrop-mobile-campaign-row__metric-value financial-value">
+            <span className="airdrop-mobile-campaign-row__metric-value airdrop-mobile-campaign-row__metric-value--pool financial-value">
               {usdLabel}
             </span>
           </div>
         </div>
-        {timeCaption ? (
-          <div className="airdrop-mobile-campaign-row__time financial-value">
-            {airdropShowsCountdown(item.displayStatus) ? (
-              <HourglassIcon size={11} aria-hidden />
-            ) : null}
-            <span>{timeCaption}</span>
+        {footLabel ? (
+          <div
+            className={`airdrop-mobile-campaign-row__ends financial-value${
+              !timeCaption ? ` ${statusToneClass(item.displayStatus)}` : ""
+            }`}
+          >
+            {showCountdown ? <HourglassIcon size={11} aria-hidden /> : null}
+            <span>{footLabel}</span>
           </div>
-        ) : (
-          <div className="airdrop-mobile-campaign-row__time airdrop-mobile-campaign-row__time--empty">
-            —
-          </div>
-        )}
+        ) : null}
       </div>
     </Link>
   );

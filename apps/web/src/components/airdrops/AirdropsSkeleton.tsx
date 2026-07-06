@@ -20,7 +20,7 @@ export function AirdropsSkeleton() {
             <div className="airdrops-filter-bar__mobile-search md:hidden">
               <Skeleton className="h-10 w-full rounded-sm" />
             </div>
-            <div className="airdrops-filter-bar__main hidden md:flex">
+            <div className="airdrops-filter-bar__main airdrops-filter-bar__main--desktop hidden md:flex">
               <div className="airdrops-filter-bar__search-row">
                 <div className="airdrops-filter-bar__search">
                   <Skeleton className="h-9 w-full rounded-sm" />
@@ -38,7 +38,7 @@ export function AirdropsSkeleton() {
         </div>
 
         <div className="airdrops-body">
-          <div className="airdrops-mobile-list md:hidden">
+          <div className="airdrops-mobile-list airdrops-mobile-list--mobile md:hidden">
             {Array.from({ length: 6 }).map((_, index) => (
               <div key={index} className="airdrop-mobile-campaign-row airdrop-mobile-campaign-row--skeleton">
                 <Skeleton className="h-[3.25rem] w-[3.25rem] shrink-0 rounded-md" />
@@ -55,9 +55,8 @@ export function AirdropsSkeleton() {
             ))}
           </div>
 
-          <section className="airdrops-list hidden md:flex" aria-hidden>
+          <section className="airdrops-list airdrops-list--desktop hidden md:flex" aria-hidden>
             <div className="airdrops-list__head">
-              <span className="airdrops-list__head-save" />
               <Skeleton variant="line" className="h-3 w-14" />
               <Skeleton variant="line" className="h-3 w-10" />
               <Skeleton variant="line" className="h-3 w-10" />
@@ -67,7 +66,6 @@ export function AirdropsSkeleton() {
             <div className="airdrops-list__scroll">
               {Array.from({ length: 6 }).map((_, index) => (
                 <div key={index} className="airdrops-list__row airdrops-list__row--skeleton">
-                  <Skeleton className="h-7 w-7 shrink-0 justify-self-center rounded-sm" />
                   <div className="flex items-center gap-2">
                     <Skeleton variant="circle" className="h-6 w-6 shrink-0" />
                     <Skeleton className="h-3.5 w-20" />

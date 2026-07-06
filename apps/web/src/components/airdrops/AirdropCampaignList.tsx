@@ -11,7 +11,6 @@ import {
 } from "@/lib/airdrop-board-format";
 import { formatUsdReadable } from "@/lib/format-usd";
 import { AirdropMobileCampaignRow } from "@/components/airdrops/AirdropMobileCampaignRow";
-import { AirdropSaveButton } from "@/components/airdrops/AirdropSaveButton";
 import { TokenAvatar } from "@/components/token/TokenAvatar";
 import { HourglassIcon } from "@/components/ui/HourglassIcon";
 import {
@@ -42,13 +41,12 @@ function AirdropCampaignRow({
   });
   const usd = airdropRewardUsd(item, bnbUsd);
   const usdLabel = usd != null ? formatUsdReadable(usd, { compact: true }) : null;
+  const statusLabel = formatAirdropDisplayStatus(item.displayStatus);
+  const footLabel = timeCaption ?? statusLabel;
+  const showCountdown = Boolean(timeCaption && airdropShowsCountdown(item.displayStatus));
 
   return (
     <Link href={href} className="airdrops-list__row">
-      <div className="airdrops-list__cell airdrops-list__cell--save">
-        <AirdropSaveButton airdropId={item.id} />
-      </div>
-
       <div className="airdrops-list__cell airdrops-list__cell--campaign">
         <TokenAvatar address={item.linkedToken} symbol={symbol} size={24} className="shrink-0" />
         <div className="min-w-0 flex-1">
@@ -75,16 +73,10 @@ function AirdropCampaignRow({
       </div>
 
       <div className="airdrops-list__cell airdrops-list__cell--time">
-        {timeCaption ? (
-          <span className="airdrops-list__time financial-value">
-            {airdropShowsCountdown(item.displayStatus) ? (
-              <HourglassIcon size={11} aria-hidden />
-            ) : null}
-            {timeCaption}
-          </span>
-        ) : (
-          <span className="airdrops-list__dash">—</span>
-        )}
+        <span className="airdrops-list__time financial-value">
+          {showCountdown ? <HourglassIcon size={11} aria-hidden /> : null}
+          {footLabel}
+        </span>
       </div>
     </Link>
   );
@@ -139,15 +131,14 @@ export function AirdropCampaignList({
 }: AirdropCampaignListProps) {
   return (
     <>
-      <div className="airdrops-mobile-list md:hidden" aria-label="Airdrop campaigns">
+      <div className="airdrops-mobile-list airdrops-mobile-list--mobile md:hidden" aria-label="Airdrop campaigns">
         {items.map((item) => (
           <AirdropMobileCampaignRow key={item.id} item={item} bnbUsd={bnbUsd} />
         ))}
       </div>
 
-      <section className="airdrops-list hidden md:flex" aria-label="Airdrop campaigns">
+      <section className="airdrops-list airdrops-list--desktop hidden md:flex" aria-label="Airdrop campaigns">
         <div className="airdrops-list__head">
-          <span className="airdrops-list__head-save" aria-hidden />
           <span className="airdrops-list__head-cell airdrops-list__head-cell--campaign">Campaign</span>
           <SortButton
             label="Pool"
