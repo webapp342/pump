@@ -240,7 +240,7 @@ export function PriceChart({
   const renderedFingerprintRef = useRef("");
 
   const [timeInterval, setTimeInterval] = useState<CandleInterval>(DEFAULT_CHART_INTERVAL);
-  const [internalCurrency, setInternalCurrency] = useState<"usd" | "mcap">("usd");
+  const [internalCurrency, setInternalCurrency] = useState<"usd" | "mcap">("mcap");
   const currency = currencyProp ?? internalCurrency;
   const [seriesState, dispatchSeries] = useReducer(chartSeriesReducer, initialChartSeriesState);
   const [loading, setLoading] = useState(() => !initialCandles?.candles.length);

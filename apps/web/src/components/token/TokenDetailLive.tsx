@@ -238,7 +238,7 @@ export function TokenDetailLive({
   const [latestWsBonding, setLatestWsBonding] = useState<
     TokenTradeWsPayload["bonding"] | null
   >(null);
-  const [chartCurrency, setChartCurrency] = useState<"usd" | "mcap">("usd");
+  const [chartCurrency, setChartCurrency] = useState<"usd" | "mcap">("mcap");
 
   const streamAddress = contentSynced ? tokenAddress : token.address;
 
