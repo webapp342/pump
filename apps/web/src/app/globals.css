@@ -9424,23 +9424,47 @@ code,
   }
 
   @media (max-width: 767px) {
-    /* Arena terminal — no global top chrome; in-page toolbar only */
-    .app-shell--hub-terminal:has(main.arena-page-main) .hub-terminal-header-band {
+    /* Hub terminals — no global top chrome on mobile; in-page toolbar only */
+    .app-shell--hub-terminal:has(
+        main.arena-page-main,
+        main.missions-page-main,
+        main.airdrops-page-main,
+        main.portfolio-page-main
+      )
+      .hub-terminal-header-band {
       display: none;
     }
 
-    .app-shell--hub-terminal:has(main.arena-page-main) {
+    .app-shell--hub-terminal:has(
+        main.arena-page-main,
+        main.missions-page-main,
+        main.airdrops-page-main,
+        main.portfolio-page-main
+      ) {
       height: 100dvh;
       max-height: 100dvh;
     }
 
-    .app-shell--hub-terminal:has(main.arena-page-main) .hub-terminal-column {
+    .app-shell--hub-terminal:has(
+        main.arena-page-main,
+        main.missions-page-main,
+        main.airdrops-page-main,
+        main.portfolio-page-main
+      )
+      .hub-terminal-column {
       max-width: none;
       border-left: none;
       border-right: none;
     }
 
-    .app-shell--hub-terminal:has(main.arena-page-main) .hub-terminal-column > main {
+    .app-shell--hub-terminal:has(
+        main.arena-page-main,
+        main.missions-page-main,
+        main.airdrops-page-main,
+        main.portfolio-page-main
+      )
+      .hub-terminal-column
+      > main {
       border-left: none;
       border-right: none;
     }
