@@ -115,7 +115,7 @@ export function PortfolioSummaryStrip({
     topHolding.pnlUsd != null;
 
   return (
-    <section className="portfolio-summary-strip" aria-label="Portfolio summary">
+    <section className="portfolio-summary-strip portfolio-summary-strip--desktop hidden md:grid" aria-label="Portfolio summary">
       <div className="portfolio-summary-strip__cell">
         <p className="portfolio-summary-strip__label">Total Value</p>
         <p className="portfolio-summary-strip__metric-row">

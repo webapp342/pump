@@ -39,6 +39,7 @@ export {
   faPen,
   faPercent,
   faPlus,
+  faQrcode,
   faRightLeft,
   faRocket,
   faRotateRight,

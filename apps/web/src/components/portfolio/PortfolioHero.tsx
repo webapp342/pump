@@ -17,7 +17,6 @@ type PortfolioHeroProps = {
   onOpenFollowers: () => void;
   followingCount: number;
   followerCount: number;
-  holdingsCount?: number;
   guestMode?: boolean;
 };
 
@@ -61,7 +60,6 @@ function ProfileStatsRow({
   guestMode,
   followingCount,
   followerCount,
-  holdingsCount,
   onOpenFollowing,
   onOpenFollowers,
   variant,
@@ -69,7 +67,6 @@ function ProfileStatsRow({
   guestMode: boolean;
   followingCount: number;
   followerCount: number;
-  holdingsCount: number;
   onOpenFollowing: () => void;
   onOpenFollowers: () => void;
   variant: "mobile" | "desktop";
@@ -99,9 +96,6 @@ function ProfileStatsRow({
             <span className="portfolio-toolbar__stat">
               <strong>0</strong> Followers
             </span>
-            <span className="portfolio-toolbar__stat portfolio-toolbar__stat--coins">
-              <strong>0</strong> Coins
-            </span>
           </>
         )}
       </div>
@@ -127,9 +121,6 @@ function ProfileStatsRow({
           <button type="button" onClick={onOpenFollowers} className="portfolio-toolbar__stat">
             <strong>{followerCount}</strong> Followers
           </button>
-          <span className="portfolio-toolbar__stat portfolio-toolbar__stat--coins">
-            <strong>{holdingsCount}</strong> Coins
-          </span>
         </>
       )}
     </div>
@@ -145,7 +136,6 @@ export function PortfolioHero({
   onOpenFollowers,
   followingCount,
   followerCount,
-  holdingsCount = 0,
   guestMode = false,
 }: PortfolioHeroProps) {
   const [shareOpen, setShareOpen] = useState(false);
@@ -160,13 +150,29 @@ export function PortfolioHero({
 
   return (
     <>
-      <header className="portfolio-header">
+      <header className="portfolio-header portfolio-hero-desktop hidden md:block">
         <div className="portfolio-toolbar">
           <div className="portfolio-toolbar__shell">
             <div className="portfolio-toolbar__lead">
               <div className="portfolio-toolbar__avatar-wrap">
                 {guestMode ? (
                   <div className="portfolio-toolbar__guest-avatar" aria-hidden />
+                ) : canEditProfile ? (
+                  <button
+                    type="button"
+                    onClick={onOpenProfileEditor}
+                    className="portfolio-toolbar__avatar-btn"
+                    aria-label="Edit profile photo and username"
+                  >
+                    <UserAvatarForAddress
+                      address={walletAddress}
+                      size={48}
+                      className="portfolio-toolbar__avatar token-detail-toolbar__logo shrink-0 !ring-0"
+                    />
+                    <span className="portfolio-toolbar__avatar-edit" aria-hidden>
+                      <PumpIcon icon={faPen} className="portfolio-toolbar__avatar-edit-glyph" />
+                    </span>
+                  </button>
                 ) : (
                   <UserAvatarForAddress
                     address={walletAddress}
@@ -201,16 +207,6 @@ export function PortfolioHero({
                         >
                           <PumpIcon icon={faShare} className="portfolio-toolbar__icon-btn-glyph" />
                         </button>
-                        {canEditProfile ? (
-                          <button
-                            type="button"
-                            onClick={onOpenProfileEditor}
-                            className="portfolio-toolbar__icon-btn"
-                            aria-label="Edit profile"
-                          >
-                            <PumpIcon icon={faPen} className="portfolio-toolbar__icon-btn-glyph" />
-                          </button>
-                        ) : null}
                       </div>
                     ) : null}
                   </div>
@@ -218,7 +214,6 @@ export function PortfolioHero({
                     guestMode={guestMode}
                     followingCount={followingCount}
                     followerCount={followerCount}
-                    holdingsCount={holdingsCount}
                     onOpenFollowing={onOpenFollowing}
                     onOpenFollowers={onOpenFollowers}
                     variant="mobile"
@@ -227,7 +222,6 @@ export function PortfolioHero({
                     guestMode={guestMode}
                     followingCount={followingCount}
                     followerCount={followerCount}
-                    holdingsCount={holdingsCount}
                     onOpenFollowing={onOpenFollowing}
                     onOpenFollowers={onOpenFollowers}
                     variant="desktop"
@@ -247,16 +241,6 @@ export function PortfolioHero({
                     <PumpIcon icon={faShare} className="h-3.5 w-3.5" />
                     <span>Share</span>
                   </button>
-                  {canEditProfile ? (
-                    <button
-                      type="button"
-                      onClick={onOpenProfileEditor}
-                      className="portfolio-toolbar__edit-btn"
-                    >
-                      <PumpIcon icon={faPen} className="h-3.5 w-3.5" />
-                      <span>Edit profile</span>
-                    </button>
-                  ) : null}
                 </div>
               </div>
             ) : null}

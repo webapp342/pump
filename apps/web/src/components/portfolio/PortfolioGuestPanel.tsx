@@ -2,6 +2,7 @@
 
 import { TokenBoardTable } from "@/components/arena/TokenBoardTable";
 import { PortfolioHero } from "@/components/portfolio/PortfolioHero";
+import { PortfolioMobileHero } from "@/components/portfolio/PortfolioMobileHero";
 import { PortfolioSummaryStrip } from "@/components/portfolio/PortfolioSummaryStrip";
 import { PortfolioFeesBreakdown } from "@/components/portfolio/PortfolioFeesBreakdown";
 import { PortfolioMetricBox } from "@/components/portfolio/PortfolioMetricBox";
@@ -139,6 +140,16 @@ export function PortfolioGuestPanel({ activeTab, onSignIn }: PortfolioGuestPanel
     <div className="portfolio-page">
       <HubDiscoveryScrollLock />
       <div className="portfolio-hub">
+        <PortfolioMobileHero
+          walletAddress={GUEST_WALLET}
+          displayUsername=""
+          guestMode
+          canEditProfile={false}
+          onOpenProfileEditor={() => {}}
+          totalValueUsd={0}
+          onSignIn={onSignIn}
+        />
+
         <PortfolioHero
           walletAddress={GUEST_WALLET}
           displayUsername=""

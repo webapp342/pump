@@ -12,6 +12,7 @@ import { bondingCurveManagerAbi } from "@/lib/bonding-curve";
 import { ClaimCreatorFeesModal } from "@/components/portfolio/ClaimCreatorFeesModal";
 import { PortfolioGuestPanel } from "@/components/portfolio/PortfolioGuestPanel";
 import { PortfolioHero } from "@/components/portfolio/PortfolioHero";
+import { PortfolioMobileHero } from "@/components/portfolio/PortfolioMobileHero";
 import { PortfolioSummaryStrip } from "@/components/portfolio/PortfolioSummaryStrip";
 import { PortfolioHoldingMobileCard } from "@/components/portfolio/PortfolioHoldingMobileCard";
 import { PortfolioFeesTab } from "@/components/portfolio/PortfolioFeesTab";
@@ -1294,6 +1295,18 @@ export function PortfolioPanel({
       <div className="portfolio-page">
         <HubDiscoveryScrollLock />
         <div className="portfolio-hub">
+        <PortfolioMobileHero
+          walletAddress={walletAddress}
+          displayUsername={displayUsername}
+          canEditProfile={isOwnPortfolio && isConnected}
+          onOpenProfileEditor={() => setAvatarPickerOpen(true)}
+          totalValueUsd={totalEstimatedUsd}
+          totalNetPnlUsd={totalNetPnlUsd}
+          totalNetPnlPct={portfolioNetPnlPct}
+          valueFlashClass={flashText(totalValueFlash)}
+          showWalletActions={isOwnPortfolio && isConnected}
+        />
+
         <PortfolioHero
           walletAddress={walletAddress}
           displayUsername={displayUsername}
@@ -1309,7 +1322,6 @@ export function PortfolioPanel({
           }}
           followingCount={data.followingCount ?? 0}
           followerCount={data.followerCount ?? 0}
-          holdingsCount={holdingsCount}
         />
 
         <PortfolioSummaryStrip

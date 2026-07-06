@@ -6,7 +6,30 @@ export function PortfolioPanelSkeleton() {
     <div className="portfolio-page" aria-busy="true" aria-label="Loading portfolio">
       <HubDiscoveryScrollLock />
       <div className="portfolio-hub">
-        <header className="portfolio-header">
+        <section className="portfolio-mobile-hero md:hidden" aria-hidden>
+          <div className="portfolio-mobile-hero__top">
+            <div className="portfolio-mobile-hero__profile">
+              <Skeleton variant="circle" className="h-11 w-11 shrink-0" />
+              <div className="flex min-w-0 flex-col gap-1.5">
+                <Skeleton variant="line" className="h-4 w-28" />
+                <Skeleton variant="line" className="h-3 w-20" />
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Skeleton variant="circle" className="h-8 w-8" />
+              <Skeleton variant="circle" className="h-8 w-8" />
+              <Skeleton variant="circle" className="h-8 w-8" />
+            </div>
+          </div>
+          <Skeleton className="mx-auto h-10 w-36" />
+          <div className="portfolio-mobile-hero__actions">
+            {Array.from({ length: 4 }).map((_, index) => (
+              <Skeleton key={index} className="h-[4.5rem] rounded-2xl" />
+            ))}
+          </div>
+        </section>
+
+        <header className="portfolio-header portfolio-hero-desktop hidden md:block">
           <div className="portfolio-toolbar">
             <div className="portfolio-toolbar__shell">
               <div className="portfolio-toolbar__lead">
@@ -33,7 +56,7 @@ export function PortfolioPanelSkeleton() {
           </div>
         </header>
 
-        <div className="portfolio-summary-strip" aria-hidden>
+        <div className="portfolio-summary-strip portfolio-summary-strip--desktop hidden md:grid" aria-hidden>
           {Array.from({ length: 3 }).map((_, index) => (
             <div
               key={index}
