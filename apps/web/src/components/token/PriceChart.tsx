@@ -15,7 +15,6 @@ import {
   CrosshairMode,
 } from "lightweight-charts";
 import { PumpSubscriptPrice } from "@/components/ui/PumpSubscriptPrice";
-import { UsdReadablePrice } from "@/components/ui/UsdReadablePrice";
 import {
   applyCandleSeriesPriceFormat,
   buildCandlesFromTrades,
@@ -50,7 +49,6 @@ import { useTheme } from "@/components/theme/ThemeProvider";
 import {
   bnbToUsd,
   DEFAULT_TOKEN_TOTAL_SUPPLY,
-  formatUsd,
 } from "@/lib/format-usd";
 
 type PriceChartProps = {
@@ -81,6 +79,8 @@ type PriceChartProps = {
 const POLL_MS = 4_000;
 const WS_FALLBACK_POLL_MS = 30_000;
 const VOLUME_SCALE_ID = "volume";
+/** Chart volume histogram — hidden in UI; flip to re-enable. */
+const SHOW_CHART_VOLUME = false;
 const DEFAULT_VISIBLE_CANDLES = 120;
 /** Minimum Y-axis span so micro-cap moves don't fill the entire chart height. */
 const MIN_CHART_PRICE_RANGE_RATIO = 0.04;
@@ -157,33 +157,6 @@ function isMobileChartViewport(): boolean {
   return window.matchMedia("(max-width: 1023px)").matches;
 }
 
-function ChartOhlcValue({
-  value,
-  currency,
-  bnbUsd,
-  className = "",
-}: {
-  value: number;
-  currency: "usd" | "mcap";
-  bnbUsd: number | null | undefined;
-  className?: string;
-}) {
-  const rate = bnbUsd != null && bnbUsd > 0 ? bnbUsd : 0;
-  if (currency === "mcap") {
-    const usd = value * rate;
-    const text = formatUsd(usd, { compact: true }) ?? "$0";
-    return <span className={className}>{text}</span>;
-  }
-  return (
-    <UsdReadablePrice
-      value={value * rate}
-      compact
-      className={className}
-    />
-  );
-}
-
-/** User-local time for crosshair + axis labels. */
 function formatLocalChartTime(time: Time, showSeconds = false): string {
   if (typeof time !== "number") return "";
   const d = new Date(time * 1000);
@@ -272,8 +245,6 @@ export function PriceChart({
   const [seriesState, dispatchSeries] = useReducer(chartSeriesReducer, initialChartSeriesState);
   const [loading, setLoading] = useState(() => !initialCandles?.candles.length);
   const [error, setError] = useState<string | null>(null);
-  const [hoverOhlc, setHoverOhlc] = useState<CandleBar | null>(null);
-  const [hoverTimeLabel, setHoverTimeLabel] = useState<string | null>(null);
   const [nowMs, setNowMs] = useState(() => Date.now());
   const [ready, setReady] = useState(false);
 
@@ -521,12 +492,6 @@ export function PriceChart({
   const candlesForChart = candles;
   const volumesForChart = volumes;
 
-  const lastCandle = candlesForChart[candlesForChart.length - 1] ?? null;
-  const displayTimeLabel =
-    hoverTimeLabel ??
-    (frozen ? null : formatLocalChartTime(Math.floor(nowMs / 1000) as Time));
-  const displayCandle = hoverOhlc ?? lastCandle;
-
   const priceFormat = useMemo(
     () => resolveChartPriceFormat(candlesForChart, currency, bnbUsd),
     [candlesForChart, currency, bnbUsd]
@@ -666,7 +631,7 @@ export function PriceChart({
       },
       rightPriceScale: {
         borderColor,
-        scaleMargins: { top: 0.08, bottom: 0.22 },
+        scaleMargins: { top: 0.08, bottom: SHOW_CHART_VOLUME ? 0.22 : 0.08 },
         autoScale: true,
         mode: PriceScaleMode.Logarithmic,
       },
@@ -717,31 +682,11 @@ export function PriceChart({
     const volumeSeries = chart.addSeries(HistogramSeries, {
       priceFormat: { type: "volume" },
       priceScaleId: VOLUME_SCALE_ID,
+      visible: SHOW_CHART_VOLUME,
     });
     chart.priceScale(VOLUME_SCALE_ID).applyOptions({
       scaleMargins: { top: 0.8, bottom: 0 },
       visible: false,
-    });
-
-    chart.subscribeCrosshairMove((param) => {
-      if (!param.time || !param.seriesData.size) {
-        setHoverOhlc(null);
-        setHoverTimeLabel(null);
-        return;
-      }
-      setHoverTimeLabel(formatLocalChartTime(param.time));
-      const bar = param.seriesData.get(candleSeries) as CandlestickData | undefined;
-      if (!bar || bar.open == null) {
-        setHoverOhlc(null);
-        return;
-      }
-      setHoverOhlc({
-        time: bar.time as number,
-        open: bar.open,
-        high: bar.high,
-        low: bar.low,
-        close: bar.close,
-      });
     });
 
     chartRef.current = chart;
@@ -1013,52 +958,6 @@ export function PriceChart({
           </button>
         </div>
       </div>
-
-      {displayCandle ? (
-        <div className={`price-chart-ohlc-bar ${chromeBlockClass}`}>
-          <div className="price-chart-ohlc financial-value">
-            <span className="shrink-0">
-              O{" "}
-              <ChartOhlcValue
-                value={displayCandle.open}
-                currency={currency}
-                bnbUsd={bnbUsd}
-                className="text-pump-text"
-              />
-            </span>
-            <span className="shrink-0">
-              H{" "}
-              <ChartOhlcValue
-                value={displayCandle.high}
-                currency={currency}
-                bnbUsd={bnbUsd}
-                className="text-pump-accent"
-              />
-            </span>
-            <span className="shrink-0">
-              L{" "}
-              <ChartOhlcValue
-                value={displayCandle.low}
-                currency={currency}
-                bnbUsd={bnbUsd}
-                className="text-pump-danger"
-              />
-            </span>
-            <span className="shrink-0">
-              C{" "}
-              <ChartOhlcValue
-                value={displayCandle.close}
-                currency={currency}
-                bnbUsd={bnbUsd}
-                className="text-pump-text"
-              />
-            </span>
-            {hoverOhlc && displayTimeLabel ? (
-              <span className="hidden shrink-0 sm:inline">{displayTimeLabel}</span>
-            ) : null}
-          </div>
-        </div>
-      ) : null}
 
       {/* Chart container always mounted so lightweight-charts can init on first load */}
       <div

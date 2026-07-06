@@ -2450,7 +2450,7 @@ code,
        * Mobile chart — fintech terminal band (Coinbase Advanced / Robinhood):
        * min 200px readable candles · target ~42% viewport · max 360px / 50% viewport
        */
-      --token-mobile-chart-chrome-height: 4.25rem;
+      --token-mobile-chart-chrome-height: 2.75rem;
       --token-mobile-chart-min-height: 12.5rem;
       --token-mobile-chart-max-height: 22.5rem;
       --token-mobile-chart-height: clamp(
@@ -2519,8 +2519,7 @@ code,
       overflow: hidden;
     }
 
-    .token-page-chart-slot .price-chart-toolbar,
-    .token-page-chart-slot .price-chart-ohlc-bar {
+    .token-page-chart-slot .price-chart-toolbar {
       flex-shrink: 0;
     }
 
