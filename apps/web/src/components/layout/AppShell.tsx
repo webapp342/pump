@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useLayoutEffect } from "react";
 import { AppHeaderView } from "@/components/layout/AppHeader";
 import { AppNavView } from "@/components/layout/AppNav";
+import { TokenMobileTradeDockProvider } from "@/components/token/TokenMobileTradeDockContext";
 import {
   isHubTerminalRoute,
   isTokenRoute,
@@ -39,32 +40,34 @@ export function AppShellFrame({ children, wide = false, pathname }: AppShellFram
       : "flex min-h-screen flex-col";
 
   return (
-    <div className={shellClass}>
-      {hubTerminal ? (
-        <>
-          <div className="hub-terminal-header-band">
+    <TokenMobileTradeDockProvider>
+      <div className={shellClass}>
+        {hubTerminal ? (
+          <>
+            <div className="hub-terminal-header-band">
+              <AppHeaderView pathname={pathname} />
+            </div>
+            <div className="hub-terminal-column">
+              <main
+                className={`flex min-h-0 flex-col ${mainPadding} ${mobileBottomOffset} ${mainLayoutClass}`}
+              >
+                {children}
+              </main>
+            </div>
+          </>
+        ) : (
+          <>
             <AppHeaderView pathname={pathname} />
-          </div>
-          <div className="hub-terminal-column">
             <main
               className={`flex min-h-0 flex-col ${mainPadding} ${mobileBottomOffset} ${mainLayoutClass}`}
             >
               {children}
             </main>
-          </div>
-        </>
-      ) : (
-        <>
-          <AppHeaderView pathname={pathname} />
-          <main
-            className={`flex min-h-0 flex-col ${mainPadding} ${mobileBottomOffset} ${mainLayoutClass}`}
-          >
-            {children}
-          </main>
-        </>
-      )}
-      <AppNavView pathname={pathname} />
-    </div>
+          </>
+        )}
+        <AppNavView pathname={pathname} />
+      </div>
+    </TokenMobileTradeDockProvider>
   );
 }
 

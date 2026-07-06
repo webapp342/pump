@@ -50,7 +50,7 @@ import { TradePanel, type TradeConfirmedPayload, type TradeOptimisticPayload, ty
 import { QuickTradeConfirmModal } from "@/components/token/QuickTradeConfirmModal";
 import { TradeSheet } from "@/components/token/TradeSheet";
 import { TokenMobileHero } from "@/components/token/TokenMobileHero";
-import { TokenTradeDock } from "@/components/token/TokenTradeDock";
+import { useRegisterTokenMobileTradeDock } from "@/components/token/TokenMobileTradeDockContext";
 import {
   buildTokenMobileQuickTradePrefill,
   buildTokenMobileTradeEditPrefill,
@@ -886,6 +886,19 @@ export function TokenDetailLive({
     [handleTradeConfirmed]
   );
 
+  const mobileTradeDock = useMemo(
+    () => ({
+      disabled: tradeLocked,
+      pendingSide: quickTradeRun?.prefill.side ?? null,
+      onBuy: () => executeQuickTrade("buy"),
+      onSell: () => executeQuickTrade("sell"),
+      onEditAmount: openMobileTradeEdit,
+    }),
+    [tradeLocked, quickTradeRun?.prefill.side, executeQuickTrade, openMobileTradeEdit]
+  );
+
+  useRegisterTokenMobileTradeDock(mobileTradeDock);
+
   const tokenToolbar = (
     <div
       className={`token-detail-toolbar panel-surface ${
@@ -1125,14 +1138,6 @@ export function TokenDetailLive({
           </section>
         </aside>
       </div>
-
-      <TokenTradeDock
-        disabled={tradeLocked}
-        pendingSide={quickTradeRun?.prefill.side ?? null}
-        onBuy={() => executeQuickTrade("buy")}
-        onSell={() => executeQuickTrade("sell")}
-        onEditAmount={openMobileTradeEdit}
-      />
 
       {quickTradeRun ? (
         <QuickTradeConfirmModal

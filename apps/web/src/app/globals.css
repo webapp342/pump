@@ -129,11 +129,8 @@ html[data-theme="light"] {
   --mobile-trade-dock-height: calc(
     var(--mobile-trade-dock-bar-height) + var(--mobile-trade-dock-pad-block) * 2
   );
-  --mobile-token-bottom-stack: calc(
-    var(--mobile-bottom-nav-height) + var(--mobile-trade-dock-nav-gap) +
-      var(--mobile-trade-dock-height)
-  );
-  --mobile-token-footer-height: var(--mobile-trade-dock-height);
+  --mobile-token-bottom-stack: var(--mobile-bottom-nav-height);
+  --mobile-token-footer-height: var(--mobile-bottom-nav-height);
   --app-header-height: 3.25rem;
   --app-header-control-height: 2.75rem;
   /* Logo: wordmark cap ~1.1× nav; logogram optically matched */
@@ -1923,27 +1920,35 @@ code,
       --mobile-trade-dock-height: calc(
         var(--mobile-trade-dock-bar-height) + var(--mobile-trade-dock-pad-block) * 2
       );
-      --mobile-trade-dock-nav-gap: 0.25rem;
-      --mobile-token-bottom-stack: calc(
-        var(--mobile-bottom-nav-height) + var(--mobile-trade-dock-nav-gap) +
-          var(--mobile-trade-dock-height)
-      );
+      --mobile-trade-dock-nav-gap: 0;
+      --mobile-token-bottom-stack: var(--mobile-bottom-nav-height);
+      --mobile-bottom-bar-content-height: calc(var(--mobile-trade-dock-bar-height) + 0.375rem);
       padding-bottom: var(--mobile-token-bottom-stack);
     }
 
     .app-shell--token .token-trade-dock--footer {
-      border-top: none;
-      background: transparent;
+      display: none;
     }
 
-    .app-shell--token .token-trade-dock--footer .token-trade-dock-inner {
-      padding-block: 0;
-      padding-inline: 0;
+    .app-shell--token .bottom-nav--trade {
+      display: block;
+      min-height: calc(var(--mobile-trade-dock-bar-height) + 0.5rem);
+      padding: 0.25rem 0.375rem;
     }
 
-    .app-shell--token .token-trade-dock-pill {
+    .app-shell--token .bottom-nav--trade .bottom-nav-trade-slot {
+      display: block;
+      width: 100%;
+    }
+
+    .app-shell--token .bottom-nav--trade .token-trade-dock-pill {
+      width: 100%;
       min-height: var(--mobile-trade-dock-bar-height);
       padding: 0.125rem;
+      border: none;
+      border-radius: 9999px;
+      background: transparent;
+      box-shadow: none;
     }
 
     .app-shell--token .bottom-nav {
@@ -2101,6 +2106,13 @@ code,
       padding-bottom: var(--mobile-bottom-nav-height);
     }
 
+    html.hub-discovery-scroll-lock .airdrops-page .airdrops-body:has(.airdrops-mobile-list) {
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      -webkit-overflow-scrolling: touch;
+      padding-bottom: calc(var(--mobile-bottom-nav-height) + 0.5rem);
+    }
+
     html.hub-discovery-scroll-lock .airdrops-page .airdrops-list {
       flex: 1 1 0;
       min-height: 0;
@@ -2219,6 +2231,7 @@ code,
     html.hub-discovery-scroll-lock .arena-page__scroll,
     html.hub-discovery-scroll-lock .airdrops-list__scroll,
     html.hub-discovery-scroll-lock .airdrops-page .airdrops-body:not(:has(.airdrops-list)),
+    html.hub-discovery-scroll-lock .airdrops-page .airdrops-body:has(.airdrops-mobile-list),
     html.hub-discovery-scroll-lock .missions-list__scroll,
     html.hub-discovery-scroll-lock .missions-page .missions-body:not(:has(.missions-list)),
     html.hub-discovery-scroll-lock .portfolio-holdings-mobile__body,
@@ -2229,6 +2242,7 @@ code,
 
     html.hub-discovery-scroll-lock.hub-discovery-search-focus .arena-filter-bar__search-row,
     html.hub-discovery-scroll-lock.hub-discovery-search-focus .airdrops-filter-bar__search-row,
+    html.hub-discovery-scroll-lock.hub-discovery-search-focus .airdrops-filter-bar__mobile-search,
     html.hub-discovery-scroll-lock.hub-discovery-search-focus .airdrops-list__head {
       touch-action: none;
     }
@@ -8428,6 +8442,16 @@ code,
       inset 0 1px 0 rgb(255 255 255 / 0.85);
   }
 
+  .bottom-nav--trade {
+    display: block;
+    justify-content: stretch;
+  }
+
+  .bottom-nav-trade-slot {
+    width: 100%;
+    pointer-events: auto;
+  }
+
   .bottom-nav-item {
     display: inline-flex;
     width: var(--mobile-bottom-nav-hit-size);
@@ -13066,6 +13090,13 @@ code,
       -webkit-overflow-scrolling: touch;
     }
 
+    .airdrops-page .airdrops-body:has(.airdrops-mobile-list) {
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      -webkit-overflow-scrolling: touch;
+      padding-bottom: calc(var(--mobile-bottom-nav-height) + 0.5rem);
+    }
+
     .airdrops-page .airdrops-list {
       flex: 1 1 0;
       min-height: 0;
@@ -13095,6 +13126,266 @@ code,
   }
 
   @media (max-width: 767px) {
+    .airdrops-page .airdrops-filter-bar__mobile-head {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      min-width: 0;
+      padding: 0.5rem 0 0.25rem;
+    }
+
+    .airdrops-page .airdrops-filter-bar__mobile-search {
+      display: block;
+      padding: 0.375rem var(--airdrops-page-gutter) 0.625rem;
+      border-bottom: 1px solid rgb(var(--pump-border) / 0.14);
+    }
+
+    .airdrops-page .airdrops-filter-bar__mobile-search .arena-search-field {
+      display: flex;
+      align-items: center;
+      width: 100%;
+      min-width: 0;
+      height: 2.125rem;
+      border: 1px solid rgb(var(--pump-border) / 0.28);
+      border-radius: var(--radius-sm);
+      background: rgb(var(--pump-surface) / 0.35) !important;
+    }
+
+    .airdrops-page .airdrops-filter-bar__mobile-search .arena-search-input {
+      font-size: 1rem;
+      line-height: 1.25;
+    }
+
+    .airdrops-page .airdrops-filter-bar__tabs-row--mobile {
+      flex: 1 1 auto;
+      min-width: 0;
+      overflow: hidden;
+      padding-left: var(--airdrops-page-gutter);
+    }
+
+    .airdrops-page .airdrops-filter-bar__tabs-row--mobile .airdrops-tab-nav {
+      width: 100%;
+    }
+
+    .airdrops-page .airdrops-filter-bar__tabs-row--mobile .airdrops-tab-nav__track {
+      gap: 0;
+      padding: 0;
+      border-bottom: none;
+      padding-right: 0;
+    }
+
+    .airdrops-page .airdrops-filter-bar__tabs-row--mobile .airdrops-tab-nav__item,
+    .airdrops-page .airdrops-filter-bar__tabs-row--mobile .airdrops-tab-nav__item--icon {
+      flex: 0 0 auto;
+      min-height: 2.375rem;
+      padding-inline: 0.875rem;
+      border: none;
+      border-radius: 0;
+      background: transparent;
+      color: rgb(var(--pump-muted));
+      box-shadow: none;
+      font-size: var(--text-body-sm);
+      font-weight: var(--weight-ui);
+      margin-bottom: 0;
+    }
+
+    .airdrops-page .airdrops-filter-bar__tabs-row--mobile .airdrops-tab-nav__item--icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding-inline: 0.625rem;
+      min-width: 2.25rem;
+    }
+
+    .airdrops-page .airdrops-filter-bar__tabs-row--mobile .airdrops-tab-nav__item--active,
+    .airdrops-page .airdrops-filter-bar__tabs-row--mobile .airdrops-tab-nav__item--icon.airdrops-tab-nav__item--active {
+      color: rgb(var(--pump-accent));
+      background: transparent;
+      box-shadow: inset 0 -2px 0 rgb(var(--pump-accent));
+      border-bottom-color: transparent;
+      font-weight: var(--weight-emphasis);
+    }
+
+    .airdrops-page .airdrops-mobile-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      padding-inline: 0;
+      min-width: 0;
+      width: 100%;
+    }
+
+    .airdrop-mobile-campaign-row {
+      --airdrop-mobile-row-logo-size: 3.25rem;
+
+      display: grid;
+      grid-template-columns: var(--airdrop-mobile-row-logo-size) minmax(0, 1fr) auto;
+      align-items: center;
+      column-gap: 0.75rem;
+      padding: 0.8125rem 0.75rem;
+      border-bottom: 1px solid rgb(var(--pump-border) / 0.14);
+      color: inherit;
+      text-decoration: none;
+      transition: background 0.12s ease;
+    }
+
+    .airdrop-mobile-campaign-row:hover {
+      background: rgb(var(--pump-border) / 0.06);
+    }
+
+    .airdrop-mobile-campaign-row--skeleton {
+      pointer-events: none;
+    }
+
+    .airdrop-mobile-campaign-row__media {
+      position: relative;
+      width: var(--airdrop-mobile-row-logo-size);
+      height: var(--airdrop-mobile-row-logo-size);
+      flex-shrink: 0;
+    }
+
+    .airdrop-mobile-campaign-row__avatar,
+    .airdrop-mobile-campaign-row__avatar img {
+      width: 100% !important;
+      height: 100% !important;
+      border-radius: var(--radius-md) !important;
+    }
+
+    .airdrop-mobile-campaign-row__main,
+    .airdrop-mobile-campaign-row__aside {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      height: var(--airdrop-mobile-row-logo-size);
+      min-height: var(--airdrop-mobile-row-logo-size);
+      min-width: 0;
+    }
+
+    .airdrop-mobile-campaign-row__aside {
+      align-items: flex-end;
+      flex-shrink: 0;
+      min-width: 4.5rem;
+    }
+
+    .airdrop-mobile-campaign-row__head {
+      display: flex;
+      flex-direction: column;
+      gap: 0.125rem;
+      min-width: 0;
+    }
+
+    .airdrop-mobile-campaign-row__name {
+      margin: 0;
+      font-size: var(--text-body-sm);
+      font-weight: var(--weight-emphasis);
+      line-height: var(--leading-tight);
+      letter-spacing: -0.01em;
+      color: rgb(var(--pump-text));
+    }
+
+    .airdrop-mobile-campaign-row__meta-line {
+      display: flex;
+      align-items: center;
+      gap: 0.375rem;
+      min-width: 0;
+    }
+
+    .airdrop-mobile-campaign-row__symbol {
+      font-size: var(--text-label);
+      font-weight: var(--weight-ui);
+      line-height: var(--leading-tight);
+      letter-spacing: var(--tracking-label);
+      color: rgb(var(--pump-muted));
+      text-transform: uppercase;
+      flex-shrink: 0;
+    }
+
+    .airdrop-mobile-campaign-row__status {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      max-width: 100%;
+      padding: 0.125rem 0.3125rem;
+      font-size: 8px;
+      font-weight: var(--weight-emphasis);
+      line-height: 1.1;
+      letter-spacing: 0.03em;
+      border-radius: 3px;
+      white-space: nowrap;
+      flex-shrink: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .airdrop-mobile-campaign-row__save {
+      margin-left: auto;
+      width: 1.5rem;
+      height: 1.5rem;
+    }
+
+    .airdrop-mobile-campaign-row__pool {
+      margin: 0;
+      font-size: var(--text-label);
+      font-weight: var(--weight-ui);
+      line-height: var(--leading-tight);
+      color: rgb(var(--pump-muted));
+    }
+
+    .airdrop-mobile-campaign-row__quote {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 0.125rem;
+    }
+
+    .airdrop-mobile-campaign-row__metric {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 0.0625rem;
+    }
+
+    .airdrop-mobile-campaign-row__metric-label {
+      font-size: 9px;
+      font-weight: var(--weight-ui);
+      line-height: 1;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: rgb(var(--pump-muted));
+    }
+
+    .airdrop-mobile-campaign-row__metric-value {
+      font-size: var(--text-body-sm);
+      font-weight: var(--weight-emphasis);
+      line-height: var(--leading-tight);
+      color: rgb(var(--pump-text));
+    }
+
+    .airdrop-mobile-campaign-row__time {
+      display: inline-flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 0.25rem;
+      font-size: var(--text-label);
+      font-weight: var(--weight-ui);
+      line-height: var(--leading-tight);
+      color: rgb(var(--pump-muted));
+      white-space: nowrap;
+    }
+
+    .airdrop-mobile-campaign-row__time--empty {
+      color: rgb(var(--pump-muted) / 0.65);
+    }
+  }
+
+  @media (min-width: 768px) {
+    .airdrops-page .airdrops-filter-bar__main {
+      flex-direction: row;
+    }
+  }
+
+  @media (max-width: 767px) {
     .missions-page .missions-toolbar__shell {
       padding-top: 0.625rem;
     }
@@ -13108,6 +13399,19 @@ code,
     border-top: 1px solid rgb(var(--pump-border) / 0.32);
     border-bottom: 1px solid rgb(var(--pump-border) / 0.32);
     background: rgb(var(--pump-bg));
+  }
+
+  .airdrops-page .airdrops-filter-bar__mobile-head,
+  .airdrops-page .airdrops-filter-bar__mobile-search {
+    display: none;
+  }
+
+  .airdrops-page .airdrops-filter-bar__main {
+    display: flex;
+    align-items: stretch;
+    flex: 1 1 auto;
+    min-width: 0;
+    width: 100%;
   }
 
   .airdrops-page .airdrops-filter-bar__search-row {

@@ -9,25 +9,23 @@ import {
   type TokenMobileTradePrefs,
 } from "@/lib/token-mobile-trade-prefs";
 
-type TokenTradeDockProps = {
+export type TokenTradeDockPillProps = {
   disabled?: boolean;
   pendingSide?: "buy" | "sell" | null;
   onBuy: () => void;
   onSell: () => void;
   onEditAmount: () => void;
-  /** Below chart on mobile — scrolls with page, sticks under chart while scrolling activity. */
-  placement?: "fixed" | "inline";
+  className?: string;
 };
 
-/** Mobile trade dock — pill Buy | order value USD | Sell; center opens amount editor. */
-export function TokenTradeDock({
+export function TokenTradeDockPill({
   disabled = false,
   pendingSide = null,
   onBuy,
   onSell,
   onEditAmount,
-  placement = "fixed",
-}: TokenTradeDockProps) {
+  className = "",
+}: TokenTradeDockPillProps) {
   const [prefs, setPrefs] = useState<TokenMobileTradePrefs>(DEFAULT_TOKEN_MOBILE_TRADE);
 
   const syncPrefs = useCallback(() => {
@@ -47,6 +45,61 @@ export function TokenTradeDock({
 
   return (
     <div
+      className={`token-trade-dock-pill${className ? ` ${className}` : ""}`}
+      role="group"
+      aria-label="Trade actions"
+    >
+      <button
+        type="button"
+        className={`token-trade-dock-pill__side token-trade-dock-pill__side--buy${
+          buyPending ? " token-trade-dock-pill__side--pending" : ""
+        }`}
+        disabled={disabled || buyPending || sellPending}
+        onClick={onBuy}
+        aria-busy={buyPending}
+      >
+        Buy
+      </button>
+
+      <button
+        type="button"
+        className="token-trade-dock-pill__amount"
+        disabled={disabled || buyPending || sellPending}
+        onClick={onEditAmount}
+        aria-label={`Edit order value, currently ${orderValueLabel}`}
+      >
+        <span className="token-trade-dock-pill__amount-value financial-value">
+          {orderValueLabel}
+        </span>
+      </button>
+
+      <button
+        type="button"
+        className={`token-trade-dock-pill__side token-trade-dock-pill__side--sell${
+          sellPending ? " token-trade-dock-pill__side--pending" : ""
+        }`}
+        disabled={disabled || buyPending || sellPending}
+        onClick={onSell}
+        aria-busy={sellPending}
+      >
+        Sell
+      </button>
+    </div>
+  );
+}
+
+type TokenTradeDockProps = TokenTradeDockPillProps & {
+  /** Below chart on mobile — scrolls with page, sticks under chart while scrolling activity. */
+  placement?: "fixed" | "inline";
+};
+
+/** Mobile trade dock — pill Buy | order value USD | Sell; center opens amount editor. */
+export function TokenTradeDock({
+  placement = "fixed",
+  ...pillProps
+}: TokenTradeDockProps) {
+  return (
+    <div
       className={`token-trade-dock lg:hidden${
         placement === "inline"
           ? " token-trade-dock--inline"
@@ -56,43 +109,7 @@ export function TokenTradeDock({
       aria-label="Trade actions"
     >
       <div className="token-trade-dock-inner">
-        <div className="token-trade-dock-pill">
-          <button
-            type="button"
-            className={`token-trade-dock-pill__side token-trade-dock-pill__side--buy${
-              buyPending ? " token-trade-dock-pill__side--pending" : ""
-            }`}
-            disabled={disabled || buyPending || sellPending}
-            onClick={onBuy}
-            aria-busy={buyPending}
-          >
-            Buy
-          </button>
-
-          <button
-            type="button"
-            className="token-trade-dock-pill__amount"
-            disabled={disabled || buyPending || sellPending}
-            onClick={onEditAmount}
-            aria-label={`Edit order value, currently ${orderValueLabel}`}
-          >
-            <span className="token-trade-dock-pill__amount-value financial-value">
-              {orderValueLabel}
-            </span>
-          </button>
-
-          <button
-            type="button"
-            className={`token-trade-dock-pill__side token-trade-dock-pill__side--sell${
-              sellPending ? " token-trade-dock-pill__side--pending" : ""
-            }`}
-            disabled={disabled || buyPending || sellPending}
-            onClick={onSell}
-            aria-busy={sellPending}
-          >
-            Sell
-          </button>
-        </div>
+        <TokenTradeDockPill {...pillProps} />
       </div>
     </div>
   );

@@ -10,8 +10,8 @@ import {
   formatAirdropReward,
 } from "@/lib/airdrop-board-format";
 import { formatUsdReadable } from "@/lib/format-usd";
-import { PumpIcon, faBookmarkRegular, faBookmarkSolid } from "@/lib/icons";
-import { useAirdropSaves } from "@/components/airdrops/AirdropSavesProvider";
+import { AirdropMobileCampaignRow } from "@/components/airdrops/AirdropMobileCampaignRow";
+import { AirdropSaveButton } from "@/components/airdrops/AirdropSaveButton";
 import { TokenAvatar } from "@/components/token/TokenAvatar";
 import { HourglassIcon } from "@/components/ui/HourglassIcon";
 import {
@@ -19,33 +19,10 @@ import {
   airdropPoolSymbol,
   airdropShowsCountdown,
   airdropTimeCaption,
-  truncateAirdropListTitle,
   type AirdropSortDir,
   type AirdropSortKey,
   type EnrichedAirdrop,
 } from "@/lib/airdrops-list-ui";
-
-function AirdropSaveButton({ airdropId }: { airdropId: string }) {
-  const { isSaved, toggleSave } = useAirdropSaves();
-  const saved = isSaved(airdropId);
-
-  return (
-    <button
-      type="button"
-      onClick={(event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        toggleSave(airdropId);
-      }}
-      className={`airdrops-list__save inline-flex h-7 w-7 shrink-0 items-center justify-center transition ${
-        saved ? "text-pump-accent" : "text-pump-muted hover:text-pump-text"
-      }`}
-      aria-label={saved ? "Remove from saved" : "Save campaign"}
-    >
-      <PumpIcon icon={saved ? faBookmarkSolid : faBookmarkRegular} className="h-3.5 w-3.5" />
-    </button>
-  );
-}
 
 function AirdropCampaignRow({
   item,
@@ -75,10 +52,7 @@ function AirdropCampaignRow({
       <div className="airdrops-list__cell airdrops-list__cell--campaign">
         <TokenAvatar address={item.linkedToken} symbol={symbol} size={24} className="shrink-0" />
         <div className="min-w-0 flex-1">
-          <p className="airdrops-list__title airdrops-list__title--mobile md:hidden" title={title}>
-            {truncateAirdropListTitle(title)}
-          </p>
-          <p className="airdrops-list__title airdrops-list__title--desktop hidden truncate md:block" title={title}>
+          <p className="airdrops-list__title airdrops-list__title--desktop truncate" title={title}>
             {title}
           </p>
           <p className="airdrops-list__symbol truncate">{symbol}</p>
@@ -87,9 +61,7 @@ function AirdropCampaignRow({
 
       <div className="airdrops-list__cell airdrops-list__cell--pool financial-value">
         <span className="airdrops-list__pool-token">{poolLabel}</span>
-        {usdLabel ? (
-          <span className="airdrops-list__pool-usd airdrops-list__pool-usd--mobile">{usdLabel}</span>
-        ) : null}
+        {usdLabel ? <span className="airdrops-list__pool-usd">{usdLabel}</span> : null}
       </div>
 
       <div className="airdrops-list__cell airdrops-list__cell--value financial-value">
@@ -166,46 +138,54 @@ export function AirdropCampaignList({
   onSort,
 }: AirdropCampaignListProps) {
   return (
-    <section className="airdrops-list">
-      <div className="airdrops-list__head">
-        <span className="airdrops-list__head-save" aria-hidden />
-        <span className="airdrops-list__head-cell airdrops-list__head-cell--campaign">Campaign</span>
-        <SortButton
-          label="Pool"
-          sortKey="reward"
-          activeKey={sortKey}
-          sortDir={sortDir}
-          onSort={onSort}
-          className="airdrops-list__head-cell airdrops-list__head-cell--pool"
-        />
-        <span className="airdrops-list__head-value airdrops-list__head-cell airdrops-list__head-cell--value">
-          Value
-        </span>
-        <SortButton
-          label="Status"
-          sortKey="status"
-          activeKey={sortKey}
-          sortDir={sortDir}
-          onSort={onSort}
-          className="airdrops-list__head-cell airdrops-list__head-cell--status"
-        />
-        <SortButton
-          label="Ends"
-          sortKey="end"
-          activeKey={sortKey}
-          sortDir={sortDir}
-          onSort={onSort}
-          alignRight
-          className="airdrops-list__head-cell airdrops-list__head-cell--time"
-        />
+    <>
+      <div className="airdrops-mobile-list md:hidden" aria-label="Airdrop campaigns">
+        {items.map((item) => (
+          <AirdropMobileCampaignRow key={item.id} item={item} bnbUsd={bnbUsd} />
+        ))}
       </div>
-      <div className="airdrops-list__scroll">
-        <div className="airdrops-list__body">
-          {items.map((item) => (
-            <AirdropCampaignRow key={item.id} item={item} bnbUsd={bnbUsd} />
-          ))}
+
+      <section className="airdrops-list hidden md:flex" aria-label="Airdrop campaigns">
+        <div className="airdrops-list__head">
+          <span className="airdrops-list__head-save" aria-hidden />
+          <span className="airdrops-list__head-cell airdrops-list__head-cell--campaign">Campaign</span>
+          <SortButton
+            label="Pool"
+            sortKey="reward"
+            activeKey={sortKey}
+            sortDir={sortDir}
+            onSort={onSort}
+            className="airdrops-list__head-cell airdrops-list__head-cell--pool"
+          />
+          <span className="airdrops-list__head-value airdrops-list__head-cell airdrops-list__head-cell--value">
+            Value
+          </span>
+          <SortButton
+            label="Status"
+            sortKey="status"
+            activeKey={sortKey}
+            sortDir={sortDir}
+            onSort={onSort}
+            className="airdrops-list__head-cell airdrops-list__head-cell--status"
+          />
+          <SortButton
+            label="Ends"
+            sortKey="end"
+            activeKey={sortKey}
+            sortDir={sortDir}
+            onSort={onSort}
+            alignRight
+            className="airdrops-list__head-cell airdrops-list__head-cell--time"
+          />
         </div>
-      </div>
-    </section>
+        <div className="airdrops-list__scroll">
+          <div className="airdrops-list__body">
+            {items.map((item) => (
+              <AirdropCampaignRow key={item.id} item={item} bnbUsd={bnbUsd} />
+            ))}
+          </div>
+        </div>
+      </section>
+    </>
   );
 }

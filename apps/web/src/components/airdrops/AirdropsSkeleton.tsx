@@ -8,30 +8,61 @@ export function AirdropsSkeleton() {
       <div className="airdrops-hub">
         <div className="airdrops-page__sticky">
           <div className="airdrops-filter-bar">
-            <div className="airdrops-filter-bar__search-row">
-              <div className="airdrops-filter-bar__search">
-                <Skeleton className="h-9 w-full rounded-sm" />
+            <div className="airdrops-filter-bar__mobile-head md:hidden">
+              <div className="airdrops-filter-bar__tabs-row airdrops-filter-bar__tabs-row--mobile">
+                <div className="flex flex-1 gap-2 overflow-hidden py-1">
+                  {Array.from({ length: 6 }).map((_, index) => (
+                    <Skeleton key={index} className="h-9 w-16 shrink-0 rounded-md" />
+                  ))}
+                </div>
               </div>
             </div>
-            <div className="airdrops-filter-bar__tabs-row">
-              <div className="flex flex-1 gap-2 overflow-hidden py-1">
-                {Array.from({ length: 6 }).map((_, index) => (
-                  <Skeleton key={index} className="h-8 w-16 shrink-0 rounded-md" />
-                ))}
+            <div className="airdrops-filter-bar__mobile-search md:hidden">
+              <Skeleton className="h-10 w-full rounded-sm" />
+            </div>
+            <div className="airdrops-filter-bar__main hidden md:flex">
+              <div className="airdrops-filter-bar__search-row">
+                <div className="airdrops-filter-bar__search">
+                  <Skeleton className="h-9 w-full rounded-sm" />
+                </div>
+              </div>
+              <div className="airdrops-filter-bar__tabs-row">
+                <div className="flex flex-1 gap-2 overflow-hidden py-1">
+                  {Array.from({ length: 6 }).map((_, index) => (
+                    <Skeleton key={index} className="h-8 w-16 shrink-0 rounded-md" />
+                  ))}
+                </div>
               </div>
             </div>
           </div>
         </div>
 
         <div className="airdrops-body">
-          <section className="airdrops-list">
-            <div className="airdrops-list__head" aria-hidden>
+          <div className="airdrops-mobile-list md:hidden">
+            {Array.from({ length: 6 }).map((_, index) => (
+              <div key={index} className="airdrop-mobile-campaign-row airdrop-mobile-campaign-row--skeleton">
+                <Skeleton className="h-[3.25rem] w-[3.25rem] shrink-0 rounded-md" />
+                <div className="min-w-0 flex-1 space-y-2">
+                  <Skeleton className="h-4 w-32" />
+                  <Skeleton variant="line" className="h-3 w-24" />
+                  <Skeleton variant="line" className="h-3 w-20" />
+                </div>
+                <div className="space-y-2">
+                  <Skeleton variant="line" className="h-3 w-10" />
+                  <Skeleton className="h-4 w-12" />
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <section className="airdrops-list hidden md:flex" aria-hidden>
+            <div className="airdrops-list__head">
               <span className="airdrops-list__head-save" />
               <Skeleton variant="line" className="h-3 w-14" />
               <Skeleton variant="line" className="h-3 w-10" />
-              <Skeleton variant="line" className="hidden h-3 w-10 md:block" />
-              <Skeleton variant="line" className="h-3 w-12 md:justify-self-start" />
-              <Skeleton variant="line" className="h-3 w-10 justify-self-end" />
+              <Skeleton variant="line" className="h-3 w-10" />
+              <Skeleton variant="line" className="h-3 w-12" />
+              <Skeleton variant="line" className="h-3 w-10" />
             </div>
             <div className="airdrops-list__scroll">
               {Array.from({ length: 6 }).map((_, index) => (
@@ -41,9 +72,9 @@ export function AirdropsSkeleton() {
                     <Skeleton variant="circle" className="h-6 w-6 shrink-0" />
                     <Skeleton className="h-3.5 w-20" />
                   </div>
-                  <Skeleton className="h-3.5 w-16 justify-self-end md:justify-self-start" />
-                  <Skeleton className="hidden h-3.5 w-10 md:block" />
-                  <Skeleton className="h-4 w-12 justify-self-center md:justify-self-start rounded-sm" />
+                  <Skeleton className="h-3.5 w-16 justify-self-end" />
+                  <Skeleton className="h-3.5 w-10" />
+                  <Skeleton className="h-4 w-12 justify-self-center rounded-sm" />
                   <Skeleton variant="line" className="h-3 w-10 justify-self-end" />
                 </div>
               ))}

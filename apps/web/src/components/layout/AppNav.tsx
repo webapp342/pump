@@ -2,6 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { isTokenRoute } from "@/components/layout/layout-shell";
+import { TokenTradeDockPill } from "@/components/token/TokenTradeDock";
+import { useTokenMobileTradeDock } from "@/components/token/TokenMobileTradeDockContext";
 import { APP_BOTTOM_TAB_ITEMS, isBottomNavActive } from "@/lib/nav-config";
 import { PumpIcon } from "@/lib/icons";
 
@@ -30,18 +33,30 @@ function BottomNavTab({
 }
 
 export function AppNavView({ pathname }: { pathname: string }) {
+  const tradeDock = useTokenMobileTradeDock();
+  const showTradeDock = isTokenRoute(pathname) && tradeDock != null;
+
   return (
     <div className="bottom-nav-host md:hidden">
-      <nav className="bottom-nav" aria-label="Primary">
-        {APP_BOTTOM_TAB_ITEMS.map((item) => (
-          <BottomNavTab
-            key={item.href}
-            href={item.href}
-            label={item.label}
-            icon={item.icon}
-            active={isBottomNavActive(pathname, item.href)}
-          />
-        ))}
+      <nav
+        className={`bottom-nav${showTradeDock ? " bottom-nav--trade" : ""}`}
+        aria-label={showTradeDock ? "Trade actions" : "Primary"}
+      >
+        {showTradeDock ? (
+          <div className="bottom-nav-trade-slot">
+            <TokenTradeDockPill {...tradeDock} />
+          </div>
+        ) : (
+          APP_BOTTOM_TAB_ITEMS.map((item) => (
+            <BottomNavTab
+              key={item.href}
+              href={item.href}
+              label={item.label}
+              icon={item.icon}
+              active={isBottomNavActive(pathname, item.href)}
+            />
+          ))
+        )}
       </nav>
     </div>
   );
