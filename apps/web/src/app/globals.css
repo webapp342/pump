@@ -100,6 +100,7 @@ html[data-theme="light"] {
   /* Layout — mobile chrome (floating icon pill dock) */
   --tma-safe-area-bottom: 0px;
   --tma-safe-area-top: 0px;
+  --tma-content-safe-top: 0px;
   --mobile-bottom-nav-inset-x: 1.25rem;
   --mobile-bottom-nav-float-gap: 0.875rem;
   --mobile-bottom-nav-offset: max(
@@ -1866,6 +1867,16 @@ code,
     flex-direction: column;
     overflow: hidden;
     overscroll-behavior: none;
+  }
+
+  @media (max-width: 1023px) {
+    html[data-tma] .app-shell,
+    html[data-tma] .app-shell--hub-terminal {
+      padding-top: max(
+        var(--tg-content-safe-area-inset-top, 0px),
+        var(--tma-content-safe-top, 0px)
+      );
+    }
   }
 
   @supports (height: 100dvh) {
