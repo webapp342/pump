@@ -177,7 +177,7 @@ export function ArenaListClient({
   const {
     openSettings: openQuickTradeSettings,
     settingsOpen: quickTradeSettingsOpen,
-    QuickTradeSettingsLayer,
+    settingsLayer,
   } = useArenaQuickTradeSettings();
   const initialBoardKey = initialPayload
     ? boardCacheKey("new", "age", "desc", "")
@@ -911,7 +911,7 @@ export function ArenaListClient({
     <div className="arena-page min-w-0" aria-busy={boardRefreshing}>
       <HubDiscoveryScrollLock />
       <ArenaShortcutsModal open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
-      <QuickTradeSettingsLayer />
+      {settingsLayer}
 
       <div className="arena-page__sticky">
         <div className="arena-hub">

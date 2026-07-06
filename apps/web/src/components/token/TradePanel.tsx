@@ -324,6 +324,43 @@ function formatTokenCompact(value: string | number): string {
 
 const TRADE_TEETH_COUNT = 100;
 
+function TradeOrderValueStrip({
+  side,
+  tokenAddress,
+  symbol,
+  orderValuePrimary,
+  orderValueUsd,
+  className = "",
+}: {
+  side: Side;
+  tokenAddress: `0x${string}`;
+  symbol: string;
+  orderValuePrimary: string | null;
+  orderValueUsd: string | null;
+  className?: string;
+}) {
+  return (
+    <div className={`trade-panel-details-grid ${className}`.trim()}>
+      <span className="trade-detail-row__label">Order value</span>
+      {orderValuePrimary ? (
+        <div className="trade-order-value-primary">
+          {side === "buy" ? (
+            <TokenAvatar address={tokenAddress} symbol={symbol} size={16} className="!ring-0" />
+          ) : (
+            <NativeLogo size={16} />
+          )}
+          <span className="financial-value text-pump-text">{orderValuePrimary}</span>
+        </div>
+      ) : (
+        <span className="trade-order-value-primary financial-value text-pump-text">—</span>
+      )}
+      <span className="trade-order-value-usd financial-value text-pump-muted">
+        {orderValueUsd ?? "—"}
+      </span>
+    </div>
+  );
+}
+
 export function TradePanel({
   tokenAddress,
   symbol,
@@ -2715,11 +2752,9 @@ export function TradePanel({
             tokenAddress={tokenAddress}
             symbol={symbol}
             logoUrl={logoUrl}
-            priceUsd={priceUsd}
             changePct={changePct}
             side={side}
             onSideChange={switchTradeSide}
-            onOpenMarket={onOpenMarket}
           />
         ) : null}
 
@@ -2869,6 +2904,17 @@ export function TradePanel({
               </div>
             </div>
 
+            {useCustomAmountNumpad && hasTradeAmount ? (
+              <TradeOrderValueStrip
+                side={side}
+                tokenAddress={tokenAddress}
+                symbol={symbol}
+                orderValuePrimary={orderValuePrimary}
+                orderValueUsd={orderValueUsd}
+                className="trade-order-value-inline"
+              />
+            ) : null}
+
             {amountInputHint ? (
               <p className="trade-field-hint text-caption text-pump-danger" role="alert">
                 {amountInputHint}
@@ -2968,51 +3014,21 @@ export function TradePanel({
           </div>
         </div>
 
-        {hasTradeAmount ? (
-        <div className="trade-panel-details-zone trade-panel-details-grid">
-          <span className="trade-detail-row__label">Order value</span>
-          {orderValuePrimary ? (
-            <div className="trade-order-value-primary">
-              {side === "buy" ? (
-                <TokenAvatar
-                  address={tokenAddress}
-                  symbol={symbol}
-                  size={16}
-                  className="!ring-0"
-                />
-              ) : (
-                <NativeLogo size={16} />
-              )}
-              <span className="financial-value text-pump-text">{orderValuePrimary}</span>
-            </div>
-          ) : (
-            <span className="trade-order-value-primary financial-value text-pump-text">—</span>
-          )}
-          <span className="trade-order-value-usd financial-value text-pump-muted">
-            {orderValueUsd ?? "—"}
-          </span>
-          <span className="trade-detail-row__label">Est. gas</span>
-          <span className="trade-detail-row__value trade-detail-row__value--wide financial-value">
-            {gasCostLabel}
-          </span>
+        {hasTradeAmount && !useCustomAmountNumpad ? (
+        <div className="trade-panel-details-zone">
+          <TradeOrderValueStrip
+            side={side}
+            tokenAddress={tokenAddress}
+            symbol={symbol}
+            orderValuePrimary={orderValuePrimary}
+            orderValueUsd={orderValueUsd}
+          />
         </div>
         ) : null}
 
         {error ? (
           <div className="notice-error mx-3 mb-2 px-3 py-2 text-caption" role="alert">
             {error}
-          </div>
-        ) : null}
-
-        {useCustomAmountNumpad ? (
-          <div className="trade-action-zone trade-action-zone--numpad-inline">
-            <button
-              type="submit"
-              disabled={submitDisabled}
-              className={`trade-submit-button ${submitButtonClass}`}
-            >
-              {submitActionLabel}
-            </button>
           </div>
         ) : null}
         </div>
@@ -3024,6 +3040,15 @@ export function TradePanel({
               onValueChange={onDisplayInputChange}
               disabled={paused}
             />
+            <div className="trade-action-zone trade-action-zone--numpad-inline">
+              <button
+                type="submit"
+                disabled={submitDisabled}
+                className={`trade-submit-button ${submitButtonClass}`}
+              >
+                {submitActionLabel}
+              </button>
+            </div>
           </div>
         ) : (
         <div className="trade-action-zone">

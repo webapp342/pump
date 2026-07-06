@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useSyncExternalStore, useState, type RefObject } from "react";
+import { useCallback, useEffect, useSyncExternalStore, useState, type RefObject } from "react";
 import { QuickTradeSettingsSheet } from "@/components/arena/QuickTradeSettingsSheet";
 import { dismissHoldingsSwipeHint } from "@/components/portfolio/HoldingSwipeRow";
 import { ModalPortal } from "@/components/ui/ModalPortal";
@@ -45,47 +45,6 @@ function readPopoverPosition(anchor: HTMLElement): PopoverPosition {
   };
 }
 
-function QuickTradeSettingsFields({
-  draftBuy,
-  draftSellPct,
-  onBuyChange,
-  onSellPctChange,
-}: {
-  draftBuy: string;
-  draftSellPct: string;
-  onBuyChange: (value: string) => void;
-  onSellPctChange: (value: string) => void;
-}) {
-  return (
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-1">
-      <label className="space-y-1.5">
-        <span className="field-label">Buy amount (USD)</span>
-        <input
-          type="text"
-          inputMode="decimal"
-          value={draftBuy}
-          onChange={(event) => onBuyChange(event.target.value)}
-          className="field-input h-10 w-full text-body-sm"
-          placeholder="3"
-        />
-      </label>
-      <label className="space-y-1.5">
-        <span className="field-label">Sell (% of balance)</span>
-        <input
-          type="number"
-          min={1}
-          max={100}
-          step={1}
-          value={draftSellPct}
-          onChange={(event) => onSellPctChange(event.target.value)}
-          className="field-input h-10 w-full text-body-sm"
-          placeholder="50"
-        />
-      </label>
-    </div>
-  );
-}
-
 function QuickTradeSettingsPanel({
   draftBuy,
   draftSellPct,
@@ -104,12 +63,32 @@ function QuickTradeSettingsPanel({
   return (
     <div className="space-y-4">
       <p className="text-body-sm font-semibold text-pump-text">Quick trade amounts</p>
-      <QuickTradeSettingsFields
-        draftBuy={draftBuy}
-        draftSellPct={draftSellPct}
-        onBuyChange={onBuyChange}
-        onSellPctChange={onSellPctChange}
-      />
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-1">
+        <label className="space-y-1.5">
+          <span className="field-label">Buy amount (USD)</span>
+          <input
+            type="text"
+            inputMode="decimal"
+            value={draftBuy}
+            onChange={(event) => onBuyChange(event.target.value)}
+            className="field-input h-10 w-full text-body-sm"
+            placeholder="3"
+          />
+        </label>
+        <label className="space-y-1.5">
+          <span className="field-label">Sell (% of balance)</span>
+          <input
+            type="number"
+            min={1}
+            max={100}
+            step={1}
+            value={draftSellPct}
+            onChange={(event) => onSellPctChange(event.target.value)}
+            className="field-input h-10 w-full text-body-sm"
+            placeholder="50"
+          />
+        </label>
+      </div>
       <div className="flex justify-end gap-2 pt-1">
         <button type="button" onClick={onCancel} className="secondary-button h-10 px-4 text-body-sm">
           Cancel
@@ -119,6 +98,75 @@ function QuickTradeSettingsPanel({
         </button>
       </div>
     </div>
+  );
+}
+
+type ArenaQuickTradeSettingsLayerProps = {
+  settingsOpen: boolean;
+  useMobileSheet: boolean;
+  popoverPos: PopoverPosition | null;
+  draftBuy: string;
+  draftSellPct: string;
+  onBuyChange: (value: string) => void;
+  onSellPctChange: (value: string) => void;
+  onClose: () => void;
+  onSave: () => void;
+};
+
+/** Stable layer — must stay module-scoped so typing does not remount inputs (iOS keyboard). */
+function ArenaQuickTradeSettingsLayer({
+  settingsOpen,
+  useMobileSheet,
+  popoverPos,
+  draftBuy,
+  draftSellPct,
+  onBuyChange,
+  onSellPctChange,
+  onClose,
+  onSave,
+}: ArenaQuickTradeSettingsLayerProps) {
+  if (!settingsOpen) return null;
+
+  if (useMobileSheet) {
+    return (
+      <QuickTradeSettingsSheet
+        open={settingsOpen}
+        draftBuy={draftBuy}
+        draftSellPct={draftSellPct}
+        onBuyChange={onBuyChange}
+        onSellPctChange={onSellPctChange}
+        onClose={onClose}
+        onSave={onSave}
+      />
+    );
+  }
+
+  if (!popoverPos) return null;
+
+  return (
+    <ModalPortal open>
+      <div role="dialog" aria-modal="true" aria-label="Quick trade settings">
+        <button
+          type="button"
+          className="fixed inset-0 z-[60] cursor-default bg-transparent"
+          aria-label="Close quick trade settings"
+          onClick={onClose}
+        />
+        <div
+          className="modal-panel pointer-events-auto fixed z-[61] w-72 rounded-md border border-pump-border/25 bg-pump-card p-3 shadow-lg"
+          style={{ top: popoverPos.top, right: popoverPos.right }}
+        >
+          <QuickTradeSettingsPanel
+            draftBuy={draftBuy}
+            draftSellPct={draftSellPct}
+            onBuyChange={onBuyChange}
+            onSellPctChange={onSellPctChange}
+            onCancel={onClose}
+            onSave={onSave}
+          />
+        </div>
+      </div>
+    </ModalPortal>
   );
 }
 
@@ -144,15 +192,6 @@ export function useArenaQuickTradeSettings(anchorRef?: RefObject<HTMLElement | n
     window.addEventListener(ARENA_QUICK_TRADE_CHANGE_EVENT, onChange);
     return () => window.removeEventListener(ARENA_QUICK_TRADE_CHANGE_EVENT, onChange);
   }, [syncPrefs]);
-
-  useEffect(() => {
-    if (!settingsOpen) return;
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setSettingsOpen(false);
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [settingsOpen]);
 
   useEffect(() => {
     if (!settingsOpen || useMobileSheet) {
@@ -191,61 +230,25 @@ export function useArenaQuickTradeSettings(anchorRef?: RefObject<HTMLElement | n
     dismissHoldingsSwipeHint();
   }, [draftBuy, draftSellPct]);
 
-  const settingsPanel = (
-    <QuickTradeSettingsPanel
+  const settingsLayer = (
+    <ArenaQuickTradeSettingsLayer
+      settingsOpen={settingsOpen}
+      useMobileSheet={useMobileSheet}
+      popoverPos={popoverPos}
       draftBuy={draftBuy}
       draftSellPct={draftSellPct}
       onBuyChange={setDraftBuy}
       onSellPctChange={setDraftSellPct}
-      onCancel={closeSettings}
+      onClose={closeSettings}
       onSave={saveSettings}
     />
   );
-
-  function QuickTradeSettingsLayer() {
-    if (!settingsOpen) return null;
-
-    if (useMobileSheet) {
-      return (
-        <QuickTradeSettingsSheet
-          open={settingsOpen}
-          draftBuy={draftBuy}
-          draftSellPct={draftSellPct}
-          onBuyChange={setDraftBuy}
-          onSellPctChange={setDraftSellPct}
-          onClose={closeSettings}
-          onSave={saveSettings}
-        />
-      );
-    }
-
-    if (!popoverPos) return null;
-
-    return (
-      <ModalPortal open>
-        <div role="dialog" aria-modal="true" aria-label="Quick trade settings">
-          <button
-            type="button"
-            className="fixed inset-0 z-[60] cursor-default bg-transparent"
-            aria-label="Close quick trade settings"
-            onClick={closeSettings}
-          />
-          <div
-            className="modal-panel pointer-events-auto fixed z-[61] w-72 rounded-md border border-pump-border/25 bg-pump-card p-3 shadow-lg"
-            style={{ top: popoverPos.top, right: popoverPos.right }}
-          >
-            {settingsPanel}
-          </div>
-        </div>
-      </ModalPortal>
-    );
-  }
 
   return {
     prefs,
     settingsOpen,
     openSettings,
     closeSettings,
-    QuickTradeSettingsLayer,
+    settingsLayer,
   };
 }

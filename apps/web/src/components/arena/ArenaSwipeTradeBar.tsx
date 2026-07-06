@@ -38,7 +38,7 @@ function QuickTradeEditButton({
 
 export function ArenaSwipeTradeBar({ variant = "default" }: ArenaSwipeTradeBarProps) {
   const anchorRef = useRef<HTMLDivElement>(null);
-  const { prefs, settingsOpen, openSettings, QuickTradeSettingsLayer } =
+  const { prefs, settingsOpen, openSettings, settingsLayer } =
     useArenaQuickTradeSettings(anchorRef);
   const stacked = variant === "sidebar" || variant === "mobile-sheet";
   const compactLabels = variant === "sidebar" || variant === "mobile-sheet";
@@ -93,7 +93,7 @@ export function ArenaSwipeTradeBar({ variant = "default" }: ArenaSwipeTradeBarPr
           </span>
         </div>
       </div>
-      <QuickTradeSettingsLayer />
+      {settingsLayer}
     </div>
   );
 }

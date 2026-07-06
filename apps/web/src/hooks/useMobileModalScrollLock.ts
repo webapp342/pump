@@ -59,8 +59,17 @@ function resetScrollContainers(selectors: readonly string[]) {
   }
 }
 
+function isHubDiscoveryLockActive(): boolean {
+  return document.documentElement.classList.contains("hub-discovery-scroll-lock");
+}
+
 function shouldPreserveTokenPageInnerScroll(): boolean {
   return isTokenPageLockActive() && isMobileViewport();
+}
+
+function shouldSkipFixedBodyScrollLock(): boolean {
+  if (!isMobileViewport()) return false;
+  return isTokenPageLockActive() || isHubDiscoveryLockActive();
 }
 
 function keyboardLikelyOpen(): boolean {
@@ -71,10 +80,21 @@ function keyboardLikelyOpen(): boolean {
 
 /** iOS dismisses the keyboard when we scroll the window while a modal field is focused. */
 function shouldDeferWindowScrollPin(): boolean {
-  if (!keyboardLikelyOpen()) return false;
   const active = document.activeElement;
+  if (active instanceof HTMLElement) {
+    const inModal = active.closest(".modal-sheet-panel, .modal-panel, [role='dialog']");
+    if (
+      inModal &&
+      (active instanceof HTMLInputElement ||
+        active instanceof HTMLTextAreaElement ||
+        active instanceof HTMLSelectElement)
+    ) {
+      return true;
+    }
+  }
+  if (!keyboardLikelyOpen()) return false;
   if (!(active instanceof HTMLElement)) return true;
-  return Boolean(active.closest(".modal-sheet-panel, [role='dialog']"));
+  return Boolean(active.closest(".modal-sheet-panel, .modal-panel, [role='dialog']"));
 }
 
 export function keyboardLikelyOpenForPin(): boolean {
@@ -133,8 +153,8 @@ function clearStuckKeyboardBodyStyles() {
   const { body } = document;
   if (body.style.position !== "fixed") return;
 
-  // Token page never uses our fixed-body lock; clear stray iOS/keyboard styles.
-  if (isTokenPageLockActive() || lockCount <= 0) {
+  // Hub/token pages already lock html/body; fixed body breaks iOS keyboard in modals.
+  if (isTokenPageLockActive() || isHubDiscoveryLockActive() || lockCount <= 0) {
     body.style.position = "";
     body.style.top = "";
     body.style.left = "";
@@ -191,8 +211,8 @@ function captureBodySnapshot(): BodySnapshot {
 }
 
 function lockBodyScroll() {
-  if (isTokenPageLockActive() && isMobileViewport()) {
-    // Token detail already locks html/body; fixed body causes the page to jump.
+  if (shouldSkipFixedBodyScrollLock()) {
+    document.body.style.overflow = "hidden";
     return;
   }
 
@@ -216,11 +236,11 @@ function unlockBodyScroll(snapshot: BodySnapshot) {
   document.body.style.right = snapshot.right;
   document.body.style.width = snapshot.width;
 
-  if (snapshot.scrollY > 0 && !(isTokenPageLockActive() && isMobileViewport())) {
+  if (snapshot.scrollY > 0 && !shouldSkipFixedBodyScrollLock()) {
     window.scrollTo(0, snapshot.scrollY);
   }
 
-  if (isTokenPageLockActive() && isMobileViewport()) {
+  if (shouldSkipFixedBodyScrollLock()) {
     settleMobileViewportAfterSheetClose();
     return;
   }
@@ -312,6 +332,9 @@ export function useMobileModalClose(onClose: () => void) {
     onClose();
     if (isTokenPageLockActive() && isMobileViewport()) {
       settleMobileViewportAfterSheetClose();
+      return;
+    }
+    if (isHubDiscoveryLockActive() && isMobileViewport()) {
       return;
     }
     releaseMobileViewportAfterKeyboard();

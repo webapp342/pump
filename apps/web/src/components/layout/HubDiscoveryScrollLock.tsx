@@ -28,6 +28,9 @@ const INTERACTION_SELECTOR = [
   ".arena-filter-bar__tool-btn",
   ".arena-filter-bar__mobile-search",
   ".arena-filter-bar__mobile-search .arena-search-field",
+  ".modal-sheet-host",
+  ".modal-sheet-panel",
+  ".modal-backdrop",
 ].join(", ");
 
 function isMobileHub(): boolean {
