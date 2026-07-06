@@ -98,11 +98,14 @@ html[data-theme="light"] {
   --weight-filter-chip-active: var(--weight-emphasis);
 
   /* Layout — mobile chrome (floating icon pill dock) */
+  --tma-safe-area-bottom: 0px;
+  --tma-safe-area-top: 0px;
   --mobile-bottom-nav-inset-x: 1.25rem;
   --mobile-bottom-nav-float-gap: 0.875rem;
   --mobile-bottom-nav-offset: max(
     var(--mobile-bottom-nav-float-gap),
-    env(safe-area-inset-bottom, 0px)
+    env(safe-area-inset-bottom, 0px),
+    var(--tma-safe-area-bottom, 0px)
   );
   --mobile-bottom-nav-hit-size: 2.5rem;
   --mobile-bottom-nav-icon-size: 1.3125rem;
@@ -1887,7 +1890,8 @@ code,
       --mobile-bottom-nav-icon-size: 1.1875rem;
       --mobile-bottom-nav-offset: max(
         var(--mobile-bottom-nav-float-gap),
-        env(safe-area-inset-bottom, 0px)
+        env(safe-area-inset-bottom, 0px),
+        var(--tma-safe-area-bottom, 0px)
       );
       --mobile-bottom-nav-height: calc(
         var(--mobile-bottom-bar-content-height) + var(--mobile-bottom-nav-offset)

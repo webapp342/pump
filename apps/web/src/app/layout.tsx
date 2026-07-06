@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { RootProviders } from "@/components/layout/RootProviders";
+import { TelegramMiniAppBootstrap } from "@/components/telegram/TelegramMiniAppBootstrap";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import { geistMono, geistSans, brandWordmark } from "@/lib/fonts";
 import "@/lib/fontawesome-config";
@@ -58,6 +59,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       className={`${geistSans.variable} ${geistMono.variable} ${brandWordmark.variable}`}
     >
       <body className={geistSans.className}>
+        <TelegramMiniAppBootstrap />
         <script
           dangerouslySetInnerHTML={{
             __html: `
