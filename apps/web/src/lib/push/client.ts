@@ -63,6 +63,77 @@ function getVapidPublicKey(): string {
   return key;
 }
 
+const SERVICE_WORKER_URL = "/serwist/sw.js";
+const SERVICE_WORKER_TIMEOUT_MS = 20_000;
+
+function waitForServiceWorkerActive(
+  registration: ServiceWorkerRegistration,
+  timeoutMs: number
+): Promise<ServiceWorkerRegistration> {
+  if (registration.active) {
+    return Promise.resolve(registration);
+  }
+
+  return new Promise((resolve, reject) => {
+    const timeout = window.setTimeout(() => {
+      reject(
+        new Error(
+          "Service worker is still starting. Refresh the page, wait a few seconds, then try again."
+        )
+      );
+    }, timeoutMs);
+
+    const worker = registration.installing ?? registration.waiting;
+    if (!worker) {
+      void navigator.serviceWorker.ready
+        .then((readyRegistration) => {
+          window.clearTimeout(timeout);
+          resolve(readyRegistration);
+        })
+        .catch((error) => {
+          window.clearTimeout(timeout);
+          reject(error instanceof Error ? error : new Error("Service worker failed to start"));
+        });
+      return;
+    }
+
+    worker.addEventListener("statechange", () => {
+      if (worker.state === "activated") {
+        window.clearTimeout(timeout);
+        resolve(registration);
+      }
+    });
+  });
+}
+
+async function ensurePushServiceWorkerRegistration(): Promise<ServiceWorkerRegistration> {
+  const registrations = await navigator.serviceWorker.getRegistrations();
+  let registration =
+    registrations.find((entry) => entry.active?.scriptURL.includes(SERVICE_WORKER_URL)) ??
+    registrations[0];
+
+  if (!registration) {
+    registration = await navigator.serviceWorker.register(SERVICE_WORKER_URL, {
+      updateViaCache: "none",
+    });
+  }
+
+  return waitForServiceWorkerActive(registration, SERVICE_WORKER_TIMEOUT_MS);
+}
+
+function applicationServerKeysMatch(
+  existing: ArrayBuffer | null | undefined,
+  next: Uint8Array<ArrayBuffer>
+): boolean {
+  if (!existing) return false;
+  if (existing.byteLength !== next.byteLength) return false;
+  const existingView = new Uint8Array(existing);
+  for (let i = 0; i < next.byteLength; i += 1) {
+    if (existingView[i] !== next[i]) return false;
+  }
+  return true;
+}
+
 function urlBase64ToUint8Array(base64String: string): Uint8Array<ArrayBuffer> {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
   const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
@@ -120,8 +191,13 @@ export async function fetchPushStatus(): Promise<PushStatus> {
   });
 
   const body = (await response.json()) as {
+    error?: string;
     data?: Omit<PushStatus, "supported" | "permission" | "platform" | "standalone" | "needsInstall">;
   };
+
+  if (!response.ok) {
+    throw new Error(body.error ?? "Could not load push status");
+  }
 
   const permission: NotificationPermission =
     typeof Notification !== "undefined" ? Notification.permission : "default";
@@ -157,13 +233,19 @@ export async function subscribeToPushNotifications(): Promise<PushStatus> {
     throw new Error("Notification permission was not granted");
   }
 
-  const registration = await navigator.serviceWorker.ready;
+  const registration = await ensurePushServiceWorkerRegistration();
+  const applicationServerKey = urlBase64ToUint8Array(getVapidPublicKey());
   const existing = await registration.pushManager.getSubscription();
+
+  if (existing && !applicationServerKeysMatch(existing.options.applicationServerKey ?? null, applicationServerKey)) {
+    await existing.unsubscribe();
+  }
+
   const subscription =
-    existing ??
+    (await registration.pushManager.getSubscription()) ??
     (await registration.pushManager.subscribe({
       userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(getVapidPublicKey()),
+      applicationServerKey,
     }));
 
   const payload = serializeSubscription(subscription);

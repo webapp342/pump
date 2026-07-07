@@ -9,6 +9,9 @@ const ALLOWED_PUSH_HOST_SUFFIXES = [
   ".mozilla.com",
   ".notify.windows.com",
   ".push.services.mozilla.com",
+  "fcm.googleapis.com",
+  "fcmregistrations.googleapis.com",
+  "updates.push.services.mozilla.com",
 ];
 
 export class PushSubscriptionValidationError extends Error {

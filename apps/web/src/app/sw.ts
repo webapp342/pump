@@ -60,16 +60,22 @@ self.addEventListener("push", (event) => {
   const body = payload.body?.trim() || "You have a new update.";
   const url = payload.url?.trim() || "/";
   const tag = payload.tag?.trim() || "pump-notification";
-  const icon = payload.icon?.trim() || "/pwa/icon-192.png";
+  const iconUrl = new URL(payload.icon?.trim() || "/pwa/icon-192.png", self.location.origin).href;
 
   event.waitUntil(
-    self.registration.showNotification(title, {
-      body,
-      tag,
-      icon,
-      badge: "/pwa/icon-192.png",
-      data: { url },
-    })
+    (async () => {
+      try {
+        await self.registration.showNotification(title, {
+          body,
+          tag,
+          icon: iconUrl,
+          badge: iconUrl,
+          data: { url },
+        });
+      } catch {
+        await self.registration.showNotification(title, { body, tag, data: { url } });
+      }
+    })()
   );
 });
 
