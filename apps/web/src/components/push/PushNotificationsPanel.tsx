@@ -3,11 +3,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   fetchPushStatus,
+  getPushInfrastructureProgress,
   getPushInfrastructureState,
   preparePushInfrastructure,
   readPushSetupDiagnostics,
+  subscribePushInfrastructureProgress,
   subscribeToPushNotifications,
   unsubscribeFromPushNotifications,
+  type PushInfrastructureProgress,
   type PushSubscribeProgress,
 } from "@/lib/push/client";
 import type { PushStatus } from "@/lib/push/types";
@@ -16,11 +19,41 @@ type PushNotificationsPanelProps = {
   className?: string;
 };
 
+function PushSetupProgressBar({
+  label,
+  percent,
+  tone = "default",
+}: {
+  label: string;
+  percent: number;
+  tone?: "default" | "danger";
+}) {
+  const clamped = Math.max(0, Math.min(100, Math.round(percent)));
+
+  return (
+    <div className="mt-2" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={clamped}>
+      <div className="mb-1 flex items-center justify-between gap-2">
+        <p className="min-w-0 text-caption text-pump-text">{label}</p>
+        <span className="shrink-0 text-caption font-medium tabular-nums text-pump-muted">{clamped}%</span>
+      </div>
+      <div className="progress-track">
+        <div
+          className={`progress-fill ${tone === "danger" ? "!bg-pump-danger" : ""}`}
+          style={{ width: `${clamped}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
 export function PushNotificationsPanel({ className = "" }: PushNotificationsPanelProps) {
   const [status, setStatus] = useState<PushStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [busyStep, setBusyStep] = useState<PushSubscribeProgress | null>(null);
+  const [prepareProgress, setPrepareProgress] = useState<PushInfrastructureProgress>(
+    getPushInfrastructureProgress
+  );
   const [error, setError] = useState<string | null>(null);
   const [diagnostics, setDiagnostics] = useState<string | null>(null);
   const lastProgressRef = useRef<PushSubscribeProgress | null>(null);
@@ -54,6 +87,10 @@ export function PushNotificationsPanel({ className = "" }: PushNotificationsPane
   }, [refresh]);
 
   useEffect(() => {
+    return subscribePushInfrastructureProgress(setPrepareProgress);
+  }, []);
+
+  useEffect(() => {
     if (!busy) return;
 
     void refreshDiagnostics();
@@ -66,7 +103,11 @@ export function PushNotificationsPanel({ className = "" }: PushNotificationsPane
 
   async function onEnable() {
     setBusy(true);
-    lastProgressRef.current = { step: "permission", label: "Enabling notifications…" };
+    lastProgressRef.current = {
+      step: "permission",
+      label: "Enabling notifications…",
+      percent: 20,
+    };
     setBusyStep(lastProgressRef.current);
     setError(null);
     try {
@@ -92,7 +133,7 @@ export function PushNotificationsPanel({ className = "" }: PushNotificationsPane
 
   async function onDisable() {
     setBusy(true);
-    setBusyStep({ step: "server-save", label: "Disabling…" });
+    setBusyStep({ step: "server-save", label: "Disabling…", percent: 50 });
     setError(null);
     try {
       await unsubscribeFromPushNotifications();
@@ -127,6 +168,18 @@ export function PushNotificationsPanel({ className = "" }: PushNotificationsPane
   const permissionBlocked = status.permission === "denied";
   const isIos = status.platform === "ios";
   const setupState = getPushInfrastructureState();
+  const preparingDevice =
+    !enabledOnThisDevice &&
+    !status.needsInstall &&
+    !permissionBlocked &&
+    !busy &&
+    setupState === "preparing" &&
+    prepareProgress.percent < 100;
+  const prepareFailed =
+    !enabledOnThisDevice &&
+    !busy &&
+    setupState === "error" &&
+    prepareProgress.phase === "error";
 
   return (
     <div className={className}>
@@ -173,11 +226,17 @@ export function PushNotificationsPanel({ className = "" }: PushNotificationsPane
                   : "Get airdrop, trade, and favorite alerts on this device."}
             </p>
           )}
-          {!enabledOnThisDevice && !status.needsInstall && !permissionBlocked && setupState === "preparing" ? (
-            <p className="mt-1 text-caption text-pump-muted">Preparing this device…</p>
+          {preparingDevice ? (
+            <PushSetupProgressBar
+              label={prepareProgress.label || "Preparing this device…"}
+              percent={prepareProgress.percent}
+            />
+          ) : null}
+          {prepareFailed ? (
+            <PushSetupProgressBar label="Device setup paused" percent={0} tone="danger" />
           ) : null}
           {busy && busyStep ? (
-            <p className="mt-2 text-caption text-pump-text">{busyStep.label}</p>
+            <PushSetupProgressBar label={busyStep.label} percent={busyStep.percent} />
           ) : null}
           {error ? (
             <p className="mt-2 rounded-lg bg-pump-danger/10 px-2.5 py-2 text-caption text-pump-danger">
@@ -191,6 +250,8 @@ export function PushNotificationsPanel({ className = "" }: PushNotificationsPane
             </p>
           ) : enabledOnThisDevice ? (
             <p className="mt-1 text-caption text-pump-muted/80">Registered on this device.</p>
+          ) : prepareProgress.percent === 100 && setupState === "ready" && !busy ? (
+            <p className="mt-1 text-caption text-pump-muted/80">Ready — tap Enable.</p>
           ) : null}
         </div>
         {!status.needsInstall && !permissionBlocked ? (
@@ -201,10 +262,10 @@ export function PushNotificationsPanel({ className = "" }: PushNotificationsPane
                 ? "secondary-button px-3 py-1.5 text-caption"
                 : "primary-button px-3 py-1.5 text-caption"
             }
-            disabled={busy}
+            disabled={busy || preparingDevice}
             onClick={() => void (enabledOnThisDevice ? onDisable() : onEnable())}
           >
-            {busy ? "…" : enabledOnThisDevice ? "Disable" : "Enable"}
+            {busy ? "…" : preparingDevice ? `${prepareProgress.percent}%` : enabledOnThisDevice ? "Disable" : "Enable"}
           </button>
         ) : null}
       </div>

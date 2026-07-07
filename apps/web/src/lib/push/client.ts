@@ -105,6 +105,15 @@ function withPushTimeout<T>(promise: Promise<T>, timeoutMs: number, message: str
 export type PushSubscribeProgress = {
   step: "permission" | "service-worker" | "device-register" | "server-save" | "done";
   label: string;
+  percent: number;
+};
+
+const SUBSCRIBE_STEP_PERCENT: Record<PushSubscribeProgress["step"], number> = {
+  permission: 20,
+  "service-worker": 50,
+  "device-register": 78,
+  "server-save": 92,
+  done: 100,
 };
 
 export type PushSubscribeOptions = {
@@ -113,10 +122,47 @@ export type PushSubscribeOptions = {
 
 export type PushInfrastructureState = "idle" | "preparing" | "ready" | "error";
 
+export type PushInfrastructureProgress = {
+  phase: "idle" | "checking" | "registering" | "installing" | "activating" | "ready" | "error";
+  label: string;
+  percent: number;
+};
+
 let infrastructureState: PushInfrastructureState = "idle";
 let infrastructureError: string | null = null;
+let infrastructureProgress: PushInfrastructureProgress = {
+  phase: "idle",
+  label: "",
+  percent: 0,
+};
+const infrastructureProgressListeners = new Set<(progress: PushInfrastructureProgress) => void>();
 let preparePromise: Promise<ServiceWorkerRegistration | null> | null = null;
 let preparedRegistration: ServiceWorkerRegistration | null = null;
+
+function emitInfrastructureProgress(progress: PushInfrastructureProgress): void {
+  infrastructureProgress = progress;
+  for (const listener of infrastructureProgressListeners) {
+    listener(progress);
+  }
+}
+
+export function getPushInfrastructureProgress(): PushInfrastructureProgress {
+  return infrastructureProgress;
+}
+
+export function subscribePushInfrastructureProgress(
+  listener: (progress: PushInfrastructureProgress) => void
+): () => void {
+  infrastructureProgressListeners.add(listener);
+  listener(infrastructureProgress);
+  return () => {
+    infrastructureProgressListeners.delete(listener);
+  };
+}
+
+function resetInfrastructureProgress(): void {
+  emitInfrastructureProgress({ phase: "idle", label: "", percent: 0 });
+}
 
 export function getPushInfrastructureState(): PushInfrastructureState {
   return infrastructureState;
@@ -171,9 +217,11 @@ function findSerwistRegistration(
 
 function waitForServiceWorkerActive(
   registration: ServiceWorkerRegistration,
-  timeoutMs: number
+  timeoutMs: number,
+  onProgress?: (percent: number, label: string) => void
 ): Promise<ServiceWorkerRegistration> {
   if (registration.active) {
+    onProgress?.(100, "Background worker ready");
     return Promise.resolve(registration);
   }
 
@@ -181,11 +229,20 @@ function waitForServiceWorkerActive(
     const started = Date.now();
     let settled = false;
 
+    const reportActivating = () => {
+      const elapsed = Date.now() - started;
+      const percent = Math.min(92, 58 + Math.round((elapsed / timeoutMs) * 34));
+      onProgress?.(percent, "Activating background worker…");
+    };
+
+    onProgress?.(55, "Installing background worker…");
+
     const finish = (value: ServiceWorkerRegistration) => {
       if (settled) return;
       settled = true;
       window.clearInterval(poll);
       window.clearTimeout(timeout);
+      onProgress?.(100, "Background worker ready");
       resolve(value);
     };
 
@@ -202,11 +259,17 @@ function waitForServiceWorkerActive(
     }, timeoutMs);
 
     const trackWorker = (worker: ServiceWorker) => {
+      if (worker.state === "installing") {
+        onProgress?.(62, "Installing background worker…");
+      }
       if (worker.state === "activated" || registration.active) {
         finish(registration);
         return;
       }
       worker.addEventListener("statechange", () => {
+        if (worker.state === "installing") {
+          onProgress?.(62, "Installing background worker…");
+        }
         if (worker.state === "activated" || registration.active) {
           finish(registration);
         }
@@ -225,9 +288,16 @@ function waitForServiceWorkerActive(
         return;
       }
 
+      if (worker?.state === "installing") {
+        reportActivating();
+        return;
+      }
+
       if (Date.now() - started > timeoutMs) {
         return;
       }
+
+      reportActivating();
     }, 250);
 
     const existing = registration.active ?? registration.waiting ?? registration.installing;
@@ -250,7 +320,17 @@ function waitForServiceWorkerActive(
 
 async function resolveServiceWorkerRegistration(options?: {
   background?: boolean;
+  onProgress?: (progress: PushInfrastructureProgress) => void;
 }): Promise<ServiceWorkerRegistration> {
+  const report = (progress: PushInfrastructureProgress) => {
+    options?.onProgress?.(progress);
+    if (options?.background) {
+      emitInfrastructureProgress(progress);
+    }
+  };
+
+  report({ phase: "checking", label: "Checking background worker…", percent: 12 });
+
   const isIos = getClientPushPlatform() === "ios";
   const background = options?.background ?? false;
   let registrations = await navigator.serviceWorker.getRegistrations();
@@ -258,8 +338,11 @@ async function resolveServiceWorkerRegistration(options?: {
     findSerwistRegistration(registrations) ?? registrations[0];
 
   if (registration?.active) {
+    report({ phase: "ready", label: "Background worker ready", percent: 100 });
     return registration;
   }
+
+  report({ phase: "checking", label: "Checking background worker…", percent: 28 });
 
   if (registration && isZombieServiceWorkerRegistration(registration)) {
     await registration.unregister();
@@ -268,6 +351,7 @@ async function resolveServiceWorkerRegistration(options?: {
   }
 
   if (!registration) {
+    report({ phase: "registering", label: "Registering background worker…", percent: 38 });
     if (!isIos) {
       await Promise.all(registrations.map((entry) => entry.unregister()));
     }
@@ -275,10 +359,21 @@ async function resolveServiceWorkerRegistration(options?: {
       updateViaCache: "none",
     });
   } else if (!registration.active && !registration.installing) {
+    report({ phase: "registering", label: "Updating background worker…", percent: 42 });
     await registration.update();
   }
 
-  return waitForServiceWorkerActive(registration, serviceWorkerTimeoutMs(background));
+  return waitForServiceWorkerActive(
+    registration,
+    serviceWorkerTimeoutMs(background),
+    (percent, label) => {
+      report({
+        phase: percent >= 100 ? "ready" : percent >= 58 ? "activating" : "installing",
+        label,
+        percent,
+      });
+    }
+  );
 }
 
 async function getPushRegistrationForSubscribe(): Promise<ServiceWorkerRegistration> {
@@ -301,11 +396,13 @@ async function getPushRegistrationForSubscribe(): Promise<ServiceWorkerRegistrat
 export function preparePushInfrastructure(): Promise<ServiceWorkerRegistration | null> {
   if (!isPushApiSupported()) {
     infrastructureState = "idle";
+    resetInfrastructureProgress();
     return Promise.resolve(null);
   }
 
   if (preparedRegistration?.active) {
     infrastructureState = "ready";
+    emitInfrastructureProgress({ phase: "ready", label: "Background worker ready", percent: 100 });
     return Promise.resolve(preparedRegistration);
   }
 
@@ -315,16 +412,26 @@ export function preparePushInfrastructure(): Promise<ServiceWorkerRegistration |
 
   infrastructureState = "preparing";
   infrastructureError = null;
+  emitInfrastructureProgress({ phase: "checking", label: "Preparing this device…", percent: 8 });
 
   preparePromise = (async () => {
     try {
-      const registration = await resolveServiceWorkerRegistration({ background: true });
+      const registration = await resolveServiceWorkerRegistration({
+        background: true,
+        onProgress: (progress) => emitInfrastructureProgress(progress),
+      });
       preparedRegistration = registration;
       infrastructureState = "ready";
+      emitInfrastructureProgress({ phase: "ready", label: "Ready for notifications", percent: 100 });
       return registration;
     } catch (error) {
       infrastructureState = "error";
       infrastructureError = error instanceof Error ? error.message : serviceWorkerStartError();
+      emitInfrastructureProgress({
+        phase: "error",
+        label: infrastructureError,
+        percent: 0,
+      });
       return null;
     } finally {
       preparePromise = null;
@@ -459,7 +566,7 @@ export async function subscribeToPushNotifications(
   options?: PushSubscribeOptions
 ): Promise<PushStatus> {
   const report = (step: PushSubscribeProgress["step"], label: string) => {
-    options?.onProgress?.({ step, label });
+    options?.onProgress?.({ step, label, percent: SUBSCRIBE_STEP_PERCENT[step] });
   };
 
   if (!isPushApiSupported()) {
