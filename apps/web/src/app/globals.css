@@ -106,6 +106,8 @@ html[data-theme="light"] {
     var(--tma-safe-area-top, 0px),
     var(--tma-content-safe-top, 0px)
   );
+  --hub-mobile-side-inset-left: env(safe-area-inset-left, 0px);
+  --hub-mobile-side-inset-right: env(safe-area-inset-right, 0px);
   --mobile-bottom-nav-inset-x: 1.25rem;
   --mobile-bottom-nav-float-gap: 0.875rem;
   --mobile-bottom-nav-offset: max(
@@ -1876,18 +1878,19 @@ code,
   }
 
   @media (max-width: 1023px) {
-    /* Hub terminals — Telegram close / status chrome (content + device insets from WebApp API) */
-    html[data-tma] .app-shell--hub-terminal {
+    /* Mobile + PWA standalone — device safe areas (not only Telegram Mini App) */
+    .app-shell {
+      box-sizing: border-box;
       padding-top: var(--hub-mobile-top-inset);
+      padding-left: var(--hub-mobile-side-inset-left);
+      padding-right: var(--hub-mobile-side-inset-right);
     }
 
     /* Token trade — in-page hero chrome owns top inset (avoid double pad) */
-    html[data-tma] .app-shell--token {
+    .app-shell--token {
       padding-top: 0;
-    }
-
-    html[data-tma] .app-shell:not(.app-shell--hub-terminal):not(.app-shell--token) {
-      padding-top: var(--hub-mobile-top-inset);
+      padding-left: 0;
+      padding-right: 0;
     }
   }
 
@@ -4977,7 +4980,8 @@ code,
 
   .bottom-nav-host {
     position: fixed;
-    inset-inline: var(--mobile-bottom-nav-inset-x);
+    left: max(var(--mobile-bottom-nav-inset-x), var(--hub-mobile-side-inset-left));
+    right: max(var(--mobile-bottom-nav-inset-x), var(--hub-mobile-side-inset-right));
     bottom: var(--mobile-bottom-nav-offset);
     z-index: 50;
     pointer-events: none;
@@ -4992,7 +4996,8 @@ code,
 
   .token-trade-dock:not(.token-trade-dock--inline) {
     position: fixed;
-    inset-inline: var(--mobile-bottom-nav-inset-x);
+    left: max(var(--mobile-bottom-nav-inset-x), var(--hub-mobile-side-inset-left));
+    right: max(var(--mobile-bottom-nav-inset-x), var(--hub-mobile-side-inset-right));
     bottom: calc(var(--mobile-bottom-nav-height) + var(--mobile-trade-dock-nav-gap));
     z-index: 45;
     padding-bottom: 0;
@@ -10006,6 +10011,7 @@ code,
   }
 
   .app-shell:has(.arena-page-main) {
+    box-sizing: border-box;
     height: 100dvh;
     max-height: 100dvh;
     overflow: hidden;
@@ -10055,6 +10061,15 @@ code,
       > main {
       border-left: none;
       border-right: none;
+    }
+
+    .app-shell--hub-terminal:has(
+        main.arena-page-main,
+        main.missions-page-main,
+        main.airdrops-page-main,
+        main.portfolio-page-main
+      ) {
+      box-sizing: border-box;
     }
   }
 

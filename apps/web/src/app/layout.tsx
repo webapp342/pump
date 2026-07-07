@@ -96,6 +96,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 }
                 document.documentElement.dataset.theme = theme;
                 document.documentElement.style.colorScheme = theme;
+
+                var standalone =
+                  (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches) ||
+                  (window.navigator && window.navigator.standalone === true);
+                if (standalone) {
+                  document.documentElement.dataset.standalone = "true";
+                }
               } catch (error) {
                 document.documentElement.dataset.theme = "dark";
                 document.documentElement.style.colorScheme = "dark";
