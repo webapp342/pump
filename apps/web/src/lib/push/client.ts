@@ -65,6 +65,18 @@ function getVapidPublicKey(): string {
 
 const SERVICE_WORKER_URL = "/serwist/sw.js";
 const SERVICE_WORKER_TIMEOUT_MS = 20_000;
+const SERVICE_WORKER_TIMEOUT_IOS_MS = 45_000;
+
+function serviceWorkerTimeoutMs(): number {
+  return getClientPushPlatform() === "ios" ? SERVICE_WORKER_TIMEOUT_IOS_MS : SERVICE_WORKER_TIMEOUT_MS;
+}
+
+function serviceWorkerStartError(): string {
+  if (getClientPushPlatform() === "ios") {
+    return "Pump could not finish setup on iPhone. Fully close Pump (swipe up), reopen from the Home Screen icon, wait 10 seconds on Arena, then tap Enable again.";
+  }
+  return "Service worker could not start. Refresh the page, wait a few seconds, then try Enable again.";
+}
 
 function isZombieServiceWorkerRegistration(registration: ServiceWorkerRegistration): boolean {
   return !registration.active && !registration.installing && !registration.waiting;
@@ -92,55 +104,85 @@ function waitForServiceWorkerActive(
   }
 
   return new Promise((resolve, reject) => {
-    const timeout = window.setTimeout(() => {
-      reject(
-        new Error(
-          "Service worker failed to start. Open DevTools → Application → Service Workers → Unregister, refresh, then try again."
-        )
-      );
-    }, timeoutMs);
+    const started = Date.now();
+    let settled = false;
 
-    const finish = () => {
+    const finish = (value: ServiceWorkerRegistration) => {
+      if (settled) return;
+      settled = true;
+      window.clearInterval(poll);
       window.clearTimeout(timeout);
-      resolve(registration);
+      resolve(value);
     };
 
+    const fail = (error: Error) => {
+      if (settled) return;
+      settled = true;
+      window.clearInterval(poll);
+      window.clearTimeout(timeout);
+      reject(error);
+    };
+
+    const timeout = window.setTimeout(() => {
+      fail(new Error(serviceWorkerStartError()));
+    }, timeoutMs);
+
     const trackWorker = (worker: ServiceWorker) => {
-      if (worker.state === "activated") {
-        finish();
+      if (worker.state === "activated" || registration.active) {
+        finish(registration);
         return;
       }
       worker.addEventListener("statechange", () => {
-        if (worker.state === "activated") {
-          finish();
+        if (worker.state === "activated" || registration.active) {
+          finish(registration);
         }
       });
     };
 
+    const poll = window.setInterval(() => {
+      if (registration.active) {
+        finish(registration);
+        return;
+      }
+
+      const worker = registration.installing ?? registration.waiting;
+      if (worker) {
+        if (worker.state === "activated") {
+          finish(registration);
+        }
+        return;
+      }
+
+      if (Date.now() - started > timeoutMs) {
+        return;
+      }
+
+      void registration.update();
+    }, 400);
+
     const existing = registration.active ?? registration.waiting ?? registration.installing;
     if (existing) {
       trackWorker(existing);
-      return;
+    } else {
+      void registration.update();
+      registration.addEventListener(
+        "updatefound",
+        () => {
+          const worker = registration.installing;
+          if (worker) {
+            trackWorker(worker);
+          }
+        },
+        { once: true }
+      );
     }
-
-    void registration.update();
-
-    registration.addEventListener(
-      "updatefound",
-      () => {
-        const worker = registration.installing;
-        if (worker) {
-          trackWorker(worker);
-        }
-      },
-      { once: true }
-    );
   });
 }
 
 async function ensurePushServiceWorkerRegistration(): Promise<ServiceWorkerRegistration> {
+  const isIos = getClientPushPlatform() === "ios";
   let registrations = await navigator.serviceWorker.getRegistrations();
-  let registration = findSerwistRegistration(registrations);
+  let registration = findSerwistRegistration(registrations) ?? registrations[0];
 
   if (registration && isZombieServiceWorkerRegistration(registration)) {
     await registration.unregister();
@@ -149,7 +191,9 @@ async function ensurePushServiceWorkerRegistration(): Promise<ServiceWorkerRegis
   }
 
   if (!registration) {
-    await Promise.all(registrations.map((entry) => entry.unregister()));
+    if (!isIos) {
+      await Promise.all(registrations.map((entry) => entry.unregister()));
+    }
     registration = await navigator.serviceWorker.register(SERVICE_WORKER_URL, {
       updateViaCache: "none",
     });
@@ -157,7 +201,22 @@ async function ensurePushServiceWorkerRegistration(): Promise<ServiceWorkerRegis
     await registration.update();
   }
 
-  return waitForServiceWorkerActive(registration, SERVICE_WORKER_TIMEOUT_MS);
+  try {
+    return await waitForServiceWorkerActive(registration, serviceWorkerTimeoutMs());
+  } catch (error) {
+    if (!isIos) {
+      throw error;
+    }
+
+    const ready = await Promise.race([
+      navigator.serviceWorker.ready,
+      new Promise<null>((resolve) => window.setTimeout(() => resolve(null), 8_000)),
+    ]);
+    if (ready?.active) {
+      return ready;
+    }
+    throw error;
+  }
 }
 
 function applicationServerKeysMatch(
@@ -269,7 +328,9 @@ export async function subscribeToPushNotifications(): Promise<PushStatus> {
 
   if (Notification.permission === "denied") {
     throw new Error(
-      "Notifications are blocked in your browser. Open site settings (lock icon in the address bar) → Notifications → Allow, then refresh and tap On again."
+      platform === "ios"
+        ? "Notifications are blocked on iPhone. Open Settings → Pump → Notifications → Allow, then reopen Pump from your Home Screen and tap Enable."
+        : "Notifications are blocked in your browser. Open site settings → Notifications → Allow, then refresh and tap Enable."
     );
   }
 
@@ -277,7 +338,9 @@ export async function subscribeToPushNotifications(): Promise<PushStatus> {
   if (permission !== "granted") {
     throw new Error(
       permission === "denied"
-        ? "Notifications are blocked in your browser. Open site settings (lock icon in the address bar) → Notifications → Allow, then refresh and tap On again."
+        ? platform === "ios"
+          ? "Notifications are blocked on iPhone. Open Settings → Pump → Notifications → Allow, then reopen Pump from your Home Screen and tap Enable."
+          : "Notifications are blocked in your browser. Open site settings → Notifications → Allow, then refresh and tap Enable."
         : "Notification permission was not granted"
     );
   }
@@ -351,4 +414,19 @@ export async function unsubscribeFromPushNotifications(): Promise<void> {
   }
 
   clearStoredPushEndpoint();
+}
+
+/** Start Serwist early so iOS PWA has an active worker before Enable is tapped. */
+export function warmPushServiceWorker(): void {
+  if (!isPushApiSupported()) return;
+  void (async () => {
+    try {
+      const registration = await navigator.serviceWorker.register(SERVICE_WORKER_URL, {
+        updateViaCache: "none",
+      });
+      await registration.update();
+    } catch {
+      // Serwist may already own registration.
+    }
+  })();
 }

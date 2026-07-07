@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { ModalPortal } from "@/components/ui/ModalPortal";
-import { useMobileModalClose } from "@/hooks/useMobileModalScrollLock";
+import { useMobileModalClose, useMobileModalScrollLock } from "@/hooks/useMobileModalScrollLock";
 import { WalletAccountPanel, type WalletAccountPanelProps } from "@/components/wallet/WalletAccountPanel";
 import { PumpIcon, faX } from "@/lib/icons";
 
@@ -12,6 +12,7 @@ type AccountSheetProps = Omit<WalletAccountPanelProps, "variant"> & {
 
 export function AccountSheet({ open, onClose, ...panelProps }: AccountSheetProps) {
   const handleClose = useMobileModalClose(onClose);
+  useMobileModalScrollLock(open);
 
   useEffect(() => {
     if (!open) return;
