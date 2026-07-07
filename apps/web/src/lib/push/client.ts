@@ -228,9 +228,19 @@ export async function subscribeToPushNotifications(): Promise<PushStatus> {
     throw new Error("Add Pump to your Home Screen in Safari before enabling notifications on iPhone");
   }
 
+  if (Notification.permission === "denied") {
+    throw new Error(
+      "Notifications are blocked in your browser. Open site settings (lock icon in the address bar) → Notifications → Allow, then refresh and tap On again."
+    );
+  }
+
   const permission = await Notification.requestPermission();
   if (permission !== "granted") {
-    throw new Error("Notification permission was not granted");
+    throw new Error(
+      permission === "denied"
+        ? "Notifications are blocked in your browser. Open site settings (lock icon in the address bar) → Notifications → Allow, then refresh and tap On again."
+        : "Notification permission was not granted"
+    );
   }
 
   const registration = await ensurePushServiceWorkerRegistration();

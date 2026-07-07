@@ -80,6 +80,7 @@ export function PushNotificationsPanel({ className = "" }: PushNotificationsPane
   }
 
   const enabled = status.subscribed && status.permission === "granted";
+  const permissionBlocked = status.permission === "denied";
 
   return (
     <div className={className}>
@@ -91,6 +92,11 @@ export function PushNotificationsPanel({ className = "" }: PushNotificationsPane
               On iPhone, add Pump to your Home Screen in Safari, then open the app from the icon
               before enabling notifications.
             </p>
+          ) : permissionBlocked ? (
+            <p className="mt-1 text-caption text-pump-danger">
+              Blocked in your browser. Click the lock icon in the address bar → Site settings →
+              Notifications → Allow, then refresh this page and tap On.
+            </p>
           ) : (
             <p className="mt-1 text-caption text-pump-muted">
               {enabled
@@ -100,7 +106,7 @@ export function PushNotificationsPanel({ className = "" }: PushNotificationsPane
           )}
           {error ? <p className="mt-1 text-caption text-pump-danger">{error}</p> : null}
         </div>
-        {!status.needsInstall ? (
+        {!status.needsInstall && !permissionBlocked ? (
           <button
             type="button"
             className={enabled ? "secondary-button px-3 py-1.5 text-caption" : "primary-button px-3 py-1.5 text-caption"}
