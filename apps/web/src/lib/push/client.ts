@@ -521,7 +521,7 @@ export async function readLocalPushSubscriptionEndpoint(): Promise<string | null
   const stored = readStoredPushEndpoint();
   try {
     const registration =
-      cachedRegistration?.active ??
+      cachedRegistration ??
       findSerwistRegistration(await navigator.serviceWorker.getRegistrations());
     if (!registration?.active) return stored;
     const subscription = await registration.pushManager.getSubscription();
