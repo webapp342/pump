@@ -82,6 +82,7 @@ export function PushNotificationsPanel({ className = "" }: PushNotificationsPane
       const message = err instanceof Error ? err.message : "Could not enable notifications";
       setError(message);
       await refreshDiagnostics();
+      await refresh();
     } finally {
       setBusy(false);
       setBusyStep(null);
@@ -122,7 +123,7 @@ export function PushNotificationsPanel({ className = "" }: PushNotificationsPane
     );
   }
 
-  const enabled = status.subscribed && status.permission === "granted";
+  const enabledOnThisDevice = status.subscribedOnThisDevice && status.permission === "granted";
   const permissionBlocked = status.permission === "denied";
   const isIos = status.platform === "ios";
   const setupState = getPushInfrastructureState();
@@ -136,12 +137,12 @@ export function PushNotificationsPanel({ className = "" }: PushNotificationsPane
             {!status.needsInstall && !permissionBlocked ? (
               <span
                 className={`rounded-full px-2 py-0.5 text-caption ${
-                  enabled
+                  enabledOnThisDevice
                     ? "bg-pump-accent/15 text-pump-accent"
                     : "bg-pump-border/20 text-pump-muted"
                 }`}
               >
-                {enabled ? "On" : "Off"}
+                {enabledOnThisDevice ? "On" : "Off"}
               </span>
             ) : null}
           </div>
@@ -156,18 +157,23 @@ export function PushNotificationsPanel({ className = "" }: PushNotificationsPane
                 ? "Blocked on iPhone. Open iOS Settings → Pump → Notifications → Allow Notifications. Then reopen Pump from your Home Screen icon and tap Enable."
                 : "Blocked in your browser. Open site settings → Notifications → Allow, then refresh and tap Enable."}
             </p>
+          ) : enabledOnThisDevice ? (
+            <p className="mt-1 text-caption text-pump-muted">Enabled on this device.</p>
+          ) : status.subscribedOnOtherDevice ? (
+            <p className="mt-1 text-caption text-pump-muted">
+              Alerts are active on another device (for example your PC). Tap Enable to add this{" "}
+              {isIos ? "iPhone" : "device"}.
+            </p>
           ) : (
             <p className="mt-1 text-caption text-pump-muted">
-              {enabled
-                ? "Enabled on this device."
-                : isIos
-                  ? "Trade, airdrop, and favorite alerts on this iPhone. Each device sets up once."
-                  : status.standalone
-                    ? "Enable on each device you use — phone and PC have separate alerts."
-                    : "Get airdrop, trade, and favorite alerts on this device."}
+              {isIos
+                ? "Each iPhone needs its own setup. Tap Enable once on this device."
+                : status.standalone
+                  ? "Enable on each device you use — phone and PC have separate alerts."
+                  : "Get airdrop, trade, and favorite alerts on this device."}
             </p>
           )}
-          {!enabled && !status.needsInstall && !permissionBlocked && setupState === "preparing" ? (
+          {!enabledOnThisDevice && !status.needsInstall && !permissionBlocked && setupState === "preparing" ? (
             <p className="mt-1 text-caption text-pump-muted">Preparing this device…</p>
           ) : null}
           {busy && busyStep ? (
@@ -183,25 +189,22 @@ export function PushNotificationsPanel({ className = "" }: PushNotificationsPane
                 </>
               ) : null}
             </p>
-          ) : enabled ? (
-            <p className="mt-1 text-caption text-pump-muted/80">
-              Server: registered
-            </p>
-          ) : null}
-          {enabled && isIos ? (
-            <p className="mt-1 text-caption text-pump-muted">
-              iPhone only shows alerts when Pump is in the background.
-            </p>
+          ) : enabledOnThisDevice ? (
+            <p className="mt-1 text-caption text-pump-muted/80">Registered on this device.</p>
           ) : null}
         </div>
         {!status.needsInstall && !permissionBlocked ? (
           <button
             type="button"
-            className={enabled ? "secondary-button px-3 py-1.5 text-caption" : "primary-button px-3 py-1.5 text-caption"}
+            className={
+              enabledOnThisDevice
+                ? "secondary-button px-3 py-1.5 text-caption"
+                : "primary-button px-3 py-1.5 text-caption"
+            }
             disabled={busy}
-            onClick={() => void (enabled ? onDisable() : onEnable())}
+            onClick={() => void (enabledOnThisDevice ? onDisable() : onEnable())}
           >
-            {busy ? "…" : enabled ? "Disable" : "Enable"}
+            {busy ? "…" : enabledOnThisDevice ? "Disable" : "Enable"}
           </button>
         ) : null}
       </div>

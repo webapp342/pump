@@ -386,6 +386,8 @@ export async function fetchPushStatus(): Promise<PushStatus> {
       supported: false,
       permission: "unsupported",
       subscribed: false,
+      subscribedOnThisDevice: false,
+      subscribedOnOtherDevice: false,
       platform,
       standalone,
       needsInstall,
@@ -397,7 +399,12 @@ export async function fetchPushStatus(): Promise<PushStatus> {
     };
   }
 
-  const response = await fetch("/api/push/status", {
+  const localEndpoint = await readLocalPushSubscriptionEndpoint();
+  const statusUrl = localEndpoint
+    ? `/api/push/status?endpoint=${encodeURIComponent(localEndpoint)}`
+    : "/api/push/status";
+
+  const response = await fetch(statusUrl, {
     method: "GET",
     credentials: "same-origin",
     cache: "no-store",
@@ -419,6 +426,8 @@ export async function fetchPushStatus(): Promise<PushStatus> {
     supported: true,
     permission,
     subscribed: body.data?.subscribed ?? false,
+    subscribedOnThisDevice: body.data?.subscribedOnThisDevice ?? false,
+    subscribedOnOtherDevice: body.data?.subscribedOnOtherDevice ?? false,
     platform,
     standalone,
     needsInstall,
@@ -428,6 +437,22 @@ export async function fetchPushStatus(): Promise<PushStatus> {
       favoriteMoves: true,
     },
   };
+}
+
+export async function readLocalPushSubscriptionEndpoint(): Promise<string | null> {
+  if (!isPushApiSupported()) return null;
+
+  const stored = readStoredPushEndpoint();
+  try {
+    const registration = preparedRegistration?.active
+      ? preparedRegistration
+      : findSerwistRegistration(await navigator.serviceWorker.getRegistrations());
+    if (!registration) return stored;
+    const subscription = await registration.pushManager.getSubscription();
+    return subscription?.endpoint ?? stored;
+  } catch {
+    return stored;
+  }
 }
 
 export async function subscribeToPushNotifications(
@@ -531,8 +556,22 @@ export async function subscribeToPushNotifications(
   storePushEndpoint(payload.endpoint);
   preparedRegistration = registration;
   infrastructureState = "ready";
+
+  if (isIos && !payload.endpoint.includes("push.apple.com")) {
+    throw new Error("This iPhone did not register with Apple Push. Tap Enable again.");
+  }
+
+  const status = await fetchPushStatus();
+  if (!status.subscribedOnThisDevice) {
+    throw new Error(
+      isIos
+        ? "This iPhone is not registered on the server yet. Tap Enable again."
+        : "This device is not registered on the server yet. Tap Enable again."
+    );
+  }
+
   report("done", "Notifications enabled.");
-  return fetchPushStatus();
+  return status;
 }
 
 export async function unsubscribeFromPushNotifications(): Promise<void> {

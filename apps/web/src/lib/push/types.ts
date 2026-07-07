@@ -30,7 +30,12 @@ export type PushNotificationPayload = {
 export type PushStatus = {
   supported: boolean;
   permission: NotificationPermission | "unsupported";
+  /** Any device registered for this wallet (legacy aggregate). */
   subscribed: boolean;
+  /** This browser/PWA install is registered on the server. */
+  subscribedOnThisDevice: boolean;
+  /** Another device is registered, but not this one. */
+  subscribedOnOtherDevice: boolean;
   platform: PushPlatform;
   standalone: boolean;
   needsInstall: boolean;
