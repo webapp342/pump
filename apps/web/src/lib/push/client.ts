@@ -182,7 +182,8 @@ function waitForServiceWorkerActive(
 async function ensurePushServiceWorkerRegistration(): Promise<ServiceWorkerRegistration> {
   const isIos = getClientPushPlatform() === "ios";
   let registrations = await navigator.serviceWorker.getRegistrations();
-  let registration = findSerwistRegistration(registrations) ?? registrations[0];
+  let registration: ServiceWorkerRegistration | undefined =
+    findSerwistRegistration(registrations) ?? registrations[0];
 
   if (registration && isZombieServiceWorkerRegistration(registration)) {
     await registration.unregister();
