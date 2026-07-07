@@ -108,17 +108,21 @@ export async function restorePumpKernelSession(): Promise<PumpAccountSession | n
 }
 
 export async function logoutPumpSession(): Promise<void> {
-  try {
-    const { unsubscribeFromPushNotifications } = await import("@/lib/push/client");
-    await unsubscribeFromPushNotifications();
-  } catch {
-    // Best-effort — logout must continue even if push cleanup fails.
-  }
   clearPumpSessionHint();
-  await fetch("/api/auth/logout", {
-    method: "POST",
-    credentials: "same-origin",
-  });
+
+  try {
+    await fetch("/api/auth/logout", {
+      method: "POST",
+      credentials: "same-origin",
+    });
+  } catch {
+    // Session hint already cleared — user is signed out locally.
+  }
+
+  // Best-effort — never block logout on push / service worker cleanup.
+  void import("@/lib/push/client")
+    .then((mod) => mod.unsubscribeFromPushNotifications())
+    .catch(() => undefined);
 }
 
 export async function fetchWalletPrivateKey(): Promise<Hex> {

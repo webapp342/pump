@@ -113,8 +113,10 @@ export function PushNotificationsPanel({ className = "" }: PushNotificationsPane
           ) : (
             <p className="mt-1 text-caption text-pump-muted">
               {enabled
-                ? "Enabled for this device."
-                : "Get airdrop, trade, and favorite alerts on this device."}
+                ? "Enabled on this device."
+                : status.standalone
+                  ? "Enable on each device you use — phone and PC have separate alerts."
+                  : "Get airdrop, trade, and favorite alerts on this device."}
             </p>
           )}
           {error ? <p className="mt-1 text-caption text-pump-danger">{error}</p> : null}
