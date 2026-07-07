@@ -73,9 +73,62 @@ function serviceWorkerTimeoutMs(): number {
 
 function serviceWorkerStartError(): string {
   if (getClientPushPlatform() === "ios") {
-    return "Pump could not finish setup on iPhone. Fully close Pump (swipe up), reopen from the Home Screen icon, wait 10 seconds on Arena, then tap Enable again.";
+    return "Background setup timed out on iPhone. Fully close Pump (swipe up), reopen from the Home Screen icon, wait 10 seconds on Arena, then tap Enable again.";
   }
-  return "Service worker could not start. Refresh the page, wait a few seconds, then try Enable again.";
+  return "Background setup timed out. Refresh the page, wait a few seconds, then try Enable again.";
+}
+
+function withPushTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timeout = window.setTimeout(() => {
+      reject(new Error(message));
+    }, timeoutMs);
+
+    void promise.then(
+      (value) => {
+        window.clearTimeout(timeout);
+        resolve(value);
+      },
+      (error: unknown) => {
+        window.clearTimeout(timeout);
+        reject(error instanceof Error ? error : new Error(message));
+      }
+    );
+  });
+}
+
+export type PushSubscribeProgress = {
+  step: "permission" | "service-worker" | "device-register" | "server-save" | "done";
+  label: string;
+};
+
+export type PushSubscribeOptions = {
+  onProgress?: (progress: PushSubscribeProgress) => void;
+};
+
+export async function readPushSetupDiagnostics(): Promise<string> {
+  if (!isPushApiSupported()) {
+    return "Push API: not supported in this browser";
+  }
+
+  const platform = getClientPushPlatform();
+  const standalone = isStandaloneDisplayMode();
+  const permission = Notification.permission;
+  const registrations = await navigator.serviceWorker.getRegistrations();
+  const serwist = findSerwistRegistration(registrations);
+  const worker = serwist?.active ?? serwist?.installing ?? serwist?.waiting;
+  const workerState = worker?.state ?? (serwist ? "missing-worker" : "not-registered");
+  const storedEndpoint = readStoredPushEndpoint();
+  const endpointHint = storedEndpoint ? "yes" : "no";
+
+  return [
+    `Device: ${platform}`,
+    `App: ${standalone ? "Home Screen" : "browser"}`,
+    `Permission: ${permission}`,
+    `Background worker: ${workerState}`,
+    `Local key: ${endpointHint}`,
+    `Registrations: ${registrations.length}`,
+  ].join(" · ");
 }
 
 function isZombieServiceWorkerRegistration(registration: ServiceWorkerRegistration): boolean {
@@ -316,37 +369,67 @@ export async function fetchPushStatus(): Promise<PushStatus> {
   };
 }
 
-export async function subscribeToPushNotifications(): Promise<PushStatus> {
+export async function subscribeToPushNotifications(
+  options?: PushSubscribeOptions
+): Promise<PushStatus> {
+  const report = (step: PushSubscribeProgress["step"], label: string) => {
+    options?.onProgress?.({ step, label });
+  };
+
   if (!isPushApiSupported()) {
     throw new Error("Push notifications are not supported in this browser");
   }
 
   const platform = getClientPushPlatform();
   const displayMode = getClientPushDisplayMode();
+  const isIos = platform === "ios";
+
   if (iosPushNeedsInstall(platform, displayMode)) {
     throw new Error("Add Pump to your Home Screen in Safari before enabling notifications on iPhone");
   }
 
+  report("permission", "Checking notification permission…");
+
   if (Notification.permission === "denied") {
     throw new Error(
-      platform === "ios"
+      isIos
         ? "Notifications are blocked on iPhone. Open Settings → Pump → Notifications → Allow, then reopen Pump from your Home Screen and tap Enable."
         : "Notifications are blocked in your browser. Open site settings → Notifications → Allow, then refresh and tap Enable."
     );
   }
 
-  const permission = await Notification.requestPermission();
+  let permission = Notification.permission;
+  if (permission !== "granted") {
+    report("permission", "Waiting for Allow on the permission popup…");
+    permission = await withPushTimeout(
+      Notification.requestPermission(),
+      isIos ? 120_000 : 60_000,
+      isIos
+        ? "Permission popup timed out. Reopen Pump from the Home Screen icon and tap Enable again."
+        : "Permission request timed out. Refresh the page and tap Enable again."
+    );
+  }
+
   if (permission !== "granted") {
     throw new Error(
       permission === "denied"
-        ? platform === "ios"
+        ? isIos
           ? "Notifications are blocked on iPhone. Open Settings → Pump → Notifications → Allow, then reopen Pump from your Home Screen and tap Enable."
           : "Notifications are blocked in your browser. Open site settings → Notifications → Allow, then refresh and tap Enable."
         : "Notification permission was not granted"
     );
   }
 
-  const registration = await ensurePushServiceWorkerRegistration();
+  report("service-worker", isIos ? "Starting background worker (up to 45s)…" : "Starting background worker…");
+
+  const registration = await withPushTimeout(
+    ensurePushServiceWorkerRegistration(),
+    serviceWorkerTimeoutMs() + (isIos ? 10_000 : 5_000),
+    serviceWorkerStartError()
+  );
+
+  report("device-register", isIos ? "Registering this iPhone for alerts…" : "Registering this device for alerts…");
+
   const applicationServerKey = urlBase64ToUint8Array(getVapidPublicKey());
   const existing = await registration.pushManager.getSubscription();
 
@@ -354,24 +437,38 @@ export async function subscribeToPushNotifications(): Promise<PushStatus> {
     await existing.unsubscribe();
   }
 
-  const subscription =
-    (await registration.pushManager.getSubscription()) ??
-    (await registration.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey,
-    }));
+  const subscription = await withPushTimeout(
+    (async () => {
+      const current = await registration.pushManager.getSubscription();
+      if (current) return current;
+      return registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey,
+      });
+    })(),
+    isIos ? 45_000 : 30_000,
+    isIos
+      ? "iPhone alert registration timed out. Close Pump completely, reopen from Home Screen, wait on Arena, then try Enable again."
+      : "Device registration timed out. Refresh the page and try Enable again."
+  );
 
   const payload = serializeSubscription(subscription);
-  const response = await fetch("/api/push/subscribe", {
-    method: "POST",
-    credentials: "same-origin",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      subscription: payload,
-      platform,
-      displayMode,
+  report("server-save", "Saving registration to Pump server…");
+
+  const response = await withPushTimeout(
+    fetch("/api/push/subscribe", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        subscription: payload,
+        platform,
+        displayMode,
+      }),
     }),
-  });
+    20_000,
+    "Server save timed out. Check your connection and tap Enable again."
+  );
 
   const body = (await response.json()) as { error?: string };
   if (!response.ok) {
@@ -379,6 +476,7 @@ export async function subscribeToPushNotifications(): Promise<PushStatus> {
   }
 
   storePushEndpoint(payload.endpoint);
+  report("done", "Notifications enabled on this device.");
   return fetchPushStatus();
 }
 

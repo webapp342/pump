@@ -1,10 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   fetchPushStatus,
+  readPushSetupDiagnostics,
   subscribeToPushNotifications,
   unsubscribeFromPushNotifications,
+  type PushSubscribeProgress,
 } from "@/lib/push/client";
 import type { PushStatus } from "@/lib/push/types";
 
@@ -16,7 +18,19 @@ export function PushNotificationsPanel({ className = "" }: PushNotificationsPane
   const [status, setStatus] = useState<PushStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [busyStep, setBusyStep] = useState<PushSubscribeProgress | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [diagnostics, setDiagnostics] = useState<string | null>(null);
+  const lastProgressRef = useRef<PushSubscribeProgress | null>(null);
+
+  const refreshDiagnostics = useCallback(async () => {
+    try {
+      const next = await readPushSetupDiagnostics();
+      setDiagnostics(next);
+    } catch {
+      setDiagnostics("Could not read device diagnostics");
+    }
+  }, []);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -24,32 +38,58 @@ export function PushNotificationsPanel({ className = "" }: PushNotificationsPane
     try {
       const next = await fetchPushStatus();
       setStatus(next);
+      await refreshDiagnostics();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not load push status");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [refreshDiagnostics]);
 
   useEffect(() => {
     void refresh();
   }, [refresh]);
 
+  useEffect(() => {
+    if (!busy) return;
+
+    void refreshDiagnostics();
+    const interval = window.setInterval(() => {
+      void refreshDiagnostics();
+    }, 2_000);
+
+    return () => window.clearInterval(interval);
+  }, [busy, refreshDiagnostics]);
+
   async function onEnable() {
     setBusy(true);
+    lastProgressRef.current = { step: "permission", label: "Starting…" };
+    setBusyStep(lastProgressRef.current);
     setError(null);
     try {
-      const next = await subscribeToPushNotifications();
+      const next = await subscribeToPushNotifications({
+        onProgress: (progress) => {
+          lastProgressRef.current = progress;
+          setBusyStep(progress);
+        },
+      });
       setStatus(next);
+      await refreshDiagnostics();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not enable notifications");
+      const message = err instanceof Error ? err.message : "Could not enable notifications";
+      const step = lastProgressRef.current?.label ?? "Enable";
+      setError(`Failed during: ${step} ${message}`);
+      await refreshDiagnostics();
     } finally {
       setBusy(false);
+      setBusyStep(null);
+      lastProgressRef.current = null;
     }
   }
 
   async function onDisable() {
     setBusy(true);
+    setBusyStep({ step: "server-save", label: "Disabling notifications…" });
     setError(null);
     try {
       await unsubscribeFromPushNotifications();
@@ -58,6 +98,7 @@ export function PushNotificationsPanel({ className = "" }: PushNotificationsPane
       setError(err instanceof Error ? err.message : "Could not disable notifications");
     } finally {
       setBusy(false);
+      setBusyStep(null);
     }
   }
 
@@ -82,6 +123,7 @@ export function PushNotificationsPanel({ className = "" }: PushNotificationsPane
   const enabled = status.subscribed && status.permission === "granted";
   const permissionBlocked = status.permission === "denied";
   const isIos = status.platform === "ios";
+  const waitHint = isIos ? "up to 60 seconds" : "up to 30 seconds";
 
   return (
     <div className={className}>
@@ -117,30 +159,38 @@ export function PushNotificationsPanel({ className = "" }: PushNotificationsPane
               {enabled
                 ? "Enabled on this device."
                 : isIos
-                  ? "Tap Enable — wait up to 20 seconds. iPhone and PC each need their own setup."
+                  ? `Tap Enable and wait ${waitHint}. iPhone and PC each need their own setup.`
                   : status.standalone
                     ? "Enable on each device you use — phone and PC have separate alerts."
                     : "Get airdrop, trade, and favorite alerts on this device."}
             </p>
           )}
-          {isIos || !enabled ? (
-            <p className="mt-1 text-caption text-pump-muted/80">
-              {isIos ? "Home Screen app" : "App mode"}: {status.standalone ? "Yes" : "No"}
-              {" · "}
-              Permission: {status.permission}
-              {" · "}
-              Server: {status.subscribed ? "registered" : "not registered"}
-            </p>
-          ) : null}
+          <p className="mt-1 text-caption text-pump-muted/80">
+            Server: {status.subscribed ? "registered" : "not registered"}
+            {diagnostics ? (
+              <>
+                <br />
+                <span className="break-words">{diagnostics}</span>
+              </>
+            ) : null}
+          </p>
           {enabled && isIos ? (
             <p className="mt-1 text-caption text-pump-muted">
               iPhone only shows alerts when Pump is in the background. Close Pump or lock the
               screen, then trigger a trade.
             </p>
           ) : null}
-          {error ? <p className="mt-1 text-caption text-pump-danger">{error}</p> : null}
-          {busy ? (
-            <p className="mt-1 text-caption text-pump-muted">Setting up… may take up to 20 seconds.</p>
+          {busy && busyStep ? (
+            <p className="mt-2 rounded-lg bg-pump-border/10 px-2.5 py-2 text-caption text-pump-text">
+              <span className="font-medium">Working:</span> {busyStep.label}
+              <br />
+              <span className="text-pump-muted">Please wait ({waitHint}). Do not close Pump.</span>
+            </p>
+          ) : null}
+          {error ? (
+            <p className="mt-2 rounded-lg bg-pump-danger/10 px-2.5 py-2 text-caption text-pump-danger">
+              {error}
+            </p>
           ) : null}
         </div>
         {!status.needsInstall && !permissionBlocked ? (
