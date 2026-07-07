@@ -2,14 +2,20 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  clearPushActivityLog,
   fetchPushStatus,
+  getPushActivityLog,
+  getPushInfrastructureError,
   getPushInfrastructureProgress,
   getPushInfrastructureState,
   preparePushInfrastructure,
   readPushSetupDiagnostics,
+  retryPreparePushInfrastructure,
+  subscribePushActivityLog,
   subscribePushInfrastructureProgress,
   subscribeToPushNotifications,
   unsubscribeFromPushNotifications,
+  type PushActivityEntry,
   type PushInfrastructureProgress,
   type PushSubscribeProgress,
 } from "@/lib/push/client";
@@ -46,6 +52,47 @@ function PushSetupProgressBar({
   );
 }
 
+function activityToneClass(level: PushActivityEntry["level"]): string {
+  switch (level) {
+    case "error":
+      return "text-pump-danger";
+    case "warn":
+      return "text-amber-400";
+    case "success":
+      return "text-pump-accent";
+    default:
+      return "text-pump-muted";
+  }
+}
+
+function PushActivityLog({
+  entries,
+  onClear,
+}: {
+  entries: readonly PushActivityEntry[];
+  onClear: () => void;
+}) {
+  if (entries.length === 0) return null;
+
+  return (
+    <div className="mt-2 rounded-lg border border-pump-border/25 bg-pump-border/5 p-2.5">
+      <div className="mb-1.5 flex items-center justify-between gap-2">
+        <p className="text-caption font-medium text-pump-text">Activity log</p>
+        <button type="button" className="text-caption text-pump-muted underline" onClick={onClear}>
+          Clear
+        </button>
+      </div>
+      <ul className="max-h-36 space-y-1 overflow-y-auto overscroll-contain">
+        {entries.map((entry) => (
+          <li key={entry.id} className={`text-caption leading-snug ${activityToneClass(entry.level)}`}>
+            <span className="tabular-nums text-pump-muted/80">{entry.time}</span> {entry.message}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 export function PushNotificationsPanel({ className = "" }: PushNotificationsPanelProps) {
   const [status, setStatus] = useState<PushStatus | null>(null);
   const [loading, setLoading] = useState(true);
@@ -54,6 +101,7 @@ export function PushNotificationsPanel({ className = "" }: PushNotificationsPane
   const [prepareProgress, setPrepareProgress] = useState<PushInfrastructureProgress>(
     getPushInfrastructureProgress
   );
+  const [activityLog, setActivityLog] = useState<readonly PushActivityEntry[]>(getPushActivityLog);
   const [error, setError] = useState<string | null>(null);
   const [diagnostics, setDiagnostics] = useState<string | null>(null);
   const lastProgressRef = useRef<PushSubscribeProgress | null>(null);
@@ -69,13 +117,13 @@ export function PushNotificationsPanel({ className = "" }: PushNotificationsPane
 
   const refresh = useCallback(async () => {
     setLoading(true);
-    setError(null);
     try {
       const next = await fetchPushStatus();
       setStatus(next);
       await refreshDiagnostics();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not load push status");
+      const message = err instanceof Error ? err.message : "Could not load push status";
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -83,12 +131,11 @@ export function PushNotificationsPanel({ className = "" }: PushNotificationsPane
 
   useEffect(() => {
     void refresh();
-    void preparePushInfrastructure();
+    void preparePushInfrastructure({ source: "auto" });
   }, [refresh]);
 
-  useEffect(() => {
-    return subscribePushInfrastructureProgress(setPrepareProgress);
-  }, []);
+  useEffect(() => subscribePushInfrastructureProgress(setPrepareProgress), []);
+  useEffect(() => subscribePushActivityLog(setActivityLog), []);
 
   useEffect(() => {
     if (!busy) return;
@@ -100,6 +147,19 @@ export function PushNotificationsPanel({ className = "" }: PushNotificationsPane
 
     return () => window.clearInterval(interval);
   }, [busy, refreshDiagnostics]);
+
+  async function onRetrySetup() {
+    setError(null);
+    setBusy(true);
+    try {
+      await retryPreparePushInfrastructure();
+      await refreshDiagnostics();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Setup retry failed");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function onEnable() {
     setBusy(true);
@@ -168,6 +228,7 @@ export function PushNotificationsPanel({ className = "" }: PushNotificationsPane
   const permissionBlocked = status.permission === "denied";
   const isIos = status.platform === "ios";
   const setupState = getPushInfrastructureState();
+  const setupError = getPushInfrastructureError();
   const preparingDevice =
     !enabledOnThisDevice &&
     !status.needsInstall &&
@@ -175,11 +236,7 @@ export function PushNotificationsPanel({ className = "" }: PushNotificationsPane
     !busy &&
     setupState === "preparing" &&
     prepareProgress.percent < 100;
-  const prepareFailed =
-    !enabledOnThisDevice &&
-    !busy &&
-    setupState === "error" &&
-    prepareProgress.phase === "error";
+  const prepareFailed = !enabledOnThisDevice && !busy && setupState === "error";
 
   return (
     <div className={className}>
@@ -233,7 +290,21 @@ export function PushNotificationsPanel({ className = "" }: PushNotificationsPane
             />
           ) : null}
           {prepareFailed ? (
-            <PushSetupProgressBar label="Device setup paused" percent={0} tone="danger" />
+            <>
+              <PushSetupProgressBar
+                label={setupError ?? "Device setup failed"}
+                percent={0}
+                tone="danger"
+              />
+              <button
+                type="button"
+                className="mt-2 text-caption text-pump-accent underline"
+                disabled={busy}
+                onClick={() => void onRetrySetup()}
+              >
+                Retry background setup
+              </button>
+            </>
           ) : null}
           {busy && busyStep ? (
             <PushSetupProgressBar label={busyStep.label} percent={busyStep.percent} />
@@ -253,6 +324,7 @@ export function PushNotificationsPanel({ className = "" }: PushNotificationsPane
           ) : prepareProgress.percent === 100 && setupState === "ready" && !busy ? (
             <p className="mt-1 text-caption text-pump-muted/80">Ready — tap Enable.</p>
           ) : null}
+          <PushActivityLog entries={activityLog} onClear={() => clearPushActivityLog()} />
         </div>
         {!status.needsInstall && !permissionBlocked ? (
           <button
@@ -262,10 +334,10 @@ export function PushNotificationsPanel({ className = "" }: PushNotificationsPane
                 ? "secondary-button px-3 py-1.5 text-caption"
                 : "primary-button px-3 py-1.5 text-caption"
             }
-            disabled={busy || preparingDevice}
+            disabled={busy}
             onClick={() => void (enabledOnThisDevice ? onDisable() : onEnable())}
           >
-            {busy ? "…" : preparingDevice ? `${prepareProgress.percent}%` : enabledOnThisDevice ? "Disable" : "Enable"}
+            {busy ? "…" : enabledOnThisDevice ? "Disable" : "Enable"}
           </button>
         ) : null}
       </div>

@@ -120,6 +120,71 @@ export type PushSubscribeOptions = {
   onProgress?: (progress: PushSubscribeProgress) => void;
 };
 
+export type PushActivityLevel = "info" | "success" | "warn" | "error";
+
+export type PushActivityEntry = {
+  id: string;
+  time: string;
+  level: PushActivityLevel;
+  message: string;
+};
+
+const PUSH_ACTIVITY_MAX = 40;
+let pushActivitySeq = 0;
+let pushActivityEntries: PushActivityEntry[] = [];
+const pushActivityListeners = new Set<(entries: readonly PushActivityEntry[]) => void>();
+
+function formatActivityTime(date = new Date()): string {
+  return date.toLocaleTimeString(undefined, {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+}
+
+function emitPushActivity(): void {
+  const snapshot = pushActivityEntries;
+  for (const listener of pushActivityListeners) {
+    listener(snapshot);
+  }
+}
+
+export function getPushActivityLog(): readonly PushActivityEntry[] {
+  return pushActivityEntries;
+}
+
+export function subscribePushActivityLog(
+  listener: (entries: readonly PushActivityEntry[]) => void
+): () => void {
+  pushActivityListeners.add(listener);
+  listener(pushActivityEntries);
+  return () => {
+    pushActivityListeners.delete(listener);
+  };
+}
+
+export function clearPushActivityLog(): void {
+  pushActivityEntries = [];
+  emitPushActivity();
+}
+
+export function pushActivity(level: PushActivityLevel, message: string): void {
+  const entry: PushActivityEntry = {
+    id: `${Date.now()}-${pushActivitySeq++}`,
+    time: formatActivityTime(),
+    level,
+    message,
+  };
+  pushActivityEntries = [entry, ...pushActivityEntries].slice(0, PUSH_ACTIVITY_MAX);
+  emitPushActivity();
+}
+
+function pushActivityFromError(context: string, error: unknown): Error {
+  const message = error instanceof Error ? error.message : String(error);
+  pushActivity("error", `${context}: ${message}`);
+  return error instanceof Error ? error : new Error(message);
+}
+
 export type PushInfrastructureState = "idle" | "preparing" | "ready" | "error";
 
 export type PushInfrastructureProgress = {
@@ -138,6 +203,7 @@ let infrastructureProgress: PushInfrastructureProgress = {
 const infrastructureProgressListeners = new Set<(progress: PushInfrastructureProgress) => void>();
 let preparePromise: Promise<ServiceWorkerRegistration | null> | null = null;
 let preparedRegistration: ServiceWorkerRegistration | null = null;
+let prepareAttempted = false;
 
 function emitInfrastructureProgress(progress: PushInfrastructureProgress): void {
   infrastructureProgress = progress;
@@ -255,7 +321,9 @@ function waitForServiceWorkerActive(
     };
 
     const timeout = window.setTimeout(() => {
-      fail(new Error(serviceWorkerStartError()));
+      const worker = registration.installing ?? registration.waiting ?? registration.active;
+      const state = worker?.state ?? "none";
+      fail(new Error(`${serviceWorkerStartError()} (worker state: ${state})`));
     }, timeoutMs);
 
     const trackWorker = (worker: ServiceWorker) => {
@@ -345,6 +413,7 @@ async function resolveServiceWorkerRegistration(options?: {
   report({ phase: "checking", label: "Checking background worker…", percent: 28 });
 
   if (registration && isZombieServiceWorkerRegistration(registration)) {
+    pushActivity("warn", "Removed broken background worker registration");
     await registration.unregister();
     registration = undefined;
     registrations = await navigator.serviceWorker.getRegistrations();
@@ -352,6 +421,7 @@ async function resolveServiceWorkerRegistration(options?: {
 
   if (!registration) {
     report({ phase: "registering", label: "Registering background worker…", percent: 38 });
+    pushActivity("info", "Registering background worker…");
     if (!isIos) {
       await Promise.all(registrations.map((entry) => entry.unregister()));
     }
@@ -360,6 +430,7 @@ async function resolveServiceWorkerRegistration(options?: {
     });
   } else if (!registration.active && !registration.installing) {
     report({ phase: "registering", label: "Updating background worker…", percent: 42 });
+    pushActivity("info", "Updating background worker…");
     await registration.update();
   }
 
@@ -378,22 +449,37 @@ async function resolveServiceWorkerRegistration(options?: {
 
 async function getPushRegistrationForSubscribe(): Promise<ServiceWorkerRegistration> {
   if (preparedRegistration?.active) {
+    pushActivity("info", "Background worker already active");
     return preparedRegistration;
   }
 
-  try {
-    const prepared = await preparePushInfrastructure();
+  if (preparePromise) {
+    pushActivity("info", "Waiting for background setup to finish…");
+    const prepared = await preparePromise;
     if (prepared?.active) {
       return prepared;
     }
-  } catch {
-    // Fall through to a direct resolve attempt.
   }
 
-  return resolveServiceWorkerRegistration();
+  if (infrastructureState === "error" && infrastructureError) {
+    throw new Error(infrastructureError);
+  }
+
+  pushActivity("warn", "Background worker not ready — running setup now");
+  const prepared = await preparePushInfrastructure({ source: "enable" });
+  if (prepared?.active) {
+    return prepared;
+  }
+
+  throw new Error(infrastructureError ?? serviceWorkerStartError());
 }
 
-export function preparePushInfrastructure(): Promise<ServiceWorkerRegistration | null> {
+export function preparePushInfrastructure(options?: {
+  force?: boolean;
+  source?: "auto" | "enable" | "retry";
+}): Promise<ServiceWorkerRegistration | null> {
+  const source = options?.source ?? "auto";
+
   if (!isPushApiSupported()) {
     infrastructureState = "idle";
     resetInfrastructureProgress();
@@ -407,22 +493,43 @@ export function preparePushInfrastructure(): Promise<ServiceWorkerRegistration |
   }
 
   if (preparePromise) {
+    pushActivity("info", "Background setup already in progress");
     return preparePromise;
+  }
+
+  if (prepareAttempted && infrastructureState === "error" && !options?.force) {
+    pushActivity("warn", `Setup paused: ${infrastructureError ?? serviceWorkerStartError()}`);
+    return Promise.resolve(null);
   }
 
   infrastructureState = "preparing";
   infrastructureError = null;
+  prepareAttempted = true;
   emitInfrastructureProgress({ phase: "checking", label: "Preparing this device…", percent: 8 });
+  pushActivity(
+    "info",
+    source === "auto"
+      ? "Automatic background setup started"
+      : source === "retry"
+        ? "Retrying background setup"
+        : "Background setup started from Enable"
+  );
 
   preparePromise = (async () => {
     try {
       const registration = await resolveServiceWorkerRegistration({
         background: true,
-        onProgress: (progress) => emitInfrastructureProgress(progress),
+        onProgress: (progress) => {
+          emitInfrastructureProgress(progress);
+          if (progress.phase === "registering" || progress.phase === "activating") {
+            pushActivity("info", progress.label);
+          }
+        },
       });
       preparedRegistration = registration;
       infrastructureState = "ready";
       emitInfrastructureProgress({ phase: "ready", label: "Ready for notifications", percent: 100 });
+      pushActivity("success", "Background worker ready (100%)");
       return registration;
     } catch (error) {
       infrastructureState = "error";
@@ -432,6 +539,7 @@ export function preparePushInfrastructure(): Promise<ServiceWorkerRegistration |
         label: infrastructureError,
         percent: 0,
       });
+      pushActivity("error", infrastructureError);
       return null;
     } finally {
       preparePromise = null;
@@ -439,6 +547,12 @@ export function preparePushInfrastructure(): Promise<ServiceWorkerRegistration |
   })();
 
   return preparePromise;
+}
+
+export function retryPreparePushInfrastructure(): Promise<ServiceWorkerRegistration | null> {
+  infrastructureError = null;
+  preparedRegistration = null;
+  return preparePushInfrastructure({ force: true, source: "retry" });
 }
 
 function applicationServerKeysMatch(
@@ -566,11 +680,14 @@ export async function subscribeToPushNotifications(
   options?: PushSubscribeOptions
 ): Promise<PushStatus> {
   const report = (step: PushSubscribeProgress["step"], label: string) => {
+    pushActivity("info", label);
     options?.onProgress?.({ step, label, percent: SUBSCRIBE_STEP_PERCENT[step] });
   };
 
+  pushActivity("info", "Enable tapped — starting notification setup");
+
   if (!isPushApiSupported()) {
-    throw new Error("Push notifications are not supported in this browser");
+    throw pushActivityFromError("Push not supported", new Error("Push notifications are not supported in this browser"));
   }
 
   const platform = getClientPushPlatform();
@@ -578,106 +695,149 @@ export async function subscribeToPushNotifications(
   const isIos = platform === "ios";
 
   if (iosPushNeedsInstall(platform, displayMode)) {
-    throw new Error("Add Pump to your Home Screen in Safari before enabling notifications on iPhone");
+    throw pushActivityFromError(
+      "Install required",
+      new Error("Add Pump to your Home Screen in Safari before enabling notifications on iPhone")
+    );
   }
 
   if (Notification.permission === "denied") {
-    throw new Error(
-      isIos
-        ? "Notifications are blocked on iPhone. Open Settings → Pump → Notifications → Allow, then reopen Pump from your Home Screen and tap Enable."
-        : "Notifications are blocked in your browser. Open site settings → Notifications → Allow, then refresh and tap Enable."
+    throw pushActivityFromError(
+      "Permission blocked",
+      new Error(
+        isIos
+          ? "Notifications are blocked on iPhone. Open Settings → Pump → Notifications → Allow, then reopen Pump from your Home Screen and tap Enable."
+          : "Notifications are blocked in your browser. Open site settings → Notifications → Allow, then refresh and tap Enable."
+      )
     );
   }
 
   let permission: NotificationPermission = Notification.permission;
   if (permission !== "granted") {
-    report("permission", "Allow notifications when prompted.");
+    report("permission", "Waiting for notification permission…");
     permission = await Notification.requestPermission();
+    pushActivity(
+      permission === "granted" ? "success" : permission === "denied" ? "error" : "warn",
+      `Notification permission: ${permission}`
+    );
+  } else {
+    pushActivity("info", "Notification permission already granted");
   }
 
   if (permission !== "granted") {
-    throw new Error(
-      permission === "denied"
-        ? isIos
-          ? "Notifications are blocked on iPhone. Open Settings → Pump → Notifications → Allow, then reopen Pump from your Home Screen and tap Enable."
-          : "Notifications are blocked in your browser. Open site settings → Notifications → Allow, then refresh and tap Enable."
-        : "Notification permission was not granted"
+    throw pushActivityFromError(
+      "Permission denied",
+      new Error(
+        permission === "denied"
+          ? isIos
+            ? "Notifications are blocked on iPhone. Open Settings → Pump → Notifications → Allow, then reopen Pump from your Home Screen and tap Enable."
+            : "Notifications are blocked in your browser. Open site settings → Notifications → Allow, then refresh and tap Enable."
+          : "Notification permission was not granted"
+      )
     );
   }
 
-  report("service-worker", "Finishing setup…");
+  report("service-worker", "Waiting for background worker…");
 
-  const registration = await withPushTimeout(
-    getPushRegistrationForSubscribe(),
-    serviceWorkerTimeoutMs() + 2_000,
-    serviceWorkerStartError()
-  );
+  let registration: ServiceWorkerRegistration;
+  try {
+    registration = await withPushTimeout(
+      getPushRegistrationForSubscribe(),
+      serviceWorkerTimeoutMs() + 2_000,
+      serviceWorkerStartError()
+    );
+    pushActivity("success", "Background worker active");
+  } catch (error) {
+    throw pushActivityFromError("Background worker failed", error);
+  }
 
-  report("device-register", "Enabling alerts on this device…");
+  report("device-register", "Creating device push subscription…");
 
   const applicationServerKey = urlBase64ToUint8Array(getVapidPublicKey());
   const existing = await registration.pushManager.getSubscription();
 
   if (existing && !applicationServerKeysMatch(existing.options.applicationServerKey ?? null, applicationServerKey)) {
+    pushActivity("warn", "Replacing old push keys on this device");
     await existing.unsubscribe();
   }
 
-  const subscription = await withPushTimeout(
-    (async () => {
-      const current = await registration.pushManager.getSubscription();
-      if (current) return current;
-      return registration.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey,
-      });
-    })(),
-    isIos ? 15_000 : 10_000,
-    isIos
-      ? "Could not register this iPhone for alerts. Close Pump, reopen from Home Screen, then try again."
-      : "Could not register this device for alerts. Refresh and try again."
-  );
+  let subscription: PushSubscription;
+  try {
+    subscription = await withPushTimeout(
+      (async () => {
+        const current = await registration.pushManager.getSubscription();
+        if (current) return current;
+        return registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey,
+        });
+      })(),
+      isIos ? 15_000 : 10_000,
+      isIos
+        ? "Could not register this iPhone for alerts. Close Pump, reopen from Home Screen, then try again."
+        : "Could not register this device for alerts. Refresh and try again."
+    );
+    const endpointHost = new URL(subscription.endpoint).host;
+    pushActivity("success", `Device subscription created (${endpointHost})`);
+  } catch (error) {
+    throw pushActivityFromError("Device subscription failed", error);
+  }
 
   const payload = serializeSubscription(subscription);
-  report("server-save", "Saving…");
+  report("server-save", "Saving to Pump server…");
 
-  const response = await withPushTimeout(
-    fetch("/api/push/subscribe", {
-      method: "POST",
-      credentials: "same-origin",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        subscription: payload,
-        platform,
-        displayMode,
+  let response: Response;
+  try {
+    response = await withPushTimeout(
+      fetch("/api/push/subscribe", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          subscription: payload,
+          platform,
+          displayMode,
+        }),
       }),
-    }),
-    12_000,
-    "Could not reach Pump servers. Check your connection and try again."
-  );
+      12_000,
+      "Could not reach Pump servers. Check your connection and try again."
+    );
+  } catch (error) {
+    throw pushActivityFromError("Server request failed", error);
+  }
 
   const body = (await response.json()) as { error?: string };
   if (!response.ok) {
-    throw new Error(body.error ?? "Could not save push subscription");
+    throw pushActivityFromError("Server rejected subscription", new Error(body.error ?? "Could not save push subscription"));
   }
+
+  pushActivity("success", `Server saved subscription (HTTP ${response.status})`);
 
   storePushEndpoint(payload.endpoint);
   preparedRegistration = registration;
   infrastructureState = "ready";
 
   if (isIos && !payload.endpoint.includes("push.apple.com")) {
-    throw new Error("This iPhone did not register with Apple Push. Tap Enable again.");
+    throw pushActivityFromError(
+      "Wrong push endpoint",
+      new Error(`Expected Apple push endpoint, got: ${new URL(payload.endpoint).host}`)
+    );
   }
 
   const status = await fetchPushStatus();
   if (!status.subscribedOnThisDevice) {
-    throw new Error(
-      isIos
-        ? "This iPhone is not registered on the server yet. Tap Enable again."
-        : "This device is not registered on the server yet. Tap Enable again."
+    throw pushActivityFromError(
+      "Server verification failed",
+      new Error(
+        isIos
+          ? "This iPhone is not registered on the server yet."
+          : "This device is not registered on the server yet."
+      )
     );
   }
 
-  report("done", "Notifications enabled.");
+  report("done", "Notifications enabled on this device.");
+  pushActivity("success", "Enable complete — this device is registered");
   return status;
 }
 
@@ -730,11 +890,17 @@ export async function syncPushSubscriptionIfGranted(): Promise<void> {
   if (iosPushNeedsInstall(getClientPushPlatform(), getClientPushDisplayMode())) return;
 
   try {
-    const registration = await preparePushInfrastructure();
-    if (!registration?.active) return;
+    const registration = await preparePushInfrastructure({ source: "auto" });
+    if (!registration?.active) {
+      pushActivity("warn", "Background sync skipped — worker not active");
+      return;
+    }
 
     const subscription = await registration.pushManager.getSubscription();
-    if (!subscription) return;
+    if (!subscription) {
+      pushActivity("info", "Background sync skipped — no local subscription");
+      return;
+    }
 
     const payload = serializeSubscription(subscription);
     const response = await fetch("/api/push/subscribe", {
@@ -750,8 +916,12 @@ export async function syncPushSubscriptionIfGranted(): Promise<void> {
 
     if (response.ok) {
       storePushEndpoint(payload.endpoint);
+      pushActivity("success", "Background sync: server subscription refreshed");
+    } else {
+      const body = (await response.json()) as { error?: string };
+      pushActivity("error", `Background sync failed: ${body.error ?? `HTTP ${response.status}`}`);
     }
-  } catch {
-    // Silent background sync — Enable flow handles user-facing errors.
+  } catch (error) {
+    pushActivityFromError("Background sync failed", error);
   }
 }
