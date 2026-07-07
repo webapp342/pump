@@ -20,6 +20,7 @@ import {
 import { upsertCandlesAfterTrade } from "./candles.js";
 import { fetchIndexerNativeUsdRate } from "./native-usd.js";
 import { invalidateArenaCaches } from "./redis-cache.js";
+import { dispatchTradePushNotifications } from "./push-dispatch.js";
 import { FIRST_SMART_BUY_MIN_WEI, VOLUME_MONSTER_MIN_BNB } from "./mission-thresholds.js";
 
 type ParsedLaunchpadLog = {
@@ -511,6 +512,21 @@ export class LaunchpadEventHandlers {
         },
       });
     }
+
+    void dispatchTradePushNotifications(this.context.launchpadPool, {
+      tradeId: tradeResult.tradeId,
+      tokenAddress: token,
+      traderAddress: trader,
+      side: side as "BUY" | "SELL",
+      zugAmount: weiToDecimal(zugAmount),
+      tokenAmount: weiToDecimal(tokenAmount),
+      txHash: txHash.toLowerCase(),
+    }).catch((error) => {
+      console.warn(
+        "trade push dispatch failed:",
+        error instanceof Error ? error.message : error
+      );
+    });
   }
 
   private handleFeeSplit(log: ParsedLaunchpadLog): void {

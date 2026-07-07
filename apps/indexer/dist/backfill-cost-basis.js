@@ -1,6 +1,6 @@
 /**
- * One-time backfill: replay trades into remaining_cost_basis_zug + realized_pnl_zug.
- * Run after migration 010 on existing deployments.
+ * Replay trades into remaining_cost_basis_* + realized_pnl_* (native + USD).
+ * Run after migration 030 on existing deployments.
  *
  *   npm run backfill-cost-basis
  */
@@ -11,7 +11,7 @@ const pool = new pg.Pool({ connectionString: process.env.LAUNCHPAD_DATABASE_URL 
 async function replayWalletToken(tokenAddress, walletAddress) {
     const result = await pool.query(`
       SELECT side, zug_amount::text, fee_zug::text, token_amount::text,
-             block_time, block_number::text, log_index
+             native_usd_rate::text, block_time, block_number::text, log_index
       FROM trades
       WHERE token_address = $1 AND trader_address = $2
       ORDER BY block_time ASC, block_number ASC, log_index ASC
@@ -19,11 +19,15 @@ async function replayWalletToken(tokenAddress, walletAddress) {
     let state = emptyPositionCostState();
     for (const row of result.rows) {
         const isBuy = row.side === "BUY";
-        state = applyTradeToPositionCost(state, isBuy, Number(row.zug_amount), Number(row.fee_zug), Number(row.token_amount));
+        const rateRaw = row.native_usd_rate != null ? Number(row.native_usd_rate) : null;
+        const rate = rateRaw != null && Number.isFinite(rateRaw) && rateRaw > 0 ? rateRaw : null;
+        state = applyTradeToPositionCost(state, isBuy, Number(row.zug_amount), Number(row.fee_zug), Number(row.token_amount), rate);
     }
     return {
         remainingCostBasis: String(state.remainingCostBasis),
         realizedPnl: String(state.realizedPnl),
+        remainingCostBasisUsd: String(state.remainingCostBasisUsd),
+        realizedPnlUsd: String(state.realizedPnlUsd),
         tokenBalance: String(state.tokenBalance),
     };
 }
@@ -36,12 +40,21 @@ async function main() {
         UPDATE user_positions
         SET remaining_cost_basis_zug = $3::numeric,
             realized_pnl_zug = $4::numeric,
+            remaining_cost_basis_usd = $5::numeric,
+            realized_pnl_usd = $6::numeric,
             updated_at = now()
         WHERE token_address = $1 AND address = $2
-      `, [token_address, address, replayed.remainingCostBasis, replayed.realizedPnl]);
+      `, [
+            token_address,
+            address,
+            replayed.remainingCostBasis,
+            replayed.realizedPnl,
+            replayed.remainingCostBasisUsd,
+            replayed.realizedPnlUsd,
+        ]);
         updated += 1;
     }
-    console.log(`backfill-cost-basis: updated ${updated} user_positions rows`);
+    console.log(`backfill-cost-basis: updated ${updated} user_positions rows (native + USD)`);
     await pool.end();
 }
 main().catch((error) => {

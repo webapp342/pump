@@ -37,3 +37,59 @@ const serwist = new Serwist({
 });
 
 serwist.addEventListeners();
+
+type PushPayload = {
+  title?: string;
+  body?: string;
+  url?: string;
+  tag?: string;
+  icon?: string;
+};
+
+self.addEventListener("push", (event) => {
+  if (!event.data) return;
+
+  let payload: PushPayload = {};
+  try {
+    payload = event.data.json() as PushPayload;
+  } catch {
+    payload = { body: event.data.text() };
+  }
+
+  const title = payload.title?.trim() || "Pump";
+  const body = payload.body?.trim() || "You have a new update.";
+  const url = payload.url?.trim() || "/";
+  const tag = payload.tag?.trim() || "pump-notification";
+  const icon = payload.icon?.trim() || "/pwa/icon-192.png";
+
+  event.waitUntil(
+    self.registration.showNotification(title, {
+      body,
+      tag,
+      icon,
+      badge: "/pwa/icon-192.png",
+      data: { url },
+    })
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const targetUrl = typeof event.notification.data?.url === "string" ? event.notification.data.url : "/";
+
+  event.waitUntil(
+    (async () => {
+      const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+      for (const client of windows) {
+        if ("focus" in client) {
+          await client.focus();
+          if ("navigate" in client && typeof client.navigate === "function") {
+            await client.navigate(targetUrl);
+          }
+          return;
+        }
+      }
+      await self.clients.openWindow(targetUrl);
+    })()
+  );
+});

@@ -1,11 +1,13 @@
 import pg from "pg";
 import { incrementalBoardStatsEnabled } from "./board-stats.js";
+import { loadIndexerEnv } from "./load-env.js";
+loadIndexerEnv();
 const BONDING_VIRTUAL_BNB = 5;
 const TOKEN_SUPPLY = 1_000_000_000;
 async function main() {
     const url = process.env.LAUNCHPAD_DATABASE_URL;
     if (!url) {
-        throw new Error("LAUNCHPAD_DATABASE_URL is required");
+        throw new Error("LAUNCHPAD_DATABASE_URL is required. Set it in /var/www/pump/Indexer/.env or export before running.");
     }
     const pool = new pg.Pool({ connectionString: url, max: 4 });
     try {

@@ -108,6 +108,12 @@ export async function restorePumpKernelSession(): Promise<PumpAccountSession | n
 }
 
 export async function logoutPumpSession(): Promise<void> {
+  try {
+    const { unsubscribeFromPushNotifications } = await import("@/lib/push/client");
+    await unsubscribeFromPushNotifications();
+  } catch {
+    // Best-effort — logout must continue even if push cleanup fails.
+  }
   clearPumpSessionHint();
   await fetch("/api/auth/logout", {
     method: "POST",

@@ -1,3 +1,4 @@
+import { queryQualifyingBuyVolumeBnb, resolveProgressTraderAddresses, } from "./airdrop-qualify-volume.js";
 function decimalToNumber(value) {
     if (!value)
         return 0;
@@ -99,24 +100,22 @@ export async function refreshParticipantSnapshotIndexer(db, airdropId, address) 
     let holdCurrent = 0;
     let buyCurrent = 0;
     if (socialPassed && (hasHold || hasBuy)) {
-        const [holdRow, buyRow] = await Promise.all([
+        const traderAddresses = await resolveProgressTraderAddresses(db, normalized);
+        const [holdRow, buyVolume] = await Promise.all([
             db.query(`
           SELECT COALESCE(token_balance, 0)::text AS token_balance
           FROM user_positions
           WHERE token_address = $1 AND address = $2
         `, [airdrop.linked_token, normalized]),
-            db.query(`
-          SELECT COALESCE(SUM(zug_amount), 0)::text AS buy_volume
-          FROM trades
-          WHERE token_address = $1
-            AND trader_address = $2
-            AND side = 'BUY'
-            AND block_time >= $3::timestamptz
-            AND block_time <= $4::timestamptz
-        `, [airdrop.linked_token, normalized, airdrop.qualify_start, airdrop.qualify_end]),
+            queryQualifyingBuyVolumeBnb(db, {
+                linkedToken: airdrop.linked_token,
+                traderAddresses,
+                qualifyStart: airdrop.qualify_start,
+                qualifyEnd: airdrop.qualify_end,
+            }),
         ]);
         holdCurrent = decimalToNumber(holdRow.rows[0]?.token_balance);
-        buyCurrent = decimalToNumber(buyRow.rows[0]?.buy_volume);
+        buyCurrent = decimalToNumber(buyVolume);
     }
     const holdTarget = hasHold ? weiStringToDecimal(minHoldWei) : 0;
     const buyTarget = hasBuy ? weiStringToDecimal(minBuyWei) : 0;

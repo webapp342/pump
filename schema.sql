@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict XF05QzCGgcAXJESMjhUBkYiBlH6xUfdWGh3YIYFZaLXLs1MuA5YVCCdIBqP0G5A
+\restrict 6MRwp4avbUH99PHaR2MwpERig6ZtyP5PJ9wLIXT0cmYA5qiMObzwd9w0ykMFqbQ
 
 -- Dumped from database version 16.14 (Ubuntu 16.14-0ubuntu0.24.04.1)
 -- Dumped by pg_dump version 16.14 (Ubuntu 16.14-0ubuntu0.24.04.1)
@@ -1338,14 +1338,14 @@ COMMENT ON COLUMN public.user_positions.remaining_cost_basis_zug IS 'Open-lot co
 -- Name: COLUMN user_positions.remaining_cost_basis_usd; Type: COMMENT; Schema: public; Owner: -
 --
 
-COMMENT ON COLUMN public.user_positions.remaining_cost_basis_usd IS 'Open-lot USD cost (net native × native_usd_rate at each buy). Resets at zero balance.';
+COMMENT ON COLUMN public.user_positions.remaining_cost_basis_usd IS 'Open-lot USD cost (net native ├ù native_usd_rate at each buy). Resets at zero balance.';
 
 
 --
 -- Name: COLUMN user_positions.realized_pnl_usd; Type: COMMENT; Schema: public; Owner: -
 --
 
-COMMENT ON COLUMN public.user_positions.realized_pnl_usd IS 'Cumulative realized P/L in USD (sell proceeds USD − avg-cost USD removed).';
+COMMENT ON COLUMN public.user_positions.realized_pnl_usd IS 'Cumulative realized P/L in USD (sell proceeds USD ظêْ avg-cost USD removed).';
 
 
 --
@@ -1377,7 +1377,7 @@ CREATE TABLE public.users (
     avatar_id text,
     username text,
     CONSTRAINT users_address_check CHECK ((address = lower(address))),
-    CONSTRAINT users_username_check CHECK ((username IS NULL OR username = lower(username)))
+    CONSTRAINT users_username_check CHECK (((username IS NULL) OR (username = lower(username))))
 );
 
 
@@ -2450,5 +2450,5 @@ ALTER TABLE ONLY public.user_positions
 -- PostgreSQL database dump complete
 --
 
-\unrestrict XF05QzCGgcAXJESMjhUBkYiBlH6xUfdWGh3YIYFZaLXLs1MuA5YVCCdIBqP0G5A
+\unrestrict 6MRwp4avbUH99PHaR2MwpERig6ZtyP5PJ9wLIXT0cmYA5qiMObzwd9w0ykMFqbQ
 

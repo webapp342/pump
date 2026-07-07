@@ -35,8 +35,8 @@ function privateKey(name) {
 }
 export const airdropKeeperConfig = {
     launchpadDatabaseUrl: required("LAUNCHPAD_DATABASE_URL"),
-    rpcUrl: optional("BSC_RPC_URL") ?? optional("ZUGCHAIN_RPC_URL") ?? required("ZUGCHAIN_RPC_URL"),
-    chainId: integer("ZUGCHAIN_CHAIN_ID", 97),
+    rpcUrl: optional("RPC_URL") ?? optional("BASE_SEPOLIA_RPC_URL") ?? required("RPC_URL"),
+    chainId: integer("CHAIN_ID", 84532),
     keeperPrivateKey: privateKey("AIRDROP_KEEPER_PRIVATE_KEY"),
     pollIntervalMs: integer("AIRDROP_KEEPER_POLL_MS", 60_000),
     once: booleanFlag("AIRDROP_KEEPER_ONCE", false)

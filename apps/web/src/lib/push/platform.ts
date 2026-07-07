@@ -1,0 +1,23 @@
+import type { PushDisplayMode, PushPlatform } from "@/lib/push/types";
+
+export function detectPushPlatform(userAgent: string): PushPlatform {
+  if (/iPad|iPhone|iPod/i.test(userAgent)) return "ios";
+  if (/Android/i.test(userAgent)) return "android";
+  if (userAgent) return "desktop";
+  return "unknown";
+}
+
+export function parsePushDisplayMode(value: unknown): PushDisplayMode {
+  return value === "standalone" ? "standalone" : "browser";
+}
+
+export function parsePushPlatform(value: unknown): PushPlatform {
+  if (value === "desktop" || value === "android" || value === "ios" || value === "unknown") {
+    return value;
+  }
+  return "unknown";
+}
+
+export function iosPushNeedsInstall(platform: PushPlatform, displayMode: PushDisplayMode): boolean {
+  return platform === "ios" && displayMode !== "standalone";
+}

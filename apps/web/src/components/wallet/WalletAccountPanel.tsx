@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { NATIVE_SYMBOL, shortAddress } from "@/config/chain";
 import { ThemePicker } from "@/components/theme/ThemePicker";
+import { PushNotificationsPanel } from "@/components/push/PushNotificationsPanel";
 import { useWalletFunding } from "@/components/wallet/WalletFundingProvider";
 import { copyToClipboard } from "@/lib/copy-to-clipboard";
 import { PumpIcon, faCopy, faWallet } from "@/lib/icons";
@@ -157,6 +158,7 @@ export function WalletAccountPanel({
           </div>
 
           <div className="wallet-account-panel__menu">
+            <PushNotificationsPanel />
             <div className="wallet-account-panel__menu-item wallet-account-panel__menu-item--static">
               <span className="wallet-account-panel__menu-leading">
                 <span className="text-body-sm text-pump-text">Appearance</span>
@@ -200,6 +202,8 @@ export function WalletAccountPanel({
         <SmartWalletAddressRow address={address} />
 
         <WalletActionButtons onClose={onClose} onExportWallet={openExportWallet} />
+
+        <PushNotificationsPanel className="wallet-account-panel__appearance border-t border-pump-border/15 pt-3" />
 
         <div className="wallet-account-panel__appearance">
           <span className="wallet-account-panel__appearance-label">Appearance</span>
