@@ -202,8 +202,12 @@ export function PushNotificationsPanel({ className = "" }: PushNotificationsPane
             <p className="mt-1 text-caption text-pump-muted">Enabled on this device.</p>
           ) : status.subscribedOnOtherDevice ? (
             <p className="mt-1 text-caption text-pump-muted">
-              Your PC has alerts. Tap Enable once to add this {isIos ? "iPhone" : "device"} — setup is one-time per
-              device.
+              Your PC has alerts. Tap Enable once to add this {isIos ? "iPhone" : "device"} — first time
+              takes ~10 seconds on iPhone.
+            </p>
+          ) : isIos ? (
+            <p className="mt-1 text-caption text-pump-muted">
+              Tap Enable once. iPhone installs a lightweight alerts worker (one-time, ~10 sec).
             </p>
           ) : (
             <p className="mt-1 text-caption text-pump-muted">

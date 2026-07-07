@@ -38,15 +38,6 @@ const serwist = new Serwist({
 
 serwist.addEventListeners();
 
-// Explicit claim/skip for iOS PWA first-launch push (Discourse/WebKit pattern).
-self.addEventListener("install", (event) => {
-  event.waitUntil(self.skipWaiting());
-});
-
-self.addEventListener("activate", (event) => {
-  event.waitUntil(self.clients.claim());
-});
-
 type PushPayload = {
   title?: string;
   body?: string;
