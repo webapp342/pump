@@ -81,6 +81,7 @@ export function PushNotificationsPanel({ className = "" }: PushNotificationsPane
 
   const enabled = status.subscribed && status.permission === "granted";
   const permissionBlocked = status.permission === "denied";
+  const isIos = status.platform === "ios";
 
   return (
     <div className={className}>
@@ -102,24 +103,39 @@ export function PushNotificationsPanel({ className = "" }: PushNotificationsPane
           </div>
           {status.needsInstall ? (
             <p className="mt-1 text-caption text-pump-muted">
-              On iPhone, add Pump to your Home Screen in Safari, then open the app from the icon
-              before enabling notifications.
+              On iPhone: Safari → Share → <strong>Add to Home Screen</strong>, then open{" "}
+              <strong>Pump</strong> from the icon (not Safari) and tap Enable.
             </p>
           ) : permissionBlocked ? (
             <p className="mt-1 text-caption text-pump-danger">
-              Blocked in your browser. Click the lock icon in the address bar → Site settings →
-              Notifications → Allow, then refresh this page and tap Enable.
+              {isIos
+                ? "Blocked on iPhone. Open iOS Settings → Pump → Notifications → Allow Notifications. Then reopen Pump from your Home Screen icon and tap Enable."
+                : "Blocked in your browser. Open site settings → Notifications → Allow, then refresh and tap Enable."}
             </p>
           ) : (
             <p className="mt-1 text-caption text-pump-muted">
               {enabled
                 ? "Enabled on this device."
-                : status.standalone
-                  ? "Enable on each device you use — phone and PC have separate alerts."
-                  : "Get airdrop, trade, and favorite alerts on this device."}
+                : isIos
+                  ? "Tap Enable — wait up to 20 seconds. iPhone and PC each need their own setup."
+                  : status.standalone
+                    ? "Enable on each device you use — phone and PC have separate alerts."
+                    : "Get airdrop, trade, and favorite alerts on this device."}
             </p>
           )}
+          {!enabled && !status.needsInstall ? (
+            <p className="mt-1 text-caption text-pump-muted/80">
+              {isIos ? "Home Screen app" : "App mode"}: {status.standalone ? "Yes" : "No"}
+              {" · "}
+              Permission: {status.permission}
+              {" · "}
+              Server: {status.subscribed ? "registered" : "not registered"}
+            </p>
+          ) : null}
           {error ? <p className="mt-1 text-caption text-pump-danger">{error}</p> : null}
+          {busy ? (
+            <p className="mt-1 text-caption text-pump-muted">Setting up… may take up to 20 seconds.</p>
+          ) : null}
         </div>
         {!status.needsInstall && !permissionBlocked ? (
           <button
