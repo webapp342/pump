@@ -123,13 +123,19 @@ export function PushNotificationsPanel({ className = "" }: PushNotificationsPane
                     : "Get airdrop, trade, and favorite alerts on this device."}
             </p>
           )}
-          {!enabled && !status.needsInstall ? (
+          {isIos || !enabled ? (
             <p className="mt-1 text-caption text-pump-muted/80">
               {isIos ? "Home Screen app" : "App mode"}: {status.standalone ? "Yes" : "No"}
               {" · "}
               Permission: {status.permission}
               {" · "}
               Server: {status.subscribed ? "registered" : "not registered"}
+            </p>
+          ) : null}
+          {enabled && isIos ? (
+            <p className="mt-1 text-caption text-pump-muted">
+              iPhone only shows alerts when Pump is in the background. Close Pump or lock the
+              screen, then trigger a trade.
             </p>
           ) : null}
           {error ? <p className="mt-1 text-caption text-pump-danger">{error}</p> : null}
