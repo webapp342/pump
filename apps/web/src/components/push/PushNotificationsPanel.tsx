@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   fetchPushStatus,
+  getPushInfrastructureState,
+  preparePushInfrastructure,
   readPushSetupDiagnostics,
   subscribeToPushNotifications,
   unsubscribeFromPushNotifications,
@@ -48,6 +50,7 @@ export function PushNotificationsPanel({ className = "" }: PushNotificationsPane
 
   useEffect(() => {
     void refresh();
+    void preparePushInfrastructure();
   }, [refresh]);
 
   useEffect(() => {
@@ -56,14 +59,14 @@ export function PushNotificationsPanel({ className = "" }: PushNotificationsPane
     void refreshDiagnostics();
     const interval = window.setInterval(() => {
       void refreshDiagnostics();
-    }, 2_000);
+    }, 1_500);
 
     return () => window.clearInterval(interval);
   }, [busy, refreshDiagnostics]);
 
   async function onEnable() {
     setBusy(true);
-    lastProgressRef.current = { step: "permission", label: "Starting…" };
+    lastProgressRef.current = { step: "permission", label: "Enabling notifications…" };
     setBusyStep(lastProgressRef.current);
     setError(null);
     try {
@@ -77,8 +80,7 @@ export function PushNotificationsPanel({ className = "" }: PushNotificationsPane
       await refreshDiagnostics();
     } catch (err) {
       const message = err instanceof Error ? err.message : "Could not enable notifications";
-      const step = lastProgressRef.current?.label ?? "Enable";
-      setError(`Failed during: ${step} ${message}`);
+      setError(message);
       await refreshDiagnostics();
     } finally {
       setBusy(false);
@@ -89,7 +91,7 @@ export function PushNotificationsPanel({ className = "" }: PushNotificationsPane
 
   async function onDisable() {
     setBusy(true);
-    setBusyStep({ step: "server-save", label: "Disabling notifications…" });
+    setBusyStep({ step: "server-save", label: "Disabling…" });
     setError(null);
     try {
       await unsubscribeFromPushNotifications();
@@ -123,7 +125,7 @@ export function PushNotificationsPanel({ className = "" }: PushNotificationsPane
   const enabled = status.subscribed && status.permission === "granted";
   const permissionBlocked = status.permission === "denied";
   const isIos = status.platform === "ios";
-  const waitHint = isIos ? "up to 60 seconds" : "up to 30 seconds";
+  const setupState = getPushInfrastructureState();
 
   return (
     <div className={className}>
@@ -159,37 +161,36 @@ export function PushNotificationsPanel({ className = "" }: PushNotificationsPane
               {enabled
                 ? "Enabled on this device."
                 : isIos
-                  ? `Tap Enable and wait ${waitHint}. iPhone and PC each need their own setup.`
+                  ? "Trade, airdrop, and favorite alerts on this iPhone. Each device sets up once."
                   : status.standalone
                     ? "Enable on each device you use — phone and PC have separate alerts."
                     : "Get airdrop, trade, and favorite alerts on this device."}
             </p>
           )}
-          <p className="mt-1 text-caption text-pump-muted/80">
-            Server: {status.subscribed ? "registered" : "not registered"}
-            {diagnostics ? (
-              <>
-                <br />
-                <span className="break-words">{diagnostics}</span>
-              </>
-            ) : null}
-          </p>
-          {enabled && isIos ? (
-            <p className="mt-1 text-caption text-pump-muted">
-              iPhone only shows alerts when Pump is in the background. Close Pump or lock the
-              screen, then trigger a trade.
-            </p>
+          {!enabled && !status.needsInstall && !permissionBlocked && setupState === "preparing" ? (
+            <p className="mt-1 text-caption text-pump-muted">Preparing this device…</p>
           ) : null}
           {busy && busyStep ? (
-            <p className="mt-2 rounded-lg bg-pump-border/10 px-2.5 py-2 text-caption text-pump-text">
-              <span className="font-medium">Working:</span> {busyStep.label}
-              <br />
-              <span className="text-pump-muted">Please wait ({waitHint}). Do not close Pump.</span>
-            </p>
+            <p className="mt-2 text-caption text-pump-text">{busyStep.label}</p>
           ) : null}
           {error ? (
             <p className="mt-2 rounded-lg bg-pump-danger/10 px-2.5 py-2 text-caption text-pump-danger">
               {error}
+              {diagnostics ? (
+                <>
+                  <br />
+                  <span className="mt-1 block break-words text-pump-muted">{diagnostics}</span>
+                </>
+              ) : null}
+            </p>
+          ) : enabled ? (
+            <p className="mt-1 text-caption text-pump-muted/80">
+              Server: registered
+            </p>
+          ) : null}
+          {enabled && isIos ? (
+            <p className="mt-1 text-caption text-pump-muted">
+              iPhone only shows alerts when Pump is in the background.
             </p>
           ) : null}
         </div>

@@ -64,18 +64,23 @@ function getVapidPublicKey(): string {
 }
 
 const SERVICE_WORKER_URL = "/serwist/sw.js";
-const SERVICE_WORKER_TIMEOUT_MS = 20_000;
-const SERVICE_WORKER_TIMEOUT_IOS_MS = 45_000;
+const SERVICE_WORKER_TIMEOUT_DESKTOP_MS = 8_000;
+const SERVICE_WORKER_TIMEOUT_IOS_MS = 20_000;
+const SERVICE_WORKER_BACKGROUND_TIMEOUT_IOS_MS = 45_000;
 
-function serviceWorkerTimeoutMs(): number {
-  return getClientPushPlatform() === "ios" ? SERVICE_WORKER_TIMEOUT_IOS_MS : SERVICE_WORKER_TIMEOUT_MS;
+function serviceWorkerTimeoutMs(background = false): number {
+  const isIos = getClientPushPlatform() === "ios";
+  if (isIos) {
+    return background ? SERVICE_WORKER_BACKGROUND_TIMEOUT_IOS_MS : SERVICE_WORKER_TIMEOUT_IOS_MS;
+  }
+  return SERVICE_WORKER_TIMEOUT_DESKTOP_MS;
 }
 
 function serviceWorkerStartError(): string {
   if (getClientPushPlatform() === "ios") {
-    return "Background setup timed out on iPhone. Fully close Pump (swipe up), reopen from the Home Screen icon, wait 10 seconds on Arena, then tap Enable again.";
+    return "Could not finish setup on iPhone. Close Pump completely, reopen from your Home Screen icon, then tap Enable again.";
   }
-  return "Background setup timed out. Refresh the page, wait a few seconds, then try Enable again.";
+  return "Could not finish setup. Refresh the page and tap Enable again.";
 }
 
 function withPushTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
@@ -106,6 +111,21 @@ export type PushSubscribeOptions = {
   onProgress?: (progress: PushSubscribeProgress) => void;
 };
 
+export type PushInfrastructureState = "idle" | "preparing" | "ready" | "error";
+
+let infrastructureState: PushInfrastructureState = "idle";
+let infrastructureError: string | null = null;
+let preparePromise: Promise<ServiceWorkerRegistration | null> | null = null;
+let preparedRegistration: ServiceWorkerRegistration | null = null;
+
+export function getPushInfrastructureState(): PushInfrastructureState {
+  return infrastructureState;
+}
+
+export function getPushInfrastructureError(): string | null {
+  return infrastructureError;
+}
+
 export async function readPushSetupDiagnostics(): Promise<string> {
   if (!isPushApiSupported()) {
     return "Push API: not supported in this browser";
@@ -126,6 +146,7 @@ export async function readPushSetupDiagnostics(): Promise<string> {
     `App: ${standalone ? "Home Screen" : "browser"}`,
     `Permission: ${permission}`,
     `Background worker: ${workerState}`,
+    `Setup: ${infrastructureState}`,
     `Local key: ${endpointHint}`,
     `Registrations: ${registrations.length}`,
   ].join(" · ");
@@ -199,25 +220,20 @@ function waitForServiceWorkerActive(
       }
 
       const worker = registration.installing ?? registration.waiting;
-      if (worker) {
-        if (worker.state === "activated") {
-          finish(registration);
-        }
+      if (worker?.state === "activated") {
+        finish(registration);
         return;
       }
 
       if (Date.now() - started > timeoutMs) {
         return;
       }
-
-      void registration.update();
-    }, 400);
+    }, 250);
 
     const existing = registration.active ?? registration.waiting ?? registration.installing;
     if (existing) {
       trackWorker(existing);
     } else {
-      void registration.update();
       registration.addEventListener(
         "updatefound",
         () => {
@@ -232,11 +248,18 @@ function waitForServiceWorkerActive(
   });
 }
 
-async function ensurePushServiceWorkerRegistration(): Promise<ServiceWorkerRegistration> {
+async function resolveServiceWorkerRegistration(options?: {
+  background?: boolean;
+}): Promise<ServiceWorkerRegistration> {
   const isIos = getClientPushPlatform() === "ios";
+  const background = options?.background ?? false;
   let registrations = await navigator.serviceWorker.getRegistrations();
   let registration: ServiceWorkerRegistration | undefined =
     findSerwistRegistration(registrations) ?? registrations[0];
+
+  if (registration?.active) {
+    return registration;
+  }
 
   if (registration && isZombieServiceWorkerRegistration(registration)) {
     await registration.unregister();
@@ -251,26 +274,64 @@ async function ensurePushServiceWorkerRegistration(): Promise<ServiceWorkerRegis
     registration = await navigator.serviceWorker.register(SERVICE_WORKER_URL, {
       updateViaCache: "none",
     });
-  } else {
+  } else if (!registration.active && !registration.installing) {
     await registration.update();
   }
 
-  try {
-    return await waitForServiceWorkerActive(registration, serviceWorkerTimeoutMs());
-  } catch (error) {
-    if (!isIos) {
-      throw error;
-    }
+  return waitForServiceWorkerActive(registration, serviceWorkerTimeoutMs(background));
+}
 
-    const ready = await Promise.race([
-      navigator.serviceWorker.ready,
-      new Promise<null>((resolve) => window.setTimeout(() => resolve(null), 8_000)),
-    ]);
-    if (ready?.active) {
-      return ready;
-    }
-    throw error;
+async function getPushRegistrationForSubscribe(): Promise<ServiceWorkerRegistration> {
+  if (preparedRegistration?.active) {
+    return preparedRegistration;
   }
+
+  try {
+    const prepared = await preparePushInfrastructure();
+    if (prepared?.active) {
+      return prepared;
+    }
+  } catch {
+    // Fall through to a direct resolve attempt.
+  }
+
+  return resolveServiceWorkerRegistration();
+}
+
+export function preparePushInfrastructure(): Promise<ServiceWorkerRegistration | null> {
+  if (!isPushApiSupported()) {
+    infrastructureState = "idle";
+    return Promise.resolve(null);
+  }
+
+  if (preparedRegistration?.active) {
+    infrastructureState = "ready";
+    return Promise.resolve(preparedRegistration);
+  }
+
+  if (preparePromise) {
+    return preparePromise;
+  }
+
+  infrastructureState = "preparing";
+  infrastructureError = null;
+
+  preparePromise = (async () => {
+    try {
+      const registration = await resolveServiceWorkerRegistration({ background: true });
+      preparedRegistration = registration;
+      infrastructureState = "ready";
+      return registration;
+    } catch (error) {
+      infrastructureState = "error";
+      infrastructureError = error instanceof Error ? error.message : serviceWorkerStartError();
+      return null;
+    } finally {
+      preparePromise = null;
+    }
+  })();
+
+  return preparePromise;
 }
 
 function applicationServerKeysMatch(
@@ -388,8 +449,6 @@ export async function subscribeToPushNotifications(
     throw new Error("Add Pump to your Home Screen in Safari before enabling notifications on iPhone");
   }
 
-  report("permission", "Checking notification permission…");
-
   if (Notification.permission === "denied") {
     throw new Error(
       isIos
@@ -398,16 +457,10 @@ export async function subscribeToPushNotifications(
     );
   }
 
-  let permission = Notification.permission;
+  let permission: NotificationPermission = Notification.permission;
   if (permission !== "granted") {
-    report("permission", "Waiting for Allow on the permission popup…");
-    permission = await withPushTimeout(
-      Notification.requestPermission(),
-      isIos ? 120_000 : 60_000,
-      isIos
-        ? "Permission popup timed out. Reopen Pump from the Home Screen icon and tap Enable again."
-        : "Permission request timed out. Refresh the page and tap Enable again."
-    );
+    report("permission", "Allow notifications when prompted.");
+    permission = await Notification.requestPermission();
   }
 
   if (permission !== "granted") {
@@ -420,15 +473,15 @@ export async function subscribeToPushNotifications(
     );
   }
 
-  report("service-worker", isIos ? "Starting background worker (up to 45s)…" : "Starting background worker…");
+  report("service-worker", "Finishing setup…");
 
   const registration = await withPushTimeout(
-    ensurePushServiceWorkerRegistration(),
-    serviceWorkerTimeoutMs() + (isIos ? 10_000 : 5_000),
+    getPushRegistrationForSubscribe(),
+    serviceWorkerTimeoutMs() + 2_000,
     serviceWorkerStartError()
   );
 
-  report("device-register", isIos ? "Registering this iPhone for alerts…" : "Registering this device for alerts…");
+  report("device-register", "Enabling alerts on this device…");
 
   const applicationServerKey = urlBase64ToUint8Array(getVapidPublicKey());
   const existing = await registration.pushManager.getSubscription();
@@ -446,14 +499,14 @@ export async function subscribeToPushNotifications(
         applicationServerKey,
       });
     })(),
-    isIos ? 45_000 : 30_000,
+    isIos ? 15_000 : 10_000,
     isIos
-      ? "iPhone alert registration timed out. Close Pump completely, reopen from Home Screen, wait on Arena, then try Enable again."
-      : "Device registration timed out. Refresh the page and try Enable again."
+      ? "Could not register this iPhone for alerts. Close Pump, reopen from Home Screen, then try again."
+      : "Could not register this device for alerts. Refresh and try again."
   );
 
   const payload = serializeSubscription(subscription);
-  report("server-save", "Saving registration to Pump server…");
+  report("server-save", "Saving…");
 
   const response = await withPushTimeout(
     fetch("/api/push/subscribe", {
@@ -466,8 +519,8 @@ export async function subscribeToPushNotifications(
         displayMode,
       }),
     }),
-    20_000,
-    "Server save timed out. Check your connection and tap Enable again."
+    12_000,
+    "Could not reach Pump servers. Check your connection and try again."
   );
 
   const body = (await response.json()) as { error?: string };
@@ -476,7 +529,9 @@ export async function subscribeToPushNotifications(
   }
 
   storePushEndpoint(payload.endpoint);
-  report("done", "Notifications enabled on this device.");
+  preparedRegistration = registration;
+  infrastructureState = "ready";
+  report("done", "Notifications enabled.");
   return fetchPushStatus();
 }
 
@@ -485,12 +540,14 @@ export async function unsubscribeFromPushNotifications(): Promise<void> {
   let subscription: PushSubscription | null = null;
 
   try {
-    const registration = await ensurePushServiceWorkerRegistration();
+    const registration = preparedRegistration?.active
+      ? preparedRegistration
+      : await getPushRegistrationForSubscribe();
     subscription = await registration.pushManager.getSubscription();
   } catch {
     const registrations = await navigator.serviceWorker.getRegistrations();
-    for (const registration of registrations) {
-      const existing = await registration.pushManager.getSubscription();
+    for (const entry of registrations) {
+      const existing = await entry.pushManager.getSubscription();
       if (existing) {
         subscription = existing;
         break;
@@ -515,17 +572,40 @@ export async function unsubscribeFromPushNotifications(): Promise<void> {
   clearStoredPushEndpoint();
 }
 
-/** Start Serwist early so iOS PWA has an active worker before Enable is tapped. */
+/** Start push infrastructure as soon as the app opens — not when Enable is tapped. */
 export function warmPushServiceWorker(): void {
+  void preparePushInfrastructure();
+}
+
+/** Re-sync an existing browser subscription with the server after app open. */
+export async function syncPushSubscriptionIfGranted(): Promise<void> {
   if (!isPushApiSupported()) return;
-  void (async () => {
-    try {
-      const registration = await navigator.serviceWorker.register(SERVICE_WORKER_URL, {
-        updateViaCache: "none",
-      });
-      await registration.update();
-    } catch {
-      // Serwist may already own registration.
+  if (Notification.permission !== "granted") return;
+  if (iosPushNeedsInstall(getClientPushPlatform(), getClientPushDisplayMode())) return;
+
+  try {
+    const registration = await preparePushInfrastructure();
+    if (!registration?.active) return;
+
+    const subscription = await registration.pushManager.getSubscription();
+    if (!subscription) return;
+
+    const payload = serializeSubscription(subscription);
+    const response = await fetch("/api/push/subscribe", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        subscription: payload,
+        platform: getClientPushPlatform(),
+        displayMode: getClientPushDisplayMode(),
+      }),
+    });
+
+    if (response.ok) {
+      storePushEndpoint(payload.endpoint);
     }
-  })();
+  } catch {
+    // Silent background sync — Enable flow handles user-facing errors.
+  }
 }

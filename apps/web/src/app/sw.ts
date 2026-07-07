@@ -47,13 +47,13 @@ type PushPayload = {
 };
 
 self.addEventListener("push", (event) => {
-  if (!event.data) return;
-
   let payload: PushPayload = {};
-  try {
-    payload = event.data.json() as PushPayload;
-  } catch {
-    payload = { body: event.data.text() };
+  if (event.data) {
+    try {
+      payload = event.data.json() as PushPayload;
+    } catch {
+      payload = { body: event.data.text() };
+    }
   }
 
   const title = payload.title?.trim() || "Pump";

@@ -2,12 +2,12 @@
 
 import { useEffect } from "react";
 import { SerwistProvider } from "@serwist/turbopack/react";
-import { warmPushServiceWorker } from "@/lib/push/client";
+import { preparePushInfrastructure, syncPushSubscriptionIfGranted } from "@/lib/push/client";
 
 export function PwaProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (process.env.NODE_ENV === "development") return;
-    warmPushServiceWorker();
+    void preparePushInfrastructure().then(() => syncPushSubscriptionIfGranted());
   }, []);
 
   return (
