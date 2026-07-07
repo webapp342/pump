@@ -86,7 +86,20 @@ export function PushNotificationsPanel({ className = "" }: PushNotificationsPane
     <div className={className}>
       <div className="wallet-account-panel__menu-item wallet-account-panel__menu-item--static !items-start">
         <div className="min-w-0 flex-1">
-          <p className="text-body-sm font-medium text-pump-text">Push notifications</p>
+          <div className="flex items-center gap-2">
+            <p className="text-body-sm font-medium text-pump-text">Push notifications</p>
+            {!status.needsInstall && !permissionBlocked ? (
+              <span
+                className={`rounded-full px-2 py-0.5 text-caption ${
+                  enabled
+                    ? "bg-pump-accent/15 text-pump-accent"
+                    : "bg-pump-border/20 text-pump-muted"
+                }`}
+              >
+                {enabled ? "On" : "Off"}
+              </span>
+            ) : null}
+          </div>
           {status.needsInstall ? (
             <p className="mt-1 text-caption text-pump-muted">
               On iPhone, add Pump to your Home Screen in Safari, then open the app from the icon
@@ -95,7 +108,7 @@ export function PushNotificationsPanel({ className = "" }: PushNotificationsPane
           ) : permissionBlocked ? (
             <p className="mt-1 text-caption text-pump-danger">
               Blocked in your browser. Click the lock icon in the address bar → Site settings →
-              Notifications → Allow, then refresh this page and tap On.
+              Notifications → Allow, then refresh this page and tap Enable.
             </p>
           ) : (
             <p className="mt-1 text-caption text-pump-muted">
@@ -113,7 +126,7 @@ export function PushNotificationsPanel({ className = "" }: PushNotificationsPane
             disabled={busy}
             onClick={() => void (enabled ? onDisable() : onEnable())}
           >
-            {busy ? "…" : enabled ? "Off" : "On"}
+            {busy ? "…" : enabled ? "Disable" : "Enable"}
           </button>
         ) : null}
       </div>

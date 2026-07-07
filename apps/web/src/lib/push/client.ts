@@ -66,6 +66,23 @@ function getVapidPublicKey(): string {
 const SERVICE_WORKER_URL = "/serwist/sw.js";
 const SERVICE_WORKER_TIMEOUT_MS = 20_000;
 
+function isZombieServiceWorkerRegistration(registration: ServiceWorkerRegistration): boolean {
+  return !registration.active && !registration.installing && !registration.waiting;
+}
+
+function findSerwistRegistration(
+  registrations: readonly ServiceWorkerRegistration[]
+): ServiceWorkerRegistration | undefined {
+  return registrations.find((entry) => {
+    const script =
+      entry.active?.scriptURL ??
+      entry.installing?.scriptURL ??
+      entry.waiting?.scriptURL ??
+      "";
+    return script.includes(SERVICE_WORKER_URL);
+  });
+}
+
 function waitForServiceWorkerActive(
   registration: ServiceWorkerRegistration,
   timeoutMs: number
@@ -78,44 +95,66 @@ function waitForServiceWorkerActive(
     const timeout = window.setTimeout(() => {
       reject(
         new Error(
-          "Service worker is still starting. Refresh the page, wait a few seconds, then try again."
+          "Service worker failed to start. Open DevTools → Application → Service Workers → Unregister, refresh, then try again."
         )
       );
     }, timeoutMs);
 
-    const worker = registration.installing ?? registration.waiting;
-    if (!worker) {
-      void navigator.serviceWorker.ready
-        .then((readyRegistration) => {
-          window.clearTimeout(timeout);
-          resolve(readyRegistration);
-        })
-        .catch((error) => {
-          window.clearTimeout(timeout);
-          reject(error instanceof Error ? error : new Error("Service worker failed to start"));
-        });
+    const finish = () => {
+      window.clearTimeout(timeout);
+      resolve(registration);
+    };
+
+    const trackWorker = (worker: ServiceWorker) => {
+      if (worker.state === "activated") {
+        finish();
+        return;
+      }
+      worker.addEventListener("statechange", () => {
+        if (worker.state === "activated") {
+          finish();
+        }
+      });
+    };
+
+    const existing = registration.active ?? registration.waiting ?? registration.installing;
+    if (existing) {
+      trackWorker(existing);
       return;
     }
 
-    worker.addEventListener("statechange", () => {
-      if (worker.state === "activated") {
-        window.clearTimeout(timeout);
-        resolve(registration);
-      }
-    });
+    void registration.update();
+
+    registration.addEventListener(
+      "updatefound",
+      () => {
+        const worker = registration.installing;
+        if (worker) {
+          trackWorker(worker);
+        }
+      },
+      { once: true }
+    );
   });
 }
 
 async function ensurePushServiceWorkerRegistration(): Promise<ServiceWorkerRegistration> {
-  const registrations = await navigator.serviceWorker.getRegistrations();
-  let registration =
-    registrations.find((entry) => entry.active?.scriptURL.includes(SERVICE_WORKER_URL)) ??
-    registrations[0];
+  let registrations = await navigator.serviceWorker.getRegistrations();
+  let registration = findSerwistRegistration(registrations);
+
+  if (registration && isZombieServiceWorkerRegistration(registration)) {
+    await registration.unregister();
+    registration = undefined;
+    registrations = await navigator.serviceWorker.getRegistrations();
+  }
 
   if (!registration) {
+    await Promise.all(registrations.map((entry) => entry.unregister()));
     registration = await navigator.serviceWorker.register(SERVICE_WORKER_URL, {
       updateViaCache: "none",
     });
+  } else {
+    await registration.update();
   }
 
   return waitForServiceWorkerActive(registration, SERVICE_WORKER_TIMEOUT_MS);
@@ -281,19 +320,33 @@ export async function subscribeToPushNotifications(): Promise<PushStatus> {
 
 export async function unsubscribeFromPushNotifications(): Promise<void> {
   const endpoint = readStoredPushEndpoint();
-  const registration = await navigator.serviceWorker.ready;
-  const subscription = await registration.pushManager.getSubscription();
+  let subscription: PushSubscription | null = null;
+
+  try {
+    const registration = await ensurePushServiceWorkerRegistration();
+    subscription = await registration.pushManager.getSubscription();
+  } catch {
+    const registrations = await navigator.serviceWorker.getRegistrations();
+    for (const registration of registrations) {
+      const existing = await registration.pushManager.getSubscription();
+      if (existing) {
+        subscription = existing;
+        break;
+      }
+    }
+  }
 
   if (subscription) {
     await subscription.unsubscribe();
   }
 
-  if (endpoint) {
+  const resolvedEndpoint = endpoint ?? subscription?.endpoint ?? null;
+  if (resolvedEndpoint) {
     await fetch("/api/push/unsubscribe", {
       method: "POST",
       credentials: "same-origin",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ endpoint }),
+      body: JSON.stringify({ endpoint: resolvedEndpoint }),
     });
   }
 
