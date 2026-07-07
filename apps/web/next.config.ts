@@ -1,5 +1,6 @@
 import type { NextConfig } from "next";
 import path from "node:path";
+import { withSerwist } from "@serwist/turbopack";
 import { loadMonorepoRootEnv } from "./src/lib/load-monorepo-env";
 
 /** Monorepo root — standalone tracing + turbopack resolve shared deps. */
@@ -58,4 +59,4 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+export default withSerwist(nextConfig);

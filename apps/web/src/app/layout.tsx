@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { RootProviders } from "@/components/layout/RootProviders";
+import { PwaProvider } from "@/components/pwa/PwaProvider";
 import { TelegramMiniAppBootstrap } from "@/components/telegram/TelegramMiniAppBootstrap";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import { geistMono, geistSans, brandWordmark } from "@/lib/fonts";
@@ -7,30 +8,43 @@ import "@/lib/fontawesome-config";
 import "./globals.css";
 
 const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3012";
+const appName = "Pump";
 const defaultTitle = "Pump — BSC Meme Launchpad";
 const defaultDescription =
   "Launch, trade, and earn on BSC bonding curves. Pro trader terminal with rewards layer.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(appUrl),
+  applicationName: appName,
   title: {
     default: defaultTitle,
     template: "%s | Pump",
   },
   description: defaultDescription,
+  manifest: "/manifest.webmanifest",
   icons: {
     icon: [
       { url: "/logos/light.svg", type: "image/svg+xml", media: "(prefers-color-scheme: light)" },
       { url: "/logos/dark.svg", type: "image/svg+xml", media: "(prefers-color-scheme: dark)" },
       { url: "/logo-mark.svg", type: "image/svg+xml" },
+      { url: "/pwa/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/pwa/icon-512.png", sizes: "512x512", type: "image/png" },
     ],
-    apple: [{ url: "/logo-mark.svg", type: "image/svg+xml" }],
+    apple: [{ url: "/pwa/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
     shortcut: ["/logo-mark.svg"],
+  },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: appName,
+  },
+  formatDetection: {
+    telephone: false,
   },
   openGraph: {
     title: defaultTitle,
     description: defaultDescription,
-    siteName: "Pump",
+    siteName: appName,
     type: "website",
     url: appUrl,
     images: [{ url: "/opengraph-image", width: 1200, height: 630, alt: defaultTitle }],
@@ -48,6 +62,10 @@ export const viewport: Viewport = {
   initialScale: 1,
   viewportFit: "cover",
   interactiveWidget: "resizes-content",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#0052ff" },
+    { media: "(prefers-color-scheme: dark)", color: "#0052ff" },
+  ],
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -59,7 +77,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       className={`${geistSans.variable} ${geistMono.variable} ${brandWordmark.variable}`}
     >
       <body className={geistSans.className}>
-        <TelegramMiniAppBootstrap />
+        <PwaProvider>
+          <TelegramMiniAppBootstrap />
         <script
           dangerouslySetInnerHTML={{
             __html: `
@@ -87,6 +106,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <ThemeProvider>
           <RootProviders>{children}</RootProviders>
         </ThemeProvider>
+        </PwaProvider>
       </body>
     </html>
   );

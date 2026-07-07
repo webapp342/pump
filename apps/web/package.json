@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "next dev -H 0.0.0.0 -p 3012",
     "dev:local": "next dev -H 0.0.0.0 -p 80",
-    "build": "next build",
+    "build": "npm run pwa:icons && next build",
+    "pwa:icons": "node scripts/generate-pwa-icons.mjs",
     "start": "next start -H 0.0.0.0 -p 3012",
     "lint": "next lint",
     "typecheck": "tsc --noEmit"
@@ -36,13 +37,17 @@
     "wagmi": "^2.19.5"
   },
   "devDependencies": {
+    "@serwist/turbopack": "^9.5.11",
     "@types/node": "^22.15.21",
     "@types/pg": "^8.11.14",
     "@types/qrcode": "^1.5.6",
     "@types/react": "^19.1.6",
     "@types/react-dom": "^19.1.5",
     "autoprefixer": "^10.4.21",
+    "esbuild": "^0.28.1",
     "postcss": "^8.5.4",
+    "serwist": "^9.5.11",
+    "sharp": "^0.34.5",
     "tailwindcss": "^3.4.17",
     "typescript": "^5.8.3"
   }
