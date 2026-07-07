@@ -5,23 +5,18 @@ import { SerwistProvider } from "@serwist/turbopack/react";
 import {
   preparePushInfrastructure,
   PushReloadPendingError,
-  shouldUseIosMinimalPushWorker,
+  shouldUseMinimalPushWorker,
   syncPushSubscriptionIfGranted,
 } from "@/lib/push/client";
 
-function detectIosStandalonePwa(): boolean {
-  if (typeof window === "undefined") return false;
-  return shouldUseIosMinimalPushWorker();
-}
-
 export function PwaProvider({ children }: { children: React.ReactNode }) {
-  const iosPwa = detectIosStandalonePwa();
+  const skipSerwist = shouldUseMinimalPushWorker();
 
   useEffect(() => {
     if (process.env.NODE_ENV === "development") return;
 
-    const prepDelay = iosPwa ? 500 : 1_500;
-    const syncDelay = iosPwa ? 3_000 : 4_000;
+    const prepDelay = skipSerwist ? 500 : 1_500;
+    const syncDelay = skipSerwist ? 3_000 : 4_000;
 
     const timer = window.setTimeout(() => {
       void preparePushInfrastructure().catch((error) => {
@@ -33,14 +28,23 @@ export function PwaProvider({ children }: { children: React.ReactNode }) {
       void syncPushSubscriptionIfGranted();
     }, syncDelay);
 
+    // Desktop Serwist: delayed skipWaiting avoids install hang (serwist/serwist#276).
+    const skipTimer =
+      skipSerwist ?
+        undefined
+      : window.setTimeout(() => {
+          window.serwist?.messageSkipWaiting();
+        }, 15_000);
+
     return () => {
       window.clearTimeout(timer);
       window.clearTimeout(syncTimer);
+      if (skipTimer !== undefined) window.clearTimeout(skipTimer);
     };
-  }, [iosPwa]);
+  }, [skipSerwist]);
 
-  if (iosPwa) {
-    // iOS Home Screen: Serwist precache hangs in "installing" — use /push-sw.js instead.
+  if (skipSerwist) {
+    // Mobile: Serwist precache hangs — push uses /push-sw.js instead.
     return <>{children}</>;
   }
 

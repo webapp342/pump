@@ -5,8 +5,8 @@ import { detectPushPlatform, iosPushNeedsInstall } from "@/lib/push/platform";
 
 const PUSH_ENDPOINT_STORAGE_KEY = "pump_push_endpoint";
 const SERVICE_WORKER_URL = "/serwist/sw.js";
-/** Minimal classic SW for iOS Home Screen — Serwist precache hangs in "installing" on Safari. */
-const IOS_PUSH_SW_URL = "/push-sw.js";
+/** Minimal classic SW for mobile push — Serwist precache hangs in "installing" on Safari/Chrome mobile. */
+const MINIMAL_PUSH_SW_URL = "/push-sw.js";
 /** One-time iOS PWA reload so push SW controls the page (WebKit first-launch quirk). */
 const IOS_SW_RELOAD_KEY = "pump_ios_sw_control_reload_v1";
 
@@ -17,8 +17,17 @@ const SW_WAIT_MS = {
   unknown: 15_000,
 } as const;
 
+/** iOS Home Screen + Android: Serwist install hangs; use lightweight push-sw.js instead. */
+export function shouldUseMinimalPushWorker(): boolean {
+  const platform = getClientPushPlatform();
+  if (platform === "android") return true;
+  if (platform === "ios") return isStandaloneDisplayMode();
+  return false;
+}
+
+/** @deprecated use shouldUseMinimalPushWorker */
 export function shouldUseIosMinimalPushWorker(): boolean {
-  return getClientPushPlatform() === "ios" && isStandaloneDisplayMode();
+  return shouldUseMinimalPushWorker();
 }
 
 export function isPushApiSupported(): boolean {
@@ -239,7 +248,7 @@ function findPushRegistration(
       entry.installing?.scriptURL ??
       entry.waiting?.scriptURL ??
       "";
-    return script.includes(SERVICE_WORKER_URL) || script.includes(IOS_PUSH_SW_URL);
+    return script.includes(SERVICE_WORKER_URL) || script.includes(MINIMAL_PUSH_SW_URL);
   });
 }
 
@@ -250,7 +259,7 @@ function registrationScriptLabel(registration?: ServiceWorkerRegistration): stri
     registration.installing?.scriptURL ??
     registration.waiting?.scriptURL ??
     "";
-  if (script.includes(IOS_PUSH_SW_URL)) return "push-sw";
+  if (script.includes(MINIMAL_PUSH_SW_URL)) return "push-sw";
   if (script.includes(SERVICE_WORKER_URL)) return "serwist";
   try {
     return script ? new URL(script).pathname : "unknown";
@@ -347,7 +356,7 @@ async function waitForWorkerActive(
       if (elapsed >= deadlineMs) {
         fail(
           `Background worker did not activate in time (${formatSwDiagnostics(registration)}). ` +
-            (shouldUseIosMinimalPushWorker()
+            (shouldUseMinimalPushWorker()
               ? "Tap Enable again — the iPhone alerts worker should activate in a few seconds."
               : getClientPushPlatform() === "ios"
                 ? "Close Pump, reopen from Home Screen, then tap Enable once."
@@ -381,17 +390,21 @@ async function unregisterStuckSerwistWorkers(): Promise<void> {
     if (!script.includes(SERVICE_WORKER_URL)) continue;
 
     if (registration.installing?.state === "installing") {
-      pushActivity("warn", "Removing stuck cache worker on iPhone (Safari + Serwist precache bug)…");
+      pushActivity("warn", "Removing stuck cache worker (Serwist precache bug)…");
     }
     await registration.unregister();
   }
 }
 
-async function registerIosPushWorker(options?: {
+async function registerMinimalPushWorker(options?: {
   onProgress?: (percent: number, label: string) => void;
 }): Promise<ServiceWorkerRegistration> {
-  if (cachedRegistration?.active?.scriptURL.includes(IOS_PUSH_SW_URL)) {
-    options?.onProgress?.(100, "iPhone alerts worker ready");
+  const platform = getClientPushPlatform();
+  const readyLabel =
+    platform === "ios" ? "iPhone alerts worker ready" : platform === "android" ? "Android alerts worker ready" : "Alerts worker ready";
+
+  if (cachedRegistration?.active?.scriptURL.includes(MINIMAL_PUSH_SW_URL)) {
+    options?.onProgress?.(100, readyLabel);
     return cachedRegistration;
   }
 
@@ -399,17 +412,17 @@ async function registerIosPushWorker(options?: {
   await sleep(400);
 
   let registration = findPushRegistration(await navigator.serviceWorker.getRegistrations());
-  if (registration?.active?.scriptURL.includes(IOS_PUSH_SW_URL)) {
+  if (registration?.active?.scriptURL.includes(MINIMAL_PUSH_SW_URL)) {
     cachedRegistration = registration;
-    options?.onProgress?.(100, "iPhone alerts worker ready");
-    pushActivity("success", "iPhone alerts worker active");
+    options?.onProgress?.(100, readyLabel);
+    pushActivity("success", readyLabel);
     return registration;
   }
 
-  pushActivity("info", "Registering lightweight iPhone alerts worker (no heavy cache)…");
-  options?.onProgress?.(25, "Registering iPhone alerts worker…");
+  pushActivity("info", "Registering lightweight alerts worker (no heavy cache)…");
+  options?.onProgress?.(25, "Registering alerts worker…");
 
-  registration = await navigator.serviceWorker.register(IOS_PUSH_SW_URL, {
+  registration = await navigator.serviceWorker.register(MINIMAL_PUSH_SW_URL, {
     scope: "/",
     type: "classic",
     updateViaCache: "none",
@@ -417,37 +430,61 @@ async function registerIosPushWorker(options?: {
 
   const active = await waitForWorkerActive(registration, 45_000, options?.onProgress);
   cachedRegistration = active;
-  pushActivity("success", "iPhone alerts worker active");
+  pushActivity("success", readyLabel);
   return active;
 }
 
-/** Wait for SerwistProvider's registration on desktop/Android. */
+function nudgeSerwistSkipWaiting(registration: ServiceWorkerRegistration): void {
+  const waiting = registration.waiting;
+  if (!waiting) return;
+  pushActivity("info", "Activating updated background worker…");
+  void waiting.postMessage({ type: "SKIP_WAITING" });
+}
+
+/** Wait for SerwistProvider's registration on desktop. Falls back to push-sw if stuck. */
 async function waitForSerwistRegistration(options?: {
   onProgress?: (percent: number, label: string) => void;
 }): Promise<ServiceWorkerRegistration> {
-  if (cachedRegistration?.active) {
+  if (cachedRegistration?.active?.scriptURL.includes(SERVICE_WORKER_URL)) {
     options?.onProgress?.(100, "Background worker ready");
     return cachedRegistration;
   }
 
   const deadline = Date.now() + swWaitMs();
   pushActivity("info", "Waiting for Serwist service worker…");
+  let nudgedSkipWaiting = false;
 
   while (Date.now() < deadline) {
     const registrations = await navigator.serviceWorker.getRegistrations();
     const registration = findPushRegistration(registrations);
 
-    if (registration?.active) {
+    if (registration?.active?.scriptURL.includes(SERVICE_WORKER_URL)) {
       cachedRegistration = registration;
       options?.onProgress?.(100, "Background worker ready");
       pushActivity("success", "Serwist worker active");
       return registration;
     }
 
+    if (registration?.waiting && !nudgedSkipWaiting) {
+      nudgedSkipWaiting = true;
+      nudgeSerwistSkipWaiting(registration);
+    }
+
     if (registration) {
-      const remaining = deadline - Date.now();
-      if (remaining > 0) {
-        return waitForWorkerActive(registration, remaining, options?.onProgress);
+      const script =
+        registration.installing?.scriptURL ??
+        registration.waiting?.scriptURL ??
+        registration.active?.scriptURL ??
+        "";
+      if (script.includes(SERVICE_WORKER_URL)) {
+        const remaining = deadline - Date.now();
+        if (remaining > 0) {
+          try {
+            return await waitForWorkerActive(registration, remaining, options?.onProgress);
+          } catch {
+            break;
+          }
+        }
       }
     }
 
@@ -457,18 +494,15 @@ async function waitForSerwistRegistration(options?: {
     await sleep(400);
   }
 
-  const registrations = await navigator.serviceWorker.getRegistrations();
-  const registration = findPushRegistration(registrations);
-  throw new Error(
-    `Background worker not ready (${formatSwDiagnostics(registration)}). Refresh the page, wait a few seconds, then tap Enable.`
-  );
+  pushActivity("warn", "Cache worker stuck — switching to lightweight alerts worker…");
+  return registerMinimalPushWorker(options);
 }
 
 async function waitForPushRegistration(options?: {
   onProgress?: (percent: number, label: string) => void;
 }): Promise<ServiceWorkerRegistration> {
-  if (shouldUseIosMinimalPushWorker()) {
-    return registerIosPushWorker(options);
+  if (shouldUseMinimalPushWorker()) {
+    return registerMinimalPushWorker(options);
   }
   return waitForSerwistRegistration(options);
 }
@@ -478,14 +512,14 @@ export function preparePushInfrastructure(): Promise<ServiceWorkerRegistration |
 
   if (
     cachedRegistration?.active &&
-    (!shouldUseIosMinimalPushWorker() || cachedRegistration.active.scriptURL.includes(IOS_PUSH_SW_URL))
+    (!shouldUseMinimalPushWorker() || cachedRegistration.active.scriptURL.includes(MINIMAL_PUSH_SW_URL))
   ) {
     infrastructureState = "ready";
     emitInfrastructureProgress({ phase: "ready", label: "Ready", percent: 100 });
     return Promise.resolve(cachedRegistration);
   }
 
-  if (shouldUseIosMinimalPushWorker()) {
+  if (shouldUseMinimalPushWorker()) {
     cachedRegistration = null;
   }
 

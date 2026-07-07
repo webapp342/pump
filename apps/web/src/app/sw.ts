@@ -14,9 +14,9 @@ declare const self: ServiceWorkerGlobalScope;
 
 const serwist = new Serwist({
   precacheEntries: self.__SW_MANIFEST,
-  skipWaiting: true,
+  skipWaiting: false,
   clientsClaim: true,
-  navigationPreload: true,
+  navigationPreload: false,
   runtimeCaching: [
     {
       matcher: ({ url }) => url.origin === self.location.origin && url.pathname.startsWith("/api/"),
