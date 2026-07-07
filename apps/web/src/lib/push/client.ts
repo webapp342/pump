@@ -250,6 +250,7 @@ export async function readPushSetupDiagnostics(): Promise<string> {
   const serwist = findSerwistRegistration(registrations);
   const worker = serwist?.active ?? serwist?.installing ?? serwist?.waiting;
   const workerState = worker?.state ?? (serwist ? "missing-worker" : "not-registered");
+  const hasController = !!(navigator.serviceWorker && navigator.serviceWorker.controller);
   const storedEndpoint = readStoredPushEndpoint();
   const endpointHint = storedEndpoint ? "yes" : "no";
 
@@ -258,6 +259,7 @@ export async function readPushSetupDiagnostics(): Promise<string> {
     `App: ${standalone ? "Home Screen" : "browser"}`,
     `Permission: ${permission}`,
     `Background worker: ${workerState}`,
+    `Controller: ${hasController}`,
     `Setup: ${infrastructureState}`,
     `Local key: ${endpointHint}`,
     `Registrations: ${registrations.length}`,
@@ -323,7 +325,8 @@ function waitForServiceWorkerActive(
     const timeout = window.setTimeout(() => {
       const worker = registration.installing ?? registration.waiting ?? registration.active;
       const state = worker?.state ?? "none";
-      fail(new Error(`${serviceWorkerStartError()} (worker state: ${state})`));
+      const hasController = !!(typeof navigator !== "undefined" && navigator.serviceWorker?.controller);
+      fail(new Error(`${serviceWorkerStartError()} (worker state: ${state}, controller: ${hasController})`));
     }, timeoutMs);
 
     const trackWorker = (worker: ServiceWorker) => {
@@ -386,6 +389,43 @@ function waitForServiceWorkerActive(
   });
 }
 
+async function waitForServiceWorkerToControl(
+  timeoutMs: number,
+  onProgress?: (percent: number, label: string) => void
+): Promise<void> {
+  if (typeof navigator === "undefined" || !navigator.serviceWorker) return;
+
+  if (navigator.serviceWorker.controller) {
+    onProgress?.(100, "Page controlled by background worker");
+    pushActivity("success", "Service worker is controlling the page");
+    return;
+  }
+
+  onProgress?.(93, "Ensuring background worker controls this page (iOS first-launch)…");
+  pushActivity("info", "Service worker activated but page not yet controlled — waiting for controllerchange");
+
+  return new Promise((resolve, reject) => {
+    const to = window.setTimeout(() => {
+      const hasCtrl = !!navigator.serviceWorker.controller;
+      const msg = `Service worker activated but not controlling the page (controller=${hasCtrl}). This is a known iOS PWA behavior on first launch after install.`;
+      pushActivity("error", msg);
+      reject(new Error(msg));
+    }, timeoutMs);
+
+    const onController = () => {
+      if (navigator.serviceWorker.controller) {
+        window.clearTimeout(to);
+        navigator.serviceWorker.removeEventListener("controllerchange", onController);
+        onProgress?.(100, "Page controlled by background worker");
+        pushActivity("success", "Service worker now controls the page");
+        resolve();
+      }
+    };
+
+    navigator.serviceWorker.addEventListener("controllerchange", onController);
+  });
+}
+
 async function resolveServiceWorkerRegistration(options?: {
   background?: boolean;
   onProgress?: (progress: PushInfrastructureProgress) => void;
@@ -421,20 +461,22 @@ async function resolveServiceWorkerRegistration(options?: {
 
   if (!registration) {
     report({ phase: "registering", label: "Registering background worker…", percent: 38 });
-    pushActivity("info", "Registering background worker…");
+    pushActivity("info", "Registering background worker (scope /)…");
     if (!isIos) {
       await Promise.all(registrations.map((entry) => entry.unregister()));
     }
     registration = await navigator.serviceWorker.register(SERVICE_WORKER_URL, {
+      scope: "/",
       updateViaCache: "none",
     });
+    report({ phase: "registering", label: "Registered — waiting for install/activate…", percent: 48 });
   } else if (!registration.active && !registration.installing) {
     report({ phase: "registering", label: "Updating background worker…", percent: 42 });
     pushActivity("info", "Updating background worker…");
     await registration.update();
   }
 
-  return waitForServiceWorkerActive(
+  const activeReg = await waitForServiceWorkerActive(
     registration,
     serviceWorkerTimeoutMs(background),
     (percent, label) => {
@@ -445,6 +487,19 @@ async function resolveServiceWorkerRegistration(options?: {
       });
     }
   );
+
+  // Critical for iOS PWA: wait until this page is actually controlled by the SW.
+  // Without controller, pushManager.subscribe will not work reliably or at all.
+  const controlTimeout = getClientPushPlatform() === "ios" ? 10_000 : 5_000;
+  await waitForServiceWorkerToControl(controlTimeout, (percent, label) => {
+    report({
+      phase: "activating",
+      label,
+      percent: Math.max(93, percent),
+    });
+  });
+
+  return activeReg;
 }
 
 async function getPushRegistrationForSubscribe(): Promise<ServiceWorkerRegistration> {
@@ -486,7 +541,7 @@ export function preparePushInfrastructure(options?: {
     return Promise.resolve(null);
   }
 
-  if (preparedRegistration?.active) {
+  if (preparedRegistration?.active && navigator.serviceWorker?.controller) {
     infrastructureState = "ready";
     emitInfrastructureProgress({ phase: "ready", label: "Background worker ready", percent: 100 });
     return Promise.resolve(preparedRegistration);
@@ -749,6 +804,20 @@ export async function subscribeToPushNotifications(
     pushActivity("success", "Background worker active");
   } catch (error) {
     throw pushActivityFromError("Background worker failed", error);
+  }
+
+  // Extra guard in user gesture path: ensure we have page control before subscribe.
+  try {
+    if (!navigator.serviceWorker?.controller) {
+      pushActivity("info", "Waiting for page control before subscribing to push (iOS)…");
+      await withPushTimeout(
+        waitForServiceWorkerToControl(8000),
+        9000,
+        "Timed out waiting for service worker to control the page"
+      );
+    }
+  } catch (error) {
+    throw pushActivityFromError("Page control wait failed", error);
   }
 
   report("device-register", "Creating device push subscription…");

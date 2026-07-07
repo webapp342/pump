@@ -38,6 +38,15 @@ const serwist = new Serwist({
 
 serwist.addEventListeners();
 
+// Explicit claim/skip for maximum compatibility with iOS PWA first-launch push (ensures controlling).
+self.addEventListener("install", () => {
+  self.skipWaiting();
+});
+
+self.addEventListener("activate", (event) => {
+  event.waitUntil(self.clients.claim());
+});
+
 type PushPayload = {
   title?: string;
   body?: string;

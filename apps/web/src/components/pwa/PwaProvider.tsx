@@ -7,7 +7,7 @@ import { preparePushInfrastructure, syncPushSubscriptionIfGranted } from "@/lib/
 export function PwaProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (process.env.NODE_ENV === "development") return;
-    void preparePushInfrastructure().then(() => syncPushSubscriptionIfGranted());
+    void preparePushInfrastructure({ source: "auto" }).then(() => syncPushSubscriptionIfGranted());
   }, []);
 
   return (

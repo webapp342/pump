@@ -131,7 +131,9 @@ export function PushNotificationsPanel({ className = "" }: PushNotificationsPane
 
   useEffect(() => {
     void refresh();
-    void preparePushInfrastructure({ source: "auto" });
+    // Avoid re-triggering prepare on every Account modal open/close.
+    // Background prepare runs from PwaProvider on app start.
+    // Explicit Enable or Retry will drive the flow and surface errors.
   }, [refresh]);
 
   useEffect(() => subscribePushInfrastructureProgress(setPrepareProgress), []);
@@ -296,14 +298,26 @@ export function PushNotificationsPanel({ className = "" }: PushNotificationsPane
                 percent={0}
                 tone="danger"
               />
-              <button
-                type="button"
-                className="mt-2 text-caption text-pump-accent underline"
-                disabled={busy}
-                onClick={() => void onRetrySetup()}
-              >
-                Retry background setup
-              </button>
+              <div className="mt-2 flex flex-wrap gap-2 text-caption">
+                <button
+                  type="button"
+                  className="text-pump-accent underline"
+                  disabled={busy}
+                  onClick={() => void onRetrySetup()}
+                >
+                  Retry background setup
+                </button>
+                <button
+                  type="button"
+                  className="text-pump-muted underline"
+                  onClick={() => {
+                    // One-time reload can help iOS PWA give control to the newly activated SW.
+                    window.location.reload();
+                  }}
+                >
+                  Reload page (helps iOS PWA control)
+                </button>
+              </div>
             </>
           ) : null}
           {busy && busyStep ? (
@@ -324,7 +338,11 @@ export function PushNotificationsPanel({ className = "" }: PushNotificationsPane
           ) : prepareProgress.percent === 100 && setupState === "ready" && !busy ? (
             <p className="mt-1 text-caption text-pump-muted/80">Ready — tap Enable.</p>
           ) : null}
-          <PushActivityLog entries={activityLog} onClear={() => clearPushActivityLog()} />
+
+          {/* Always surface the detailed activity log during setup so errors and states are visible */}
+          {activityLog.length > 0 && (
+            <PushActivityLog entries={activityLog} onClear={() => clearPushActivityLog()} />
+          )}
         </div>
         {!status.needsInstall && !permissionBlocked ? (
           <button
