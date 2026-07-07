@@ -38,9 +38,9 @@ const serwist = new Serwist({
 
 serwist.addEventListeners();
 
-// Explicit claim/skip for maximum compatibility with iOS PWA first-launch push (ensures controlling).
-self.addEventListener("install", () => {
-  self.skipWaiting();
+// Explicit claim/skip for iOS PWA first-launch push (Discourse/WebKit pattern).
+self.addEventListener("install", (event) => {
+  event.waitUntil(self.skipWaiting());
 });
 
 self.addEventListener("activate", (event) => {

@@ -5,6 +5,7 @@ import {
   clearPushActivityLog,
   fetchPushStatus,
   getPushActivityLog,
+  PushReloadPendingError,
   readPushSetupDiagnostics,
   subscribePushActivityLog,
   subscribeToPushNotifications,
@@ -125,6 +126,7 @@ export function PushNotificationsPanel({ className = "" }: PushNotificationsPane
       setStatus(next);
       await refreshDiagnostics();
     } catch (err) {
+      if (err instanceof PushReloadPendingError) return;
       const message = err instanceof Error ? err.message : "Could not enable notifications";
       setError(message);
       await refreshDiagnostics();
@@ -214,15 +216,6 @@ export function PushNotificationsPanel({ className = "" }: PushNotificationsPane
           {error ? (
             <div className="mt-2 rounded-lg bg-pump-danger/10 px-2.5 py-2 text-caption text-pump-danger">
               {error}
-              {isIos && error.includes("First launch") ? (
-                <button
-                  type="button"
-                  className="mt-2 block text-pump-accent underline"
-                  onClick={() => window.location.reload()}
-                >
-                  Reload page (one-time iOS step)
-                </button>
-              ) : null}
             </div>
           ) : null}
 

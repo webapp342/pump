@@ -5,6 +5,8 @@ import { detectPushPlatform, iosPushNeedsInstall } from "@/lib/push/platform";
 
 const PUSH_ENDPOINT_STORAGE_KEY = "pump_push_endpoint";
 const SERVICE_WORKER_URL = "/serwist/sw.js";
+/** One-time iOS PWA reload so Serwist SW controls the page (WebKit first-launch quirk). */
+const IOS_SW_RELOAD_KEY = "pump_ios_sw_control_reload_v1";
 
 const SW_WAIT_MS = {
   desktop: 12_000,
@@ -245,12 +247,14 @@ function formatSwDiagnostics(registration?: ServiceWorkerRegistration): string {
   const platform = getClientPushPlatform();
   const standalone = isStandaloneDisplayMode();
   const hasController = !!navigator.serviceWorker?.controller;
+  const scope = registration?.scope ?? "none";
   return [
     `Device: ${platform}`,
     `App: ${standalone ? "Home Screen" : "browser"}`,
     `Permission: ${Notification.permission}`,
     `Worker: ${workerStateLabel(registration)}`,
     `Controller: ${hasController}`,
+    `Scope: ${scope}`,
   ].join(" · ");
 }
 
@@ -403,8 +407,16 @@ export function preparePushInfrastructure(): Promise<ServiceWorkerRegistration |
       emitInfrastructureProgress({ phase: "waiting", label, percent });
     },
   })
-    .then((registration) => {
+    .then(async (registration) => {
       cachedRegistration = registration;
+      if (getClientPushPlatform() === "ios" && isStandaloneDisplayMode()) {
+        try {
+          await ensureIosServiceWorkerControl({ autoReload: true, quiet: true });
+        } catch (error) {
+          if (error instanceof PushReloadPendingError) throw error;
+          // Non-fatal during passive prep — Enable flow shows errors.
+        }
+      }
       infrastructureState = "ready";
       emitInfrastructureProgress({ phase: "ready", label: "Ready", percent: 100 });
       return registration;
@@ -425,8 +437,94 @@ export function retryPreparePushInfrastructure(): Promise<ServiceWorkerRegistrat
   return preparePushInfrastructure();
 }
 
-function iosNeedsReloadForControl(): boolean {
-  return getClientPushPlatform() === "ios" && isStandaloneDisplayMode() && !navigator.serviceWorker?.controller;
+async function waitForServiceWorkerController(timeoutMs: number): Promise<boolean> {
+  if (navigator.serviceWorker.controller) return true;
+
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = (value: boolean) => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timer);
+      navigator.serviceWorker.removeEventListener("controllerchange", onChange);
+      resolve(value);
+    };
+
+    const onChange = () => {
+      if (navigator.serviceWorker.controller) finish(true);
+    };
+
+    const timer = window.setTimeout(() => finish(!!navigator.serviceWorker.controller), timeoutMs);
+    navigator.serviceWorker.addEventListener("controllerchange", onChange);
+
+    void navigator.serviceWorker.ready.then(() => {
+      if (navigator.serviceWorker.controller) finish(true);
+    });
+  });
+}
+
+function readIosSwReloadFlag(): boolean {
+  try {
+    return sessionStorage.getItem(IOS_SW_RELOAD_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function markIosSwReloadFlag(): void {
+  try {
+    sessionStorage.setItem(IOS_SW_RELOAD_KEY, "1");
+  } catch {
+    // ignore
+  }
+}
+
+/** iOS Home Screen PWA: SW may activate without controlling the page until one navigation/reload. */
+export class PushReloadPendingError extends Error {
+  constructor(message = "Reloading to activate background worker…") {
+    super(message);
+    this.name = "PushReloadPendingError";
+  }
+}
+
+export async function ensureIosServiceWorkerControl(options?: {
+  autoReload?: boolean;
+  quiet?: boolean;
+}): Promise<void> {
+  const autoReload = options?.autoReload ?? true;
+  const quiet = options?.quiet ?? false;
+
+  if (getClientPushPlatform() !== "ios" || !isStandaloneDisplayMode()) return;
+  if (navigator.serviceWorker.controller) return;
+
+  if (!quiet) {
+    pushActivity("info", "Waiting for iPhone background worker to control the app…");
+  }
+
+  await waitForSerwistRegistration();
+
+  const controlled = await waitForServiceWorkerController(8_000);
+  if (controlled || navigator.serviceWorker.controller) {
+    if (!quiet) pushActivity("success", "Background worker controls the app");
+    return;
+  }
+
+  if (!autoReload) {
+    throw new Error(
+      "Background worker is active but does not control this page yet. Reload once, then tap Enable."
+    );
+  }
+
+  if (!readIosSwReloadFlag()) {
+    markIosSwReloadFlag();
+    if (!quiet) pushActivity("info", "One-time reload for iPhone — activating alerts…");
+    window.location.reload();
+    throw new PushReloadPendingError();
+  }
+
+  throw new Error(
+    "Close Pump completely (swipe away), reopen from Home Screen, wait 5 seconds, then tap Enable once."
+  );
 }
 
 function applicationServerKeysMatch(
@@ -556,15 +654,6 @@ export async function subscribeToPushNotifications(
     );
   }
 
-  if (iosNeedsReloadForControl()) {
-    throw pushActivityFromError(
-      "One-time reload needed",
-      new Error(
-        "First launch on iPhone: close Pump, reopen from Home Screen, wait 5 seconds, then tap Enable again. This is a one-time iOS step — not every time."
-      )
-    );
-  }
-
   if (Notification.permission === "denied") {
     throw pushActivityFromError(
       "Permission blocked",
@@ -598,6 +687,13 @@ export async function subscribeToPushNotifications(
   ).catch((error) => {
     throw pushActivityFromError("Background worker", error);
   });
+
+  try {
+    await ensureIosServiceWorkerControl({ autoReload: true });
+  } catch (error) {
+    if (error instanceof PushReloadPendingError) throw error;
+    throw pushActivityFromError("iPhone setup", error);
+  }
 
   report("device-register", "Registering this device for alerts…");
 
