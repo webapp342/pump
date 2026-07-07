@@ -576,7 +576,7 @@ export async function subscribeToPushNotifications(
     );
   }
 
-  let permission = Notification.permission;
+  let permission: NotificationPermission = Notification.permission;
   if (permission !== "granted") {
     report("permission", "Allow notifications when prompted…");
     permission = await Notification.requestPermission();
