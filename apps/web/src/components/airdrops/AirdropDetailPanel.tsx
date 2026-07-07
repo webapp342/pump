@@ -52,7 +52,7 @@ import { BnbLogo } from "@/components/token/BnbLogo";
 import { UserDisplayName } from "@/components/user/UserDisplayName";
 import { UserAvatarForAddress } from "@/components/user/UserAvatarForAddress";
 import { useBnbUsdPrice } from "@/hooks/useBnbUsdPrice";
-import { formatUsdReadable, tokenAmountUsd } from "@/lib/format-usd";
+import { formatUsdReadable } from "@/lib/format-usd";
 import {
   buildTokenTradeUrl,
   remainingRuleAmount,
@@ -478,27 +478,14 @@ function ViewerRankBanner({
 
 function HoldCell({
   holdAmount,
-  linkedToken,
-  poolSymbol: symbol,
-  linkedPriceBnb,
-  bnbUsd,
   align = "right",
-  showSymbol = true,
-  inlineUsd = false,
 }: {
   holdAmount: string | null | undefined;
-  linkedToken: string;
-  poolSymbol: string;
-  linkedPriceBnb: string | null;
-  bnbUsd: number | null;
   align?: "left" | "right";
-  showSymbol?: boolean;
-  inlineUsd?: boolean;
 }) {
   const amount = Number(holdAmount);
   const hasHold = Number.isFinite(amount) && amount > 0;
   const alignClass = align === "right" ? "text-right" : "text-left";
-  const flexAlign = align === "right" ? "justify-end" : "justify-start";
 
   if (!hasHold) {
     return (
@@ -508,34 +495,11 @@ function HoldCell({
     );
   }
 
-  const priceBnb = Number(linkedPriceBnb);
-  const usd = tokenAmountUsd(amount, priceBnb, bnbUsd);
-
   return (
     <div className={`min-w-0 ${alignClass}`}>
-      <div className={`flex min-w-0 items-center gap-1 ${flexAlign} flex-nowrap`}>
-        <p className="financial-value shrink-0 text-caption font-medium tabular-nums text-pump-text">
-          {formatAmount(holdAmount!)}
-        </p>
-        {showSymbol ? (
-          <TokenSymbolInline
-            address={linkedToken}
-            symbol={symbol}
-            size={12}
-            className="shrink-0 text-caption font-medium text-pump-text"
-          />
-        ) : null}
-        {inlineUsd && usd != null ? (
-          <span className="financial-value shrink-0 text-caption tabular-nums text-pump-muted">
-            · {formatUsdReadable(usd, { compact: true })}
-          </span>
-        ) : null}
-      </div>
-      {!inlineUsd && usd != null ? (
-        <p className="text-[10px] tabular-nums text-pump-muted">
-          {formatUsdReadable(usd, { compact: true })}
-        </p>
-      ) : null}
+      <p className="financial-value text-caption font-medium tabular-nums text-pump-text">
+        {formatAmount(holdAmount!)}
+      </p>
     </div>
   );
 }
@@ -555,23 +519,36 @@ function CreatorBadge() {
   );
 }
 
+function LeaderboardHeldHead({
+  linkedToken,
+  symbol,
+  className = "",
+}: {
+  linkedToken: string;
+  symbol: string;
+  className?: string;
+}) {
+  return (
+    <span className={`inline-flex min-w-0 items-center gap-1 ${className}`}>
+      <TokenSymbolInline address={linkedToken} symbol={symbol} size={10} className="shrink-0" />
+      <span>held</span>
+    </span>
+  );
+}
+
 function LeaderboardWalletCell({
   walletAddress,
-  viewerAddress,
   creatorAddress,
   claimed,
   onWalletClick,
   compact = false,
 }: {
   walletAddress: string;
-  viewerAddress?: string;
   creatorAddress: string;
   claimed?: boolean;
   onWalletClick?: (address: string) => void;
   compact?: boolean;
 }) {
-  const isYou =
-    viewerAddress && walletAddress.toLowerCase() === viewerAddress.toLowerCase();
   const isCreator = walletAddress.toLowerCase() === creatorAddress.toLowerCase();
 
   return (
@@ -590,7 +567,6 @@ function LeaderboardWalletCell({
           <span className="font-medium text-pump-text">
             <UserDisplayName address={walletAddress} compact={compact} />
           </span>
-          {isYou ? <span className="text-caption text-pump-accent">(you)</span> : null}
           {claimed ? <span className="text-caption text-pump-accent">✓</span> : null}
           {isCreator ? <CreatorBadge /> : null}
         </span>
@@ -634,13 +610,7 @@ function LiveLeaderboardTable({
   function holdCellProps(holdAmount: string | null | undefined) {
     return {
       holdAmount,
-      linkedToken: detail.linkedToken,
-      poolSymbol: symbol,
-      linkedPriceBnb: detail.linkedPriceBnb,
-      bnbUsd,
       align: "right" as const,
-      showSymbol: true,
-      inlineUsd: true,
     };
   }
 
@@ -661,19 +631,22 @@ function LiveLeaderboardTable({
         className={`sticky top-0 z-[1] hidden gap-x-3 border-b border-pump-border/10 bg-pump-card/95 px-3 py-2 text-[10px] font-semibold uppercase tracking-wide text-pump-muted backdrop-blur-sm sm:grid ${LEADERBOARD_GRID_COLS}`}
       >
         <span>#</span>
-        <span>Wallet</span>
-        <span className="flex items-center justify-end gap-1">
-          <TokenSymbolInline address={detail.linkedToken} symbol={symbol} size={10} />
-          <span>held</span>
+        <span>Account</span>
+        <span className="flex items-center justify-end">
+          <LeaderboardHeldHead linkedToken={detail.linkedToken} symbol={symbol} />
         </span>
         <span className="text-right">Est. reward</span>
       </div>
 
       <div className="airdrop-leaderboard-head sm:hidden" aria-hidden>
-        <span>#</span>
-        <span>Wallet</span>
-        <span className="airdrop-leaderboard-head__cell--right">Held</span>
-        <span className="airdrop-leaderboard-head__cell--right">Est.</span>
+        <span className="airdrop-leaderboard-head__cell--rank">#</span>
+        <span className="airdrop-leaderboard-head__cell--account">Account</span>
+        <LeaderboardHeldHead
+          linkedToken={detail.linkedToken}
+          symbol={symbol}
+          className="airdrop-leaderboard-head__held airdrop-leaderboard-head__cell--right"
+        />
+        <span className="airdrop-leaderboard-head__cell--reward">Reward</span>
       </div>
 
       <ul className="divide-y divide-pump-border/10">
@@ -693,20 +666,15 @@ function LiveLeaderboardTable({
                   <div className="min-w-0">
                     <LeaderboardWalletCell
                       walletAddress={row.address}
-                      viewerAddress={address}
                       creatorAddress={detail.creatorAddress}
                       onWalletClick={onWalletClick}
                       compact
                     />
                   </div>
-                  <div className="airdrop-leaderboard-row__metric">
-                    <HoldCell
-                      {...holdCellProps(row.holdAmount)}
-                      showSymbol={false}
-                      inlineUsd={false}
-                    />
+                  <div className="airdrop-leaderboard-row__metric airdrop-leaderboard-row__held">
+                    <HoldCell {...holdCellProps(row.holdAmount)} />
                   </div>
-                  <div className="airdrop-leaderboard-row__metric">
+                  <div className="airdrop-leaderboard-row__metric airdrop-leaderboard-row__reward">
                     <RewardCell {...rewardCellProps(reward)} />
                   </div>
                 </div>
@@ -717,7 +685,6 @@ function LiveLeaderboardTable({
                   </span>
                   <LeaderboardWalletCell
                     walletAddress={row.address}
-                    viewerAddress={address}
                     creatorAddress={detail.creatorAddress}
                     onWalletClick={onWalletClick}
                   />
@@ -733,10 +700,10 @@ function LiveLeaderboardTable({
               <div className="airdrop-leaderboard-row sm:hidden">
                 <span className="airdrop-leaderboard-row__rank">{rank}</span>
                 <span className="airdrop-leaderboard-row__open">Open slot</span>
-                <span className="airdrop-leaderboard-row__metric airdrop-leaderboard-row__metric--muted">
+                <span className="airdrop-leaderboard-row__metric airdrop-leaderboard-row__held airdrop-leaderboard-row__metric--muted">
                   —
                 </span>
-                <div className="airdrop-leaderboard-row__metric">
+                <div className="airdrop-leaderboard-row__metric airdrop-leaderboard-row__reward">
                   <RewardCell {...rewardCellProps(reward)} />
                 </div>
               </div>
@@ -787,14 +754,14 @@ function WinnersTable({
     <div className={className}>
       <div className="sticky top-0 z-[1] hidden grid-cols-[2.5rem_minmax(0,1fr)_minmax(8rem,9.5rem)] gap-x-3 border-b border-pump-border/10 bg-pump-card/95 px-3 py-2 text-[10px] font-semibold uppercase tracking-wide text-pump-muted backdrop-blur-sm sm:grid">
         <span>#</span>
-        <span>Wallet</span>
+        <span>Account</span>
         <span className="text-right">Reward</span>
       </div>
 
       <div className="airdrop-leaderboard-head airdrop-leaderboard-head--winners sm:hidden" aria-hidden>
-        <span>#</span>
-        <span>Wallet</span>
-        <span className="airdrop-leaderboard-head__cell--right">Reward</span>
+        <span className="airdrop-leaderboard-head__cell--rank">#</span>
+        <span className="airdrop-leaderboard-head__cell--account">Account</span>
+        <span className="airdrop-leaderboard-head__cell--reward">Reward</span>
       </div>
 
       <ul className="divide-y divide-pump-border/10">
@@ -810,14 +777,13 @@ function WinnersTable({
                 <div className="min-w-0">
                   <LeaderboardWalletCell
                     walletAddress={row.address}
-                    viewerAddress={address}
                     creatorAddress={detail.creatorAddress}
                     claimed={row.claimed}
                     onWalletClick={onWalletClick}
                     compact
                   />
                 </div>
-                <div className="airdrop-leaderboard-row__metric">
+                <div className="airdrop-leaderboard-row__metric airdrop-leaderboard-row__reward">
                   <RewardCell
                     amount={rewardCompact}
                     usd={rewardUsd}
@@ -832,7 +798,6 @@ function WinnersTable({
                 <span className="financial-value font-semibold text-pump-muted">{row.rank}</span>
                 <LeaderboardWalletCell
                   walletAddress={row.address}
-                  viewerAddress={address}
                   creatorAddress={detail.creatorAddress}
                   claimed={row.claimed}
                   onWalletClick={onWalletClick}

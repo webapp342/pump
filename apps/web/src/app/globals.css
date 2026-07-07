@@ -8507,19 +8507,15 @@ code,
   }
 
   .bottom-nav-item-active {
-    background: rgb(var(--pump-card-soft));
-    color: rgb(var(--pump-text));
-  }
-
-  html[data-theme="light"] .bottom-nav-item-active {
-    background: rgb(var(--pump-card-soft));
+    background: transparent;
+    color: rgb(var(--pump-accent));
   }
 
   .bottom-nav-icon {
     width: var(--mobile-bottom-nav-icon-size);
     height: var(--mobile-bottom-nav-icon-size);
     flex-shrink: 0;
-    opacity: 0.46;
+    opacity: 0.42;
     color: inherit;
     transition:
       opacity 0.18s ease,
@@ -8528,7 +8524,7 @@ code,
 
   .bottom-nav-item-active .bottom-nav-icon {
     opacity: 1;
-    color: rgb(var(--pump-text));
+    color: rgb(var(--pump-accent));
   }
 
   .wallet-account-panel__appearance {
@@ -9015,16 +9011,18 @@ code,
 
   .airdrop-leaderboard-row {
     display: grid;
-    grid-template-columns: 1.75rem minmax(0, 1fr) minmax(3.75rem, 4.75rem) minmax(3.75rem, 4.75rem);
-    gap: 0.375rem 0.5rem;
+    grid-template-columns: 1.625rem minmax(0, 1fr) minmax(3.25rem, 3.875rem) minmax(4.75rem, 5.5rem);
+    gap: 0.375rem 0.4375rem;
     align-items: center;
     padding: 0.5625rem var(--airdrops-page-gutter);
     font-size: var(--text-caption);
   }
 
   .airdrop-leaderboard-row__rank {
+    width: 100%;
     font-variant-numeric: tabular-nums;
     font-weight: var(--weight-ui);
+    font-size: 0.6875rem;
     color: rgb(var(--pump-muted));
     text-align: center;
   }
@@ -9048,8 +9046,27 @@ code,
     color: rgb(var(--pump-muted));
   }
 
+  .airdrop-leaderboard-row__held {
+    color: rgb(var(--pump-muted));
+    font-size: 0.6875rem;
+    font-weight: var(--weight-ui);
+  }
+
+  .airdrop-leaderboard-row__held .financial-value {
+    color: rgb(var(--pump-muted));
+    font-weight: var(--weight-ui);
+    font-size: 0.6875rem;
+  }
+
+  .airdrop-leaderboard-row__reward .financial-value {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: rgb(var(--pump-success));
+    letter-spacing: -0.01em;
+  }
+
   .airdrop-leaderboard-winners-row {
-    grid-template-columns: 1.75rem minmax(0, 1fr) minmax(4.5rem, 5.5rem);
+    grid-template-columns: 1.625rem minmax(0, 1fr) minmax(4.75rem, 5.5rem);
   }
 
   .airdrops-page .airdrop-detail-task-list {
@@ -9190,8 +9207,8 @@ code,
       position: sticky;
       top: 0;
       z-index: 1;
-      grid-template-columns: 1.75rem minmax(0, 1fr) minmax(3.75rem, 4.75rem) minmax(3.75rem, 4.75rem);
-      gap: 0.375rem 0.5rem;
+      grid-template-columns: 1.625rem minmax(0, 1fr) minmax(3.25rem, 3.875rem) minmax(4.75rem, 5.5rem);
+      gap: 0.375rem 0.4375rem;
       align-items: center;
       padding: 0.4375rem var(--airdrops-page-gutter);
       border-bottom: 1px solid rgb(var(--pump-border) / 0.22);
@@ -9203,12 +9220,36 @@ code,
       color: rgb(var(--pump-muted));
     }
 
+    .airdrop-leaderboard-head__cell--rank {
+      text-align: center;
+    }
+
+    .airdrop-leaderboard-head__cell--account {
+      min-width: 0;
+    }
+
+    .airdrop-leaderboard-head__cell--reward {
+      text-align: right;
+      color: rgb(var(--pump-text));
+      font-weight: 600;
+      letter-spacing: 0.05em;
+    }
+
     .airdrop-leaderboard-head--winners {
-      grid-template-columns: 1.75rem minmax(0, 1fr) minmax(4.5rem, 5.5rem);
+      grid-template-columns: 1.625rem minmax(0, 1fr) minmax(4.75rem, 5.5rem);
     }
 
     .airdrop-leaderboard-head__cell--right {
       text-align: right;
+    }
+
+    .airdrop-leaderboard-head__held {
+      display: inline-flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 0.25rem;
+      width: 100%;
+      min-width: 0;
     }
   }
 
