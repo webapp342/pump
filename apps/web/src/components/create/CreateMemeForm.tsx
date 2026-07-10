@@ -19,7 +19,6 @@ import {
   bondingCurveManagerAbi,
   DEFAULT_VIRTUAL_BNB_RESERVE,
   DEFAULT_VIRTUAL_TOKEN_RESERVE,
-  formatTokenAmountCompact,
   minOutWithSlippage,
   quoteFreshBuy,
   SLIPPAGE_BPS,
@@ -34,15 +33,21 @@ import {
 } from "@/lib/upload-token-logo";
 import { TokenAvatar } from "@/components/token/TokenAvatar";
 import { BnbLogo } from "@/components/token/BnbLogo";
-import {
-  BnbAmountDisplay,
-  BnbAmountLabel,
-  TokenAmountDisplay,
-} from "@/components/token/AssetAmountDisplay";
+import { BnbAmountDisplay } from "@/components/token/AssetAmountDisplay";
 import { TokenLaunchSuccessModal } from "@/components/create/TokenLaunchSuccessModal";
+import {
+  createEmptyTokenSocialLinksState,
+  TokenSocialLinksEditor,
+  tokenSocialLinksToPayload,
+  TOKEN_SOCIAL_LINK_FIELDS,
+  type TokenSocialLinkKey,
+  type TokenSocialLinksState,
+} from "@/components/create/TokenSocialLinksEditor";
+import { FieldErrorIcon, FieldErrorMessage } from "@/components/ui/FieldError";
 import { FormExecutionStatus } from "@/components/ui/FormExecutionStatus";
+import { InfoTip } from "@/components/ui/InfoTip";
 import { DEFAULT_MIN_INITIAL_BUY_BNB } from "@/lib/platform-settings";
-import { formatCampaignAmount, formatCampaignAmountInput } from "@/lib/airdrop-board-format";
+import { formatCampaignAmount } from "@/lib/airdrop-board-format";
 import { useCreateGasReserve } from "@/hooks/useCreateGasReserve";
 
 type LaunchSuccess = {
@@ -61,116 +66,13 @@ async function fileToDataUrl(file: File): Promise<string> {
   });
 }
 
-function IssuanceSummaryRows({
-  feeWei,
-  initialBuyWei,
-  showReceivePreview,
-  estimatedTokens,
-  displaySymbol,
-  logoPreview,
-  totalValue,
-  variant = "desktop",
-}: {
-  feeWei: bigint;
-  initialBuyWei: bigint;
-  showReceivePreview: boolean;
-  estimatedTokens: bigint;
-  displaySymbol: string;
-  logoPreview: string | null;
-  totalValue: bigint;
-  variant?: "desktop" | "mobile";
-}) {
-  const isMobile = variant === "mobile";
-  const rowClass = `flex items-center justify-between gap-3 ${isMobile ? "text-caption" : "text-body-sm"}`;
-  const totalLogoSize = isMobile ? 16 : 20;
-  const totalAmountClass = isMobile
-    ? "financial-value text-body-sm font-semibold tabular-nums text-pump-text"
-    : "financial-value text-h3 font-semibold tabular-nums text-pump-text";
-  const totalSymbolClass = isMobile
-    ? "text-caption font-medium text-pump-muted"
-    : "text-body-sm font-medium text-pump-muted";
-
-  return (
-    <dl className={isMobile ? "space-y-2.5" : "mt-4 space-y-3"}>
-      <div className={rowClass}>
-        <dt className="text-pump-muted">Create fee</dt>
-        <dd className="min-w-0 shrink-0 text-right">
-          {feeWei === 0n ? (
-            <span className="text-caption font-medium text-pump-accent">Free (exempt)</span>
-          ) : (
-            <BnbAmountDisplay
-            amount={formatCampaignAmount(feeWei)}
-            logoSize={isMobile ? 14 : 18}
-            amountClassName={
-              isMobile
-                ? "financial-value text-caption font-medium tabular-nums text-pump-text"
-                : undefined
-            }
-            symbolClassName={isMobile ? "text-caption font-medium text-pump-muted" : undefined}
-          />
-          )}
-        </dd>
-      </div>
-      {initialBuyWei > 0n ? (
-        <div className={rowClass}>
-          <dt className="text-pump-muted">Initial buy</dt>
-          <dd className="min-w-0 shrink-0 text-right">
-            <BnbAmountDisplay
-              amount={formatCampaignAmount(initialBuyWei)}
-              logoSize={isMobile ? 14 : 18}
-              amountClassName={
-                isMobile
-                  ? "financial-value text-caption font-medium tabular-nums text-pump-text"
-                  : undefined
-              }
-              symbolClassName={isMobile ? "text-caption font-medium text-pump-muted" : undefined}
-            />
-          </dd>
-        </div>
-      ) : null}
-      {showReceivePreview ? (
-        <div className={rowClass}>
-          <dt className="text-pump-muted">You receive</dt>
-          <dd className="min-w-0 max-w-[58%] shrink-0 text-right">
-            <TokenAmountDisplay
-              amount={formatTokenAmountCompact(estimatedTokens)}
-              symbol={displaySymbol}
-              previewUrl={logoPreview}
-              logoSize={isMobile ? 14 : 18}
-              amountClassName={
-                isMobile
-                  ? "financial-value text-caption font-medium tabular-nums text-pump-text"
-                  : undefined
-              }
-              symbolClassName={isMobile ? "text-caption font-medium text-pump-muted" : undefined}
-            />
-          </dd>
-        </div>
-      ) : null}
-      <div
-        className={`${rowClass} border-t border-pump-border/15 ${isMobile ? "pt-2.5" : "pt-3"}`}
-      >
-        <dt className="font-medium text-pump-text">Total</dt>
-        <dd className="min-w-0 shrink-0 text-right">
-          <BnbAmountDisplay
-            amount={formatCampaignAmount(totalValue)}
-            logoSize={totalLogoSize}
-            amountClassName={totalAmountClass}
-            symbolClassName={totalSymbolClass}
-          />
-        </dd>
-      </div>
-    </dl>
-  );
-}
-
 export function CreateMemeForm() {
   const router = useRouter();
   const handledReceiptRef = useRef<string | null>(null);
   const logoFileRef = useRef<File | null>(null);
   const logoPreviewRef = useRef<string | null>(null);
   const descriptionRef = useRef("");
-  const socialLinksRef = useRef({ twitter: "", website: "", telegram: "", discord: "" });
+  const socialLinksRef = useRef<ReturnType<typeof tokenSocialLinksToPayload>>({});
   const { openConnectModal } = useOpenConnectModal();
   const { openFundChoice } = useWalletFunding();
   const { signedIn, scwAddress, chain } = usePumpSession();
@@ -179,25 +81,21 @@ export function CreateMemeForm() {
   const [name, setName] = useState("");
   const [symbol, setSymbol] = useState("");
   const [description, setDescription] = useState("");
-  const [initialBuyBnb, setInitialBuyBnb] = useState(DEFAULT_MIN_INITIAL_BUY_BNB);
+  const [initialBuyBnb, setInitialBuyBnb] = useState("");
   const [socialOpen, setSocialOpen] = useState(false);
-  const [twitter, setTwitter] = useState("");
-  const [website, setWebsite] = useState("");
-  const [telegram, setTelegram] = useState("");
-  const [discord, setDiscord] = useState("");
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [launchFinalizing, setLaunchFinalizing] = useState(false);
   const [uploadStatus, setUploadStatus] = useState<string | null>(null);
   const [launchSuccess, setLaunchSuccess] = useState<LaunchSuccess | null>(null);
+  const [showFieldErrors, setShowFieldErrors] = useState(false);
+  const [socialLinks, setSocialLinks] = useState<TokenSocialLinksState>(createEmptyTokenSocialLinksState);
 
   logoFileRef.current = logoFile;
   logoPreviewRef.current = logoPreview;
   descriptionRef.current = description;
-  socialLinksRef.current = { twitter, website, telegram, discord };
-
-  const minInitialBuySyncedRef = useRef(false);
+  socialLinksRef.current = tokenSocialLinksToPayload(socialLinks);
 
   const { data: minInitialBuyWeiOnChain } = useReadContract({
     address: contracts.memeFactory,
@@ -215,14 +113,6 @@ export function CreateMemeForm() {
     () => (minInitialBuyWei > 0n ? formatCampaignAmount(minInitialBuyWei) : "0"),
     [minInitialBuyWei]
   );
-
-  useEffect(() => {
-    if (minInitialBuyWeiOnChain === undefined || minInitialBuySyncedRef.current) return;
-    minInitialBuySyncedRef.current = true;
-    if (minInitialBuyWeiOnChain > 0n) {
-      setInitialBuyBnb(formatCampaignAmount(minInitialBuyWeiOnChain));
-    }
-  }, [minInitialBuyWeiOnChain]);
 
   const contractsReady = Boolean(contracts.memeFactory && contracts.bondingCurveManager);
 
@@ -414,9 +304,9 @@ export function CreateMemeForm() {
     });
   }, [initialBuyWei, resolvedVirtualBnb, resolvedVirtualToken, protocolFeeBps]);
 
-  const minInitialBuyTokens = minOutWithSlippage(estimatedTokens, SLIPPAGE_BPS);
+  const minInitialBuyTokens =
+    initialBuyWei > 0n ? minOutWithSlippage(estimatedTokens, SLIPPAGE_BPS) : 0n;
   const totalValue = feeWei + initialBuyWei;
-  const showReceivePreview = initialBuyWei > 0n && estimatedTokens > 0n && protocolFeeBps !== undefined;
 
   const { gasReserveWei, isLoading: gasReserveLoading } = useCreateGasReserve({
     kind: "meme",
@@ -429,33 +319,10 @@ export function CreateMemeForm() {
   });
   const gasWei = gasReserveWei ?? 0n;
 
-  const maxInitialBuyWei = useMemo(() => {
-    const overhead = feeWei + gasWei;
-    if (!isConnected || bnbBalance === undefined) {
-      return minInitialBuyWei;
-    }
-    if (bnbBalance.value <= overhead) {
-      return minInitialBuyWei;
-    }
-    const afford = bnbBalance.value - overhead;
-    return afford > minInitialBuyWei ? afford : minInitialBuyWei;
-  }, [isConnected, bnbBalance, feeWei, gasWei, minInitialBuyWei]);
-
-  const canUseInitialBuySlider =
-    isConnected &&
-    !bnbBalanceLoading &&
-    bnbBalance !== undefined &&
-    maxInitialBuyWei > minInitialBuyWei;
-
-  const launchRequiredWei = useMemo(() => {
-    const buyWei =
-      initialBuyWei >= minInitialBuyWei
-        ? initialBuyWei
-        : initialBuyWei > 0n
-          ? initialBuyWei
-          : minInitialBuyWei;
-    return feeWei + buyWei + gasWei;
-  }, [feeWei, initialBuyWei, minInitialBuyWei, gasWei]);
+  const launchRequiredWei = useMemo(
+    () => feeWei + initialBuyWei + gasWei,
+    [feeWei, initialBuyWei, gasWei]
+  );
 
   const bnbShortfallWei = useMemo(() => {
     if (!isConnected || bnbBalanceLoading || gasReserveLoading || bnbBalance === undefined) {
@@ -471,50 +338,37 @@ export function CreateMemeForm() {
   function openLaunchFundingModal() {
     openFundChoice({
       title: `Add ${NATIVE_SYMBOL} to launch`,
-      message: `You need ${formatCampaignAmount(bnbShortfallWei)} more ${NATIVE_SYMBOL} for the create fee, initial buy, and gas.`,
+      message: `You need ${formatCampaignAmount(bnbShortfallWei)} more ${NATIVE_SYMBOL} for the create fee${initialBuyWei > 0n ? ", initial buy," : ""} and gas.`,
     });
   }
-
-  const showInitialBuySlider = canUseInitialBuySlider;
-
-  const initialBuySliderPct = useMemo(() => {
-    if (maxInitialBuyWei <= minInitialBuyWei) return 100;
-    const clamped =
-      initialBuyWei < minInitialBuyWei
-        ? minInitialBuyWei
-        : initialBuyWei > maxInitialBuyWei
-          ? maxInitialBuyWei
-          : initialBuyWei;
-    const range = maxInitialBuyWei - minInitialBuyWei;
-    const scaled = Number(((clamped - minInitialBuyWei) * 10000n) / range) / 100;
-    return Math.max(0, Math.min(100, scaled));
-  }, [initialBuyWei, minInitialBuyWei, maxInitialBuyWei]);
-
-  const initialBuySliderFillPct = initialBuySliderPct;
-  const maxInitialBuyLabel = formatCampaignAmount(maxInitialBuyWei);
 
   function onInitialBuyChange(raw: string) {
     const cleaned = raw.replace(/,/g, ".").replace(/[^\d.]/g, "");
     setInitialBuyBnb(cleaned);
   }
 
-  function applyInitialBuySliderPct(pct: number) {
-    if (!isConnected) {
-      openConnectModal?.();
-      return;
-    }
-    if (bnbBalance === undefined || maxInitialBuyWei <= minInitialBuyWei) {
-      setInitialBuyBnb(minInitialBuyBnb);
-      return;
-    }
+  function toggleSocialLink(key: TokenSocialLinkKey) {
+    setSocialLinks((prev) => ({
+      ...prev,
+      [key]: { ...prev[key], enabled: !prev[key].enabled },
+    }));
+  }
 
-    const clamped = Math.max(0, Math.min(100, pct));
-    const range = maxInitialBuyWei - minInitialBuyWei;
-    const wei =
-      clamped >= 100
-        ? maxInitialBuyWei
-        : minInitialBuyWei + (range * BigInt(clamped)) / 100n;
-    setInitialBuyBnb(formatCampaignAmountInput(wei));
+  function updateSocialLink(key: TokenSocialLinkKey, value: string) {
+    setSocialLinks((prev) => ({
+      ...prev,
+      [key]: { ...prev[key], value },
+    }));
+  }
+
+  function hasSocialFieldError(): boolean {
+    for (const field of TOKEN_SOCIAL_LINK_FIELDS) {
+      const draft = socialLinks[field.key];
+      if (!draft.enabled) continue;
+      const trimmed = draft.value.trim();
+      if (!trimmed || !/^https?:\/\//i.test(trimmed)) return true;
+    }
+    return false;
   }
 
   function onLogoChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -535,8 +389,7 @@ export function CreateMemeForm() {
       .catch(() => setError("Could not read logo file"));
   }
 
-  async function onSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function executeLaunch() {
     setError(null);
     reset();
 
@@ -556,13 +409,19 @@ export function CreateMemeForm() {
       setError("Token logo is required.");
       return;
     }
-    if (initialBuyWei < minInitialBuyWei) {
-      setError(`Initial buy is required (minimum ${minInitialBuyBnb} ${NATIVE_SYMBOL}).`);
+    if (initialBuyWei === 0n && minInitialBuyWei > 0n) {
+      setError(`Minimum initial buy is ${minInitialBuyBnb} ${NATIVE_SYMBOL}.`);
       return;
     }
-    if (minInitialBuyTokens === 0n) {
-      setError("Initial buy is too small for the bonding curve.");
-      return;
+    if (initialBuyWei > 0n) {
+      if (minInitialBuyWei > 0n && initialBuyWei < minInitialBuyWei) {
+        setError(`Minimum initial buy is ${minInitialBuyBnb} ${NATIVE_SYMBOL}.`);
+        return;
+      }
+      if (minInitialBuyTokens === 0n) {
+        setError("Initial buy is too small for the bonding curve.");
+        return;
+      }
     }
     if (needsBnbFunding) {
       openLaunchFundingModal();
@@ -582,6 +441,54 @@ export function CreateMemeForm() {
       setError(err instanceof Error ? err.message : "Transaction failed");
     }
   }
+
+  function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    handleLaunch();
+  }
+
+  const fieldErrors = useMemo(() => {
+    if (!showFieldErrors) {
+      return {
+        name: null as string | null,
+        symbol: null as string | null,
+        logo: null as string | null,
+        initialBuy: null as string | null,
+      };
+    }
+
+    const next = {
+      name: null as string | null,
+      symbol: null as string | null,
+      logo: null as string | null,
+      initialBuy: null as string | null,
+    };
+
+    if (!name.trim()) next.name = "Enter a coin name.";
+    if (!symbol.trim()) next.symbol = "Enter a ticker.";
+    if (!logoFile) next.logo = "Upload a token logo.";
+
+    if (initialBuyWei === 0n && minInitialBuyWei > 0n) {
+      next.initialBuy = `Minimum initial buy is ${minInitialBuyBnb} ${NATIVE_SYMBOL}.`;
+    } else if (initialBuyWei > 0n) {
+      if (minInitialBuyWei > 0n && initialBuyWei < minInitialBuyWei) {
+        next.initialBuy = `Minimum initial buy is ${minInitialBuyBnb} ${NATIVE_SYMBOL}.`;
+      } else if (minInitialBuyTokens === 0n) {
+        next.initialBuy = "Initial buy is too small for the bonding curve.";
+      }
+    }
+
+    return next;
+  }, [
+    showFieldErrors,
+    name,
+    symbol,
+    logoFile,
+    initialBuyWei,
+    minInitialBuyWei,
+    minInitialBuyBnb,
+    minInitialBuyTokens,
+  ]);
 
   const displayError = error ?? (writeError ? formatTradeError(writeError) : null);
 
@@ -628,386 +535,273 @@ export function CreateMemeForm() {
           ? formSubmitPhase === "submitting"
             ? "Processing"
             : "Confirming"
-          : "Create + Launch";
+          : "Create token";
 
-  const submitDisabled = isConnected && (wrongChain || isBusy || !contractsReady);
-
-  const displayName = name.trim() || "Your coin";
   const displaySymbol = symbol.trim() || "TICKER";
+  const submitDisabled = isBusy || (isConnected && (wrongChain || !contractsReady));
 
-  return (
-    <form
-      onSubmit={onSubmit}
-      className="create-meme-form grid gap-3 pb-[var(--mobile-main-bottom-pad)] md:gap-4 md:pb-0 xl:grid-cols-[minmax(0,1fr)_minmax(280px,360px)] xl:items-start"
+  function handleLaunch() {
+    if (!isConnected) {
+      openConnectModal?.();
+      return;
+    }
+    if (wrongChain || !contractsReady) return;
+
+    const hasRequiredFieldError = !name.trim() || !symbol.trim() || !logoFile;
+    const hasBuyFieldError =
+      (initialBuyWei === 0n && minInitialBuyWei > 0n) ||
+      (initialBuyWei > 0n &&
+        ((minInitialBuyWei > 0n && initialBuyWei < minInitialBuyWei) || minInitialBuyTokens === 0n));
+
+    if (hasRequiredFieldError || hasBuyFieldError || hasSocialFieldError()) {
+      setShowFieldErrors(true);
+      if (hasSocialFieldError()) setSocialOpen(true);
+      return;
+    }
+
+    setShowFieldErrors(false);
+
+    if (needsBnbFunding) {
+      openLaunchFundingModal();
+      return;
+    }
+
+    void executeLaunch();
+  }
+
+  const submitButton = (
+    <button
+      type="submit"
+      disabled={submitDisabled}
+      aria-busy={formSubmitPending}
+      className={`primary-button min-w-0 flex-1 sm:flex-none sm:min-w-[9.5rem] sm:px-8${formSubmitPending ? " form-submit-button--loading" : ""}`}
     >
-      <div className="space-y-3 md:space-y-4">
-        <section className="panel-surface p-3 md:p-5">
-          <p className="section-label">Token profile</p>
+      {formSubmitPending ? (
+        <>
+          <span className="trade-submit-spinner" aria-hidden />
+          <span>{submitLabel}</span>
+        </>
+      ) : (
+        submitLabel
+      )}
+    </button>
+  );
 
-          <div className="mt-3 flex flex-col gap-4 sm:mt-4 sm:flex-row sm:items-start sm:gap-5">
-            <div className="flex min-w-0 items-center gap-3 sm:w-[5.75rem] sm:shrink-0 sm:flex-col sm:items-center sm:gap-2">
-              <TokenAvatar
-                address="0x0000000000000000000000000000000000000000"
-                symbol={displaySymbol}
-                previewUrl={logoPreview}
-                size={56}
-                className="sm:hidden"
-              />
-              <TokenAvatar
-                address="0x0000000000000000000000000000000000000000"
-                symbol={displaySymbol}
-                previewUrl={logoPreview}
-                size={72}
-                className="hidden sm:flex"
-              />
-              <label
-                htmlFor="logo"
-                className="secondary-button w-fit cursor-pointer px-3 py-2 text-caption sm:w-full sm:justify-center sm:px-2"
-              >
-                Upload logo
-              </label>
-              <input
-                id="logo"
-                type="file"
-                accept={LOGO_ACCEPT}
-                onChange={onLogoChange}
-                className="hidden"
-              />
-              <p className="field-hint min-w-0 flex-1 sm:w-full sm:flex-none sm:text-center">
-                PNG, JPEG, WebP or GIF · max 2 MB
-              </p>
-            </div>
-
-            <div className="min-w-0 flex-1 space-y-3 md:space-y-4">
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <label className="field-label" htmlFor="name">
-                    Coin name <span className="text-pump-accent">*</span>
-                  </label>
-                  <input
-                    id="name"
-                    maxLength={64}
-                    required
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="Moon Pepe"
-                    className="field-input"
-                  />
-                </div>
-                <div>
-                  <label className="field-label" htmlFor="symbol">
-                    Ticker <span className="text-pump-accent">*</span>
-                  </label>
-                  <input
-                    id="symbol"
-                    maxLength={16}
-                    required
-                    value={symbol}
-                    onChange={(e) => setSymbol(e.target.value.toUpperCase())}
-                    placeholder="MPEPE"
-                    className="field-input"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="field-label" htmlFor="description">
-                  Description
-                </label>
-                <textarea
-                  id="description"
-                  maxLength={2000}
-                  rows={3}
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="What is this coin about?"
-                  className="field-textarea min-h-[5.5rem] md:min-h-[6.5rem]"
-                />
-                <p className="mt-1 field-hint">{description.length}/2000</p>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section className="panel-surface p-3 md:p-5">
-          <p className="section-label">Initial issuance</p>
-
-          <div className="mt-3 md:mt-4">
-            <label className="field-label" htmlFor="initialBuy">
-              Initial buy <span className="text-pump-accent">*</span>
-            </label>
-            <div className="relative w-full sm:max-w-xs">
-              <div className="pointer-events-none absolute inset-y-0 left-3 flex items-center">
-                <BnbLogo size={20} />
-              </div>
-              <input
-                id="initialBuy"
-                inputMode="decimal"
-                required
-                value={initialBuyBnb}
-                onChange={(e) => onInitialBuyChange(e.target.value)}
-                placeholder={minInitialBuyBnb}
-                className="field-input financial-value w-full pl-11 pr-14"
-              />
-              <div className="pointer-events-none absolute inset-y-0 right-3 flex items-center">
-                <span className="text-caption font-medium text-pump-muted">{NATIVE_SYMBOL}</span>
-              </div>
-            </div>
-
-            {showInitialBuySlider ? (
-              <div className="mt-3 w-full sm:max-w-sm">
-                <div className="flex items-center gap-2.5">
-                  <div className="relative min-w-0 flex-1 pt-1">
-                    <div
-                      className="pointer-events-none absolute top-1/2 h-1 w-full -translate-y-1/2 rounded-full bg-pump-border/25"
-                      aria-hidden
-                    />
-                    <div
-                      className="pointer-events-none absolute top-1/2 h-1 -translate-y-1/2 rounded-full bg-pump-accent/70 transition-[width] duration-75"
-                      style={{ width: `${initialBuySliderFillPct}%` }}
-                      aria-hidden
-                    />
-                    <input
-                      id="initialBuySlider"
-                      type="range"
-                      min={0}
-                      max={100}
-                      step={1}
-                      value={initialBuySliderPct}
-                      onChange={(e) => applyInitialBuySliderPct(Number(e.target.value))}
-                      className="trade-amount-slider relative z-[1] w-full"
-                      aria-label="Initial buy amount slider"
-                      aria-valuetext={
-                        initialBuySliderPct >= 100
-                          ? `Max (${maxInitialBuyLabel} ${NATIVE_SYMBOL})`
-                          : `${initialBuySliderPct}% between ${minInitialBuyBnb} and ${maxInitialBuyLabel} ${NATIVE_SYMBOL}`
-                      }
-                    />
-                  </div>
-                  <button
-                    type="button"
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => applyInitialBuySliderPct(100)}
-                    className="chip-button shrink-0 px-2.5 py-1.5 text-caption"
-                  >
-                    Max
-                  </button>
-                </div>
-                <div className="mt-1.5 flex items-center justify-between gap-2 text-caption text-pump-muted">
-                  <BnbAmountLabel amount={minInitialBuyBnb} />
-                  <BnbAmountLabel amount={maxInitialBuyLabel} />
-                </div>
-              </div>
-            ) : null}
-
-            <p className="mt-2 field-hint">
-              Minimum {minInitialBuyBnb} {NATIVE_SYMBOL}. A larger initial buy launches your coin at a higher
-              starting price.
-              {!isConnected ? (
-                <span className="mt-1 block">Connect wallet to use your {NATIVE_SYMBOL} balance on the slider.</span>
-              ) : bnbBalanceLoading ? (
-                <span className="mt-1 block text-pump-muted">Loading wallet balance…</span>
-              ) : null}
-            </p>
-            {bnbShortfallWei > 0n && isConnected && !bnbBalanceLoading ? (
-              <div className="mt-2 rounded-md border border-pump-warning/30 bg-pump-warning/10 px-2.5 py-2">
-                <p className="text-caption leading-snug text-pump-warning">
-                  Need{" "}
-                  <BnbAmountDisplay
-                    amount={formatCampaignAmount(bnbShortfallWei)}
-                    logoSize={14}
-                    amountClassName="financial-value font-semibold tabular-nums text-pump-warning"
-                    symbolClassName="text-caption font-medium text-pump-warning/90"
-                  />{" "}
-                  more for create fee, initial buy, and gas.
-                </p>
-                <button
-                  type="button"
-                  onClick={openLaunchFundingModal}
-                  className="secondary-button mt-2 w-full py-2 text-caption"
-                >
-                  Add funds
-                </button>
-              </div>
-            ) : null}
-          </div>
-        </section>
-
-        <section className="panel-surface p-3 md:hidden">
-          <p className="section-label">Issuance summary</p>
-          <IssuanceSummaryRows
-            variant="mobile"
-            feeWei={feeWei}
-            initialBuyWei={initialBuyWei}
-            showReceivePreview={showReceivePreview}
-            estimatedTokens={estimatedTokens}
-            displaySymbol={displaySymbol}
-            logoPreview={logoPreview}
-            totalValue={totalValue}
-          />
-          {displayError ? <p className="notice-error mt-3 text-caption leading-snug">{displayError}</p> : null}
-          {txHash ? (
-            <p className="mt-3 field-hint break-all">
-              Tx: {txHash}
-              {isConfirming
-                ? " — confirming…"
-                : uploadStatus
-                  ? ` — ${uploadStatus}`
-                  : launchSuccess
-                    ? " — confirmed"
-                    : null}
-            </p>
-          ) : null}
-        </section>
-
-        <section className="panel-surface overflow-hidden">
+  const statusBlock = (
+    <>
+      {formSubmitPending && formStatusDetail ? (
+        <FormExecutionStatus phase={formSubmitPhase} detail={formStatusDetail} />
+      ) : null}
+      {displayError ? (
+        <div className="notice-error px-3 py-2 text-caption" role="alert">
+          {displayError}
+        </div>
+      ) : null}
+      {txHash ? (
+        <p className="field-hint break-all">
+          Tx: {txHash}
+          {isConfirming
+            ? " — confirming…"
+            : uploadStatus
+              ? ` — ${uploadStatus}`
+              : launchSuccess
+                ? " — confirmed"
+                : null}
+        </p>
+      ) : null}
+      {wrongChain ? (
+        <p className="field-hint text-pump-warning">Switch to Base Sepolia to launch.</p>
+      ) : null}
+      {needsBnbFunding && isConnected && !bnbBalanceLoading ? (
+        <div className="rounded-md border border-pump-warning/30 bg-pump-warning/10 px-2.5 py-2">
+          <p className="text-caption leading-snug text-pump-warning">
+            Need{" "}
+            <BnbAmountDisplay
+              amount={formatCampaignAmount(bnbShortfallWei)}
+              logoSize={14}
+              amountClassName="financial-value font-semibold tabular-nums text-pump-warning"
+              symbolClassName="text-caption font-medium text-pump-warning/90"
+            />{" "}
+            more for launch.
+          </p>
           <button
             type="button"
-            onClick={() => setSocialOpen((open) => !open)}
-            className="flex w-full items-center justify-between px-4 py-3.5 text-left transition hover:bg-pump-surface/40"
-            aria-expanded={socialOpen}
+            onClick={openLaunchFundingModal}
+            className="secondary-button mt-2 w-full py-2 text-caption"
           >
-            <span className="section-label">Social links (optional)</span>
-            <span className="text-caption text-pump-muted">{socialOpen ? "−" : "+"}</span>
+            Add funds
           </button>
-          {socialOpen ? (
-            <div className="space-y-4 border-t border-pump-border/15 px-4 pb-4 pt-4">
-              <div>
-                <label className="field-label" htmlFor="twitter">X (Twitter)</label>
-                <input
-                  id="twitter"
-                  type="url"
-                  maxLength={256}
-                  value={twitter}
-                  onChange={(e) => setTwitter(e.target.value)}
-                  placeholder="https://x.com/yourcoin"
-                  className="field-input"
-                />
-              </div>
-              <div>
-                <label className="field-label" htmlFor="website">Website</label>
-                <input
-                  id="website"
-                  type="url"
-                  maxLength={256}
-                  value={website}
-                  onChange={(e) => setWebsite(e.target.value)}
-                  placeholder="https://yourcoin.com"
-                  className="field-input"
-                />
-              </div>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <label className="field-label" htmlFor="telegram">Telegram</label>
-                  <input
-                    id="telegram"
-                    type="url"
-                    maxLength={256}
-                    value={telegram}
-                    onChange={(e) => setTelegram(e.target.value)}
-                    placeholder="https://t.me/yourcoin"
-                    className="field-input"
+        </div>
+      ) : null}
+    </>
+  );
+
+  return (
+    <>
+      <div className="airdrops-page airdrop-create-page airdrop-create-page--token">
+        <div className="airdrop-create-hub">
+          <div className="airdrop-create-body">
+            <form onSubmit={onSubmit} className="airdrop-create-form">
+              <section className="airdrop-create-step-panel">
+                <div className="airdrop-create-step-panel__body">
+                  <div className="token-create-sheet space-y-4">
+                    <p className="section-label">Token profile</p>
+
+                    <div className="token-create-identity">
+                      <div
+                        className={`token-create-identity__logo${fieldErrors.logo ? " field-group--error" : ""}`}
+                      >
+                        <TokenAvatar
+                          address="0x0000000000000000000000000000000000000000"
+                          symbol={displaySymbol}
+                          previewUrl={logoPreview}
+                          size={72}
+                        />
+                        <label htmlFor="logo" className="secondary-button cursor-pointer px-3 py-1.5 text-caption">
+                          Upload <span className="text-pump-accent">*</span>
+                        </label>
+                        <input
+                          id="logo"
+                          type="file"
+                          accept={LOGO_ACCEPT}
+                          onChange={onLogoChange}
+                          className="hidden"
+                          aria-invalid={fieldErrors.logo ? true : undefined}
+                        />
+                        <p className="field-hint text-center">PNG, JPEG, WebP or GIF · Max 2 MB</p>
+                        <FieldErrorMessage>{fieldErrors.logo}</FieldErrorMessage>
+                      </div>
+
+                      <div className="token-create-identity__fields min-w-0">
+                        <div className="token-create-field-grid">
+                          <div
+                            className={`token-create-field-cell${fieldErrors.name ? " field-group--error" : ""}`}
+                          >
+                            <label className="field-label" htmlFor="name">
+                              Coin name <span className="text-pump-accent">*</span>
+                            </label>
+                            <div className={`field-control${fieldErrors.name ? " field-control--error" : ""}`}>
+                              <input
+                                id="name"
+                                maxLength={64}
+                                value={name}
+                                onChange={(e) => setName(e.target.value)}
+                                placeholder="Moon Pepe"
+                                className={`field-input${fieldErrors.name ? " field-input--error" : ""}`}
+                                aria-invalid={fieldErrors.name ? true : undefined}
+                              />
+                              {fieldErrors.name ? <FieldErrorIcon /> : null}
+                            </div>
+                            <FieldErrorMessage>{fieldErrors.name}</FieldErrorMessage>
+                          </div>
+
+                          <div
+                            className={`token-create-field-cell${fieldErrors.symbol ? " field-group--error" : ""}`}
+                          >
+                            <label className="field-label" htmlFor="symbol">
+                              Ticker <span className="text-pump-accent">*</span>
+                            </label>
+                            <div className={`field-control${fieldErrors.symbol ? " field-control--error" : ""}`}>
+                              <input
+                                id="symbol"
+                                maxLength={16}
+                                value={symbol}
+                                onChange={(e) => setSymbol(e.target.value.toUpperCase())}
+                                placeholder="MPEPE"
+                                className={`field-input${fieldErrors.symbol ? " field-input--error" : ""}`}
+                                aria-invalid={fieldErrors.symbol ? true : undefined}
+                              />
+                              {fieldErrors.symbol ? <FieldErrorIcon /> : null}
+                            </div>
+                            <FieldErrorMessage>{fieldErrors.symbol}</FieldErrorMessage>
+                          </div>
+
+                          <div
+                            className={`token-create-field-cell${fieldErrors.initialBuy ? " field-group--error" : ""}`}
+                          >
+                            <label className="field-label inline-flex items-center gap-1" htmlFor="initialBuy">
+                              Initial buy
+                              <span className="font-normal text-pump-muted">(optional)</span>
+                              <InfoTip label="About initial buy">
+                                Seed liquidity at launch. Leave blank to pay only the create fee.
+                                {minInitialBuyWei > 0n
+                                  ? ` Minimum when used: ${minInitialBuyBnb} ${NATIVE_SYMBOL}.`
+                                  : null}
+                              </InfoTip>
+                            </label>
+                            <div
+                              className={`relative field-control${fieldErrors.initialBuy ? " field-control--error" : ""}`}
+                            >
+                              <div className="pointer-events-none absolute inset-y-0 left-3 z-[1] flex items-center">
+                                <BnbLogo size={20} />
+                              </div>
+                              <input
+                                id="initialBuy"
+                                inputMode="decimal"
+                                value={initialBuyBnb}
+                                onChange={(e) => onInitialBuyChange(e.target.value)}
+                                placeholder="0"
+                                className={`field-input financial-value w-full pl-11 pr-14${fieldErrors.initialBuy ? " field-input--error" : ""}`}
+                                aria-invalid={fieldErrors.initialBuy ? true : undefined}
+                              />
+                              <div className="pointer-events-none absolute inset-y-0 right-3 flex items-center">
+                                <span className="text-caption font-medium text-pump-muted">{NATIVE_SYMBOL}</span>
+                              </div>
+                              {fieldErrors.initialBuy ? <FieldErrorIcon /> : null}
+                            </div>
+                            <FieldErrorMessage>{fieldErrors.initialBuy}</FieldErrorMessage>
+                          </div>
+
+                          <TokenSocialLinksEditor
+                            links={socialLinks}
+                            open={socialOpen}
+                            onOpenChange={setSocialOpen}
+                            onToggle={toggleSocialLink}
+                            onChange={updateSocialLink}
+                            showFieldErrors={showFieldErrors}
+                          />
+                        </div>
+
+                        <div className="token-create-description">
+                          <label className="field-label" htmlFor="description">
+                            Description
+                          </label>
+                          <textarea
+                            id="description"
+                            maxLength={2000}
+                            rows={3}
+                            value={description}
+                            onChange={(e) => setDescription(e.target.value)}
+                            placeholder="What is this coin about?"
+                            className="field-textarea min-h-[5rem]"
+                          />
+                          <p className="mt-1 field-hint">{description.length}/2000</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {statusBlock}
+                  </div>
+                </div>
+              </section>
+
+              <div className="airdrop-create-form__actions">
+                <div className="token-create-actions__total min-w-0 flex-1">
+                  <p className="text-caption text-pump-muted">Total due</p>
+                  <BnbAmountDisplay
+                    amount={formatCampaignAmount(launchRequiredWei)}
+                    logoSize={16}
+                    amountClassName="financial-value text-body-sm font-semibold tabular-nums text-pump-text"
+                    symbolClassName="text-caption text-pump-muted"
                   />
                 </div>
-                <div>
-                  <label className="field-label" htmlFor="discord">Discord</label>
-                  <input
-                    id="discord"
-                    type="url"
-                    maxLength={256}
-                    value={discord}
-                    onChange={(e) => setDiscord(e.target.value)}
-                    placeholder="https://discord.gg/yourcoin"
-                    className="field-input"
-                  />
-                </div>
+                {submitButton}
               </div>
-            </div>
-          ) : null}
-        </section>
+            </form>
+          </div>
+        </div>
       </div>
 
-      <aside className="hidden space-y-4 md:block xl:sticky xl:top-[4.75rem]">
-        <section className="panel-surface overflow-hidden p-4 md:p-5">
-          <p className="section-label">Live preview</p>
-          <div className="mt-4 flex items-center gap-3">
-            <TokenAvatar
-              address="0x0000000000000000000000000000000000000000"
-              symbol={displaySymbol}
-              previewUrl={logoPreview}
-              size={56}
-            />
-            <div className="min-w-0">
-              <p className="card-title truncate">{displayName}</p>
-              <p className="financial-value text-caption text-pump-muted">${displaySymbol}</p>
-            </div>
-          </div>
-          {description.trim() ? (
-            <p className="mt-3 text-body-sm leading-relaxed text-pump-muted line-clamp-4">
-              {description.trim()}
-            </p>
-          ) : (
-            <p className="mt-3 field-hint">Description will appear on the token page.</p>
-          )}
-        </section>
-
-        <section className="panel-surface p-4 md:p-5">
-          <p className="section-label">Issuance summary</p>
-          <IssuanceSummaryRows
-            feeWei={feeWei}
-            initialBuyWei={initialBuyWei}
-            showReceivePreview={showReceivePreview}
-            estimatedTokens={estimatedTokens}
-            displaySymbol={displaySymbol}
-            logoPreview={logoPreview}
-            totalValue={totalValue}
-          />
-
-          {displayError ? (
-            <div className="notice-error mt-4 px-3 py-2 text-caption" role="alert">
-              {displayError}
-            </div>
-          ) : null}
-
-          {txHash ? (
-            <p className="mt-4 field-hint break-all">
-              Tx: {txHash}
-              {isConfirming
-                ? " — confirming"
-                : uploadStatus
-                  ? ` — ${uploadStatus}`
-                  : launchSuccess
-                    ? " — confirmed"
-                    : null}
-            </p>
-          ) : null}
-
-          <div className="form-action-zone mt-4 -mx-4 px-4 md:-mx-5 md:px-5">
-            {formSubmitPending && formStatusDetail ? (
-              <FormExecutionStatus phase={formSubmitPhase} detail={formStatusDetail} />
-            ) : null}
-            <button
-              type="submit"
-              disabled={submitDisabled}
-              aria-busy={formSubmitPending}
-              className={`primary-button w-full${formSubmitPending ? " form-submit-button--loading" : ""}`}
-            >
-              {formSubmitPending ? (
-                <>
-                  <span className="trade-submit-spinner" aria-hidden />
-                  <span>{submitLabel}</span>
-                </>
-              ) : (
-                submitLabel
-              )}
-            </button>
-          </div>
-
-          {wrongChain ? (
-            <p className="mt-3 field-hint text-pump-warning">Switch to Base Sepolia to launch.</p>
-          ) : null}
-        </section>
-      </aside>
       <TokenLaunchSuccessModal
         open={launchSuccess !== null}
         tokenAddress={launchSuccess?.tokenAddress ?? ""}
@@ -1018,48 +812,6 @@ export function CreateMemeForm() {
         onViewToken={goToTokenPage}
         onDismiss={() => setLaunchSuccess(null)}
       />
-
-      <div className="create-mobile-dock md:hidden">
-        {displayError ? <p className="notice-error mb-2 text-caption leading-snug">{displayError}</p> : null}
-        <div className="flex items-center gap-3">
-          <TokenAvatar
-            address="0x0000000000000000000000000000000000000000"
-            symbol={displaySymbol}
-            previewUrl={logoPreview}
-            size={36}
-            className="shrink-0"
-          />
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-caption font-semibold text-pump-text">{displayName}</p>
-            <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5">
-              <span className="text-caption text-pump-muted">Total</span>
-              <BnbAmountDisplay
-                amount={formatCampaignAmount(totalValue)}
-                logoSize={14}
-                amountClassName="financial-value text-caption font-semibold tabular-nums text-pump-text"
-                symbolClassName="text-caption text-pump-muted"
-              />
-            </div>
-          </div>
-          <button
-            type="submit"
-            disabled={submitDisabled}
-            className="primary-button min-h-11 shrink-0 px-4 text-caption"
-          >
-            {isBusy
-              ? formSubmitPhase === "submitting"
-                ? "Processing"
-                : "Confirming"
-              : !isConnected
-                ? "Connect"
-                : wrongChain
-                  ? "Switch net"
-                  : needsBnbFunding
-                    ? `Add ${NATIVE_SYMBOL}`
-                    : "Launch"}
-          </button>
-        </div>
-      </div>
-    </form>
+    </>
   );
 }

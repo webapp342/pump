@@ -136,13 +136,21 @@ export function PortfolioSummaryStrip({
         <p className="portfolio-summary-strip__label">Top Holding</p>
         {topHolding ? (
           <p className="portfolio-summary-strip__metric-row">
-            <HoldingChip holding={topHolding} />
-            <ValueWithPnl
-              valueUsd={topHolding.valueUsd}
-              pnlUsd={showTopPnl ? topHolding.pnlUsd! : undefined}
-              pnlPct={showTopPnl ? topHolding.pnlPct : undefined}
-              guestMode={guestMode}
-            />
+            <span className="portfolio-summary-strip__value-stack">
+              <span className="portfolio-summary-strip__amount-row">
+                {guestMode || topHolding.valueUsd == null ? (
+                  <span className="portfolio-summary-strip__amount">—</span>
+                ) : (
+                  <span className="portfolio-summary-strip__amount financial-value">
+                    {formatPortfolioHoldingValueUsd(topHolding.valueUsd)}
+                  </span>
+                )}
+                <HoldingChip holding={topHolding} />
+              </span>
+              {showTopPnl ? (
+                <PnlInline usd={topHolding.pnlUsd!} pct={topHolding.pnlPct} />
+              ) : null}
+            </span>
             {topHolding.isNative ? (
               <span className="portfolio-summary-strip__meta">Native balance</span>
             ) : null}

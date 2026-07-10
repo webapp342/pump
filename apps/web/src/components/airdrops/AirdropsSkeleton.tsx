@@ -90,26 +90,27 @@ export function AirdropDetailSkeleton() {
     <div className="airdrops-page airdrop-detail-page" aria-busy="true" aria-label="Loading airdrop">
       <div className="airdrop-detail-hub">
         <div className="airdrop-detail-toolbar-band">
-          <Skeleton variant="line" className="mx-3 my-2 h-4 w-14" />
-          <div className="token-detail-toolbar airdrop-detail-toolbar">
-            <div className="token-detail-toolbar__row">
-              <div className="token-detail-toolbar__identity">
-                <Skeleton className="h-5 w-5 shrink-0 rounded-sm" />
-                <Skeleton className="h-7 w-7 shrink-0 rounded-md" />
-                <div className="min-w-0 flex-1 space-y-1.5">
-                  <Skeleton className="h-4 w-36 max-w-full" />
-                  <Skeleton variant="line" className="h-3 w-24" />
-                </div>
-              </div>
+          <div className="airdrop-detail-topbar">
+            <Skeleton variant="line" className="h-4 w-14" />
+            <div className="airdrop-detail-toolbar__actions">
+              <Skeleton className="h-5 w-5 shrink-0 rounded-sm" />
               <Skeleton className="h-6 w-16 shrink-0 rounded-md" />
             </div>
-            <div className="mt-2 flex gap-3 border-t border-pump-border/10 pt-2 md:mt-0 md:gap-4 md:border-t-0 md:pt-0">
-              {Array.from({ length: 3 }).map((_, index) => (
-                <div key={index} className="space-y-1">
-                  <Skeleton variant="line" className="h-2.5 w-12" />
-                  <Skeleton className="h-4 w-16" />
+          </div>
+          <div className="token-detail-toolbar airdrop-detail-toolbar">
+            <div className="token-detail-toolbar__row airdrop-detail-toolbar__main-row">
+              <div className="token-detail-toolbar__identity">
+                <Skeleton className="h-7 w-7 shrink-0 rounded-md" />
+                <div className="min-w-0 flex-1">
+                  <Skeleton className="h-4 w-36 max-w-full" />
                 </div>
-              ))}
+              </div>
+              <div className="airdrop-detail-toolbar__stats-slot">
+                <div className="flex gap-2">
+                  <Skeleton className="h-4 w-12" />
+                  <Skeleton className="h-4 w-6" />
+                </div>
+              </div>
             </div>
           </div>
         </div>

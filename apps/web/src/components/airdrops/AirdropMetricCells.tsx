@@ -44,7 +44,8 @@ export function AirdropRewardPoolMetric({
   totalFunded,
   bnbUsd,
   showIcon = true,
-}: RewardPoolMetricProps) {
+  usdPrimary = false,
+}: RewardPoolMetricProps & { usdPrimary?: boolean }) {
   const isBnb = !rewardToken;
   const usd = airdropRewardUsd(
     { rewardToken, rewardSymbol, rewardPriceBnb, totalFunded },
@@ -52,11 +53,16 @@ export function AirdropRewardPoolMetric({
   );
   const amountLabel = formatAirdropReward(totalFunded, { isBnb, symbol: rewardSymbol });
 
+  const primaryLabel =
+    usdPrimary && usd != null ? formatUsdReadable(usd, { compact: true }) : amountLabel;
+  const secondaryLabel =
+    usdPrimary && usd != null ? amountLabel : usd != null ? formatUsdReadable(usd, { compact: true }) : null;
+
   return (
     <MetricValueStack
       primary={
         <div className="flex min-w-0 items-center gap-1.5">
-          {showIcon ? (
+          {showIcon && !usdPrimary ? (
             isBnb ? (
               <BnbLogo size={16} className="shrink-0" />
             ) : (
@@ -69,8 +75,8 @@ export function AirdropRewardPoolMetric({
             )
           ) : null}
           <span className="financial-value min-w-0 truncate text-caption font-semibold tabular-nums text-pump-text">
-            {amountLabel}
-            {usd != null ? (
+            {primaryLabel}
+            {!usdPrimary && usd != null ? (
               <span className="font-medium text-pump-muted">
                 {" "}
                 · {formatUsdReadable(usd, { compact: true })}
@@ -78,6 +84,11 @@ export function AirdropRewardPoolMetric({
             ) : null}
           </span>
         </div>
+      }
+      secondary={
+        secondaryLabel ? (
+          <span className="financial-value truncate text-caption text-pump-muted">{secondaryLabel}</span>
+        ) : undefined
       }
     />
   );

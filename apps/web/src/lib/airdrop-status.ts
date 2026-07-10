@@ -77,14 +77,14 @@ const statusBadgeBase =
 export function airdropStatusBadgeClass(status: AirdropDisplayStatus): string {
   switch (status) {
     case "UPCOMING":
-      return `${statusBadgeBase} border border-pump-border/25 bg-pump-surface/65 text-pump-muted`;
+      return `${statusBadgeBase} border border-pump-accent/30 bg-pump-accent/10 text-pump-accent`;
     case "QUALIFYING":
-      return `${statusBadgeBase} border border-pump-accent/35 bg-pump-accent/15 text-pump-accent`;
+      return `${statusBadgeBase} border border-pump-success/35 bg-pump-success/12 text-pump-success`;
     case "FINALIZING":
       return `${statusBadgeBase} border border-pump-warning/35 bg-pump-warning/15 text-pump-warning`;
     case "CLAIMABLE":
-      return `${statusBadgeBase} border border-pump-success/35 bg-pump-success/15 text-pump-success`;
+      return `${statusBadgeBase} border border-pump-success/40 bg-pump-success/18 text-pump-success`;
     case "CLOSED":
-      return `${statusBadgeBase} border border-pump-border/20 bg-pump-surface/50 text-pump-muted opacity-80`;
+      return `${statusBadgeBase} border border-pump-border/25 bg-pump-surface/55 text-pump-muted`;
   }
 }

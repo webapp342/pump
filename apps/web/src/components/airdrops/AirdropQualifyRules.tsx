@@ -1,5 +1,7 @@
 "use client";
 
+import { InfoTip } from "@/components/ui/InfoTip";
+import { FieldErrorIcon, FieldErrorMessage } from "@/components/ui/FieldError";
 import type { TokenListItem } from "@/lib/db/launchpad";
 import { NATIVE_SYMBOL } from "@/config/chain";
 import { BnbLogo } from "@/components/token/BnbLogo";
@@ -48,6 +50,14 @@ type AirdropQualifyRulesEditorProps = {
   minBuyBnb: string;
   onMinHoldChange: (value: string) => void;
   onMinBuyChange: (value: string) => void;
+  /** When provided, min buy is edited in USD (BNB still stored via onMinBuyChange). */
+  minBuyUsdInput?: string | null;
+  onMinBuyUsdChange?: (value: string) => void;
+  minBuyAssetHint?: string | null;
+  holdUsdHint?: string | null;
+  error?: string | null;
+  holdError?: string | null;
+  buyError?: string | null;
 };
 
 export function AirdropQualifyRulesEditor({
@@ -56,74 +66,108 @@ export function AirdropQualifyRulesEditor({
   minBuyBnb,
   onMinHoldChange,
   onMinBuyChange,
+  minBuyUsdInput = null,
+  onMinBuyUsdChange,
+  minBuyAssetHint = null,
+  holdUsdHint = null,
+  error = null,
+  holdError = null,
+  buyError = null,
 }: AirdropQualifyRulesEditorProps) {
   const symbol = linkedToken?.symbol ?? "TOKEN";
-  const name = linkedToken?.name ?? "pool token";
+  const holdInvalid = Boolean(holdError);
+  const buyInvalid = Boolean(buyError);
+  const groupError = Boolean(error) && !holdInvalid && !buyInvalid;
+  const buyInUsd = minBuyUsdInput != null && onMinBuyUsdChange != null;
 
   return (
-    <div className="mt-4 space-y-3">
-      <div className="rounded-md border border-pump-border/15 bg-pump-surface/35 p-3">
-        <div className="flex gap-3">
-          <PoolTokenAvatar token={linkedToken} size={40} />
-          <div className="min-w-0 flex-1">
-            <p className="text-body-sm text-pump-text">
-              Hold at least{" "}
-              <span className="font-semibold text-pump-accent">${symbol}</span>
-            </p>
-            <p className="mt-0.5 text-caption text-pump-muted truncate">{name}</p>
+    <div className="space-y-4">
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className={holdInvalid || groupError ? "field-group--error" : undefined}>
+          <label className="field-label inline-flex items-center gap-1" htmlFor="minHold">
+            Min hold · {symbol}
+            <InfoTip label="About min hold">
+              Minimum {symbol} balance in wallet when qualification ends.
+            </InfoTip>
+          </label>
+          <div
+            className={`field-control mt-1${holdInvalid || groupError ? " field-control--error" : ""}`}
+          >
             <input
               id="minHold"
               inputMode="decimal"
-              className="field-input financial-value mt-2"
+              className={`field-input financial-value${
+                holdInvalid || groupError ? " field-input--error" : ""
+              }`}
               value={minHoldTokens}
               onChange={(e) => onMinHoldChange(e.target.value)}
               placeholder="e.g. 1000"
+              aria-invalid={holdInvalid || groupError || undefined}
             />
-            <p className="mt-1 field-hint">
-              Minimum {symbol} balance in wallet when qualification ends.
-            </p>
+            {holdInvalid || groupError ? <FieldErrorIcon /> : null}
           </div>
+          {holdUsdHint && !holdError ? (
+            <p className="mt-1 field-hint airdrop-create-field-meta">
+              ≈ <span className="financial-value text-pump-text">{holdUsdHint}</span>
+            </p>
+          ) : null}
+          <FieldErrorMessage>{holdError}</FieldErrorMessage>
         </div>
-      </div>
 
-      <div className="rounded-md border border-pump-border/15 bg-pump-surface/35 p-3">
-        <div className="flex gap-3">
-          <PoolTokenAvatar token={linkedToken} size={40} />
-          <div className="min-w-0 flex-1">
-            <p className="text-body-sm text-pump-text">
-              Buy at least{" "}
-              <span className="font-semibold text-pump-accent">{NATIVE_SYMBOL}</span>
-              {" of "}
-              <span className="font-semibold text-pump-accent">${symbol}</span>
-            </p>
-            <p className="mt-0.5 text-caption text-pump-muted">
-              During the qualify window on the bonding curve
-            </p>
-            <div className="relative mt-2">
-              <div className="pointer-events-none absolute inset-y-0 left-3 flex items-center">
+        <div className={buyInvalid || groupError ? "field-group--error" : undefined}>
+          <label className="field-label inline-flex items-center gap-1" htmlFor="minBuy">
+            Min buy · {buyInUsd ? "USD" : NATIVE_SYMBOL}
+            <InfoTip label="About min buy volume">
+              Total buy volume required to qualify during this campaign window (fees excluded).
+            </InfoTip>
+          </label>
+          <div
+            className={`relative mt-1 field-control${
+              buyInvalid || groupError
+                ? " field-control--error field-control--error-with-suffix"
+                : ""
+            }`}
+          >
+            {!buyInUsd ? (
+              <div className="pointer-events-none absolute inset-y-0 left-3 z-[1] flex items-center">
                 <BnbLogo size={18} />
               </div>
-              <input
-                id="minBuy"
-                inputMode="decimal"
-                className="field-input financial-value pl-10 pr-14"
-                value={minBuyBnb}
-                onChange={(e) => onMinBuyChange(e.target.value)}
-                placeholder="0.01"
-              />
-              <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-caption font-medium text-pump-muted">
-                {NATIVE_SYMBOL}
+            ) : (
+              <span className="pointer-events-none absolute inset-y-0 left-3 z-[1] flex items-center text-caption font-medium text-pump-muted">
+                $
               </span>
-            </div>
-            <p className="mt-1 field-hint">
-              Total buy volume required to qualify (fees excluded).
-            </p>
+            )}
+            <input
+              id="minBuy"
+              inputMode="decimal"
+              className={`field-input financial-value pr-14${
+                buyInUsd ? " pl-7" : " pl-10"
+              }${buyInvalid || groupError ? " field-input--error" : ""}`}
+              value={buyInUsd ? minBuyUsdInput : minBuyBnb}
+              onChange={(e) =>
+                buyInUsd ? onMinBuyUsdChange(e.target.value) : onMinBuyChange(e.target.value)
+              }
+              placeholder={buyInUsd ? "0.00" : "0.01"}
+              aria-invalid={buyInvalid || groupError || undefined}
+            />
+            <span className="pointer-events-none absolute right-3 top-1/2 z-[1] -translate-y-1/2 text-caption font-medium text-pump-muted">
+              {buyInUsd ? "USD" : NATIVE_SYMBOL}
+            </span>
+            {buyInvalid || groupError ? <FieldErrorIcon /> : null}
           </div>
+          {minBuyAssetHint && !buyError ? (
+            <p className="mt-1 field-hint airdrop-create-field-meta airdrop-create-field-meta--end">
+              ≈ <span className="financial-value text-pump-text">{minBuyAssetHint}</span>
+            </p>
+          ) : null}
+          <FieldErrorMessage>{buyError}</FieldErrorMessage>
         </div>
       </div>
 
+      <FieldErrorMessage>{error}</FieldErrorMessage>
+
       {!linkedToken ? (
-        <p className="text-caption text-pump-warning">Select a pool token above to name these rules.</p>
+        <p className="text-caption text-pump-muted">Select a pool token to name these rules.</p>
       ) : null}
     </div>
   );
@@ -133,12 +177,16 @@ type AirdropQualifyRulesPreviewProps = {
   linkedToken: TokenListItem | null;
   minHoldTokens: string;
   minBuyBnb: string;
+  minBuyUsdLabel?: string | null;
+  holdUsdLabel?: string | null;
 };
 
 export function AirdropQualifyRulesPreview({
   linkedToken,
   minHoldTokens,
   minBuyBnb,
+  minBuyUsdLabel = null,
+  holdUsdLabel = null,
 }: AirdropQualifyRulesPreviewProps) {
   const hasHold = minHoldTokens.trim().length > 0;
   const hasBuy = minBuyBnb.trim().length > 0;
@@ -154,14 +202,18 @@ export function AirdropQualifyRulesPreview({
         {hasHold ? (
           <>
             Hold ≥ {formatHoldAmount(minHoldTokens)}{" "}
-            <span className="font-medium text-pump-accent">${symbol}</span>
+            <span className="font-medium text-pump-accent">{symbol}</span>
+            {holdUsdLabel ? (
+              <span className="text-pump-muted"> ({holdUsdLabel})</span>
+            ) : null}
           </>
         ) : null}
         {hasHold && hasBuy ? <span className="text-pump-muted"> · </span> : null}
         {hasBuy ? (
           <>
-            Buy ≥ {minBuyBnb} {NATIVE_SYMBOL} <span className="text-pump-muted">of</span>{" "}
-            <span className="font-medium text-pump-accent">${symbol}</span>
+            Buy ≥ {minBuyUsdLabel ?? `${minBuyBnb} ${NATIVE_SYMBOL}`}{" "}
+            <span className="text-pump-muted">of</span>{" "}
+            <span className="font-medium text-pump-accent">{symbol}</span>
           </>
         ) : null}
       </p>

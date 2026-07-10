@@ -2,11 +2,9 @@
 
 import Link from "next/link";
 import { HourglassIcon } from "@/components/ui/HourglassIcon";
+import { InfoTip } from "@/components/ui/InfoTip";
 import { PageBackLink } from "@/components/ui/PageBackLink";
 import {
-  AirdropParticipantsMetric,
-  AirdropProgressMetric,
-  AirdropRewardPoolMetric,
   airdropDetailRewardProps,
 } from "@/components/airdrops/AirdropMetricCells";
 import { AirdropTrustBadge } from "@/components/airdrops/AirdropTrustBadge";
@@ -32,7 +30,8 @@ import {
 } from "@/lib/airdrop-status";
 import {
   airdropRewardAmountUsd,
-  airdropTimelineProgress,
+  airdropRewardUsd,
+  formatAirdropReward,
   formatAirdropRewardCompact,
   formatDurationUntil,
   formatTimeRemaining,
@@ -57,8 +56,8 @@ import {
   buildTokenTradeUrl,
   remainingRuleAmount,
 } from "@/lib/token-trade-prefill";
-import { useAirdropSaves } from "@/components/airdrops/AirdropSavesProvider";
-import { PumpIcon, faBookmarkRegular, faBookmarkSolid } from "@/lib/icons";
+import { AirdropSaveButton } from "@/components/airdrops/AirdropSaveButton";
+import { PumpIcon } from "@/lib/icons";
 import { MetricIcons } from "@/lib/metric-icons";
 
 function formatAmount(value: string): string {
@@ -108,14 +107,14 @@ function UpcomingTasksLockedNotice({
     <section className="airdrop-detail-section airdrop-detail-section--locked">
       <SectionHeader
         title="Tasks locked"
-        hint="Social and on-chain steps open when qualification begins."
+        hint="Social and on-chain steps unlock when qualification begins."
       />
       <div className="airdrop-detail-section__body">
-        <p className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-body-sm text-pump-muted">
-          <HourglassIcon size={14} className="shrink-0" />
+        <p className="airdrop-detail-countdown" role="status" aria-live="polite">
+          <HourglassIcon size={14} className="shrink-0 text-pump-accent" aria-hidden />
           <span>
             Opens in{" "}
-            <span className="font-medium tabular-nums text-pump-text" aria-live="polite">
+            <span className="financial-value font-semibold tabular-nums text-pump-text">
               {nowTick >= 0 ? formatDurationUntil(qualifyStart) : "—"}
             </span>
           </span>
@@ -125,12 +124,77 @@ function UpcomingTasksLockedNotice({
   );
 }
 
+function AirdropDetailStatusStrip({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="airdrop-detail-status-strip" role="status">
+      {children}
+    </div>
+  );
+}
+
+function AirdropToolbarStats({
+  poolLabel,
+  timeLabel,
+  participantCount,
+  showTime,
+}: {
+  poolLabel: string;
+  timeLabel: string;
+  participantCount: number;
+  showTime: boolean;
+}) {
+  return (
+    <div className="airdrop-toolbar-stats" role="list" aria-label="Campaign stats">
+      <div className="airdrop-toolbar-stats__item" role="listitem" title="Reward pool">
+        <PumpIcon icon={MetricIcons.rewardPool} className="airdrop-toolbar-stats__icon" aria-hidden />
+        <span className="airdrop-toolbar-stats__value financial-value tabular-nums">{poolLabel}</span>
+      </div>
+      {showTime ? (
+        <div className="airdrop-toolbar-stats__item" role="listitem" title="Time remaining">
+          <PumpIcon icon={MetricIcons.progress} className="airdrop-toolbar-stats__icon" aria-hidden />
+          <span className="airdrop-toolbar-stats__value financial-value tabular-nums">{timeLabel}</span>
+        </div>
+      ) : null}
+      <div
+        className="airdrop-toolbar-stats__item"
+        role="listitem"
+        title="Participants"
+        aria-label={`Participants: ${participantCount.toLocaleString()}`}
+      >
+        <PumpIcon icon={MetricIcons.participants} className="airdrop-toolbar-stats__icon" aria-hidden />
+        <span className="airdrop-toolbar-stats__value financial-value tabular-nums">
+          {participantCount.toLocaleString()}
+        </span>
+      </div>
+    </div>
+  );
+}
+
 function SectionHeader({ title, hint }: { title: string; hint?: string }) {
   return (
     <header className="airdrop-detail-section__head">
-      <p className="airdrop-detail-section__title">{title}</p>
+      <h2 className="airdrop-detail-section__title">{title}</h2>
       {hint ? <p className="airdrop-detail-section__hint">{hint}</p> : null}
     </header>
+  );
+}
+
+function LeaderboardEmptyState({ ended }: { ended: boolean }) {
+  return (
+    <div className="airdrop-detail-empty" role="status">
+      <p className="airdrop-detail-empty__title">
+        {ended ? "No one ranked" : "Waiting for participants"}
+      </p>
+      <p className="airdrop-detail-empty__hint">
+        {ended
+          ? "This campaign ended without qualifiers on the leaderboard."
+          : "Hold or buy the pool token during qualify to appear here. Projected rewards update live."}
+      </p>
+    </div>
   );
 }
 
@@ -209,7 +273,8 @@ function RuleProgressRow({
   tokenAddress,
   buyMode,
   returnTo,
-  footnote,
+  tooltip,
+  tooltipLabel = "About this requirement",
 }: {
   label: ReactNode;
   rule: { current: string; target: string; met: boolean };
@@ -217,15 +282,9 @@ function RuleProgressRow({
   tokenAddress: string;
   buyMode: "bnb" | "token";
   returnTo?: string;
-  footnote?: string;
+  tooltip?: ReactNode;
+  tooltipLabel?: string;
 }) {
-  const pct =
-    Number(rule.target) > 0
-      ? Math.min(100, (Number(rule.current) / Number(rule.target)) * 100)
-      : rule.met
-        ? 100
-        : 0;
-
   const href = buildTokenTradeUrl(tokenAddress, {
     buyMode,
     amount: rule.met ? undefined : remainingRuleAmount(rule.current, rule.target),
@@ -235,33 +294,39 @@ function RuleProgressRow({
 
   return (
     <li>
-      <Link
-        href={href}
-        className={`block rounded-md p-3 transition ${
-          rule.met
-            ? "bg-pump-accent/5 hover:bg-pump-accent/8"
-            : "bg-pump-surface/35 hover:bg-pump-surface/50"
+      <div
+        className={`airdrop-detail-task-row airdrop-detail-task-row--onchain${
+          rule.met ? " airdrop-detail-task-row--done" : ""
         }`}
       >
-        <div className="flex items-center justify-between gap-2">
-          <p className="text-body-sm font-medium text-pump-text">{label}</p>
-          <span
-            className={`status-badge shrink-0 ${rule.met ? "border-pump-accent/30 bg-pump-accent/10 text-pump-accent" : ""}`}
-          >
-            {rule.met ? "Met" : "In progress"}
+        <div className="airdrop-detail-onchain-task min-w-0">
+          <div className="airdrop-detail-onchain-task__title-row">
+            <span className="airdrop-detail-onchain-task__label text-body-sm font-medium text-pump-text">
+              {label}
+            </span>
+            {tooltip ? (
+              <InfoTip label={tooltipLabel} className="airdrop-detail-onchain-task__info shrink-0">
+                {tooltip}
+              </InfoTip>
+            ) : null}
+          </div>
+          <span className="financial-value text-caption text-pump-muted">
+            {formatAmount(rule.current)} / {formatAmount(rule.target)} {unit}
           </span>
         </div>
-        <p className="mt-1 text-caption text-pump-muted">
-          {formatAmount(rule.current)} / {formatAmount(rule.target)} {unit}
-        </p>
-        {footnote ? <p className="mt-1 text-caption text-pump-muted/90">{footnote}</p> : null}
-        <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-pump-surface/70">
-          <div
-            className={`h-full rounded-full transition-all duration-300 ${rule.met ? "bg-pump-accent" : "bg-pump-accent/70"}`}
-            style={{ width: `${pct}%` }}
-          />
+        <div className="airdrop-detail-task-row__action">
+          {rule.met ? (
+            <span className="airdrop-detail-task-status airdrop-detail-task-status--done">Met</span>
+          ) : (
+            <Link
+              href={href}
+              className="chip-button inline-flex shrink-0 items-center whitespace-nowrap px-2.5 py-1 text-caption"
+            >
+              Trade
+            </Link>
+          )}
         </div>
-      </Link>
+      </div>
     </li>
   );
 }
@@ -283,19 +348,21 @@ function SocialTaskRow({
     <li>
       <div
         className={`airdrop-detail-task-row ${
-          done ? "airdrop-detail-task-row--done" : ""
+          done ? "airdrop-detail-task-row--done" : qualifyEnded ? "airdrop-detail-task-row--ended" : ""
         }`}
       >
-        <span className="min-w-0 truncate text-body-sm font-semibold text-pump-text">
+        <span className="min-w-0 truncate text-body-sm font-medium text-pump-text">
           {socialTaskPreviewLabel(task.taskType, task.targetUrl)}
         </span>
         {done ? (
-          <span className="status-badge shrink-0 text-pump-muted">Done</span>
+          <span className="airdrop-detail-task-status airdrop-detail-task-status--done">Done</span>
+        ) : qualifyEnded ? (
+          <span className="airdrop-detail-task-status">Ended</span>
         ) : (
           <button
             type="button"
-            className="chip-button flex shrink-0 items-center gap-1.5 whitespace-nowrap px-2.5 py-1 text-caption disabled:opacity-50"
-            disabled={qualifyEnded || completing}
+            className="chip-button flex shrink-0 items-center gap-1.5 whitespace-nowrap px-2.5 py-1 text-caption"
+            disabled={completing}
             onClick={onComplete}
           >
             {completing ? (
@@ -304,7 +371,7 @@ function SocialTaskRow({
                 aria-hidden
               />
             ) : null}
-            {completing ? "Saving…" : qualifyEnded ? "Closed" : socialTaskActionLabel(task.taskType)}
+            {completing ? "Saving…" : socialTaskActionLabel(task.taskType)}
           </button>
         )}
       </div>
@@ -510,6 +577,8 @@ const LEADERBOARD_GRID_COLS =
 const LEADERBOARD_ROW_GRID = `grid ${LEADERBOARD_GRID_COLS} items-center gap-x-4 px-3 py-2 text-caption`;
 
 const PREVIEW_RANKS = Array.from({ length: 100 }, (_, index) => index + 1);
+/** During qualify, only preview this many open slots so the board stays scannable. */
+const LIVE_OPEN_SLOT_CAP = 20;
 
 function CreatorBadge() {
   return (
@@ -539,13 +608,11 @@ function LeaderboardHeldHead({
 function LeaderboardWalletCell({
   walletAddress,
   creatorAddress,
-  claimed,
   onWalletClick,
   compact = false,
 }: {
   walletAddress: string;
   creatorAddress: string;
-  claimed?: boolean;
   onWalletClick?: (address: string) => void;
   compact?: boolean;
 }) {
@@ -567,7 +634,6 @@ function LeaderboardWalletCell({
           <span className="font-medium text-pump-text">
             <UserDisplayName address={walletAddress} compact={compact} />
           </span>
-          {claimed ? <span className="text-caption text-pump-accent">✓</span> : null}
           {isCreator ? <CreatorBadge /> : null}
         </span>
       </span>
@@ -581,6 +647,7 @@ function LiveLeaderboardTable({
   bnbUsd,
   address,
   onWalletClick,
+  campaignEnded = false,
   className = "",
 }: {
   rows: LeaderboardRow[];
@@ -588,6 +655,7 @@ function LiveLeaderboardTable({
   bnbUsd: number | null;
   address?: string;
   onWalletClick?: (walletAddress: string) => void;
+  campaignEnded?: boolean;
   className?: string;
 }) {
   const symbol = poolSymbol(detail);
@@ -598,6 +666,17 @@ function LiveLeaderboardTable({
     totalFunded: detail.totalFunded,
   };
   const rowByRank = new Map(rows.map((row) => [row.rank, row]));
+
+  if (campaignEnded && rows.length === 0) {
+    return <LeaderboardEmptyState ended />;
+  }
+
+  const maxRank = campaignEnded
+    ? Math.max(...rows.map((row) => row.rank), 0)
+    : Math.max(LIVE_OPEN_SLOT_CAP, ...rows.map((row) => row.rank), 0);
+  const ranks = campaignEnded
+    ? rows.map((row) => row.rank).sort((a, b) => a - b)
+    : PREVIEW_RANKS.filter((rank) => rank <= maxRank);
 
   function rewardForRank(rank: number) {
     const amount = projectedRankRewardAmount(detail.totalFunded, rank);
@@ -625,6 +704,10 @@ function LiveLeaderboardTable({
     };
   }
 
+  if (ranks.length === 0) {
+    return <LeaderboardEmptyState ended={campaignEnded} />;
+  }
+
   return (
     <div className={className}>
       <div
@@ -635,7 +718,7 @@ function LiveLeaderboardTable({
         <span className="flex items-center justify-end">
           <LeaderboardHeldHead linkedToken={detail.linkedToken} symbol={symbol} />
         </span>
-        <span className="text-right">Est. reward</span>
+        <span className="text-right">{campaignEnded ? "Reward" : "Est. reward"}</span>
       </div>
 
       <div className="airdrop-leaderboard-head sm:hidden" aria-hidden>
@@ -650,7 +733,7 @@ function LiveLeaderboardTable({
       </div>
 
       <ul className="divide-y divide-pump-border/10">
-        {PREVIEW_RANKS.map((rank) => {
+        {ranks.map((rank) => {
           const row = rowByRank.get(rank);
           const reward = rewardForRank(rank);
           const isYou = row && address && row.address.toLowerCase() === address.toLowerCase();
@@ -695,15 +778,17 @@ function LiveLeaderboardTable({
             );
           }
 
+          if (campaignEnded) return null;
+
           return (
             <li key={`open-${rank}`} className="text-pump-muted/90">
               <div className="airdrop-leaderboard-row sm:hidden">
                 <span className="airdrop-leaderboard-row__rank">{rank}</span>
-                <span className="airdrop-leaderboard-row__open">Open slot</span>
+                <span className="airdrop-leaderboard-row__open">Open</span>
                 <span className="airdrop-leaderboard-row__metric airdrop-leaderboard-row__held airdrop-leaderboard-row__metric--muted">
                   —
                 </span>
-                <div className="airdrop-leaderboard-row__metric airdrop-leaderboard-row__reward">
+                <div className="airdrop-leaderboard-row__metric airdrop-leaderboard-row__reward airdrop-leaderboard-row__reward--projected">
                   <RewardCell {...rewardCellProps(reward)} />
                 </div>
               </div>
@@ -712,9 +797,11 @@ function LiveLeaderboardTable({
                 <span className="financial-value font-semibold tabular-nums text-pump-muted">
                   {rank}
                 </span>
-                <span className="min-w-0 truncate italic text-pump-muted">Open slot</span>
+                <span className="min-w-0 truncate text-pump-muted">Open</span>
                 <HoldCell {...holdCellProps(null)} />
-                <RewardCell {...rewardCellProps(reward)} />
+                <div className="airdrop-leaderboard-row__reward--projected">
+                  <RewardCell {...rewardCellProps(reward)} />
+                </div>
               </div>
             </li>
           );
@@ -778,7 +865,6 @@ function WinnersTable({
                   <LeaderboardWalletCell
                     walletAddress={row.address}
                     creatorAddress={detail.creatorAddress}
-                    claimed={row.claimed}
                     onWalletClick={onWalletClick}
                     compact
                   />
@@ -799,7 +885,6 @@ function WinnersTable({
                 <LeaderboardWalletCell
                   walletAddress={row.address}
                   creatorAddress={detail.creatorAddress}
-                  claimed={row.claimed}
                   onWalletClick={onWalletClick}
                 />
                 <RewardCell amount={rewardCompact} usd={rewardUsd} detail={detail} compact />
@@ -841,7 +926,7 @@ function OnchainRequirementsContent({
   return (
     <>
       {!qualifyStarted ? (
-        <p className="flex flex-wrap items-center gap-x-1.5 text-body-sm text-pump-muted">
+        <p className="airdrop-detail-section__body flex flex-wrap items-center gap-x-1.5 text-body-sm text-pump-muted">
           <HourglassIcon size={14} />
           <span>
             On-chain tracking opens in{" "}
@@ -852,29 +937,29 @@ function OnchainRequirementsContent({
           </span>
         </p>
       ) : !isConnected ? (
-        <button type="button" className="primary-button w-full sm:w-auto" onClick={onConnect}>
-          Connect wallet
-        </button>
+        <div className="airdrop-detail-section__body">
+          <button type="button" className="primary-button w-full sm:w-auto" onClick={onConnect}>
+            Connect wallet
+          </button>
+        </div>
       ) : !hasOnchainRules ? (
-        <p className="text-body-sm text-pump-muted">No on-chain rules configured.</p>
+        <p className="airdrop-detail-section__body text-body-sm text-pump-muted">
+          No on-chain rules configured.
+        </p>
       ) : progressError ? (
-        <p className="notice-error text-body-sm">{progressError}</p>
+        <p className="airdrop-detail-section__body notice-error text-body-sm">{progressError}</p>
       ) : progress ? (
-        <ul className="space-y-2">
+        <ul className="airdrop-detail-task-list">
           {progress.minHold ? (
             <RuleProgressRow
-              label={
-                <span className="inline-flex flex-wrap items-center gap-1">
-                  Min hold ·{" "}
-                  <TokenSymbolInline address={linkedToken} symbol={symbol} size={14} />
-                </span>
-              }
+              label={`Min hold · ${symbol}`}
               rule={progress.minHold}
               unit="tokens"
               tokenAddress={linkedToken}
               buyMode="token"
               returnTo={returnTo}
-              footnote="Uses your current wallet balance. Tokens from earlier campaigns on this coin still count."
+              tooltipLabel="About min hold"
+              tooltip="Uses your current wallet balance. Tokens from earlier campaigns on this coin still count."
             />
           ) : null}
           {progress.minBuy ? (
@@ -885,19 +970,22 @@ function OnchainRequirementsContent({
               tokenAddress={linkedToken}
               buyMode="bnb"
               returnTo={returnTo}
-              footnote={`Only buys during this campaign window count (${qualifyWindowLabel}). Each new airdrop on the same token starts buy tracking from zero.`}
+              tooltipLabel="About min buy volume"
+              tooltip={`Only buys during this campaign window count (${qualifyWindowLabel}). Each new airdrop on the same token starts buy tracking from zero.`}
             />
           ) : null}
         </ul>
       ) : (
-        <p className="text-body-sm text-pump-muted">Loading your progress…</p>
+        <p className="airdrop-detail-section__body text-body-sm text-pump-muted">
+          Loading your progress…
+        </p>
       )}
       {progress?.onchainQualified ? (
-        <p className="mt-3 rounded-md bg-pump-accent/5 px-3 py-2 text-body-sm text-pump-accent">
+        <p className="airdrop-detail-onchain-qualified">
           <span className="inline-flex flex-wrap items-center gap-x-1 gap-y-0.5">
-            All on-chain requirements met — rank is based on your{" "}
+            All requirements met — rank uses your{" "}
             <TokenSymbolInline address={linkedToken} symbol={symbol} size={14} />
-            balance when the qualify window ends.
+            balance at qualify end.
           </span>
         </p>
       ) : null}
@@ -908,7 +996,6 @@ function OnchainRequirementsContent({
 export function AirdropDetailPanel({ airdropId }: { airdropId: string }) {
   const { openConnectModal } = useOpenConnectModal();
   const { address, isConnected } = useAccount();
-  const { isSaved, toggleSave } = useAirdropSaves();
   const { bnbUsd } = useBnbUsdPrice();
   const [detail, setDetail] = useState<AirdropDetail | null>(null);
   const [progress, setProgress] = useState<AirdropProgress | null>(null);
@@ -1109,7 +1196,9 @@ export function AirdropDetailPanel({ airdropId }: { airdropId: string }) {
       <div className="airdrops-page airdrop-detail-page">
         <div className="airdrop-detail-hub">
           <div className="airdrop-detail-toolbar-band">
-            <PageBackLink href="/airdrops" className="airdrop-detail-back" />
+            <div className="airdrop-detail-topbar">
+              <PageBackLink href="/airdrops" className="airdrop-detail-back" />
+            </div>
           </div>
           <p className="airdrop-detail-notice airdrop-detail-notice--error">{error}</p>
         </div>
@@ -1137,17 +1226,17 @@ export function AirdropDetailPanel({ airdropId }: { airdropId: string }) {
   const hasOnchainRules = Boolean(
     detail.rules.onchain?.minHoldWei || detail.rules.onchain?.minBuyBnbWei
   );
-  const showSocialSection = hasSocialGate && !socialDone && qualifyStarted;
+  const isClosed = displayStatus === "CLOSED";
+  const showSocialSection =
+    hasSocialGate && !socialDone && qualifyStarted && !isClosed && displayStatus !== "FINALIZING";
   const showUpcomingLockedPanel =
     isUpcoming && !detail.merkleRoot && (hasSocialGate || hasOnchainRules);
   const showOnchainSection =
-    !detail.merkleRoot && hasOnchainRules && (hasSocialGate ? socialDone : onchainUnlocked);
-  const timelineProgress = airdropTimelineProgress(
-    displayStatus,
-    detail.qualifyStart,
-    detail.qualifyEnd,
-    detail.claimEnd
-  );
+    !detail.merkleRoot &&
+    hasOnchainRules &&
+    !isClosed &&
+    displayStatus !== "FINALIZING" &&
+    (hasSocialGate ? socialDone : onchainUnlocked);
   const symbol = poolSymbol(detail);
   const title = campaignTitle(detail);
 
@@ -1196,9 +1285,21 @@ export function AirdropDetailPanel({ airdropId }: { airdropId: string }) {
       : "idle";
 
   const airdropReturnTo = `/airdrops/${airdropId}`;
-  const saved = isSaved(airdropId);
 
+  const showStepBar =
+    !isClosed &&
+    displayStatus !== "FINALIZING" &&
+    (hasSocialGate || hasOnchainRules || showClaimPanel);
+  const campaignEndedForBoard = isClosed || displayStatus === "FINALIZING";
   const rewardProps = airdropDetailRewardProps(detail, bnbUsd);
+  const poolUsd = airdropRewardUsd(rewardProps, bnbUsd);
+  const poolLabel =
+    poolUsd != null
+      ? formatUsdReadable(poolUsd, { compact: true })
+      : formatAirdropReward(rewardProps.totalFunded, {
+          isBnb: !rewardProps.rewardToken,
+          symbol: rewardProps.rewardSymbol,
+        });
   const openSocialCount = requiredSocialTasks.filter((t) => !t.completed).length;
 
   return (
@@ -1210,111 +1311,64 @@ export function AirdropDetailPanel({ airdropId }: { airdropId: string }) {
         ) : null}
 
         <div className="airdrop-detail-toolbar-band">
-          <PageBackLink href="/airdrops" className="airdrop-detail-back" />
+          <div className="airdrop-detail-topbar">
+            <PageBackLink href="/airdrops" className="airdrop-detail-back" />
+            <div className="airdrop-detail-toolbar__actions">
+              <AirdropSaveButton airdropId={airdropId} className="airdrop-detail-topbar__save" />
+              <span className={`${airdropStatusBadgeClass(displayStatus)} airdrop-detail-status`}>
+                {formatAirdropDisplayStatus(displayStatus)}
+              </span>
+            </div>
+          </div>
 
           <div className="token-detail-toolbar airdrop-detail-toolbar">
-            <div className="token-detail-toolbar__row">
+            <div className="token-detail-toolbar__row airdrop-detail-toolbar__main-row">
               <div className="token-detail-toolbar__identity">
-                <button
-                  type="button"
-                  onClick={() => toggleSave(airdropId)}
-                  className={
-                    saved
-                      ? "token-detail-toolbar__fav-btn token-detail-toolbar__fav-btn--active"
-                      : "token-detail-toolbar__fav-btn"
-                  }
-                  aria-label={saved ? "Remove from saved" : "Save campaign"}
-                >
-                  <PumpIcon
-                    icon={saved ? faBookmarkSolid : faBookmarkRegular}
-                    className="token-detail-toolbar__fav-icon"
-                  />
-                </button>
                 <TokenAvatar
                   address={detail.linkedToken}
                   symbol={symbol}
                   size={28}
+                  shape="rounded"
                   className="token-detail-toolbar__logo shrink-0 !ring-0"
                 />
                 <div className="token-detail-toolbar__pair-meta">
                   <div className="token-detail-toolbar__symbol-row">
-                    <h1 className="token-detail-toolbar__symbol truncate">{title}</h1>
-                  </div>
-                  <span className="token-detail-toolbar__age inline-flex min-w-0 items-center">
-                    <AirdropTrustBadge />
-                  </span>
-                </div>
-              </div>
-
-              <div className="token-detail-toolbar__scroll">
-                <div className="token-detail-toolbar__stats">
-                  <div className="token-detail-toolbar__stat airdrop-detail-toolbar__stat--reward">
-                    <span className="token-detail-toolbar__stat-label">
-                      <span className="airdrop-detail-toolbar__stat-label-full">Reward pool</span>
-                      <span className="airdrop-detail-toolbar__stat-label-short">Pool</span>
-                    </span>
-                    <div className="token-detail-toolbar__stat-value">
-                      <AirdropRewardPoolMetric {...rewardProps} />
-                    </div>
-                  </div>
-                  <div className="token-detail-toolbar__stat">
-                    <span className="token-detail-toolbar__stat-label">Progress</span>
-                    <div className="token-detail-toolbar__stat-value">
-                      <AirdropProgressMetric
-                        timeLabel={nowTick >= 0 ? timeLeftLabel(displayStatus, detail) : "—"}
-                        progressPct={timelineProgress}
-                        showBar={false}
-                        showPct={false}
-                      />
-                    </div>
-                  </div>
-                  <div className="token-detail-toolbar__stat airdrop-detail-toolbar__stat--participants">
-                    <div
-                      className="airdrop-detail-toolbar__participants"
-                      title="Participants"
-                      aria-label={`Participants: ${detail.participantCount.toLocaleString()}`}
-                    >
-                      <PumpIcon
-                        icon={MetricIcons.participants}
-                        className="airdrop-detail-toolbar__participants-icon"
-                        aria-hidden
-                      />
-                      <div className="token-detail-toolbar__stat-value">
-                        <AirdropParticipantsMetric count={detail.participantCount} />
-                      </div>
-                    </div>
+                    <h1 className="token-detail-toolbar__symbol truncate" title={title}>
+                      {title}
+                    </h1>
+                    <AirdropTrustBadge compact className="airdrop-detail-toolbar__trust" />
                   </div>
                 </div>
               </div>
 
-              <div className="token-detail-toolbar__actions">
-                <span className={`${airdropStatusBadgeClass(displayStatus)} airdrop-detail-status`}>
-                  {formatAirdropDisplayStatus(displayStatus)}
-                </span>
+              <div className="airdrop-detail-toolbar__stats-slot">
+                <AirdropToolbarStats
+                  poolLabel={poolLabel}
+                  timeLabel={nowTick >= 0 ? timeLeftLabel(displayStatus, detail) : "—"}
+                  participantCount={detail.participantCount}
+                  showTime={displayStatus === "QUALIFYING" || displayStatus === "CLAIMABLE"}
+                />
               </div>
             </div>
 
             {detail.description ? (
-              <p className="airdrop-detail-toolbar__description">{detail.description}</p>
+              <p className="airdrop-detail-toolbar__description" title={detail.description}>
+                {detail.description}
+              </p>
             ) : null}
           </div>
         </div>
 
-        {displayStatus === "UPCOMING" ? (
-          <p className="airdrop-detail-notice">
-            <HourglassIcon size={14} className="shrink-0 self-center" />
-            <span>
+        {displayStatus === "UPCOMING" && !showUpcomingLockedPanel ? (
+          <AirdropDetailStatusStrip>
+            <HourglassIcon size={14} className="shrink-0 text-pump-accent" aria-hidden />
+            <span className="text-body-sm text-pump-muted">
               Qualification opens in{" "}
-              <span className="font-medium tabular-nums text-pump-text" aria-live="polite">
-                {nowTick >= 0 ? formatDurationUntil(detail.qualifyStart) : null}
+              <span className="financial-value font-semibold tabular-nums text-pump-text" aria-live="polite">
+                {nowTick >= 0 ? formatDurationUntil(detail.qualifyStart) : "—"}
               </span>
-              {hasSocialGate
-                ? ". Social and on-chain tasks unlock when qualify opens."
-                : hasOnchainRules
-                  ? ". On-chain tracking begins when qualify opens."
-                  : "."}
             </span>
-          </p>
+          </AirdropDetailStatusStrip>
         ) : null}
 
         {displayStatus === "FINALIZING" ? (
@@ -1325,7 +1379,7 @@ export function AirdropDetailPanel({ airdropId }: { airdropId: string }) {
           </p>
         ) : null}
 
-        {(hasSocialGate || hasOnchainRules || showClaimPanel) && (
+        {showStepBar ? (
           <div className="airdrop-detail-step-bar">
             <nav className="airdrops-tab-nav" aria-label="Campaign steps">
               <div className="airdrops-tab-nav__track">
@@ -1343,7 +1397,7 @@ export function AirdropDetailPanel({ airdropId }: { airdropId: string }) {
               </div>
             </nav>
           </div>
-        )}
+        ) : null}
 
         <div className="airdrop-detail-body">
           <div
@@ -1379,12 +1433,8 @@ export function AirdropDetailPanel({ airdropId }: { airdropId: string }) {
 
                 {showOnchainSection ? (
                   <section className="airdrop-detail-section">
-                    <SectionHeader
-                      title={hasSocialGate ? "On-chain requirements" : "On-chain requirements"}
-                      hint="Hold or buy the pool token during the qualify window."
-                    />
-                    <div className="airdrop-detail-section__body">
-                      <OnchainRequirementsContent
+                    <SectionHeader title="On-chain requirements" />
+                    <OnchainRequirementsContent
                         symbol={symbol}
                         linkedToken={detail.linkedToken}
                         qualifyStarted={qualifyStarted}
@@ -1397,7 +1447,6 @@ export function AirdropDetailPanel({ airdropId }: { airdropId: string }) {
                         onConnect={() => openConnectModal?.()}
                         returnTo={airdropReturnTo}
                       />
-                    </div>
                   </section>
                 ) : null}
 
@@ -1472,11 +1521,19 @@ export function AirdropDetailPanel({ airdropId }: { airdropId: string }) {
               }`}
             >
               <SectionHeader
-                title={detail.merkleRoot ? "Winners" : "Live leaderboard"}
+                title={
+                  detail.merkleRoot
+                    ? "Winners"
+                    : campaignEndedForBoard
+                      ? "Leaderboard"
+                      : "Live leaderboard"
+                }
                 hint={
                   detail.merkleRoot
                     ? `Final top 100 ranked by ${symbol} balance at qualify end.`
-                    : `Projected rewards by rank · ${symbol} balances refresh every 12s during qualify.`
+                    : campaignEndedForBoard
+                      ? `Final ranking by ${symbol} balance.`
+                      : `Projected rewards by rank · ${symbol} balances`
                 }
               />
 
@@ -1504,6 +1561,7 @@ export function AirdropDetailPanel({ airdropId }: { airdropId: string }) {
                     bnbUsd={bnbUsd}
                     address={address}
                     onWalletClick={setProfileAddress}
+                    campaignEnded={campaignEndedForBoard}
                   />
                 )}
               </div>

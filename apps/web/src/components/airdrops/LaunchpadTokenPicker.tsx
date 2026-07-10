@@ -3,6 +3,7 @@
 import { useEffect, useId, useMemo, useState, type ReactNode } from "react";
 import type { TokenListItem } from "@/lib/db/launchpad";
 import { TokenAvatar } from "@/components/token/TokenAvatar";
+import { FieldErrorIcon, FieldErrorMessage } from "@/components/ui/FieldError";
 import { ModalPortal } from "@/components/ui/ModalPortal";
 
 function formatTokenBalance(value: string | number): string {
@@ -35,13 +36,16 @@ type LaunchpadTokenPickerProps = {
   value: string;
   onChange: (address: string) => void;
   tokens: TokenListItem[];
-  /** Creator-owned tokens — pinned at top with balances when provided. */
+  /** Creator-owned / held tokens — pinned at top with balances when provided. */
   priorityTokens?: TokenListItem[];
   balances?: Record<string, string>;
   loading?: boolean;
   placeholder?: string;
   disabled?: boolean;
   hint?: ReactNode;
+  /** Compact chips for tokens with balance > 0. */
+  showQuickPick?: boolean;
+  error?: string | null;
 };
 
 function TokenPickerRow({
@@ -56,7 +60,7 @@ function TokenPickerRow({
   onSelect: () => void;
 }) {
   const balanceNum = balance != null ? Number(balance) : NaN;
-  const showBalance = Number.isFinite(balanceNum);
+  const showBalance = balance != null && Number.isFinite(balanceNum);
 
   return (
     <button
@@ -106,7 +110,10 @@ export function LaunchpadTokenPicker({
   placeholder = "Select a token",
   disabled = false,
   hint,
+  showQuickPick = false,
+  error = null,
 }: LaunchpadTokenPickerProps) {
+  const hasError = Boolean(error);
   const listboxId = useId();
   const titleId = useId();
   const [open, setOpen] = useState(false);
@@ -177,6 +184,21 @@ export function LaunchpadTokenPicker({
 
   const empty = !loading && priorityList.length === 0 && otherList.length === 0;
 
+  const quickPickTokens = useMemo(() => {
+    if (!showQuickPick) return [];
+    return [...priorityTokens]
+      .filter((token) => {
+        const bal = Number(balances[token.address.toLowerCase()] ?? 0);
+        return Number.isFinite(bal) && bal > 0;
+      })
+      .sort((a, b) => {
+        const balA = Number(balances[a.address.toLowerCase()] ?? 0);
+        const balB = Number(balances[b.address.toLowerCase()] ?? 0);
+        return balB - balA;
+      })
+      .slice(0, 4);
+  }, [showQuickPick, priorityTokens, balances]);
+
   function closeModal() {
     setOpen(false);
   }
@@ -187,55 +209,95 @@ export function LaunchpadTokenPicker({
   }
 
   return (
-    <div>
+    <div className={hasError ? "field-group--error" : undefined}>
       {label ? (
         <label className="field-label" htmlFor={id}>
           {label}
         </label>
       ) : null}
 
-      <button
-        id={id}
-        type="button"
-        disabled={disabled || loading}
-        aria-haspopup="dialog"
-        aria-expanded={open}
-        onClick={() => setOpen(true)}
-        className={`field-input flex items-center gap-2.5 py-2.5 text-left ${
-          disabled || loading ? "cursor-not-allowed opacity-60" : ""
-        }`}
-      >
-        {loading ? (
-          <span className="text-body-sm text-pump-muted">Loading tokens…</span>
-        ) : selectedToken ? (
-          <>
-            <TokenAvatar
-              address={selectedToken.address}
-              symbol={selectedToken.symbol}
-              logoUrl={selectedToken.logoUrl}
-              size={28}
-              className="shrink-0"
-            />
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-body-sm font-medium text-pump-text">
-                {selectedToken.name}
-              </p>
-              <p className="truncate text-caption font-medium text-pump-muted">
-                ${selectedToken.symbol}
-              </p>
-            </div>
-            {balances[selectedToken.address.toLowerCase()] ? (
-              <span className="financial-value shrink-0 text-caption tabular-nums text-pump-muted">
-                {formatTokenBalance(balances[selectedToken.address.toLowerCase()]!)}
+      <div className={`field-control${hasError ? " field-control--error" : ""}`}>
+        <button
+          id={id}
+          type="button"
+          disabled={disabled || loading}
+          aria-haspopup="dialog"
+          aria-expanded={open}
+          aria-invalid={hasError || undefined}
+          onClick={() => setOpen(true)}
+          className={`field-input flex items-center gap-2.5 py-2 text-left ${
+            hasError ? "field-input--error pr-10" : ""
+          } ${disabled || loading ? "cursor-not-allowed opacity-60" : ""}`}
+        >
+          {loading ? (
+            <span className="text-body-sm text-pump-muted">Loading tokens…</span>
+          ) : selectedToken ? (
+            <>
+              <TokenAvatar
+                address={selectedToken.address}
+                symbol={selectedToken.symbol}
+                logoUrl={selectedToken.logoUrl}
+                size={24}
+                className="shrink-0"
+              />
+              <span className="min-w-0 flex-1 truncate text-body-sm font-medium text-pump-text">
+                {selectedToken.symbol}
               </span>
-            ) : null}
-          </>
-        ) : (
-          <span className="text-body-sm text-pump-muted">{placeholder}</span>
-        )}
-        <span className="ml-auto shrink-0 text-caption font-medium text-pump-accent">Browse</span>
-      </button>
+              {balances[selectedToken.address.toLowerCase()] != null ? (
+                <span className="financial-value shrink-0 text-caption tabular-nums text-pump-muted">
+                  {formatTokenBalance(balances[selectedToken.address.toLowerCase()]!)}
+                </span>
+              ) : null}
+            </>
+          ) : (
+            <span className="text-body-sm text-pump-muted">{placeholder}</span>
+          )}
+          {!hasError ? (
+            <span className="ml-auto shrink-0 text-caption font-medium text-pump-accent">Browse</span>
+          ) : null}
+        </button>
+        {hasError ? <FieldErrorIcon /> : null}
+      </div>
 
+      {quickPickTokens.length > 0 ? (
+        <div className="mt-2 flex flex-nowrap gap-1.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {quickPickTokens.map((token) => {
+            const selected = token.address.toLowerCase() === value.toLowerCase();
+            const bal = balances[token.address.toLowerCase()];
+            return (
+              <button
+                key={token.address}
+                type="button"
+                disabled={disabled || loading}
+                onClick={() => onChange(token.address)}
+                className={`inline-flex shrink-0 items-center gap-1.5 rounded-md border px-2 py-1 text-left transition ${
+                  selected
+                    ? "border-pump-accent/40 bg-pump-accent/10 text-pump-text"
+                    : "border-pump-border/20 bg-pump-surface/30 text-pump-muted hover:border-pump-border/40 hover:text-pump-text"
+                }`}
+              >
+                <TokenAvatar
+                  address={token.address}
+                  symbol={token.symbol}
+                  logoUrl={token.logoUrl}
+                  size={14}
+                  className="shrink-0"
+                />
+                <span className="max-w-[4.5rem] truncate text-caption font-medium">
+                  {token.symbol}
+                </span>
+                {bal != null ? (
+                  <span className="financial-value shrink-0 text-[10px] tabular-nums opacity-80">
+                    {formatTokenBalance(bal)}
+                  </span>
+                ) : null}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+
+      <FieldErrorMessage>{error}</FieldErrorMessage>
       {hint ? <div className="mt-1.5">{hint}</div> : null}
 
       {open ? (
@@ -309,7 +371,7 @@ export function LaunchpadTokenPicker({
                             key={token.address}
                             token={token}
                             selected={token.address.toLowerCase() === value.toLowerCase()}
-                            balance={balances[token.address.toLowerCase()]}
+                            balance={balances[token.address.toLowerCase()] ?? "0"}
                             onSelect={() => selectToken(token.address)}
                           />
                         ))}
@@ -333,6 +395,7 @@ export function LaunchpadTokenPicker({
                             key={token.address}
                             token={token}
                             selected={token.address.toLowerCase() === value.toLowerCase()}
+                            balance={balances[token.address.toLowerCase()]}
                             onSelect={() => selectToken(token.address)}
                           />
                         ))}

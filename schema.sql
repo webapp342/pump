@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 6MRwp4avbUH99PHaR2MwpERig6ZtyP5PJ9wLIXT0cmYA5qiMObzwd9w0ykMFqbQ
+\restrict ZDzDOIfjNFidSDjxCbnqzVxPA1BRfhWdFTh44XBk92ga3aOea6Ue5lKz9L1kD69
 
 -- Dumped from database version 16.14 (Ubuntu 16.14-0ubuntu0.24.04.1)
 -- Dumped by pg_dump version 16.14 (Ubuntu 16.14-0ubuntu0.24.04.1)
@@ -280,6 +280,8 @@ BEGIN
     public.launchpad_user_daily_completions,
     public.launchpad_user_task_completions,
     public.points_audit_log,
+    public.push_subscriptions,
+    public.push_preferences,
     public.trades,
     public.token_candles,
     public.token_favorites,
@@ -1116,6 +1118,62 @@ ALTER SEQUENCE public.points_audit_log_id_seq OWNED BY public.points_audit_log.i
 
 
 --
+-- Name: push_preferences; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.push_preferences (
+    user_address text NOT NULL,
+    airdrop_updates boolean DEFAULT true NOT NULL,
+    trade_alerts boolean DEFAULT true NOT NULL,
+    favorite_moves boolean DEFAULT true NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT push_preferences_user_address_check CHECK ((user_address = lower(user_address)))
+);
+
+
+--
+-- Name: push_subscriptions; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.push_subscriptions (
+    id bigint NOT NULL,
+    user_address text NOT NULL,
+    endpoint text NOT NULL,
+    p256dh_key text NOT NULL,
+    auth_key text NOT NULL,
+    platform text DEFAULT 'unknown'::text NOT NULL,
+    display_mode text DEFAULT 'browser'::text NOT NULL,
+    user_agent_hash text,
+    enabled boolean DEFAULT true NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    last_sent_at timestamp with time zone,
+    last_error_at timestamp with time zone,
+    last_error_code integer,
+    CONSTRAINT push_subscriptions_auth_len_check CHECK (((char_length(auth_key) >= 20) AND (char_length(auth_key) <= 64))),
+    CONSTRAINT push_subscriptions_display_mode_check CHECK ((display_mode = ANY (ARRAY['standalone'::text, 'browser'::text]))),
+    CONSTRAINT push_subscriptions_endpoint_len_check CHECK ((char_length(endpoint) <= 2048)),
+    CONSTRAINT push_subscriptions_p256dh_len_check CHECK (((char_length(p256dh_key) >= 80) AND (char_length(p256dh_key) <= 256))),
+    CONSTRAINT push_subscriptions_platform_check CHECK ((platform = ANY (ARRAY['desktop'::text, 'android'::text, 'ios'::text, 'unknown'::text]))),
+    CONSTRAINT push_subscriptions_user_address_check CHECK ((user_address = lower(user_address)))
+);
+
+
+--
+-- Name: push_subscriptions_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+ALTER TABLE public.push_subscriptions ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME public.push_subscriptions_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
 -- Name: referral_bindings; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1767,6 +1825,22 @@ ALTER TABLE ONLY public.points_audit_log
 
 
 --
+-- Name: push_preferences push_preferences_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.push_preferences
+    ADD CONSTRAINT push_preferences_pkey PRIMARY KEY (user_address);
+
+
+--
+-- Name: push_subscriptions push_subscriptions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.push_subscriptions
+    ADD CONSTRAINT push_subscriptions_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: referral_bindings referral_bindings_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2107,6 +2181,20 @@ CREATE INDEX idx_points_audit_log_address ON public.points_audit_log USING btree
 
 
 --
+-- Name: idx_push_subscriptions_endpoint; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_push_subscriptions_endpoint ON public.push_subscriptions USING btree (endpoint);
+
+
+--
+-- Name: idx_push_subscriptions_user_enabled; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_push_subscriptions_user_enabled ON public.push_subscriptions USING btree (user_address, updated_at DESC) WHERE (enabled = true);
+
+
+--
 -- Name: idx_referral_bindings_referrer; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2160,6 +2248,13 @@ CREATE INDEX idx_token_board_stats_volume_24h ON public.token_board_stats USING 
 --
 
 CREATE INDEX idx_token_candles_lookup ON public.token_candles USING btree (token_address, candle_interval, bucket_ts DESC);
+
+
+--
+-- Name: idx_token_favorites_token_user; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_token_favorites_token_user ON public.token_favorites USING btree (token_address, user_address);
 
 
 --
@@ -2450,5 +2545,5 @@ ALTER TABLE ONLY public.user_positions
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 6MRwp4avbUH99PHaR2MwpERig6ZtyP5PJ9wLIXT0cmYA5qiMObzwd9w0ykMFqbQ
+\unrestrict ZDzDOIfjNFidSDjxCbnqzVxPA1BRfhWdFTh44XBk92ga3aOea6Ue5lKz9L1kD69
 

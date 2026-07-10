@@ -3,26 +3,29 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { formatEther, formatUnits, parseEther } from "viem";
-import { FormExecutionStatus } from "@/components/ui/FormExecutionStatus";
 import { TokenAvatar } from "@/components/token/TokenAvatar";
 import { BnbLogo } from "@/components/token/BnbLogo";
+import { AirdropQualifyRulesEditor } from "@/components/airdrops/AirdropQualifyRules";
+import { AirdropCreateConfirmModal } from "@/components/airdrops/AirdropCreateConfirmModal";
+import { AirdropCreateDetailPreview } from "@/components/airdrops/AirdropCreateDetailPreview";
 import {
-  BnbAmountDisplay,
-  RewardAmountDisplay,
-  TokenAssetChip,
-} from "@/components/token/AssetAmountDisplay";
-import { AirdropQualifyRulesEditor, AirdropQualifyRulesPreview } from "@/components/airdrops/AirdropQualifyRules";
-import { AirdropRewardSplitPreview } from "@/components/airdrops/AirdropRewardSplitPreview";
+  AIRDROP_CREATE_STEPS,
+  AirdropCreateStepNav,
+} from "@/components/airdrops/AirdropCreateStepNav";
+import { HubDiscoveryScrollLock } from "@/components/layout/HubDiscoveryScrollLock";
+import { FieldErrorIcon, FieldErrorMessage } from "@/components/ui/FieldError";
+import { InfoTip } from "@/components/ui/InfoTip";
 import {
   AirdropSocialTasksEditor,
-  AirdropSocialTasksPreview,
 } from "@/components/airdrops/AirdropSocialTasks";
 import { LaunchpadTokenPicker } from "@/components/airdrops/LaunchpadTokenPicker";
+import { LocalDateTimeField } from "@/components/airdrops/LocalDateTimeField";
 import {
   BNB_REWARD_ASSET,
   isBnbRewardAsset,
   RewardAssetPicker,
 } from "@/components/airdrops/RewardAssetPicker";
+import type { PortfolioPosition, TokenListItem } from "@/lib/db/launchpad";
 import {
   createDefaultSocialTasks,
   normalizeSocialTaskTarget,
@@ -51,7 +54,6 @@ import {
   type AirdropRules,
   type AirdropSocialTaskInput,
 } from "@/lib/airdrop-rules";
-import type { TokenListItem } from "@/lib/db/launchpad";
 import { EMPTY_SOCIAL_LINKS } from "@/lib/token-social";
 import {
   defaultQualifyEndLocal,
@@ -66,10 +68,39 @@ import {
   unixToDatetimeLocal,
   validateQualifyWindow,
 } from "@/lib/airdrop-datetime";
-import { formatCampaignAmount, formatCampaignAmountInput, floorCampaignAmountWei, formatAirdropReward } from "@/lib/airdrop-board-format";
+import { formatCampaignAmount, formatCampaignAmountInput, floorCampaignAmountWei } from "@/lib/airdrop-board-format";
+import {
+  bnbAmountToUsdInput,
+  rewardWeiToUsd,
+  tokenPriceBnbFromMcap,
+  usdToBnbAmountString,
+  type RewardUsdConvertOpts,
+} from "@/lib/airdrop-usd-input";
+import { bnbToUsd, formatUsdReadable, tokenAmountUsd } from "@/lib/format-usd";
+import { useBnbUsdPrice } from "@/hooks/useBnbUsdPrice";
 import { useCreateGasReserve } from "@/hooks/useCreateGasReserve";
 
 const ZERO = "0x0000000000000000000000000000000000000000" as const;
+
+function positionToTokenListItem(position: PortfolioPosition): TokenListItem {
+  return {
+    address: position.tokenAddress,
+    symbol: position.symbol,
+    name: position.name,
+    creatorAddress: "",
+    status: position.status,
+    createdAt: new Date(0).toISOString(),
+    launchBlockNumber: "0",
+    progressBps: position.progressBps,
+    reserveBnb: "0",
+    marketCapBnb: "0",
+    holderCount: 0,
+    logoUrl: position.logoUrl,
+    socialLinks: EMPTY_SOCIAL_LINKS,
+    creatorHoldPct: null,
+    top10HoldPct: null,
+  };
+}
 
 function tryParseEtherWei(value: string): bigint | null {
   const trimmed = value.trim();
@@ -138,8 +169,11 @@ export function CreateAirdropForm({
   const { openConnectModal } = useOpenConnectModal();
   const { openFundChoice } = useWalletFunding();
   const { address, isConnected } = useAccount();
+  const { bnbUsd } = useBnbUsdPrice();
   const [tokens, setTokens] = useState<TokenListItem[]>([]);
   const [createdTokens, setCreatedTokens] = useState<TokenListItem[]>([]);
+  const [heldTokens, setHeldTokens] = useState<TokenListItem[]>([]);
+  const [positionBalanceMap, setPositionBalanceMap] = useState<Record<string, string>>({});
   const [tokensLoading, setTokensLoading] = useState(true);
   const [linkedToken, setLinkedToken] = useState("");
   const [title, setTitle] = useState("");
@@ -148,13 +182,17 @@ export function CreateAirdropForm({
   const [rewardAmountInput, setRewardAmountInput] = useState("");
   const [minHoldTokens, setMinHoldTokens] = useState("");
   const [minBuyBnb, setMinBuyBnb] = useState("0.01");
+  const [minBuyUsdInput, setMinBuyUsdInput] = useState("");
   const [qualifyStartLocal, setQualifyStartLocal] = useState(defaultQualifyStartLocal);
   const [qualifyEndLocal, setQualifyEndLocal] = useState(() =>
     defaultQualifyEndLocal(defaultQualifyStartLocal())
   );
   const [socialTasks, setSocialTasks] = useState<SocialTaskDraft[]>(createDefaultSocialTasks);
-  const [socialOpen, setSocialOpen] = useState(false);
+  const [currentStep, setCurrentStep] = useState(0);
+  const [maxReachedStep, setMaxReachedStep] = useState(0);
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showFieldErrors, setShowFieldErrors] = useState(false);
   const [pendingAction, setPendingAction] = useState<"approve" | "create" | null>(null);
   const [nowTick, setNowTick] = useState(0);
   const prevRewardAssetRef = useRef(rewardAsset);
@@ -254,6 +292,8 @@ export function CreateAirdropForm({
   useEffect(() => {
     if (!address) {
       setCreatedTokens([]);
+      setHeldTokens([]);
+      setPositionBalanceMap({});
       return;
     }
 
@@ -262,12 +302,34 @@ export function CreateAirdropForm({
     (async () => {
       try {
         const res = await fetch(`/api/portfolio?address=${address}&createdLimit=all`, { cache: "no-store" });
-        const json = (await res.json()) as { data?: { createdTokens?: TokenListItem[] } };
-        if (!cancelled && res.ok) {
-          setCreatedTokens(json.data?.createdTokens ?? []);
+        const json = (await res.json()) as {
+          data?: {
+            createdTokens?: TokenListItem[];
+            positions?: PortfolioPosition[];
+          };
+        };
+        if (cancelled || !res.ok) return;
+
+        setCreatedTokens(json.data?.createdTokens ?? []);
+
+        const positions = json.data?.positions ?? [];
+        const balances: Record<string, string> = {};
+        const held: TokenListItem[] = [];
+        for (const position of positions) {
+          const key = position.tokenAddress.toLowerCase();
+          const bal = Number(position.tokenBalance);
+          if (!Number.isFinite(bal) || bal <= 0) continue;
+          balances[key] = position.tokenBalance;
+          held.push(positionToTokenListItem(position));
         }
+        setPositionBalanceMap(balances);
+        setHeldTokens(held);
       } catch {
-        if (!cancelled) setCreatedTokens([]);
+        if (!cancelled) {
+          setCreatedTokens([]);
+          setHeldTokens([]);
+          setPositionBalanceMap({});
+        }
       }
     })();
 
@@ -288,6 +350,11 @@ export function CreateAirdropForm({
     const map = new Map<string, TokenListItem>();
     for (const token of tokens) map.set(token.address.toLowerCase(), token);
     for (const token of createdTokens) map.set(token.address.toLowerCase(), token);
+    for (const token of heldTokens) {
+      if (!map.has(token.address.toLowerCase())) {
+        map.set(token.address.toLowerCase(), token);
+      }
+    }
 
     if (initialLinkedToken) {
       const normalized = initialLinkedToken.trim().toLowerCase();
@@ -313,7 +380,22 @@ export function CreateAirdropForm({
     }
 
     return [...map.values()];
-  }, [tokens, createdTokens, initialLinkedToken, initialLinkedTokenName, initialLinkedTokenSymbol, address]);
+  }, [
+    tokens,
+    createdTokens,
+    heldTokens,
+    initialLinkedToken,
+    initialLinkedTokenName,
+    initialLinkedTokenSymbol,
+    address,
+  ]);
+
+  const priorityTokens = useMemo(() => {
+    const map = new Map<string, TokenListItem>();
+    for (const token of heldTokens) map.set(token.address.toLowerCase(), token);
+    for (const token of createdTokens) map.set(token.address.toLowerCase(), token);
+    return [...map.values()];
+  }, [heldTokens, createdTokens]);
 
   const creatorTokenAddresses = useMemo(
     () => createdTokens.map((token) => token.address as `0x${string}`),
@@ -332,15 +414,17 @@ export function CreateAirdropForm({
   });
 
   const creatorBalanceMap = useMemo(() => {
-    const map: Record<string, string> = {};
+    const map: Record<string, string> = { ...positionBalanceMap };
     creatorTokenAddresses.forEach((tokenAddress, index) => {
       const result = creatorBalanceResults?.[index];
       if (result?.status === "success") {
         map[tokenAddress.toLowerCase()] = formatUnits(result.result, 18);
+      } else if (map[tokenAddress.toLowerCase()] == null) {
+        map[tokenAddress.toLowerCase()] = "0";
       }
     });
     return map;
-  }, [creatorBalanceResults, creatorTokenAddresses]);
+  }, [creatorBalanceResults, creatorTokenAddresses, positionBalanceMap]);
 
   const socialTasksForSync = useMemo((): AirdropSocialTaskInput[] => {
     return socialTasks
@@ -527,6 +611,104 @@ export function CreateAirdropForm({
 
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+  }
+
+  function validateStep(stepIndex: number): string | null {
+    switch (stepIndex) {
+      case 0:
+        if (!linkedToken) return "Select a pool token.";
+        if (!title.trim()) return "Enter a campaign title.";
+        return null;
+      case 1: {
+        if (!isBnbReward && !rewardToken) return "Select a reward asset.";
+        if (!parsedRewardAmount) {
+          return rewardPoolValidationMessage({
+            isConnected: Boolean(address),
+            maxRewardWei,
+            rewardAmountInput,
+            parsedRewardWei,
+            isBnbReward,
+            rewardSymbol: selectedRewardSymbol,
+          });
+        }
+        const windowCheck = validateQualifyWindow(qualifyStartLocal, qualifyEndLocal);
+        if (!windowCheck.ok) return windowCheck.error;
+        return null;
+      }
+      case 2:
+        if (!rules.onchain?.minHoldWei && !rules.onchain?.minBuyBnbWei) {
+          return "Set at least one on-chain rule (min hold or min buy).";
+        }
+        if (minHoldTokens.trim() && !rules.onchain?.minHoldWei) {
+          return "Min hold must be a valid token amount.";
+        }
+        if (minBuyBnb.trim() && !rules.onchain?.minBuyBnbWei) {
+          return `Min buy must be a valid ${NATIVE_SYMBOL} amount.`;
+        }
+        for (const task of socialTasks) {
+          if (!task.enabled) continue;
+          const urlError = validateSocialTaskUrl(task.taskType, task.targetUrl);
+          if (urlError) return `${socialTaskLabel(task.taskType)}: ${urlError}`;
+        }
+        return null;
+      case 3:
+        if (!isConnected) return "Connect wallet to create a campaign.";
+        if (formValidation.needsBnbFunding) return formValidation.fundMessage || "Add BNB to continue.";
+        if (!formValidation.canSubmit) return formValidation.warnings[0] ?? "Fix form errors before creating.";
+        return null;
+      default:
+        return null;
+    }
+  }
+
+  function goToStep(stepIndex: number) {
+    if (stepIndex < 0 || stepIndex >= AIRDROP_CREATE_STEPS.length) return;
+    if (stepIndex > maxReachedStep) return;
+    setError(null);
+    setShowFieldErrors(false);
+    setCurrentStep(stepIndex);
+  }
+
+  function goNextStep() {
+    const stepError = validateStep(currentStep);
+    if (stepError) {
+      setShowFieldErrors(true);
+      return;
+    }
+    setShowFieldErrors(false);
+    setError(null);
+    if (currentStep >= AIRDROP_CREATE_STEPS.length - 1) return;
+    const next = currentStep + 1;
+    setCurrentStep(next);
+    setMaxReachedStep((prev) => Math.max(prev, next));
+  }
+
+  function goBackStep() {
+    setError(null);
+    setShowFieldErrors(false);
+    setCurrentStep((prev) => Math.max(0, prev - 1));
+  }
+
+  function openConfirmModal() {
+    const stepError = validateStep(3);
+    if (stepError) {
+      if (formValidation.needsBnbFunding && isConnected) {
+        openAirdropFundingModal();
+        return;
+      }
+      setError(stepError);
+      return;
+    }
+    setError(null);
+    setConfirmOpen(true);
+  }
+
+  function closeConfirmModal() {
+    if (isPending || isConfirming) return;
+    setConfirmOpen(false);
+  }
+
+  function executeCreate() {
     setError(null);
     reset();
     approveTxHashRef.current = null;
@@ -651,12 +833,74 @@ export function CreateAirdropForm({
     return `${duration} qualify window`;
   }, [qualifyStartLocal, qualifyEndLocal]);
 
+  const qualifyStartIso = useMemo(() => {
+    const startSec = localDatetimeToUnix(qualifyStartLocal);
+    if (!Number.isFinite(startSec)) return new Date().toISOString();
+    return new Date(startSec * 1000).toISOString();
+  }, [qualifyStartLocal]);
+
   function handleQualifyStartChange(value: string) {
     setQualifyStartLocal(value);
     setQualifyEndLocal((prev) => endAfterStartOrDefault(value, prev));
   }
 
   const feeWei = effectiveCreateFee;
+
+  const selectedRewardSymbol = useMemo(
+    () => allTokens.find((t) => t.address === rewardToken)?.symbol ?? "tokens",
+    [allTokens, rewardToken]
+  );
+
+  const selectedRewardToken = useMemo(
+    () =>
+      isBnbReward || !rewardToken
+        ? null
+        : allTokens.find((t) => t.address.toLowerCase() === rewardToken.toLowerCase()) ?? null,
+    [allTokens, rewardToken, isBnbReward]
+  );
+
+  const selectedLinkedToken = useMemo(
+    () => allTokens.find((t) => t.address.toLowerCase() === linkedToken.toLowerCase()) ?? null,
+    [allTokens, linkedToken]
+  );
+
+  const rewardPriceBnb = useMemo(
+    () => (isBnbReward ? null : tokenPriceBnbFromMcap(selectedRewardToken?.marketCapBnb)),
+    [isBnbReward, selectedRewardToken?.marketCapBnb]
+  );
+
+  const poolUsdConvertOpts = useMemo((): RewardUsdConvertOpts | null => {
+    if (bnbUsd == null || !(bnbUsd > 0)) return null;
+    if (!isBnbReward && (rewardPriceBnb == null || !(rewardPriceBnb > 0))) return null;
+    return { isBnbReward, bnbUsd, priceBnb: rewardPriceBnb };
+  }, [bnbUsd, isBnbReward, rewardPriceBnb]);
+
+  const canUseMinBuyUsd = bnbUsd != null && bnbUsd > 0;
+
+  useEffect(() => {
+    if (!canUseMinBuyUsd || !bnbUsd) return;
+    setMinBuyUsdInput((prev) => {
+      if (prev.trim()) return prev;
+      return bnbAmountToUsdInput(minBuyBnb, bnbUsd);
+    });
+  }, [canUseMinBuyUsd, bnbUsd, minBuyBnb]);
+
+  function handleMinBuyUsdChange(value: string) {
+    setMinBuyUsdInput(value);
+    if (!bnbUsd || !(bnbUsd > 0)) return;
+    setMinBuyBnb(usdToBnbAmountString(value, bnbUsd));
+  }
+
+  const linkedPriceBnb = useMemo(
+    () => tokenPriceBnbFromMcap(selectedLinkedToken?.marketCapBnb),
+    [selectedLinkedToken?.marketCapBnb]
+  );
+
+  const holdUsdHint = useMemo(() => {
+    if (linkedPriceBnb == null || bnbUsd == null) return null;
+    const usd = tokenAmountUsd(Number(minHoldTokens), linkedPriceBnb, bnbUsd);
+    return usd != null ? formatUsdReadable(usd, { compact: true }) : null;
+  }, [minHoldTokens, linkedPriceBnb, bnbUsd]);
 
   const parsedRewardWei = useMemo(
     () => tryParseEtherWei(rewardAmountInput),
@@ -704,6 +948,12 @@ export function CreateAirdropForm({
     [maxRewardWei]
   );
 
+  const poolUsdInlineLabel = useMemo(() => {
+    if (!poolUsdConvertOpts || parsedRewardWei == null || parsedRewardWei <= 0n) return null;
+    const usd = rewardWeiToUsd(parsedRewardWei, poolUsdConvertOpts);
+    return usd != null ? formatUsdReadable(usd, { compact: true }) : null;
+  }, [poolUsdConvertOpts, parsedRewardWei]);
+
   const canUseRewardSlider = isConnected && maxRewardWei > 0n;
 
   const rewardSliderPct = useMemo(() => {
@@ -750,24 +1000,6 @@ export function CreateAirdropForm({
       return formatCampaignAmountInput(defaultWei > 0n ? defaultWei : maxRewardInputWei);
     });
   }, [maxRewardWei, maxRewardInputWei]);
-
-  const selectedRewardSymbol = useMemo(
-    () => allTokens.find((t) => t.address === rewardToken)?.symbol ?? "tokens",
-    [allTokens, rewardToken]
-  );
-
-  const selectedRewardToken = useMemo(
-    () =>
-      isBnbReward || !rewardToken
-        ? null
-        : allTokens.find((t) => t.address.toLowerCase() === rewardToken.toLowerCase()) ?? null,
-    [allTokens, rewardToken, isBnbReward]
-  );
-
-  const selectedLinkedToken = useMemo(
-    () => allTokens.find((t) => t.address.toLowerCase() === linkedToken.toLowerCase()) ?? null,
-    [allTokens, linkedToken]
-  );
 
   const totalBnbCost = useMemo(() => {
     if (!parsedRewardAmount) return null;
@@ -932,6 +1164,104 @@ export function CreateAirdropForm({
     gasReserveLoading,
   ]);
 
+  const fieldErrors = useMemo(() => {
+    if (!showFieldErrors) {
+      return {
+        linkedToken: null as string | null,
+        title: null as string | null,
+        rewardAsset: null as string | null,
+        rewardAmount: null as string | null,
+        qualifyStart: null as string | null,
+        qualifyEnd: null as string | null,
+        rules: null as string | null,
+        hold: null as string | null,
+        buy: null as string | null,
+      };
+    }
+
+    const next = {
+      linkedToken: null as string | null,
+      title: null as string | null,
+      rewardAsset: null as string | null,
+      rewardAmount: null as string | null,
+      qualifyStart: null as string | null,
+      qualifyEnd: null as string | null,
+      rules: null as string | null,
+      hold: null as string | null,
+      buy: null as string | null,
+    };
+
+    if (currentStep === 0) {
+      if (!linkedToken) next.linkedToken = "Select a pool token.";
+      if (!title.trim()) next.title = "Enter a campaign title.";
+    }
+
+    if (currentStep === 1) {
+      if (!isBnbReward && !rewardToken) next.rewardAsset = "Select a reward asset.";
+      if (!parsedRewardAmount) {
+        next.rewardAmount = rewardPoolValidationMessage({
+          isConnected: Boolean(address),
+          maxRewardWei,
+          rewardAmountInput,
+          parsedRewardWei,
+          isBnbReward,
+          rewardSymbol: selectedRewardSymbol,
+        });
+      }
+      const windowCheck = validateQualifyWindow(qualifyStartLocal, qualifyEndLocal);
+      if (!windowCheck.ok) {
+        next.qualifyStart = windowCheck.error;
+        next.qualifyEnd = windowCheck.error;
+      }
+    }
+
+    if (currentStep === 2) {
+      if (!rules.onchain?.minHoldWei && !rules.onchain?.minBuyBnbWei) {
+        next.rules = "Set at least one on-chain rule (min hold or min buy).";
+      } else {
+        if (minHoldTokens.trim() && !rules.onchain?.minHoldWei) {
+          next.hold = "Min hold must be a valid token amount.";
+        }
+        if (minBuyBnb.trim() && !rules.onchain?.minBuyBnbWei) {
+          next.buy = `Min buy must be a valid ${NATIVE_SYMBOL} amount.`;
+        }
+      }
+    }
+
+    return next;
+  }, [
+    showFieldErrors,
+    currentStep,
+    linkedToken,
+    title,
+    isBnbReward,
+    rewardToken,
+    parsedRewardAmount,
+    address,
+    maxRewardWei,
+    rewardAmountInput,
+    parsedRewardWei,
+    selectedRewardSymbol,
+    qualifyStartLocal,
+    qualifyEndLocal,
+    rules.onchain?.minHoldWei,
+    rules.onchain?.minBuyBnbWei,
+    minHoldTokens,
+    minBuyBnb,
+  ]);
+
+  const rewardUsdLabel = useMemo(() => {
+    if (!poolUsdConvertOpts || parsedRewardAmount == null) return null;
+    const usd = rewardWeiToUsd(parsedRewardAmount, poolUsdConvertOpts);
+    return usd != null ? formatUsdReadable(usd, { compact: true }) : null;
+  }, [poolUsdConvertOpts, parsedRewardAmount]);
+
+  const minBuyUsdLabel = useMemo(() => {
+    if (!canUseMinBuyUsd) return null;
+    const usd = bnbToUsd(Number(minBuyBnb), bnbUsd);
+    return usd != null ? formatUsdReadable(usd, { compact: true }) : null;
+  }, [canUseMinBuyUsd, minBuyBnb, bnbUsd]);
+
   if (!contracts.airdropManager) {
     return (
       <div className="notice-error p-4 text-body-sm">
@@ -952,7 +1282,6 @@ export function CreateAirdropForm({
   const busy = isPending || isConfirming || (Boolean(txHash) && !receiptOk && !error && !writeError);
   const displayError = error ?? (writeError ? formatTradeError(writeError) : null);
   const canUseFundingCta = formValidation.needsBnbFunding && isConnected;
-  const submitDisabled = busy || (!formValidation.canSubmit && !canUseFundingCta);
   const displayTitle = title.trim() || "Your campaign";
   const displayPoolSymbol = selectedLinkedToken?.symbol ?? "TOKEN";
 
@@ -987,13 +1316,8 @@ export function CreateAirdropForm({
   const rewardAssetLabel = isBnbReward ? NATIVE_SYMBOL : selectedRewardSymbol;
   const rewardAmountValue =
     parsedRewardAmount != null ? formatCampaignAmount(parsedRewardAmount) : "—";
-  const boardRewardLabel =
-    parsedRewardAmount != null
-      ? formatAirdropReward(formatEther(parsedRewardAmount), {
-          isBnb: isBnbReward,
-          symbol: selectedRewardSymbol,
-        })
-      : "—";
+  const rewardAmountRaw =
+    parsedRewardAmount != null ? formatCampaignAmountInput(parsedRewardAmount) : "0";
   const createFeeValue =
     effectiveCreateFee !== undefined || createFee !== undefined
       ? formatCampaignAmount(feeWei)
@@ -1001,60 +1325,131 @@ export function CreateAirdropForm({
   const totalBnbValue =
     totalBnbCost != null ? formatCampaignAmount(totalBnbCost) : "—";
 
-  return (
-    <form
-      onSubmit={onSubmit}
-      className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(300px,400px)] xl:items-start"
-    >
-      <div className="space-y-4">
-        <section className="panel-surface p-4 md:p-5">
-          <p className="section-label">1 · Campaign</p>
-          <p className="mt-1 field-hint">Pool token, title, and short description.</p>
+  const isReviewStep = currentStep === AIRDROP_CREATE_STEPS.length - 1;
+  const footerPrimaryLabel = !isConnected
+    ? "Connect wallet"
+    : isReviewStep
+      ? canUseFundingCta
+        ? `Add ${NATIVE_SYMBOL} to create`
+        : "Create campaign"
+      : "Continue";
+  const footerPrimaryDisabled =
+    busy || (isReviewStep && !formValidation.canSubmit && !canUseFundingCta);
 
-          <div className="mt-4 space-y-4">
+  function handleFooterPrimary() {
+    if (!isConnected) {
+      openConnectModal?.();
+      return;
+    }
+    if (isReviewStep) {
+      openConfirmModal();
+      return;
+    }
+    goNextStep();
+  }
+
+  return (
+    <>
+      <div className={`airdrops-page airdrop-create-page${isReviewStep ? " airdrop-create-page--review" : ""}`}>
+        <HubDiscoveryScrollLock />
+        <div className="airdrop-create-hub">
+          <div className="airdrop-create-page__sticky">
+            <AirdropCreateStepNav
+              currentIndex={currentStep}
+              maxReachedIndex={maxReachedStep}
+              onStepClick={goToStep}
+            />
+          </div>
+
+          <div className="airdrop-create-body">
+            <form onSubmit={onSubmit} className="airdrop-create-form">
+              {isReviewStep ? (
+                <>
+                  <AirdropCreateDetailPreview
+                    title={displayTitle}
+                    description={description}
+                    linkedToken={selectedLinkedToken}
+                    rewardAmountLabel={rewardAmountValue}
+                    rewardAmountRaw={rewardAmountRaw}
+                    isBnbReward={isBnbReward}
+                    rewardSymbol={selectedRewardSymbol}
+                    rewardToken={selectedRewardToken}
+                    minHoldTokens={minHoldTokens}
+                    minBuyBnb={minBuyBnb}
+                    socialTasks={socialTasksForSync}
+                    qualifyStartIso={qualifyStartIso}
+                    qualifyDurationLabel={qualifyDurationLabel}
+                  />
+                  {formValidation.warnings.length > 0 ? (
+                    <ul className="airdrop-create-review-warnings">
+                      {formValidation.warnings.map((warning) => (
+                        <li key={warning} className="text-caption leading-snug text-pump-warning">
+                          {warning}
+                        </li>
+                      ))}
+                      {canUseFundingCta ? (
+                        <li className="pt-1">
+                          <button
+                            type="button"
+                            onClick={openAirdropFundingModal}
+                            className="secondary-button w-full py-2 text-caption"
+                          >
+                            Add funds
+                          </button>
+                        </li>
+                      ) : null}
+                    </ul>
+                  ) : null}
+                  {displayError ? (
+                    <div className="notice-error mx-[var(--airdrops-page-gutter)] mt-3 px-3 py-2 text-caption" role="alert">
+                      {displayError}
+                    </div>
+                  ) : null}
+                </>
+              ) : (
+                <section className="airdrop-create-step-panel">
+                  <div className="airdrop-create-step-panel__body">
+            {currentStep === 0 ? (
+              <div className="space-y-4">
             <LaunchpadTokenPicker
               id="linkedToken"
               modalTitle="Select pool token"
               label={
-                <>
+                <span className="inline-flex items-center gap-1">
                   Pool token <span className="text-pump-accent">*</span>
-                </>
+                  <InfoTip label="About pool token">
+                    Holders and buyers of the pool token can qualify for this campaign.
+                  </InfoTip>
+                </span>
               }
               value={linkedToken}
               onChange={setLinkedToken}
               tokens={tokens}
-              priorityTokens={createdTokens}
+              priorityTokens={priorityTokens}
               balances={creatorBalanceMap}
               loading={tokensLoading}
               placeholder="Select a launchpad token"
-              hint={
-                selectedLinkedToken ? (
-                  <p className="field-hint inline-flex flex-wrap items-center gap-1">
-                    Holders and buyers of{" "}
-                    <TokenAssetChip
-                      address={selectedLinkedToken.address}
-                      symbol={selectedLinkedToken.symbol}
-                      logoUrl={selectedLinkedToken.logoUrl}
-                      size={14}
-                    />{" "}
-                    can qualify.
-                  </p>
-                ) : null
-              }
+              showQuickPick
+              error={fieldErrors.linkedToken}
             />
 
-            <div>
+            <div className={fieldErrors.title ? "field-group--error" : undefined}>
               <label className="field-label" htmlFor="campaignTitle">
                 Title <span className="text-pump-accent">*</span>
               </label>
-              <input
-                id="campaignTitle"
-                className="field-input"
-                placeholder="Early holder rewards"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                maxLength={120}
-              />
+              <div className={`field-control${fieldErrors.title ? " field-control--error" : ""}`}>
+                <input
+                  id="campaignTitle"
+                  className={`field-input${fieldErrors.title ? " field-input--error" : ""}`}
+                  placeholder="Early holder rewards"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  maxLength={120}
+                  aria-invalid={fieldErrors.title ? true : undefined}
+                />
+                {fieldErrors.title ? <FieldErrorIcon /> : null}
+              </div>
+              <FieldErrorMessage>{fieldErrors.title}</FieldErrorMessage>
             </div>
 
             <div>
@@ -1072,412 +1467,304 @@ export function CreateAirdropForm({
               />
               <p className="mt-1 field-hint">{description.length}/2000</p>
             </div>
-          </div>
-        </section>
-
-        <section className="panel-surface p-4 md:p-5">
-          <p className="section-label">2 · Reward & timing</p>
-          <p className="mt-1 field-hint">
-            Escrow locks until qualify ends. TOP 100 wallets split the pool.
-          </p>
-
-          <div className="mt-4 space-y-4">
-            <RewardAssetPicker
-              id="rewardAsset"
-              modalTitle="Select reward asset"
-              label={
-                <>
-                  Reward <span className="text-pump-accent">*</span>
-                </>
-              }
-              value={rewardAsset}
-              onChange={setRewardAsset}
-              tokens={tokens}
-              priorityTokens={createdTokens}
-              tokenBalances={creatorBalanceMap}
-              bnbBalance={
-                bnbBalance != null ? formatEther(bnbBalance.value) : isConnected ? "0" : null
-              }
-              loading={tokensLoading}
-              placeholder={`${NATIVE_SYMBOL} or launchpad token`}
-              hint={
-                !isConnected ? (
-                  <p className="field-hint">Connect wallet to see balances.</p>
-                ) : !isBnbReward ? (
-                  <p className="field-hint">Token rewards need one approval + create fee in {NATIVE_SYMBOL}.</p>
-                ) : null
-              }
-            />
-
-            <div>
-              <label className="field-label" htmlFor="rewardAmount">
-                Pool size <span className="text-pump-accent">*</span>
-              </label>
-              <div className="relative mt-1 max-w-xs">
-                {isBnbReward ? (
-                  <div className="pointer-events-none absolute inset-y-0 left-3 flex items-center">
-                    <BnbLogo size={20} />
-                  </div>
-                ) : selectedRewardToken ? (
-                  <div className="pointer-events-none absolute inset-y-0 left-3 flex items-center">
-                    <TokenAvatar
-                      address={selectedRewardToken.address}
-                      symbol={selectedRewardToken.symbol}
-                      logoUrl={selectedRewardToken.logoUrl}
-                      size={20}
-                    />
-                  </div>
-                ) : null}
-                <input
-                  id="rewardAmount"
-                  inputMode="decimal"
-                  value={rewardAmountInput}
-                  onChange={(e) => setRewardAmountInput(e.target.value)}
-                  placeholder="0"
-                  disabled={!isConnected}
-                  className={`field-input financial-value w-full pr-14 ${
-                    isBnbReward || selectedRewardToken ? "pl-11" : ""
-                  }`}
-                />
-                <div className="pointer-events-none absolute inset-y-0 right-3 flex items-center">
-                  <span className="text-caption font-medium text-pump-muted">
-                    {isBnbReward ? NATIVE_SYMBOL : selectedRewardSymbol}
-                  </span>
-                </div>
               </div>
-              {canUseRewardSlider ? (
-                <p className="mt-1 field-hint">
-                  Max available{" "}
-                  <span className="financial-value text-pump-text">{maxRewardLabel}</span>
-                  {isBnbReward ? ` ${NATIVE_SYMBOL}` : ` ${selectedRewardSymbol}`}.
-                </p>
-              ) : null}
+            ) : null}
 
-              {canUseFundingCta ? (
-                <div className="mt-2 rounded-md border border-pump-warning/30 bg-pump-warning/10 px-2.5 py-2">
-                  <p className="text-caption leading-snug text-pump-warning">
-                    {formValidation.fundMessage}
-                  </p>
-                  <button
-                    type="button"
-                    onClick={openAirdropFundingModal}
-                    className="secondary-button mt-2 w-full py-2 text-caption"
-                  >
-                    Add funds
-                  </button>
-                </div>
-              ) : null}
-
-              <div className="mt-3 max-w-sm">
-                <div className="flex items-center gap-2.5">
-                  <div className="relative min-w-0 flex-1 pt-1">
-                    <div
-                      className="pointer-events-none absolute top-1/2 h-1 w-full -translate-y-1/2 rounded-full bg-pump-border/25"
-                      aria-hidden
-                    />
-                    <div
-                      className="pointer-events-none absolute top-1/2 h-1 -translate-y-1/2 rounded-full bg-pump-accent/70 transition-[width] duration-75"
-                      style={{ width: `${rewardSliderFillPct}%` }}
-                      aria-hidden
-                    />
-                    <input
-                      id="rewardAmountSlider"
-                      type="range"
-                      min={0}
-                      max={100}
-                      step={1}
-                      value={rewardSliderPct}
-                      onChange={(e) => applyRewardSliderPct(Number(e.target.value))}
-                      disabled={!canUseRewardSlider}
-                      className="trade-amount-slider relative z-[1] w-full disabled:opacity-40"
-                      aria-label="Pool size slider"
-                      aria-valuetext={
-                        rewardSliderPct >= 100
-                          ? `Max (${maxRewardLabel} ${isBnbReward ? NATIVE_SYMBOL : selectedRewardSymbol})`
-                          : `${rewardSliderPct}% of available ${isBnbReward ? NATIVE_SYMBOL : selectedRewardSymbol}`
-                      }
-                    />
-                  </div>
-                  <button
-                    type="button"
-                    onMouseDown={(e) => e.preventDefault()}
-                    disabled={!canUseRewardSlider}
-                    onClick={() => applyRewardSliderPct(100)}
-                    className="chip-button shrink-0 px-2.5 py-1 text-caption disabled:opacity-40"
-                  >
-                    Max
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <div className="grid gap-4 border-t border-pump-border/15 pt-4 sm:grid-cols-2">
-              <div>
-                <label className="field-label" htmlFor="qualifyStart">
-                  Qualify starts
-                </label>
-                <input
-                  id="qualifyStart"
-                  type="datetime-local"
-                  className="field-input"
-                  value={qualifyStartLocal}
-                  min={startMinLocal}
-                  onChange={(e) => handleQualifyStartChange(e.target.value)}
-                />
-              </div>
-              <div>
-                <label className="field-label" htmlFor="qualifyEnd">
-                  Qualify ends
-                </label>
-                <input
-                  id="qualifyEnd"
-                  type="datetime-local"
-                  className="field-input"
-                  value={qualifyEndLocal}
-                  min={endMinLocal}
-                  onChange={(e) => setQualifyEndLocal(e.target.value)}
-                />
-              </div>
-            </div>
-
-            {qualifyDurationLabel ? (
-              <p className="field-hint">{qualifyDurationLabel}</p>
-            ) : (
-              <p className="text-caption text-pump-warning">
-                End must be at least 15 minutes after start.
-              </p>
-            )}
-          </div>
-        </section>
-
-        <section className="panel-surface p-4 md:p-5">
-          <p className="section-label">3 · Who qualifies</p>
-          <p className="mt-1 field-hint">Set at least one on-chain rule.</p>
-
-          <AirdropQualifyRulesEditor
-            linkedToken={selectedLinkedToken}
-            minHoldTokens={minHoldTokens}
-            minBuyBnb={minBuyBnb}
-            onMinHoldChange={setMinHoldTokens}
-            onMinBuyChange={setMinBuyBnb}
-          />
-        </section>
-
-        <section className="panel-surface overflow-hidden">
-          <button
-            type="button"
-            onClick={() => setSocialOpen((open) => !open)}
-            className="flex w-full items-center justify-between px-4 py-3.5 text-left transition hover:bg-pump-surface/40 md:px-5"
-            aria-expanded={socialOpen}
-          >
-            <div>
-              <p className="section-label">Social tasks</p>
-              <p className="mt-0.5 field-hint">Optional — skip if not needed.</p>
-            </div>
-            <span className="text-caption text-pump-muted">{socialOpen ? "−" : "+"}</span>
-          </button>
-          {socialOpen ? (
-            <div className="border-t border-pump-border/15 px-4 pb-4 pt-2 md:px-5">
-              <AirdropSocialTasksEditor
-                tasks={socialTasks}
-                onToggle={toggleSocialTask}
-                onUrlChange={updateSocialTaskUrl}
-                embedded
-              />
-            </div>
-          ) : null}
-        </section>
-      </div>
-
-      <aside className="space-y-4 xl:sticky xl:top-20 xl:min-w-[300px]">
-        <section className="panel-surface p-4 md:p-5">
-          <p className="section-label">Preview</p>
-          <div className="mt-3 flex items-center gap-2.5">
-            {selectedLinkedToken ? (
-              <TokenAvatar
-                address={selectedLinkedToken.address}
-                symbol={selectedLinkedToken.symbol}
-                logoUrl={selectedLinkedToken.logoUrl}
-                size={40}
-              />
-            ) : (
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-dashed border-pump-border/30 bg-pump-surface/40 text-caption text-pump-muted">
-                ?
-              </div>
-            )}
-            <div className="min-w-0">
-              <p className="truncate text-body-sm font-semibold text-pump-text">{displayTitle}</p>
-              <p className="mt-0.5 inline-flex flex-wrap items-center gap-1.5 text-caption text-pump-muted">
-                Pool
-                {selectedLinkedToken ? (
-                  <TokenAssetChip
-                    address={selectedLinkedToken.address}
-                    symbol={selectedLinkedToken.symbol}
-                    logoUrl={selectedLinkedToken.logoUrl}
-                    size={14}
+            {currentStep === 1 ? (
+              <div className="airdrop-create-reward-row space-y-4">
+                <div className="grid min-w-0 gap-4 lg:grid-cols-2 lg:items-start">
+                  <RewardAssetPicker
+                    id="rewardAsset"
+                    modalTitle="Select reward asset"
+                    label={
+                      <span className="inline-flex items-center gap-1">
+                        Reward <span className="text-pump-accent">*</span>
+                        <InfoTip label="About reward asset">
+                          Asset paid to qualified participants when the campaign distributes rewards.
+                        </InfoTip>
+                      </span>
+                    }
+                    value={rewardAsset}
+                    onChange={setRewardAsset}
+                    tokens={tokens}
+                    priorityTokens={priorityTokens}
+                    tokenBalances={creatorBalanceMap}
+                    bnbBalance={
+                      bnbBalance != null ? formatEther(bnbBalance.value) : isConnected ? "0" : null
+                    }
+                    loading={tokensLoading}
+                    placeholder={`${NATIVE_SYMBOL} or launchpad token`}
+                    showQuickPick
+                    error={fieldErrors.rewardAsset}
                   />
-                ) : (
-                  <span>${displayPoolSymbol}</span>
-                )}
-              </p>
-            </div>
-          </div>
-          {description.trim() ? (
-            <p className="mt-2 text-caption leading-snug text-pump-muted line-clamp-3">
-              {description.trim()}
-            </p>
-          ) : null}
-          <div className="mt-4 rounded border border-pump-border/20 bg-pump-surface/40 p-2.5">
-            <p className="section-label text-[10px]">Explore list row</p>
-            <div className="mt-2 flex items-start gap-2.5">
-              {selectedLinkedToken ? (
-                <TokenAvatar
-                  address={selectedLinkedToken.address}
-                  symbol={selectedLinkedToken.symbol}
-                  logoUrl={selectedLinkedToken.logoUrl}
-                  size={32}
-                />
-              ) : (
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-dashed border-pump-border/30 bg-pump-surface/40 text-caption text-pump-muted">
-                  ?
+
+                  <div className={`min-w-0${fieldErrors.rewardAmount ? " field-group--error" : ""}`}>
+                    <label className="field-label inline-flex items-center gap-1" htmlFor="rewardAmount">
+                      Pool size <span className="text-pump-accent">*</span>
+                      <InfoTip label="About pool size">
+                        Total reward amount locked on-chain until distribution. You fund this when you
+                        create the campaign.
+                      </InfoTip>
+                    </label>
+                    <div
+                      className={`relative mt-1 field-control${
+                        fieldErrors.rewardAmount
+                          ? " field-control--error field-control--error-with-suffix"
+                          : ""
+                      }`}
+                    >
+                      {isBnbReward ? (
+                        <div className="pointer-events-none absolute inset-y-0 left-3 z-[1] flex items-center">
+                          <BnbLogo size={20} />
+                        </div>
+                      ) : selectedRewardToken ? (
+                        <div className="pointer-events-none absolute inset-y-0 left-3 z-[1] flex items-center">
+                          <TokenAvatar
+                            address={selectedRewardToken.address}
+                            symbol={selectedRewardToken.symbol}
+                            logoUrl={selectedRewardToken.logoUrl}
+                            size={20}
+                          />
+                        </div>
+                      ) : null}
+                      <input
+                        id="rewardAmount"
+                        inputMode="decimal"
+                        value={rewardAmountInput}
+                        onChange={(e) => setRewardAmountInput(e.target.value)}
+                        placeholder="0"
+                        disabled={!isConnected}
+                        aria-invalid={fieldErrors.rewardAmount ? true : undefined}
+                        className={`field-input financial-value w-full min-w-0 ${
+                          poolUsdInlineLabel ? "pr-[5.25rem]" : "pr-14"
+                        } ${
+                          isBnbReward || selectedRewardToken ? "pl-11" : ""
+                        }${fieldErrors.rewardAmount ? " field-input--error" : ""}`}
+                      />
+                      <div className="pointer-events-none absolute inset-y-0 right-2.5 z-[1] flex max-w-[4.75rem] flex-col items-end justify-center leading-tight">
+                        <span className="text-caption font-medium text-pump-muted">
+                          {isBnbReward ? NATIVE_SYMBOL : selectedRewardSymbol}
+                        </span>
+                        {poolUsdInlineLabel && !fieldErrors.rewardAmount ? (
+                          <span className="financial-value max-w-full truncate text-[10px] tabular-nums text-pump-muted">
+                            ≈ {poolUsdInlineLabel}
+                          </span>
+                        ) : null}
+                      </div>
+                      {fieldErrors.rewardAmount ? <FieldErrorIcon /> : null}
+                    </div>
+                    <FieldErrorMessage>{fieldErrors.rewardAmount}</FieldErrorMessage>
+
+                    {canUseFundingCta ? (
+                      <div className="mt-2 rounded-md border border-pump-warning/30 bg-pump-warning/10 px-2.5 py-2">
+                        <p className="text-caption leading-snug text-pump-warning">
+                          {formValidation.fundMessage}
+                        </p>
+                        <button
+                          type="button"
+                          onClick={openAirdropFundingModal}
+                          className="secondary-button mt-2 w-full py-2 text-caption"
+                        >
+                          Add funds
+                        </button>
+                      </div>
+                    ) : null}
+
+                    <div className="mt-3 min-w-0">
+                      <div className="flex min-w-0 items-center gap-2">
+                        <div className="relative min-w-0 flex-1 pt-1">
+                          <div
+                            className="pointer-events-none absolute top-1/2 h-1 w-full -translate-y-1/2 rounded-full bg-pump-border/25"
+                            aria-hidden
+                          />
+                          <div
+                            className="pointer-events-none absolute top-1/2 h-1 -translate-y-1/2 rounded-full bg-pump-accent/70 transition-[width] duration-75"
+                            style={{ width: `${rewardSliderFillPct}%` }}
+                            aria-hidden
+                          />
+                          <input
+                            id="rewardAmountSlider"
+                            type="range"
+                            min={0}
+                            max={100}
+                            step={1}
+                            value={rewardSliderPct}
+                            onChange={(e) => applyRewardSliderPct(Number(e.target.value))}
+                            disabled={!canUseRewardSlider}
+                            className="trade-amount-slider relative z-[1] w-full disabled:opacity-40"
+                            aria-label="Pool size slider"
+                            aria-valuetext={
+                              rewardSliderPct >= 100
+                                ? `Max (${maxRewardLabel} ${isBnbReward ? NATIVE_SYMBOL : selectedRewardSymbol})`
+                                : `${rewardSliderPct}% of available ${isBnbReward ? NATIVE_SYMBOL : selectedRewardSymbol}`
+                            }
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onMouseDown={(e) => e.preventDefault()}
+                          disabled={!canUseRewardSlider}
+                          onClick={() => applyRewardSliderPct(100)}
+                          className="chip-button shrink-0 px-2.5 py-1 text-caption disabled:opacity-40"
+                        >
+                          Max
+                        </button>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-              )}
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-body-sm font-semibold text-pump-text">
-                  {displayPoolSymbol}
-                </p>
-                <p className="financial-value mt-0.5 truncate text-caption font-semibold tabular-nums text-pump-text">
-                  <span className="font-normal text-pump-muted">Reward </span>
-                  {boardRewardLabel}
-                </p>
+
+                <div className="grid min-w-0 gap-4 border-t border-pump-border/15 pt-4 sm:grid-cols-2">
+                  <LocalDateTimeField
+                    id="qualifyStart"
+                    label={
+                      <>
+                        Qualify starts
+                        <InfoTip label="About qualify start">
+                          When eligibility tracking begins — buys and wallet balances count from this
+                          time.
+                        </InfoTip>
+                      </>
+                    }
+                    value={qualifyStartLocal}
+                    min={startMinLocal}
+                    onChange={handleQualifyStartChange}
+                    error={fieldErrors.qualifyStart}
+                    showErrorMessage={false}
+                  />
+                  <LocalDateTimeField
+                    id="qualifyEnd"
+                    label={
+                      <>
+                        Qualify ends
+                        <InfoTip label="About qualify end">
+                          When eligibility closes — on-chain rules and balances are checked at this
+                          time.
+                        </InfoTip>
+                      </>
+                    }
+                    value={qualifyEndLocal}
+                    min={endMinLocal}
+                    onChange={setQualifyEndLocal}
+                    error={fieldErrors.qualifyEnd}
+                  />
+                </div>
+
+                {qualifyDurationLabel ? (
+                  <p className="field-hint">{qualifyDurationLabel}</p>
+                ) : (
+                  <p className="text-caption text-pump-warning">
+                    End must be at least 15 minutes after start.
+                  </p>
+                )}
               </div>
-            </div>
-          </div>
-          <dl className="mt-4 space-y-2 border-t border-pump-border/15 pt-4 text-caption">
-            <div className="flex justify-between gap-2">
-              <dt className="text-pump-muted">Reward</dt>
-              <dd className="min-w-0 text-right">
-                <RewardAmountDisplay
-                  amount={rewardAmountValue}
-                  isBnb={isBnbReward}
-                  token={selectedRewardToken}
-                  amountClassName="financial-value text-caption font-medium tabular-nums text-pump-text"
-                  logoSize={14}
-                />
-              </dd>
-            </div>
-            <div className="flex justify-between gap-2">
-              <dt className="text-pump-muted">Qualify</dt>
-              <dd className="financial-value text-right text-pump-text">
-                {qualifyDurationLabel ?? "Set window"}
-              </dd>
-            </div>
-            <div className="flex justify-between gap-2">
-              <dt className="shrink-0 text-pump-muted">Rules</dt>
-              <dd className="text-right">
-                <AirdropQualifyRulesPreview
+            ) : null}
+
+            {currentStep === 2 ? (
+              <div className="space-y-4">
+                <AirdropQualifyRulesEditor
                   linkedToken={selectedLinkedToken}
                   minHoldTokens={minHoldTokens}
                   minBuyBnb={minBuyBnb}
+                  onMinHoldChange={setMinHoldTokens}
+                  onMinBuyChange={setMinBuyBnb}
+                  minBuyUsdInput={canUseMinBuyUsd ? minBuyUsdInput : null}
+                  onMinBuyUsdChange={canUseMinBuyUsd ? handleMinBuyUsdChange : undefined}
+                  minBuyAssetHint={null}
+                  holdUsdHint={holdUsdHint}
+                  error={fieldErrors.rules}
+                  holdError={fieldErrors.hold}
+                  buyError={fieldErrors.buy}
                 />
-              </dd>
-            </div>
-          </dl>
-          <AirdropSocialTasksPreview tasks={socialTasksForSync} />
-        </section>
 
-        <AirdropRewardSplitPreview
-          totalReward={parsedRewardAmount}
-          assetLabel={rewardAssetLabel}
-          isBnb={isBnbReward}
-          rewardToken={selectedRewardToken}
-        />
-
-        <section className="panel-surface p-4 md:p-5">
-          <p className="section-label">Summary</p>
-          <dl className="mt-4 space-y-2.5 text-body-sm">
-            <div className="flex items-center justify-between gap-2">
-              <dt className="text-pump-muted">Reward pool</dt>
-              <dd className="min-w-0 text-right">
-                <RewardAmountDisplay
-                  amount={rewardAmountValue}
-                  isBnb={isBnbReward}
-                  token={selectedRewardToken}
-                />
-              </dd>
-            </div>
-            <div className="flex items-center justify-between gap-2">
-              <dt className="text-pump-muted">Create fee</dt>
-              <dd className="min-w-0 text-right">
-                {feeWei === 0n ? (
-                  <span className="text-caption font-medium text-pump-accent">Free (exempt)</span>
-                ) : (
-                  <BnbAmountDisplay amount={createFeeValue} />
-                )}
-              </dd>
-            </div>
-            <div className="flex items-center justify-between gap-2 border-t border-pump-border/15 pt-2">
-              <dt className="font-medium text-pump-text">Total {NATIVE_SYMBOL}</dt>
-              <dd className="min-w-0 text-right">
-                <BnbAmountDisplay
-                  amount={totalBnbValue}
-                  logoSize={20}
-                  amountClassName="financial-value font-semibold tabular-nums text-pump-text"
-                  symbolClassName="text-body-sm font-medium text-pump-muted"
-                />
-              </dd>
-            </div>
-          </dl>
-
-          {displayError ? (
-            <div className="notice-error mt-3 px-3 py-2 text-caption" role="alert">
-              {displayError}
-            </div>
-          ) : null}
-
-          {formValidation.warnings.length > 0 ? (
-            <ul className="mt-3 space-y-1 rounded-md border border-pump-warning/30 bg-pump-warning/5 px-2.5 py-2">
-              {formValidation.warnings.map((warning) => (
-                <li key={warning} className="text-[11px] leading-snug text-pump-warning">
-                  {warning}
-                </li>
-              ))}
-              {canUseFundingCta ? (
-                <li className="pt-1">
-                  <button
-                    type="button"
-                    onClick={openAirdropFundingModal}
-                    className="secondary-button w-full py-2 text-caption"
-                  >
-                    Add funds
-                  </button>
-                </li>
-              ) : null}
-            </ul>
-          ) : null}
-
-          <div className="form-action-zone mt-4 -mx-4 px-4 md:-mx-5 md:px-5">
-            {formSubmitPending && formStatusDetail ? (
-              <FormExecutionStatus phase={formSubmitPhase} detail={formStatusDetail} />
+                <div className="border-t border-pump-border/15 pt-4">
+                  <p className="mb-2 text-body-sm font-medium text-pump-text">
+                    Social tasks{" "}
+                    <span className="font-normal text-pump-muted">(optional)</span>
+                    <InfoTip label="About social tasks">
+                      Optional gate before on-chain rules unlock. Skip if not needed.
+                    </InfoTip>
+                  </p>
+                  <AirdropSocialTasksEditor
+                    tasks={socialTasks}
+                    onToggle={toggleSocialTask}
+                    onUrlChange={updateSocialTaskUrl}
+                    embedded
+                    compact
+                    showFieldErrors={showFieldErrors && currentStep === 2}
+                  />
+                </div>
+              </div>
             ) : null}
-            <button
-              type="submit"
-              disabled={submitDisabled}
-              aria-busy={formSubmitPending}
-              className={`primary-button flex w-full items-center justify-center gap-2${formSubmitPending ? " form-submit-button--loading" : ""}`}
-            >
-              {formSubmitPending ? (
-                <>
-                  <span className="trade-submit-spinner" aria-hidden />
-                  <span>{submitLabel}</span>
-                </>
-              ) : (
-                submitLabel
+
+                  </div>
+
+                  {displayError ? (
+                    <div className="notice-error mt-4 px-3 py-2 text-caption" role="alert">
+                      {displayError}
+                    </div>
+                  ) : null}
+                </section>
               )}
+
+              <div className="airdrop-create-form__actions">
+          {currentStep > 0 ? (
+            <button type="button" onClick={goBackStep} className="secondary-button min-w-0 shrink-0 px-4 sm:min-w-[7rem]">
+              Back
             </button>
+          ) : (
+            <span aria-hidden className="hidden min-w-[7rem] sm:block" />
+          )}
+          <button
+            type="button"
+            onClick={handleFooterPrimary}
+            disabled={footerPrimaryDisabled}
+            aria-busy={formSubmitPending && isReviewStep}
+            className={`primary-button flex min-w-0 flex-1 items-center justify-center gap-2 sm:flex-none sm:min-w-[7rem] sm:px-8${formSubmitPending && isReviewStep ? " form-submit-button--loading" : ""}`}
+          >
+            {formSubmitPending && isReviewStep ? (
+              <>
+                <span className="trade-submit-spinner" aria-hidden />
+                <span>{submitLabel}</span>
+              </>
+            ) : (
+              <>{footerPrimaryLabel}</>
+            )}
+          </button>
+              </div>
+            </form>
           </div>
-        </section>
-      </aside>
-    </form>
+        </div>
+      </div>
+
+      <AirdropCreateConfirmModal
+        open={confirmOpen}
+        loading={busy}
+        error={displayError}
+        title={displayTitle}
+        description={description}
+        linkedToken={selectedLinkedToken}
+        rewardAmountLabel={rewardUsdLabel ?? rewardAmountValue}
+        rewardUsdSecondary={
+          rewardUsdLabel ? `${rewardAmountValue} ${rewardAssetLabel}` : null
+        }
+        isBnbReward={isBnbReward}
+        rewardToken={selectedRewardToken}
+        qualifyLabel={qualifyDurationLabel ?? "—"}
+        minHoldTokens={minHoldTokens}
+        minBuyBnb={minBuyBnb}
+        minBuyUsdLabel={minBuyUsdLabel}
+        holdUsdLabel={holdUsdHint}
+        socialTasks={socialTasksForSync}
+        createFeeLabel={createFeeValue}
+        feeExempt={feeWei === 0n}
+        totalBnbLabel={totalBnbValue}
+        submitPhase={formSubmitPhase}
+        submitDetail={formStatusDetail}
+        submitLabel={submitLabel}
+        onClose={closeConfirmModal}
+        onConfirm={executeCreate}
+      />
+    </>
   );
 }

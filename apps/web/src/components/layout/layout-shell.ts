@@ -37,13 +37,19 @@ export function isAirdropsRoute(pathname: string): boolean {
   return pathname === "/airdrops" || pathname.startsWith("/airdrops/");
 }
 
-/** Portfolio, Arena, Missions, Airdrops — shared 68rem desktop terminal frame. */
+/** Create token wizard — same 68rem hub terminal as airdrop create. */
+export function isCreateRoute(pathname: string): boolean {
+  return pathname === "/create" || pathname.startsWith("/create/");
+}
+
+/** Portfolio, Arena, Missions, Airdrops, Create — shared 68rem desktop terminal frame. */
 export function isHubTerminalRoute(pathname: string): boolean {
   return (
     isPortfolioRoute(pathname) ||
     isArenaRoute(pathname) ||
     isMissionsRoute(pathname) ||
-    isAirdropsRoute(pathname)
+    isAirdropsRoute(pathname) ||
+    isCreateRoute(pathname)
   );
 }
 
@@ -86,6 +92,9 @@ export function shellMainLayoutClass(pathname: string, wide: boolean): string {
     return `missions-page-main mx-auto w-full flex-1 max-md:max-w-none ${hubDesktopWidth}`;
   }
   if (isAirdropsRoute(pathname)) {
+    return `airdrops-page-main mx-auto w-full flex-1 max-md:max-w-none ${hubDesktopWidth}`;
+  }
+  if (isCreateRoute(pathname)) {
     return `airdrops-page-main mx-auto w-full flex-1 max-md:max-w-none ${hubDesktopWidth}`;
   }
   return `mx-auto w-full flex-1 ${maxWidth}`;

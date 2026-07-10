@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { formatAirdropDisplayStatus } from "@/lib/airdrop-status";
+import { formatAirdropDisplayStatus, airdropStatusBadgeClass } from "@/lib/airdrop-status";
 import {
   airdropRewardUsd,
   formatAirdropReward,
@@ -17,22 +17,11 @@ import {
   airdropTimeCaption,
   type EnrichedAirdrop,
 } from "@/lib/airdrops-list-ui";
-import type { AirdropDisplayStatus } from "@/lib/airdrop-status";
 
 type AirdropMobileCampaignRowProps = {
   item: EnrichedAirdrop;
   bnbUsd: number | null;
 };
-
-function statusToneClass(status: AirdropDisplayStatus): string {
-  if (status === "QUALIFYING" || status === "CLAIMABLE") {
-    return "airdrop-mobile-campaign-row__tone--success";
-  }
-  if (status === "UPCOMING") {
-    return "airdrop-mobile-campaign-row__tone--neutral";
-  }
-  return "airdrop-mobile-campaign-row__tone--muted";
-}
 
 export function AirdropMobileCampaignRow({ item, bnbUsd }: AirdropMobileCampaignRowProps) {
   const symbol = airdropPoolSymbol(item);
@@ -87,7 +76,7 @@ export function AirdropMobileCampaignRow({ item, bnbUsd }: AirdropMobileCampaign
           <span>{countdownLabel}</span>
         </div>
         <span
-          className={`airdrop-mobile-campaign-row__status financial-value ${statusToneClass(item.displayStatus)}`}
+          className={`airdrop-mobile-campaign-row__status ${airdropStatusBadgeClass(item.displayStatus)}`}
         >
           {statusLabel}
         </span>

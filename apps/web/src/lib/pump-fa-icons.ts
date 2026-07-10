@@ -33,6 +33,7 @@ export {
   faLink,
   faListUl,
   faLayerGroup,
+  faLock,
   faMagnifyingGlass,
   faMoon,
   faParachuteBox,
