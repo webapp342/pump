@@ -1,7 +1,6 @@
 import { createPublicClient, formatEther, http } from "viem";
 import { memeFactoryAbi } from "@/lib/abis/meme-factory";
 import { contracts, pumpChain, rpcUrl } from "@/config/chain";
-import { DEFAULT_MIN_INITIAL_BUY_BNB } from "@/lib/platform-settings";
 
 const publicClient = createPublicClient({
   chain: pumpChain,
@@ -19,6 +18,6 @@ export async function readMinInitialBuyBnb(): Promise<string> {
     if (wei > 0n) return formatEther(wei);
     return "0";
   } catch {
-    return DEFAULT_MIN_INITIAL_BUY_BNB;
+    return "0";
   }
 }

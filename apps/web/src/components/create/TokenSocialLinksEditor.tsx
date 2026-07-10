@@ -2,6 +2,8 @@
 
 import type { TokenSocialLinks } from "@/lib/token-social";
 import { FieldErrorIcon, FieldErrorMessage } from "@/components/ui/FieldError";
+import { InfoTip } from "@/components/ui/InfoTip";
+import { PumpIcon, faChevronDown } from "@/lib/icons";
 
 export type TokenSocialLinkKey = keyof TokenSocialLinks;
 
@@ -35,16 +37,15 @@ export function createEmptyTokenSocialLinksState(): TokenSocialLinksState {
 export function tokenSocialLinksToPayload(links: TokenSocialLinksState): TokenSocialLinks {
   const out: TokenSocialLinks = {};
   for (const field of TOKEN_SOCIAL_LINK_FIELDS) {
-    if (!links[field.key].enabled) continue;
     const trimmed = links[field.key].value.trim();
     if (trimmed) out[field.key] = trimmed;
   }
   return out;
 }
 
-function validateSocialUrl(value: string): string | null {
+export function validateSocialUrl(value: string): string | null {
   const trimmed = value.trim();
-  if (!trimmed) return "Enter a URL";
+  if (!trimmed) return null;
   if (!/^https?:\/\//i.test(trimmed)) return "URL must start with http:// or https://";
   return null;
 }
@@ -53,7 +54,6 @@ type TokenSocialLinksEditorProps = {
   links: TokenSocialLinksState;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onToggle: (key: TokenSocialLinkKey) => void;
   onChange: (key: TokenSocialLinkKey, value: string) => void;
   showFieldErrors?: boolean;
 };
@@ -62,81 +62,81 @@ export function TokenSocialLinksEditor({
   links,
   open,
   onOpenChange,
-  onToggle,
   onChange,
   showFieldErrors = false,
 }: TokenSocialLinksEditorProps) {
-  const enabledCount = TOKEN_SOCIAL_LINK_FIELDS.filter((field) => links[field.key].enabled).length;
+  const filledCount = TOKEN_SOCIAL_LINK_FIELDS.filter((field) => links[field.key].value.trim()).length;
+  const summary =
+    filledCount === 0
+      ? "None added"
+      : filledCount === 1
+        ? "1 link added"
+        : `${filledCount} links added`;
 
   return (
-    <div className="token-create-social-field token-create-field-cell min-w-0">
-      <label className="field-label" htmlFor="token-social-trigger">
-        Social links <span className="font-normal text-pump-muted">(optional)</span>
-      </label>
-      <button
-        id="token-social-trigger"
-        type="button"
-        onClick={() => onOpenChange(!open)}
-        className="token-create-social-trigger field-control w-full text-left"
-        aria-expanded={open}
-      >
-        <span className="min-w-0 truncate text-body-sm text-pump-text">
-          {enabledCount > 0 ? `${enabledCount} selected` : "Add links"}
+    <div className="token-create-social">
+      <div className="token-create-social__toggle-row">
+        <span id="token-social-toggle-label" className="field-label mb-0 inline-flex items-center gap-1">
+          Social links <span className="font-normal text-pump-muted">(optional)</span>
+          <InfoTip label="About social links">
+            Shown on your coin page after launch. Leave blank if you don&apos;t have them yet. URLs must
+            start with http:// or https://
+          </InfoTip>
         </span>
-        <span className="shrink-0 text-caption text-pump-muted" aria-hidden>
-          {open ? "−" : "+"}
-        </span>
-      </button>
+        <button
+          type="button"
+          id="token-social-toggle"
+          className="token-create-social__toggle"
+          onClick={() => onOpenChange(!open)}
+          aria-expanded={open}
+          aria-controls="token-social-panel"
+          aria-labelledby="token-social-toggle-label"
+        >
+          <span className="token-create-social__toggle-meta">
+            {!open ? <span className="text-caption text-pump-muted">{summary}</span> : null}
+            <PumpIcon
+              icon={faChevronDown}
+              className={`h-3.5 w-3.5 shrink-0 text-pump-muted transition-transform${open ? " rotate-180" : ""}`}
+            />
+          </span>
+        </button>
+      </div>
 
       {open ? (
-        <div className="token-create-social-panel">
-          <ul className="token-create-social-panel__list">
-            {TOKEN_SOCIAL_LINK_FIELDS.map((field) => {
-              const draft = links[field.key];
-              const urlError =
-                draft.enabled && (showFieldErrors || draft.value.trim())
-                  ? validateSocialUrl(draft.value)
-                  : null;
+        <div id="token-social-panel" className="token-create-social__grid">
+          {TOKEN_SOCIAL_LINK_FIELDS.map((field) => {
+            const draft = links[field.key];
+            const error = validateSocialUrl(draft.value);
+            const showError = Boolean(error && (showFieldErrors || draft.value.trim()));
 
-              return (
-                <li key={field.key} className="airdrop-create-social-task-row">
-                  <label className="airdrop-create-social-task-row__toggle">
-                    <input
-                      type="checkbox"
-                      className="h-4 w-4 shrink-0 accent-pump-accent"
-                      checked={draft.enabled}
-                      onChange={() => onToggle(field.key)}
-                    />
-                    <span className="min-w-0 truncate text-body-sm font-medium text-pump-text">
-                      {field.label}
-                    </span>
-                  </label>
-                  {draft.enabled ? (
-                    <div
-                      className={`airdrop-create-social-task-row__field${urlError ? " field-group--error" : ""}`}
-                    >
-                      <div className={`field-control${urlError ? " field-control--error" : ""}`}>
-                        <input
-                          type="url"
-                          inputMode="url"
-                          className={`field-input airdrop-create-social-task-row__input min-w-0${urlError ? " field-input--error" : ""}`}
-                          placeholder={field.placeholder}
-                          value={draft.value}
-                          onChange={(e) => onChange(field.key, e.target.value)}
-                          autoCapitalize="none"
-                          autoCorrect="off"
-                          spellCheck={false}
-                          aria-invalid={urlError ? true : undefined}
-                        />
-                        {urlError ? <FieldErrorIcon /> : null}
-                      </div>
-                      <FieldErrorMessage>{urlError}</FieldErrorMessage>
-                    </div>
-                  ) : null}
-                </li>
-              );
-            })}
-          </ul>
+            return (
+              <div
+                key={field.key}
+                className={`token-create-field-cell${showError ? " field-group--error" : ""}`}
+              >
+                <label className="field-label" htmlFor={`token-social-${field.key}`}>
+                  {field.label}
+                </label>
+                <div className={`field-control${showError ? " field-control--error" : ""}`}>
+                  <input
+                    id={`token-social-${field.key}`}
+                    type="url"
+                    inputMode="url"
+                    className={`field-input${showError ? " field-input--error" : ""}`}
+                    placeholder={field.placeholder}
+                    value={draft.value}
+                    onChange={(e) => onChange(field.key, e.target.value)}
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    aria-invalid={showError ? true : undefined}
+                  />
+                  {showError ? <FieldErrorIcon /> : null}
+                </div>
+                <FieldErrorMessage>{showError ? error : null}</FieldErrorMessage>
+              </div>
+            );
+          })}
         </div>
       ) : null}
     </div>

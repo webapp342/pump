@@ -46,7 +46,6 @@ import {
 import { FieldErrorIcon, FieldErrorMessage } from "@/components/ui/FieldError";
 import { FormExecutionStatus } from "@/components/ui/FormExecutionStatus";
 import { InfoTip } from "@/components/ui/InfoTip";
-import { DEFAULT_MIN_INITIAL_BUY_BNB } from "@/lib/platform-settings";
 import { formatCampaignAmount } from "@/lib/airdrop-board-format";
 import { useCreateGasReserve } from "@/hooks/useCreateGasReserve";
 
@@ -82,7 +81,6 @@ export function CreateMemeForm() {
   const [symbol, setSymbol] = useState("");
   const [description, setDescription] = useState("");
   const [initialBuyBnb, setInitialBuyBnb] = useState("");
-  const [socialOpen, setSocialOpen] = useState(false);
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -90,6 +88,7 @@ export function CreateMemeForm() {
   const [uploadStatus, setUploadStatus] = useState<string | null>(null);
   const [launchSuccess, setLaunchSuccess] = useState<LaunchSuccess | null>(null);
   const [showFieldErrors, setShowFieldErrors] = useState(false);
+  const [socialOpen, setSocialOpen] = useState(false);
   const [socialLinks, setSocialLinks] = useState<TokenSocialLinksState>(createEmptyTokenSocialLinksState);
 
   logoFileRef.current = logoFile;
@@ -97,17 +96,14 @@ export function CreateMemeForm() {
   descriptionRef.current = description;
   socialLinksRef.current = tokenSocialLinksToPayload(socialLinks);
 
-  const { data: minInitialBuyWeiOnChain } = useReadContract({
+  const { data: minInitialBuyWeiOnChain, isFetched: minInitialBuyFetched } = useReadContract({
     address: contracts.memeFactory,
     abi: memeFactoryAbi,
     functionName: "minInitialBuyWei",
     chainId: pumpChain.id,
   });
 
-  const minInitialBuyWei = useMemo(() => {
-    if (minInitialBuyWeiOnChain !== undefined) return minInitialBuyWeiOnChain;
-    return parseEther(DEFAULT_MIN_INITIAL_BUY_BNB);
-  }, [minInitialBuyWeiOnChain]);
+  const minInitialBuyWei = minInitialBuyWeiOnChain ?? 0n;
 
   const minInitialBuyBnb = useMemo(
     () => (minInitialBuyWei > 0n ? formatCampaignAmount(minInitialBuyWei) : "0"),
@@ -347,26 +343,18 @@ export function CreateMemeForm() {
     setInitialBuyBnb(cleaned);
   }
 
-  function toggleSocialLink(key: TokenSocialLinkKey) {
-    setSocialLinks((prev) => ({
-      ...prev,
-      [key]: { ...prev[key], enabled: !prev[key].enabled },
-    }));
-  }
-
   function updateSocialLink(key: TokenSocialLinkKey, value: string) {
     setSocialLinks((prev) => ({
       ...prev,
-      [key]: { ...prev[key], value },
+      [key]: { enabled: value.trim().length > 0, value },
     }));
   }
 
   function hasSocialFieldError(): boolean {
     for (const field of TOKEN_SOCIAL_LINK_FIELDS) {
-      const draft = socialLinks[field.key];
-      if (!draft.enabled) continue;
-      const trimmed = draft.value.trim();
-      if (!trimmed || !/^https?:\/\//i.test(trimmed)) return true;
+      const trimmed = socialLinks[field.key].value.trim();
+      if (!trimmed) continue;
+      if (!/^https?:\/\//i.test(trimmed)) return true;
     }
     return false;
   }
@@ -409,12 +397,12 @@ export function CreateMemeForm() {
       setError("Token logo is required.");
       return;
     }
-    if (initialBuyWei === 0n && minInitialBuyWei > 0n) {
+    if (minInitialBuyFetched && initialBuyWei === 0n && minInitialBuyWei > 0n) {
       setError(`Minimum initial buy is ${minInitialBuyBnb} ${NATIVE_SYMBOL}.`);
       return;
     }
     if (initialBuyWei > 0n) {
-      if (minInitialBuyWei > 0n && initialBuyWei < minInitialBuyWei) {
+      if (minInitialBuyFetched && minInitialBuyWei > 0n && initialBuyWei < minInitialBuyWei) {
         setError(`Minimum initial buy is ${minInitialBuyBnb} ${NATIVE_SYMBOL}.`);
         return;
       }
@@ -468,10 +456,10 @@ export function CreateMemeForm() {
     if (!symbol.trim()) next.symbol = "Enter a ticker.";
     if (!logoFile) next.logo = "Upload a token logo.";
 
-    if (initialBuyWei === 0n && minInitialBuyWei > 0n) {
+    if (minInitialBuyFetched && initialBuyWei === 0n && minInitialBuyWei > 0n) {
       next.initialBuy = `Minimum initial buy is ${minInitialBuyBnb} ${NATIVE_SYMBOL}.`;
     } else if (initialBuyWei > 0n) {
-      if (minInitialBuyWei > 0n && initialBuyWei < minInitialBuyWei) {
+      if (minInitialBuyFetched && minInitialBuyWei > 0n && initialBuyWei < minInitialBuyWei) {
         next.initialBuy = `Minimum initial buy is ${minInitialBuyBnb} ${NATIVE_SYMBOL}.`;
       } else if (minInitialBuyTokens === 0n) {
         next.initialBuy = "Initial buy is too small for the bonding curve.";
@@ -485,6 +473,7 @@ export function CreateMemeForm() {
     symbol,
     logoFile,
     initialBuyWei,
+    minInitialBuyFetched,
     minInitialBuyWei,
     minInitialBuyBnb,
     minInitialBuyTokens,
@@ -538,7 +527,8 @@ export function CreateMemeForm() {
           : "Create token";
 
   const displaySymbol = symbol.trim() || "TICKER";
-  const submitDisabled = isBusy || (isConnected && (wrongChain || !contractsReady));
+  const submitDisabled =
+    isBusy || (isConnected && (wrongChain || !contractsReady || !minInitialBuyFetched));
 
   function handleLaunch() {
     if (!isConnected) {
@@ -549,9 +539,10 @@ export function CreateMemeForm() {
 
     const hasRequiredFieldError = !name.trim() || !symbol.trim() || !logoFile;
     const hasBuyFieldError =
-      (initialBuyWei === 0n && minInitialBuyWei > 0n) ||
-      (initialBuyWei > 0n &&
-        ((minInitialBuyWei > 0n && initialBuyWei < minInitialBuyWei) || minInitialBuyTokens === 0n));
+      minInitialBuyFetched &&
+      ((initialBuyWei === 0n && minInitialBuyWei > 0n) ||
+        (initialBuyWei > 0n &&
+          ((minInitialBuyWei > 0n && initialBuyWei < minInitialBuyWei) || minInitialBuyTokens === 0n)));
 
     if (hasRequiredFieldError || hasBuyFieldError || hasSocialFieldError()) {
       setShowFieldErrors(true);
@@ -644,36 +635,36 @@ export function CreateMemeForm() {
             <form onSubmit={onSubmit} className="airdrop-create-form">
               <section className="airdrop-create-step-panel">
                 <div className="airdrop-create-step-panel__body">
-                  <div className="token-create-sheet space-y-4">
-                    <p className="section-label">Token profile</p>
+                  <div className="token-create-sheet">
+                    <div className="token-create-stack">
+                        <div
+                          className={`token-create-identity__logo${fieldErrors.logo ? " field-group--error" : ""}`}
+                        >
+                          <TokenAvatar
+                            address="0x0000000000000000000000000000000000000000"
+                            symbol={displaySymbol}
+                            previewUrl={logoPreview}
+                            size={64}
+                          />
+                          <label
+                            htmlFor="logo"
+                            className="secondary-button cursor-pointer px-3 py-1.5 text-caption"
+                          >
+                            Upload <span className="text-pump-accent">*</span>
+                          </label>
+                          <input
+                            id="logo"
+                            type="file"
+                            accept={LOGO_ACCEPT}
+                            onChange={onLogoChange}
+                            className="hidden"
+                            aria-invalid={fieldErrors.logo ? true : undefined}
+                          />
+                          <p className="field-hint text-center">Max 2 MB</p>
+                          <FieldErrorMessage>{fieldErrors.logo}</FieldErrorMessage>
+                        </div>
 
-                    <div className="token-create-identity">
-                      <div
-                        className={`token-create-identity__logo${fieldErrors.logo ? " field-group--error" : ""}`}
-                      >
-                        <TokenAvatar
-                          address="0x0000000000000000000000000000000000000000"
-                          symbol={displaySymbol}
-                          previewUrl={logoPreview}
-                          size={72}
-                        />
-                        <label htmlFor="logo" className="secondary-button cursor-pointer px-3 py-1.5 text-caption">
-                          Upload <span className="text-pump-accent">*</span>
-                        </label>
-                        <input
-                          id="logo"
-                          type="file"
-                          accept={LOGO_ACCEPT}
-                          onChange={onLogoChange}
-                          className="hidden"
-                          aria-invalid={fieldErrors.logo ? true : undefined}
-                        />
-                        <p className="field-hint text-center">PNG, JPEG, WebP or GIF · Max 2 MB</p>
-                        <FieldErrorMessage>{fieldErrors.logo}</FieldErrorMessage>
-                      </div>
-
-                      <div className="token-create-identity__fields min-w-0">
-                        <div className="token-create-field-grid">
+                        <div className="token-create-field-grid min-w-0">
                           <div
                             className={`token-create-field-cell${fieldErrors.name ? " field-group--error" : ""}`}
                           >
@@ -715,18 +706,45 @@ export function CreateMemeForm() {
                             </div>
                             <FieldErrorMessage>{fieldErrors.symbol}</FieldErrorMessage>
                           </div>
+                        </div>
+
+                        <div className="token-create-field-grid min-w-0">
+                          <div className="token-create-field-cell">
+                            <label className="field-label" htmlFor="description">
+                              Description{" "}
+                              <span className="font-normal text-pump-muted">(optional)</span>
+                            </label>
+                            <textarea
+                              id="description"
+                              maxLength={2000}
+                              rows={3}
+                              value={description}
+                              onChange={(e) => setDescription(e.target.value)}
+                              placeholder="What is this coin about?"
+                              className="field-textarea min-h-[4.5rem]"
+                            />
+                            <p className="field-hint">{description.length}/2000</p>
+                          </div>
 
                           <div
                             className={`token-create-field-cell${fieldErrors.initialBuy ? " field-group--error" : ""}`}
                           >
                             <label className="field-label inline-flex items-center gap-1" htmlFor="initialBuy">
-                              Initial buy
-                              <span className="font-normal text-pump-muted">(optional)</span>
+                              Initial buy{" "}
+                              {minInitialBuyFetched && minInitialBuyWei > 0n ? (
+                                <span className="text-pump-accent">*</span>
+                              ) : (
+                                <span className="font-normal text-pump-muted">(optional)</span>
+                              )}
                               <InfoTip label="About initial buy">
-                                Seed liquidity at launch. Leave blank to pay only the create fee.
-                                {minInitialBuyWei > 0n
-                                  ? ` Minimum when used: ${minInitialBuyBnb} ${NATIVE_SYMBOL}.`
-                                  : null}
+                                {minInitialBuyFetched && minInitialBuyWei > 0n ? (
+                                  <>
+                                    On-chain minimum is {minInitialBuyBnb} {NATIVE_SYMBOL}. You must buy at least
+                                    this much at launch (in addition to the create fee).
+                                  </>
+                                ) : (
+                                  <>Seed liquidity at launch. Leave blank to pay only the create fee.</>
+                                )}
                               </InfoTip>
                             </label>
                             <div
@@ -751,34 +769,16 @@ export function CreateMemeForm() {
                             </div>
                             <FieldErrorMessage>{fieldErrors.initialBuy}</FieldErrorMessage>
                           </div>
-
-                          <TokenSocialLinksEditor
-                            links={socialLinks}
-                            open={socialOpen}
-                            onOpenChange={setSocialOpen}
-                            onToggle={toggleSocialLink}
-                            onChange={updateSocialLink}
-                            showFieldErrors={showFieldErrors}
-                          />
                         </div>
 
-                        <div className="token-create-description">
-                          <label className="field-label" htmlFor="description">
-                            Description
-                          </label>
-                          <textarea
-                            id="description"
-                            maxLength={2000}
-                            rows={3}
-                            value={description}
-                            onChange={(e) => setDescription(e.target.value)}
-                            placeholder="What is this coin about?"
-                            className="field-textarea min-h-[5rem]"
-                          />
-                          <p className="mt-1 field-hint">{description.length}/2000</p>
-                        </div>
+                        <TokenSocialLinksEditor
+                          links={socialLinks}
+                          open={socialOpen}
+                          onOpenChange={setSocialOpen}
+                          onChange={updateSocialLink}
+                          showFieldErrors={showFieldErrors}
+                        />
                       </div>
-                    </div>
 
                     {statusBlock}
                   </div>
