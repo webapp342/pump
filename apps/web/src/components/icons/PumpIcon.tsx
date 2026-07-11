@@ -1,17 +1,47 @@
 "use client";
 
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import type { IconProp } from "@fortawesome/fontawesome-svg-core";
+import { materialSymbols } from "@/lib/fonts";
 
-export type { IconDefinition as PumpIconDefinition, IconProp as PumpIconProp } from "@fortawesome/fontawesome-svg-core";
+export type MaterialSymbolSpec = {
+  name: string;
+  filled?: boolean;
+};
+
+export type PumpIconDefinition = string | MaterialSymbolSpec;
+export type PumpIconProp = PumpIconDefinition;
+
+function resolveSymbol(icon: PumpIconDefinition): MaterialSymbolSpec {
+  if (typeof icon === "string") return { name: icon, filled: false };
+  if (typeof icon === "object" && icon != null && typeof icon.name === "string" && icon.name.length > 0) {
+    return { name: icon.name, filled: icon.filled ?? false };
+  }
+  return { name: "help", filled: false };
+}
 
 type PumpIconProps = {
-  icon: IconProp;
+  icon: PumpIconDefinition;
   className?: string;
   fixedWidth?: boolean;
 };
 
-/** Font Awesome icon wrapper — use with icons from `@/lib/pump-fa-icons`. */
-export function PumpIcon({ icon, className, fixedWidth = false }: PumpIconProps) {
-  return <FontAwesomeIcon icon={icon} className={className} fixedWidth={fixedWidth} aria-hidden />;
+/** Material Symbols Rounded — use icons from `@/lib/pump-icons`. */
+export function PumpIcon({ icon, className = "", fixedWidth = false }: PumpIconProps) {
+  const spec = resolveSymbol(icon);
+
+  return (
+    <span
+      className={[
+        materialSymbols.className,
+        "material-symbols-rounded",
+        spec.filled ? "material-symbols-rounded--filled" : "",
+        fixedWidth ? "material-symbols-rounded--fixed" : "",
+        className,
+      ]
+        .filter(Boolean)
+        .join(" ")}
+      aria-hidden
+    >
+      {spec.name}
+    </span>
+  );
 }

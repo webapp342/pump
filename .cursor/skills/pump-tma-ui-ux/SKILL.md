@@ -49,10 +49,9 @@ Two Coinbase CDS themes via `data-theme` on `<html>`: `light`, `dark`. CSS vars 
 
 ## Icons & loading
 
-- Icons: `lucide-react` with `ICON_STROKE` from `src/lib/icons.ts`
-- Section icons: `SectionHeadingIcon`, `IconLabel` from `src/components/ui/IconLabel.tsx`
-- Skeletons: `Skeleton` component + route-level `loading.tsx` with `AppShell`
-- Metric icons: `MetricIcons` in `src/lib/metric-icons.ts`
+- Icons: `PumpIcon` + `@/lib/pump-icons` (Material Symbols Rounded)
+- Section icons: `IconLabel`, `MetricIcons` in `src/lib/metric-icons.ts`
+- Skeletons: `Skeleton` + route `loading.tsx` with `AppShell`
 
 ## Web layout constraints
 

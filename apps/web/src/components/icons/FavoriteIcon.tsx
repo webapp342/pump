@@ -1,5 +1,5 @@
 import { PumpIcon } from "@/lib/icons";
-import { faStarRegular, faStarSolid } from "@/lib/pump-fa-icons";
+import { faStarRegular, faStarSolid } from "@/lib/pump-icons";
 
 type FavoriteIconProps = {
   active: boolean;

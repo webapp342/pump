@@ -7,7 +7,7 @@ import {
   faTelegram,
   faWhatsapp,
   faXTwitter,
-} from "@/lib/pump-fa-icons";
+} from "@/lib/pump-icons";
 
 type BrandIconProps = {
   className?: string;

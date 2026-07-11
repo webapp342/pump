@@ -1,5 +1,5 @@
 import { PumpIcon } from "@/lib/icons";
-import { faAirdropParachute } from "@/lib/pump-fa-icons";
+import { faAirdropParachute } from "@/lib/pump-icons";
 
 type AirdropPromoIconProps = {
   className?: string;

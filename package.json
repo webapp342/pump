@@ -16,7 +16,8 @@
     "typecheck": "npm run typecheck -w @pump/web",
     "lint": "npm run lint -w @pump/web",
     "bulk-launch": "node --env-file=.env scripts/bulk-launch-tokens.mjs",
-    "arena-sim": "node --env-file=.env scripts/arena-table-sim.mjs"
+    "arena-sim": "node --env-file=.env scripts/arena-table-sim.mjs",
+    "21st": "21st"
   },
   "overrides": {
     "qr": "0.5.5"

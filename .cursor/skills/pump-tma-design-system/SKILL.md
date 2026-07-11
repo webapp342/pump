@@ -20,6 +20,10 @@ Authoritative visual and layout spec for Pump. Supersedes spreadsheet/Excel meta
 6. **4px spacing grid** — All padding, gaps, and min-heights on multiples of 4. Touch targets ≥ 44px on primary trade actions.
 7. **Motion with purpose** — 100–150ms transitions on hover/focus; live price flash animations preserved. Respect `prefers-reduced-motion`.
 
+## Supplementary research
+
+For UX audits, anti-patterns, or accessibility checklists on **new** surfaces, run `ui-ux-pro-max` search (see `.cursor/rules/pump-tma-skills.mdc`). **Do not** override Pump tokens, Geist typography, or Coinbase CDS palette with generic skill output.
+
 ## Research references
 
 | Pattern | Sector standard | Sources |

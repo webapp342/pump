@@ -30,6 +30,31 @@ pump-tma/
 | Admin build | `npm run build:admin` |
 | Typecheck | `npm run typecheck` |
 
+## 21st.dev CLI (component search / publish)
+
+Global install (once per machine):
+
+```bash
+npm i -g @21st-dev/cli
+21st login
+```
+
+Common commands (from repo root):
+
+```bash
+21st search "pricing table"
+21st add shadcn/button          # review + map to pump-* tokens before shipping
+21st publish ./MyComponent.tsx --description "…"
+21st edit my-slug --type component --visibility public
+21st delete my-slug --type component --yes
+```
+
+**Cursor MCP:** `.cursor/mcp.json` points at `https://21st.dev/api/mcp` with `API_KEY_21ST` from [21st.dev/mcp](https://21st.dev/mcp). Add the key to root `.env`, restart Cursor.
+
+**CI:** skip `21st login`; set `API_KEY_21ST` (or `TWENTYFIRST_TOKEN`) or pass `--api-key`.
+
+**Pump note:** prefer `pump-tma-design-system` + `globals.css` classes over raw shadcn installs — adapt 21st output to existing tokens.
+
 ## Env files
 
 | Path | Service |

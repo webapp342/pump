@@ -21,9 +21,9 @@ import {
   faUsers,
   faWallet,
   faZap,
-} from "@/lib/pump-fa-icons";
+} from "@/lib/pump-icons";
 
-/** Font Awesome icons for metrics, sections, and table headers. */
+/** Material Symbols for metrics, sections, and table headers. */
 export const MetricIcons = {
   mcap: faCircleDollarSign,
   vol24h: faActivity,

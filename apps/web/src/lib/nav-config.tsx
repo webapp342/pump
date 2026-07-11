@@ -1,5 +1,5 @@
 import type { PumpIconDefinition } from "@/lib/icons";
-import { faAirdropParachute, faArrowLeftRight, faList, faTarget, faWallet } from "@/lib/pump-fa-icons";
+import { faAirdropParachute, faArrowLeftRight, faList, faTarget, faWallet } from "@/lib/pump-icons";
 
 export type AppNavItem = {
   href: string;

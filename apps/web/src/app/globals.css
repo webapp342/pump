@@ -16211,7 +16211,32 @@ code,
   }
 }
 
-.svg-inline--fa {
+.material-symbols-rounded {
+  font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24;
+  font-feature-settings: "liga";
+  line-height: 1;
   display: inline-block;
   vertical-align: -0.125em;
+  user-select: none;
+  font-size: 1.25rem;
+  width: 1em;
+  height: 1em;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+.material-symbols-rounded--filled {
+  font-variation-settings: "FILL" 1, "wght" 400, "GRAD" 0, "opsz" 24;
+}
+
+.material-symbols-rounded--fixed {
+  width: 1.25em;
+  text-align: center;
+}
+
+.bottom-nav-icon.material-symbols-rounded {
+  font-size: var(--mobile-bottom-nav-icon-size);
+  width: var(--mobile-bottom-nav-icon-size);
+  height: var(--mobile-bottom-nav-icon-size);
 }

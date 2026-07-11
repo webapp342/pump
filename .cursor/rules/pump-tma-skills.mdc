@@ -5,29 +5,51 @@ alwaysApply: true
 
 # Pump TMA — Project Skills
 
-Before implementing or researching in this repo, read and follow the matching skill in `.cursor/skills/`:
+## UI/UX priority (this repo)
 
-| Task | Skill |
-|------|-------|
-| Docs, APIs, versions, current web facts | `research-verified` |
-| **Ultra-fast Faz 2–6, DB/Redis/WS architecture** | `.cursor/docs/ultra-fast-architecture-phases-2-6.md` |
-| **Strateji + sektör karşılaştırma + tier roadmap** | `.cursor/docs/ultra-fast-strategy-2026.md` |
-| **99.9% price accuracy (spot/quote/fill)** | `.cursor/docs/price-accuracy-contract.md` |
-| **Seamless Web3 UX / AA araştırma** | `.cursor/docs/seamless-web3-ux-research-2026.md` |
-| **Self-hosted bundler (Alto, no Pimlico SaaS)** | `.cursor/docs/self-hosted-bundler-2026.md` |
-| **Account Abstraction (Telegram/Kernel/Alto)** | `pump-tma-account-abstraction` |
-| **Telegram OIDC login / auth modal / BotFather** | `pump-tma-telegram-auth` |
-| **Admin console IA, copy, layout** | `pump-tma-admin-console` |
-| Design system, tokens, nav, layout specs | `pump-tma-design-system` |
-| Pages, modals, forms, styling, trading UI | `pump-tma-ui-ux` |
-| App Router pages, API routes, PostgreSQL layer | `pump-tma-nextjs` |
-| wagmi, viem, AppKit, on-chain writes | `pump-tma-web3` |
-| Smart wallet, session keys, gasless tx | `pump-tma-account-abstraction` |
+When skills conflict, follow this order:
+
+1. **`pump-tma-design-system`** — tokens, nav, typography, fintech dark/light (source of truth)
+2. **`pump-tma-ui-ux`** — component classes, pages, trading patterns in `apps/web/src/`
+3. **`ui-ux-pro-max`** — research only: UX checklist, anti-patterns, accessibility, industry reasoning via search script
+4. **Ignore for Pump UI:** shadcn/MUI patterns, generic landing-page palettes from ui-ux-pro-max
+
+**Never** replace Pump `pump-*` tokens or `globals.css` component classes with ui-ux-pro-max generated colors/fonts unless the user explicitly asks for a full rebrand.
+
+### ui-ux-pro-max search (optional research)
+
+From repo root (Python 3 required):
+
+```powershell
+python .cursor/skills/ui-ux-pro-max/scripts/search.py "fintech crypto trading launchpad" --design-system -p "Pump"
+python .cursor/skills/ui-ux-pro-max/scripts/search.py "dashboard data density accessibility" --domain ux
+```
+
+Use output for UX review and checklist — map recommendations onto existing Pump tokens and patterns.
+
+## Skill routing
+
+| Task | Skill / doc |
+|------|-------------|
+| Docs, APIs, versions, web facts | global `research-verified` (`~/.cursor/skills/`) |
+| Ultra-fast Faz 2–6, DB/Redis/WS | `.cursor/docs/ultra-fast-architecture-phases-2-6.md` |
+| Strategy + tier roadmap | `.cursor/docs/ultra-fast-strategy-2026.md` |
+| 99.9% price accuracy (spot/quote/fill) | `.cursor/docs/price-accuracy-contract.md` |
+| Seamless Web3 UX / AA | `.cursor/docs/seamless-web3-ux-research-2026.md` |
+| Self-hosted bundler (Alto) | `.cursor/docs/self-hosted-bundler-2026.md` |
+| Account Abstraction | `pump-tma-account-abstraction` |
+| Telegram OIDC login | `pump-tma-telegram-auth` |
+| Admin console | `pump-tma-admin-console` |
+| Design system (tokens, nav, layout) | `pump-tma-design-system` |
+| Pages, modals, trading UI | `pump-tma-ui-ux` |
+| Next.js / API / PostgreSQL | `pump-tma-nextjs` |
+| wagmi, viem, on-chain writes | `pump-tma-web3` |
 
 ## Defaults
 
-- **UI work:** Read `pump-tma-design-system` first, then `pump-tma-ui-ux`. Top nav + mobile bottom bar — no left sidebar.
-- Verify library APIs via Context7 (`user-context7`) — do not guess versions or syntax.
-- Match existing patterns in `apps/web/src/` before introducing new libraries or UI primitives.
-- No shadcn/MUI; use `globals.css` component classes and `pump-*` tokens.
-- Dev server: `npm run dev` (web :3012) · `npm run dev:admin` (:5174). Layout: `docs/repo-structure.md`.
+- **UI work:** Read `pump-tma-design-system` → `pump-tma-ui-ux`. Top nav + mobile bottom bar — no left sidebar.
+- Verify library APIs via Context7 — do not guess versions.
+- Match patterns in `apps/web/src/` before new libraries or UI primitives.
+- **No shadcn/MUI** — use `globals.css` classes and `pump-*` tokens.
+- **Icons:** Material Symbols via `PumpIcon` + `@/lib/pump-icons` (not Lucide/Font Awesome).
+- Dev: `npm run dev` (web :3012) · `npm run dev:admin` (:5174). Layout: `docs/repo-structure.md`.
