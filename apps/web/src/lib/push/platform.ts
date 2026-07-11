@@ -21,3 +21,10 @@ export function parsePushPlatform(value: unknown): PushPlatform {
 export function iosPushNeedsInstall(platform: PushPlatform, displayMode: PushDisplayMode): boolean {
   return platform === "ios" && displayMode !== "standalone";
 }
+
+/** PWA + push are mobile-only (iOS / Android). Desktop browsers use the normal web app. */
+export function isMobilePwaClient(userAgent?: string): boolean {
+  const ua = userAgent ?? (typeof navigator !== "undefined" ? navigator.userAgent : "");
+  const platform = detectPushPlatform(ua);
+  return platform === "ios" || platform === "android";
+}

@@ -203,8 +203,6 @@ export function WalletAccountPanel({
 
         <WalletActionButtons onClose={onClose} onExportWallet={openExportWallet} />
 
-        <PushNotificationsPanel className="wallet-account-panel__appearance border-t border-pump-border/15 pt-3" />
-
         <div className="wallet-account-panel__appearance">
           <span className="wallet-account-panel__appearance-label">Appearance</span>
           <ThemePicker className="wallet-account-panel__appearance-toggle" />

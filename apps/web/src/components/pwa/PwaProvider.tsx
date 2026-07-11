@@ -8,12 +8,14 @@ import {
   shouldUseMinimalPushWorker,
   syncPushSubscriptionIfGranted,
 } from "@/lib/push/client";
+import { isMobilePwaClient } from "@/lib/push/platform";
 
 export function PwaProvider({ children }: { children: React.ReactNode }) {
-  const skipSerwist = shouldUseMinimalPushWorker();
+  const mobilePwa = isMobilePwaClient();
+  const skipSerwist = !mobilePwa || shouldUseMinimalPushWorker();
 
   useEffect(() => {
-    if (process.env.NODE_ENV === "development") return;
+    if (!mobilePwa || process.env.NODE_ENV === "development") return;
 
     const prepDelay = skipSerwist ? 500 : 1_500;
     const syncDelay = skipSerwist ? 3_000 : 4_000;
@@ -28,7 +30,7 @@ export function PwaProvider({ children }: { children: React.ReactNode }) {
       void syncPushSubscriptionIfGranted();
     }, syncDelay);
 
-    // Desktop Serwist: delayed skipWaiting avoids install hang (serwist/serwist#276).
+    // Serwist: delayed skipWaiting avoids install hang (serwist/serwist#276).
     const skipTimer =
       skipSerwist ?
         undefined
@@ -41,10 +43,10 @@ export function PwaProvider({ children }: { children: React.ReactNode }) {
       window.clearTimeout(syncTimer);
       if (skipTimer !== undefined) window.clearTimeout(skipTimer);
     };
-  }, [skipSerwist]);
+  }, [mobilePwa, skipSerwist]);
 
-  if (skipSerwist) {
-    // Mobile: Serwist precache hangs — push uses /push-sw.js instead.
+  if (!mobilePwa || skipSerwist) {
+    // Desktop: no PWA. Mobile iOS/Android: lightweight push-sw.js instead of Serwist precache.
     return <>{children}</>;
   }
 

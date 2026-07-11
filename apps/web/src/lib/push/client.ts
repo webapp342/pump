@@ -1,7 +1,7 @@
 "use client";
 
 import type { PushDisplayMode, PushPlatform, PushStatus, PushSubscriptionPayload } from "@/lib/push/types";
-import { detectPushPlatform, iosPushNeedsInstall } from "@/lib/push/platform";
+import { detectPushPlatform, iosPushNeedsInstall, isMobilePwaClient } from "@/lib/push/platform";
 
 const PUSH_ENDPOINT_STORAGE_KEY = "pump_push_endpoint";
 const SERVICE_WORKER_URL = "/serwist/sw.js";
@@ -31,6 +31,7 @@ export function shouldUseIosMinimalPushWorker(): boolean {
 }
 
 export function isPushApiSupported(): boolean {
+  if (!isMobilePwaClient()) return false;
   return (
     typeof window !== "undefined" &&
     "serviceWorker" in navigator &&

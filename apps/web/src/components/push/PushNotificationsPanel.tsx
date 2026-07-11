@@ -5,6 +5,7 @@ import {
   clearPushActivityLog,
   fetchPushStatus,
   getPushActivityLog,
+  isPushApiSupported,
   PushReloadPendingError,
   readPushSetupDiagnostics,
   subscribePushActivityLog,
@@ -83,6 +84,7 @@ export function PushNotificationsPanel({ className = "" }: PushNotificationsPane
   const [error, setError] = useState<string | null>(null);
   const [diagnostics, setDiagnostics] = useState<string | null>(null);
   const lastProgressRef = useRef<PushSubscribeProgress | null>(null);
+  const supported = isPushApiSupported();
 
   const refreshDiagnostics = useCallback(async () => {
     try {
@@ -105,8 +107,9 @@ export function PushNotificationsPanel({ className = "" }: PushNotificationsPane
   }, [refreshDiagnostics]);
 
   useEffect(() => {
+    if (!supported) return;
     void refresh();
-  }, [refresh]);
+  }, [refresh, supported]);
 
   useEffect(() => subscribePushActivityLog(setActivityLog), []);
 
@@ -148,6 +151,10 @@ export function PushNotificationsPanel({ className = "" }: PushNotificationsPane
     } finally {
       setBusy(false);
     }
+  }
+
+  if (!supported) {
+    return null;
   }
 
   if (loading && !status) {
