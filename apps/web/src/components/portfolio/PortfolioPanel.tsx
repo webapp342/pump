@@ -16,11 +16,12 @@ import { PortfolioHero } from "@/components/portfolio/PortfolioHero";
 import { PortfolioMobileHero } from "@/components/portfolio/PortfolioMobileHero";
 import { PortfolioSummaryStrip } from "@/components/portfolio/PortfolioSummaryStrip";
 import { PortfolioHoldingMobileCard } from "@/components/portfolio/PortfolioHoldingMobileCard";
-import { PortfolioLaunchedList } from "@/components/portfolio/PortfolioLaunchedList";
+import { PortfolioLaunchedList, type LaunchedTokenHoldingMetrics } from "@/components/portfolio/PortfolioLaunchedList";
 import {
   PortfolioHoldingsGridHead,
   PortfolioHoldingsMobileHeader,
 } from "@/components/portfolio/PortfolioHoldingsSortControls";
+import { PnlCell } from "@/components/portfolio/PortfolioPnlCell";
 import { PortfolioFeesTab } from "@/components/portfolio/PortfolioFeesTab";
 import { PortfolioAirdropsSection } from "@/components/portfolio/PortfolioAirdropsSection";
 import { resolveTopHoldingSummary } from "@/lib/portfolio-summary";
@@ -43,7 +44,6 @@ import type { PortfolioSnapshot, TokenListItem } from "@/lib/db/launchpad";
 import { useBnbUsdPrice } from "@/hooks/useBnbUsdPrice";
 import { useScwBalance } from "@/hooks/useScwBalance";
 import { bnbToUsd, formatPortfolioHoldingValueUsd, formatUsdReadable, positionAvgEntryUsd, positionUnrealizedUsd, positionUnrealizedPct, scaleCostBasisUsdForBalance } from "@/lib/format-usd";
-import { PctChange } from "@/components/ui/PctChange";
 import { formatCapForBoard } from "@/lib/arena-board-format";
 import {
   PORTFOLIO_CREATOR_WALLET_SCAN_MAX,
@@ -72,6 +72,7 @@ import {
 import { writePortfolioWalletCookie } from "@/lib/portfolio-wallet-cookie";
 import { parsePortfolioTab, type PortfolioTab } from "@/lib/portfolio-tabs";
 import {
+  formatPortfolioTokenAmount,
   sortPortfolioHoldingRows,
   togglePortfolioHoldingsSort,
   type PortfolioHoldingsSortDir,
@@ -238,48 +239,8 @@ function holdingNetPnlUsd(
   return open + view.realizedPnlUsd;
 }
 
-function pnlTone(value: number): string {
-  if (value > 0) return "text-pump-success";
-  if (value < 0) return "text-pump-danger";
-  return "text-pump-text";
-}
-
-function formatTokenBalance(value: number): string {
-  if (!Number.isFinite(value)) return "—";
-  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(2)}M`;
-  if (value >= 1_000) return `${(value / 1_000).toFixed(2)}K`;
-  if (value >= 1) return value.toFixed(2);
-  return value.toFixed(4);
-}
-
 function formatHoldingAmount(value: number): string {
-  return formatTokenBalance(value);
-}
-
-function PnlCell({
-  usd,
-  pct,
-  align = "end",
-}: {
-  usd: number | null;
-  pct: number | null;
-  align?: "start" | "end";
-}) {
-  const tone = pct != null && Number.isFinite(pct) ? pnlTone(pct) : "text-pump-muted";
-  return (
-    <div
-      className={`flex items-center gap-2 whitespace-nowrap ${align === "start" ? "justify-start" : "justify-end"}`}
-    >
-      <span className={`financial-value text-caption font-medium ${tone}`}>
-        {formatUsdReadable(usd, { compact: true, signed: true })}
-      </span>
-      <PctChange
-        value={pct}
-        className="text-caption font-medium"
-        toneClassName={tone}
-      />
-    </div>
-  );
+  return formatPortfolioTokenAmount(value);
 }
 
 function HoldingsGridActionsCell({ actions }: { actions?: ReactNode }) {
@@ -343,7 +304,7 @@ function NativeCashMobileRow({
     <PortfolioHoldingMobileCard
       logo={<NativeLogo size={TOKEN_LOGO_SIZE_INLINE} className="portfolio-holdings-grid__coin-mark" />}
       title={<p className="truncate">{NATIVE_SYMBOL}</p>}
-      amount={formatTokenBalance(nativeBnb)}
+      amount={formatPortfolioTokenAmount(nativeBnb)}
       valueUsd={nativeUsd}
     />
   );
@@ -368,7 +329,7 @@ function NativeCashDesktopRow({
       </td>
       <HoldingsGridActionsCell />
       <td className="portfolio-holdings-grid__num portfolio-holdings-grid__data px-4 py-3 financial-value text-pump-text">
-        {formatTokenBalance(nativeBnb)}
+        {formatPortfolioTokenAmount(nativeBnb)}
       </td>
       <td className="portfolio-holdings-grid__num portfolio-holdings-grid__data portfolio-holdings-grid__value-cell px-4 py-3 financial-value text-pump-text">
         {formatPortfolioHoldingValueUsd(nativeUsd)}
@@ -410,7 +371,7 @@ function WalletHoldingMobileRow({
             {holding.symbol}
           </Link>
         }
-        amount={formatTokenBalance(balance)}
+        amount={formatPortfolioTokenAmount(balance)}
         valueUsd={positionValueUsd}
       />
     </HoldingSwipeRow>
@@ -451,7 +412,7 @@ function WalletHoldingDesktopRow({
         actions={<HoldingQuickActions onBuyMax={onBuyMax} onSellMax={onSellMax} />}
       />
       <td className="portfolio-holdings-grid__num portfolio-holdings-grid__data px-4 py-3 financial-value text-pump-text">
-        {formatTokenBalance(balance)}
+        {formatPortfolioTokenAmount(balance)}
       </td>
       <td className="portfolio-holdings-grid__num portfolio-holdings-grid__data portfolio-holdings-grid__value-cell px-4 py-3 financial-value text-pump-text">
         {formatPortfolioHoldingValueUsd(positionValueUsd)}
@@ -489,6 +450,68 @@ function buildPortfolioHoldingRows(
   ];
 
   return rows;
+}
+
+function buildLaunchedHoldingMetricsByAddress(
+  rows: PortfolioHoldingRow[],
+  bnbUsd: number | null
+): Record<string, LaunchedTokenHoldingMetrics> {
+  const map: Record<string, LaunchedTokenHoldingMetrics> = {};
+
+  for (const row of rows) {
+    if (row.kind === "position") {
+      const { position, balance, remainingCostBasis, remainingCostBasisUsd } = row.view;
+      const valueBnb = balance * Number(position.lastPriceBnb);
+      const valueUsd = bnbToUsd(valueBnb, bnbUsd) ?? 0;
+      const pnlUsd = holdingOpenPnlUsd(row.view, bnbUsd);
+      const pnlPct = positionUnrealizedPct(
+        pnlUsd,
+        remainingCostBasisUsd,
+        remainingCostBasis,
+        bnbUsd
+      );
+      map[position.tokenAddress.toLowerCase()] = {
+        balance,
+        valueBnb,
+        valueUsd,
+        pnlUsd,
+        pnlPct,
+        avgEntryUsd: positionAvgEntryUsd(
+          balance,
+          remainingCostBasisUsd,
+          remainingCostBasis,
+          bnbUsd
+        ),
+      };
+      continue;
+    }
+
+    const balance = Number(row.holding.tokenBalance);
+    const valueBnb = balance * Number(row.holding.lastPriceBnb);
+    map[row.holding.tokenAddress.toLowerCase()] = {
+      balance,
+      valueBnb,
+      valueUsd: bnbToUsd(valueBnb, bnbUsd) ?? 0,
+      pnlUsd: null,
+      pnlPct: null,
+      avgEntryUsd: null,
+    };
+  }
+
+  return map;
+}
+
+function shouldShowHoldingPnl(
+  valueUsd: number | null | undefined,
+  pnlUsd: number | null | undefined
+): pnlUsd is number {
+  return (
+    valueUsd != null &&
+    Number.isFinite(valueUsd) &&
+    valueUsd > 0 &&
+    pnlUsd != null &&
+    Number.isFinite(pnlUsd)
+  );
 }
 
 const BURST_DURATION_MS = 60_000;
@@ -1227,6 +1250,11 @@ export function PortfolioPanel({
     return sortPortfolioHoldingRows(enriched, holdingsSortKey, holdingsSortDir);
   }, [displayHoldingsRows, holdingsSortKey, holdingsSortDir]);
 
+  const launchedHoldingMetricsByAddress = useMemo(
+    () => buildLaunchedHoldingMetricsByAddress(allHoldingsRows, bnbUsd),
+    [allHoldingsRows, bnbUsd]
+  );
+
   function onHoldingsSort(column: PortfolioHoldingsSortKey) {
     const next = togglePortfolioHoldingsSort(holdingsSortKey, holdingsSortDir, column);
     setHoldingsSortKey(next.key);
@@ -1492,7 +1520,11 @@ export function PortfolioPanel({
                             }
                             amount={formatHoldingAmount(balance)}
                             valueUsd={positionValueUsd}
-                            pnlUsd={openPnlUsd}
+                            pnlUsd={
+                              shouldShowHoldingPnl(positionValueUsd, openPnlUsd)
+                                ? openPnlUsd
+                                : null
+                            }
                             valueFlashClass={flashText(
                               holdingFlashes[position.tokenAddress.toLowerCase()]
                             )}
@@ -1606,7 +1638,9 @@ export function PortfolioPanel({
                                 {formatUsdReadable(avgEntryUsd, { compact: true })}
                               </td>
                               <td className="portfolio-holdings-grid__num w-[1%] whitespace-nowrap px-4 py-3">
-                                <PnlCell usd={openPnlUsd} pct={openPnlPct} align="end" />
+                                {shouldShowHoldingPnl(positionValueUsd, openPnlUsd) ? (
+                                  <PnlCell usd={openPnlUsd} pct={openPnlPct} align="end" />
+                                ) : null}
                               </td>
                             </tr>
                           );
@@ -1647,7 +1681,11 @@ export function PortfolioPanel({
                 </div>
               ) : (
                 <section className="panel-surface portfolio-section-surface portfolio-tab-panel__surface">
-                  <PortfolioLaunchedList tokens={data.createdTokens} bnbUsd={bnbUsd} />
+                  <PortfolioLaunchedList
+                    tokens={data.createdTokens}
+                    bnbUsd={bnbUsd}
+                    holdingMetricsByAddress={launchedHoldingMetricsByAddress}
+                  />
                   {data.createdTokens.length < data.createdTokensTotal ? (
                     <div className="flex justify-center border-t border-pump-border/10 px-3 py-3">
                       <button

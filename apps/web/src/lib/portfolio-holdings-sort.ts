@@ -36,23 +36,29 @@ export function sortPortfolioHoldingRows<T extends PortfolioHoldingRowLike>(
   });
 }
 
-export function sortLaunchedTokens(
-  tokens: TokenListItem[],
+export type LaunchedTokenRow = {
+  token: TokenListItem;
+  balance: number;
+  valueBnb: number;
+};
+
+export function sortLaunchedTokenRows<T extends LaunchedTokenRow>(
+  rows: T[],
   sortKey: PortfolioHoldingsSortKey,
   sortDir: PortfolioHoldingsSortDir
-): TokenListItem[] {
-  return [...tokens].sort((a, b) => {
-    const left =
-      sortKey === "amount" ? a.holderCount : Number(a.marketCapBnb ?? 0);
-    const right =
-      sortKey === "amount" ? b.holderCount : Number(b.marketCapBnb ?? 0);
+): T[] {
+  return [...rows].sort((a, b) => {
+    const left = sortKey === "amount" ? a.balance : a.valueBnb;
+    const right = sortKey === "amount" ? b.balance : b.valueBnb;
     return compareNumbers(left, right, sortDir);
   });
 }
 
-export function formatLaunchedAmount(holderCount: number): string {
-  if (!Number.isFinite(holderCount) || holderCount <= 0) return "";
-  if (holderCount >= 1_000_000) return `${(holderCount / 1_000_000).toFixed(2)}M`;
-  if (holderCount >= 1_000) return `${(holderCount / 1_000).toFixed(2)}K`;
-  return holderCount.toLocaleString();
+export function formatPortfolioTokenAmount(value: number): string {
+  if (!Number.isFinite(value)) return "—";
+  if (value === 0) return "0";
+  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(2)}M`;
+  if (value >= 1_000) return `${(value / 1_000).toFixed(2)}K`;
+  if (value >= 1) return value.toFixed(2);
+  return value.toFixed(4);
 }

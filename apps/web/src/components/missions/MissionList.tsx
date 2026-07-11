@@ -120,7 +120,7 @@ export function MissionRow({
 
       <div
         className={`missions-list__cell missions-list__cell--progress${
-          !hasProgressBar && !done ? " missions-list__cell--progress-empty" : ""
+          !hasProgressBar || done ? " missions-list__cell--progress-empty" : ""
         }`}
       >
         <MissionProgressCell mission={mission} />

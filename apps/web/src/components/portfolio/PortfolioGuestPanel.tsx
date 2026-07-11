@@ -80,7 +80,7 @@ function GuestLaunchedTab({ onSignIn }: { onSignIn: () => void }) {
   return (
     <div className="portfolio-guest-tab">
       <section className="panel-surface portfolio-section-surface">
-        <PortfolioLaunchedList tokens={[]} bnbUsd={null} />
+        <PortfolioLaunchedList tokens={[]} bnbUsd={null} holdingMetricsByAddress={{}} />
       </section>
       <GuestSignInFooter onSignIn={onSignIn} />
     </div>

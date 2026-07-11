@@ -14866,7 +14866,6 @@ code,
   .missions-page .missions-filter-bar {
     display: flex;
     align-items: stretch;
-    justify-content: space-between;
     gap: 0.5rem 0.75rem;
     flex-shrink: 0;
     position: relative;
@@ -14877,7 +14876,7 @@ code,
 
   .missions-page .missions-tab-nav {
     min-width: 0;
-    flex: 1 1 0;
+    flex: 0 1 auto;
     padding-inline: var(--missions-page-gutter);
   }
 
@@ -14937,6 +14936,7 @@ code,
     align-items: center;
     gap: 0.5rem;
     align-self: center;
+    margin-left: auto;
     margin-right: var(--missions-page-gutter);
     padding-inline: 0.625rem;
   }

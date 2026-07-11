@@ -7,34 +7,80 @@ import {
   PortfolioHoldingsGridHead,
   PortfolioHoldingsMobileHeader,
 } from "@/components/portfolio/PortfolioHoldingsSortControls";
+import { PnlCell } from "@/components/portfolio/PortfolioPnlCell";
 import { TokenAvatar } from "@/components/token/TokenAvatar";
-import { PctChange } from "@/components/ui/PctChange";
 import type { TokenListItem } from "@/lib/db/launchpad";
-import { bnbToUsd, formatPortfolioHoldingValueUsd } from "@/lib/format-usd";
 import {
-  formatLaunchedAmount,
-  sortLaunchedTokens,
+  bnbToUsd,
+  formatPortfolioHoldingValueUsd,
+  formatUsdReadable,
+} from "@/lib/format-usd";
+import {
+  formatPortfolioTokenAmount,
+  sortLaunchedTokenRows,
   togglePortfolioHoldingsSort,
+  type LaunchedTokenRow,
   type PortfolioHoldingsSortDir,
   type PortfolioHoldingsSortKey,
 } from "@/lib/portfolio-holdings-sort";
 
+export type LaunchedTokenHoldingMetrics = {
+  balance: number;
+  valueBnb: number;
+  valueUsd: number;
+  pnlUsd: number | null;
+  pnlPct: number | null;
+  avgEntryUsd: number | null;
+};
+
 type PortfolioLaunchedListProps = {
   tokens: TokenListItem[];
   bnbUsd: number | null;
+  holdingMetricsByAddress: Record<string, LaunchedTokenHoldingMetrics>;
 };
 
+function shouldShowLaunchedPnl(valueUsd: number, pnlUsd: number | null): pnlUsd is number {
+  return valueUsd > 0 && pnlUsd != null && Number.isFinite(pnlUsd);
+}
+
+function buildLaunchedRows(
+  tokens: TokenListItem[],
+  holdingMetricsByAddress: Record<string, LaunchedTokenHoldingMetrics>,
+  bnbUsd: number | null
+): Array<LaunchedTokenRow & LaunchedTokenHoldingMetrics> {
+  return tokens.map((token) => {
+    const metrics = holdingMetricsByAddress[token.address.toLowerCase()];
+    if (metrics) {
+      return {
+        token,
+        balance: metrics.balance,
+        valueBnb: metrics.valueBnb,
+        valueUsd: metrics.valueUsd,
+        pnlUsd: metrics.pnlUsd,
+        pnlPct: metrics.pnlPct,
+        avgEntryUsd: metrics.avgEntryUsd,
+      };
+    }
+
+    return {
+      token,
+      balance: 0,
+      valueBnb: 0,
+      valueUsd: bnbToUsd(0, bnbUsd) ?? 0,
+      pnlUsd: null,
+      pnlPct: null,
+      avgEntryUsd: null,
+    };
+  });
+}
+
 function LaunchedDesktopRow({
-  token,
-  bnbUsd,
+  row,
 }: {
-  token: TokenListItem;
-  bnbUsd: number | null;
+  row: LaunchedTokenRow & LaunchedTokenHoldingMetrics;
 }) {
-  const mcapUsd = bnbToUsd(Number(token.marketCapBnb), bnbUsd);
-  const amountLabel = formatLaunchedAmount(token.holderCount);
-  const change24h = token.change24hPct ?? null;
-  const showChange = change24h != null && Number.isFinite(change24h);
+  const { token } = row;
+  const showPnl = shouldShowLaunchedPnl(row.valueUsd, row.pnlUsd);
 
   return (
     <tr>
@@ -54,22 +100,28 @@ function LaunchedDesktopRow({
       </td>
       <td className="portfolio-holdings-grid__actions-cell px-4 py-3" aria-hidden />
       <td className="portfolio-holdings-grid__num portfolio-holdings-grid__data px-4 py-3 financial-value text-pump-text">
-        {amountLabel}
+        {formatPortfolioTokenAmount(row.balance)}
       </td>
       <td className="portfolio-holdings-grid__num portfolio-holdings-grid__data portfolio-holdings-grid__value-cell px-4 py-3 financial-value text-pump-text">
-        {formatPortfolioHoldingValueUsd(mcapUsd)}
+        {formatPortfolioHoldingValueUsd(row.valueUsd)}
       </td>
-      <td className="portfolio-holdings-grid__num portfolio-holdings-grid__data px-4 py-3 financial-value text-pump-muted" />
+      <td className="portfolio-holdings-grid__num portfolio-holdings-grid__data px-4 py-3 financial-value text-pump-text">
+        {showPnl ? formatUsdReadable(row.avgEntryUsd, { compact: true }) : "—"}
+      </td>
       <td className="portfolio-holdings-grid__num w-[1%] whitespace-nowrap px-4 py-3">
-        {showChange ? (
-          <PctChange value={change24h} className="text-caption font-medium" hideWhenEmpty />
+        {showPnl ? (
+          <PnlCell usd={row.pnlUsd} pct={row.pnlPct} align="end" />
         ) : null}
       </td>
     </tr>
   );
 }
 
-export function PortfolioLaunchedList({ tokens, bnbUsd }: PortfolioLaunchedListProps) {
+export function PortfolioLaunchedList({
+  tokens,
+  bnbUsd,
+  holdingMetricsByAddress,
+}: PortfolioLaunchedListProps) {
   const [sortKey, setSortKey] = useState<PortfolioHoldingsSortKey>("value");
   const [sortDir, setSortDir] = useState<PortfolioHoldingsSortDir>("desc");
 
@@ -79,9 +131,14 @@ export function PortfolioLaunchedList({ tokens, bnbUsd }: PortfolioLaunchedListP
     setSortDir(next.dir);
   }
 
-  const sortedTokens = useMemo(
-    () => sortLaunchedTokens(tokens, sortKey, sortDir),
-    [tokens, sortKey, sortDir]
+  const launchedRows = useMemo(
+    () => buildLaunchedRows(tokens, holdingMetricsByAddress, bnbUsd),
+    [tokens, holdingMetricsByAddress, bnbUsd]
+  );
+
+  const sortedRows = useMemo(
+    () => sortLaunchedTokenRows(launchedRows, sortKey, sortDir),
+    [launchedRows, sortKey, sortDir]
   );
 
   return (
@@ -89,38 +146,27 @@ export function PortfolioLaunchedList({ tokens, bnbUsd }: PortfolioLaunchedListP
       <div className="lg:hidden portfolio-holdings-mobile">
         <PortfolioHoldingsMobileHeader sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
         <div className="portfolio-holdings-mobile__body">
-          {sortedTokens.map((token) => {
-            const mcapUsd = bnbToUsd(Number(token.marketCapBnb), bnbUsd);
-            const amountLabel = formatLaunchedAmount(token.holderCount);
-            const change24h = token.change24hPct ?? null;
-            const showChange = change24h != null && Number.isFinite(change24h);
+          {sortedRows.map((row) => {
+            const showPnl = shouldShowLaunchedPnl(row.valueUsd, row.pnlUsd);
 
             return (
               <PortfolioHoldingMobileCard
-                key={token.address}
+                key={row.token.address}
                 logo={
                   <TokenAvatar
-                    address={token.address}
-                    symbol={token.symbol}
-                    logoUrl={token.logoUrl}
+                    address={row.token.address}
+                    symbol={row.token.symbol}
+                    logoUrl={row.token.logoUrl}
                   />
                 }
                 title={
-                  <Link href={`/token/${token.address}`} className="truncate">
-                    {token.symbol}
+                  <Link href={`/token/${row.token.address}`} className="truncate">
+                    {row.token.symbol}
                   </Link>
                 }
-                amount={amountLabel}
-                valueUsd={mcapUsd}
-                pnlSlot={
-                  showChange ? (
-                    <PctChange
-                      value={change24h}
-                      className="portfolio-holding-mobile__value-pnl"
-                      hideWhenEmpty
-                    />
-                  ) : undefined
-                }
+                amount={formatPortfolioTokenAmount(row.balance)}
+                valueUsd={row.valueUsd}
+                pnlUsd={showPnl ? row.pnlUsd : null}
               />
             );
           })}
@@ -141,8 +187,8 @@ export function PortfolioLaunchedList({ tokens, bnbUsd }: PortfolioLaunchedListP
             <PortfolioHoldingsGridHead sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
           </thead>
           <tbody>
-            {sortedTokens.map((token) => (
-              <LaunchedDesktopRow key={token.address} token={token} bnbUsd={bnbUsd} />
+            {sortedRows.map((row) => (
+              <LaunchedDesktopRow key={row.token.address} row={row} />
             ))}
           </tbody>
         </table>

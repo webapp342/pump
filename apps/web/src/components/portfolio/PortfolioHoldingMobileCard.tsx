@@ -31,7 +31,12 @@ export function PortfolioHoldingMobileCard({
   pnlSlot,
   valueFlashClass = "",
 }: PortfolioHoldingMobileCardProps) {
-  const showPnlUsd = pnlUsd != null && Number.isFinite(pnlUsd);
+  const showPnlUsd =
+    pnlUsd != null &&
+    Number.isFinite(pnlUsd) &&
+    valueUsd != null &&
+    Number.isFinite(valueUsd) &&
+    valueUsd > 0;
   const showPnlSlot = pnlSlot != null;
 
   return (
