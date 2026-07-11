@@ -5,8 +5,6 @@ export const metadata: Metadata = {
   title: "Sign in · Pump",
 };
 
-export const dynamic = "force-dynamic";
-
 type OAuthAuthCompletePageProps = {
   searchParams: Promise<{ status?: string; message?: string; provider?: string }>;
 };
