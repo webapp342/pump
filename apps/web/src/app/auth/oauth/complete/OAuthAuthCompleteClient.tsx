@@ -1,23 +1,28 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useSearchParams } from "next/navigation";
-import { markPumpSessionHint, restorePumpKernelSession } from "@/lib/aa/pump-account";
+import { completePumpSignIn } from "@/lib/aa/pump-account";
 import { PumpIcon, faShieldCheck } from "@/lib/icons";
 
-export function OAuthAuthCompleteClient() {
-  const searchParams = useSearchParams();
+type OAuthAuthCompleteClientProps = {
+  status: string | null;
+  message: string | null;
+  provider: string | null;
+};
+
+export function OAuthAuthCompleteClient({
+  status,
+  message: errorMessage,
+  provider,
+}: OAuthAuthCompleteClientProps) {
   const handledRef = useRef(false);
   const [message, setMessage] = useState("Completing sign-in…");
   const [failed, setFailed] = useState(false);
+  const providerLabel = provider ?? "account";
 
   useEffect(() => {
     if (handledRef.current) return;
     handledRef.current = true;
-
-    const status = searchParams.get("status");
-    const errorMessage = searchParams.get("message");
-    const provider = searchParams.get("provider") ?? "account";
 
     if (status !== "ok") {
       setFailed(true);
@@ -27,19 +32,18 @@ export function OAuthAuthCompleteClient() {
 
     void (async () => {
       try {
-        markPumpSessionHint();
-        await restorePumpKernelSession();
+        await completePumpSignIn();
         window.location.replace("/");
       } catch (error) {
         setFailed(true);
         setMessage(
           error instanceof Error
             ? error.message
-            : `Could not restore your ${provider} session.`
+            : `Could not restore your ${providerLabel} session.`
         );
       }
     })();
-  }, [searchParams]);
+  }, [status, errorMessage, providerLabel]);
 
   return (
     <main className="flex min-h-[60vh] items-center justify-center px-4">

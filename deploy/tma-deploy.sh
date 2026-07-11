@@ -54,10 +54,10 @@ if [[ ! -f "$STANDALONE_APP_DIR/server.js" ]]; then
 fi
 
 log "Copying static assets into standalone output ($STANDALONE_APP_DIR)"
-chmod +x "$REPO_ROOT/deploy/copy-next-standalone-static.sh"
-bash "$REPO_ROOT/deploy/copy-next-standalone-static.sh" "$WEB_DIR" "$STANDALONE_APP_DIR"
+mkdir -p "$STANDALONE_APP_DIR/.next"
+cp -r "$WEB_DIR/.next/static" "$STANDALONE_APP_DIR/.next/static"
 if [ -d "$WEB_DIR/public" ]; then
-  cp -a "$WEB_DIR/public" "$STANDALONE_APP_DIR/public"
+  cp -r "$WEB_DIR/public" "$STANDALONE_APP_DIR/public"
 fi
 
 log "Building pump-realtime"

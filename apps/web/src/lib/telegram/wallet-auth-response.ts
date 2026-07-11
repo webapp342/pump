@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import type { getOrCreateTelegramWallet } from "@/lib/aa/telegram-wallet-server";
-import { resolvePublicAppOrigin } from "@/lib/telegram/public-app-origin";
+import { resolveAuthRedirectOrigin } from "@/lib/telegram/public-app-origin";
 import {
   authCookieOptions,
   AUTH_COOKIE_NAME,
@@ -38,7 +38,7 @@ export function walletAuthJsonResponse(
 }
 
 export function redirectAfterTelegramLogin(request: NextRequest, status: "ok" | "error", message?: string) {
-  const origin = resolvePublicAppOrigin(request);
+  const origin = resolveAuthRedirectOrigin(request);
   const url = new URL("/auth/telegram/complete", origin);
   url.searchParams.set("status", status);
   if (message) url.searchParams.set("message", message);

@@ -8,7 +8,7 @@ import {
   type WalletSessionPayload,
 } from "@/lib/auth/wallet-session";
 import type { SessionSubject } from "@/lib/auth/session-subject";
-import { resolvePublicAppOrigin } from "@/lib/telegram/public-app-origin";
+import { resolveAuthRedirectOrigin } from "@/lib/telegram/public-app-origin";
 
 export function walletSessionJsonResponse(
   wallet: WalletSessionPayload,
@@ -51,7 +51,7 @@ export function redirectAfterOAuthLogin(
   status: "ok" | "error",
   message?: string
 ) {
-  const origin = resolvePublicAppOrigin(request);
+  const origin = resolveAuthRedirectOrigin(request);
   const url = new URL("/auth/oauth/complete", origin);
   url.searchParams.set("provider", provider);
   url.searchParams.set("status", status);

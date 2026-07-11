@@ -1,16 +1,25 @@
-import { Suspense } from "react";
+import type { Metadata } from "next";
 import { TelegramAuthCompleteClient } from "./TelegramAuthCompleteClient";
 
-export default function TelegramAuthCompletePage() {
+export const metadata: Metadata = {
+  title: "Sign in · Pump",
+};
+
+export const dynamic = "force-dynamic";
+
+type TelegramAuthCompletePageProps = {
+  searchParams: Promise<{ status?: string; message?: string }>;
+};
+
+export default async function TelegramAuthCompletePage({
+  searchParams,
+}: TelegramAuthCompletePageProps) {
+  const params = await searchParams;
+
   return (
-    <Suspense
-      fallback={
-        <main className="flex min-h-[50vh] items-center justify-center px-4">
-          <p className="text-body-sm text-pump-muted">Finishing Telegram sign-in…</p>
-        </main>
-      }
-    >
-      <TelegramAuthCompleteClient />
-    </Suspense>
+    <TelegramAuthCompleteClient
+      status={params.status ?? null}
+      message={params.message ?? null}
+    />
   );
 }

@@ -49,10 +49,10 @@ if [[ ! -f "$STANDALONE_APP_DIR/server.js" ]]; then
 fi
 
 log "Copying static assets into standalone output ($STANDALONE_APP_DIR)"
-chmod +x "$REPO_ROOT/deploy/copy-next-standalone-static.sh"
-bash "$REPO_ROOT/deploy/copy-next-standalone-static.sh" "$WEB_DIR" "$STANDALONE_APP_DIR"
+mkdir -p "$STANDALONE_APP_DIR/.next"
+cp -r "$WEB_DIR/.next/static" "$STANDALONE_APP_DIR/.next/static"
 if [ -d "$WEB_DIR/public" ]; then
-  cp -a "$WEB_DIR/public" "$STANDALONE_APP_DIR/public"
+  cp -r "$WEB_DIR/public" "$STANDALONE_APP_DIR/public"
 fi
 
 log "Reloading PM2 pump-tma from ecosystem.config.cjs"
@@ -73,16 +73,6 @@ if [ "$health_ok" -ne 1 ]; then
   log "Health check failed after 60s: $PM2_APP"
   pm2 logs "$PM2_APP" --lines 30 --nostream || true
   exit 1
-fi
-
-SAMPLE_CHUNK="$(find "$STANDALONE_APP_DIR/.next/static/chunks" -type f -name '*.js' 2>/dev/null | head -1 || true)"
-if [[ -n "$SAMPLE_CHUNK" ]]; then
-  SAMPLE_URL="/_next/static/chunks/$(basename "$SAMPLE_CHUNK")"
-  if curl -sf "http://127.0.0.1:3012${SAMPLE_URL}" >/dev/null; then
-    log "Static chunk OK via app: $SAMPLE_URL"
-  else
-    log "WARN: app did not serve $SAMPLE_URL — reload nginx with deploy/nginx-next-static.conf.snippet"
-  fi
 fi
 
 log "UI deploy finished successfully"

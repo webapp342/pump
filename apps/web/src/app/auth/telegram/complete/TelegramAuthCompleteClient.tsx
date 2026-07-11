@@ -1,15 +1,18 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useSearchParams } from "next/navigation";
-import {
-  markPumpSessionHint,
-  restorePumpKernelSession,
-} from "@/lib/aa/pump-account";
+import { completePumpSignIn } from "@/lib/aa/pump-account";
 import { PumpIcon, faShieldCheck } from "@/lib/icons";
 
-export function TelegramAuthCompleteClient() {
-  const searchParams = useSearchParams();
+type TelegramAuthCompleteClientProps = {
+  status: string | null;
+  message: string | null;
+};
+
+export function TelegramAuthCompleteClient({
+  status,
+  message: errorMessage,
+}: TelegramAuthCompleteClientProps) {
   const handledRef = useRef(false);
   const [message, setMessage] = useState("Completing sign-in…");
   const [failed, setFailed] = useState(false);
@@ -17,9 +20,6 @@ export function TelegramAuthCompleteClient() {
   useEffect(() => {
     if (handledRef.current) return;
     handledRef.current = true;
-
-    const status = searchParams.get("status");
-    const errorMessage = searchParams.get("message");
 
     if (status !== "ok") {
       setFailed(true);
@@ -29,15 +29,14 @@ export function TelegramAuthCompleteClient() {
 
     void (async () => {
       try {
-        markPumpSessionHint();
-        await restorePumpKernelSession();
+        await completePumpSignIn();
         window.location.replace("/");
       } catch (error) {
         setFailed(true);
         setMessage(error instanceof Error ? error.message : "Could not restore your session.");
       }
     })();
-  }, [searchParams]);
+  }, [status, errorMessage]);
 
   return (
     <main className="flex min-h-[60vh] items-center justify-center px-4">

@@ -62,3 +62,33 @@ export function resolvePublicAppOrigin(request?: NextRequest): string {
 
   return originFromHost(host, proto);
 }
+
+/**
+ * Same-site redirects and session cookies after login — prefer the Host the user
+ * actually hit (x-forwarded-*) so Set-Cookie domain matches the browser tab.
+ * Falls back to NEXT_PUBLIC_APP_URL when the request host is unusable (0.0.0.0).
+ */
+export function resolveAuthRedirectOrigin(request: NextRequest): string {
+  const forwardedHost = request.headers.get("x-forwarded-host")?.split(",")[0]?.trim();
+  const host = forwardedHost ?? request.headers.get("host")?.trim();
+  if (host) {
+    const forwardedProto = request.headers.get("x-forwarded-proto")?.split(",")[0]?.trim();
+    const hostname = host.split(":")[0] ?? host;
+    const proto =
+      forwardedProto ??
+      (hostname === "localhost" || hostname === "127.0.0.1" || hostname === "0.0.0.0"
+        ? "http"
+        : "https");
+    const fromRequest = originFromHost(host, proto);
+    try {
+      const requestHostname = new URL(fromRequest).hostname.toLowerCase();
+      if (!INVALID_PUBLIC_HOSTNAMES.has(requestHostname)) {
+        return fromRequest;
+      }
+    } catch {
+      // fall through
+    }
+  }
+
+  return resolvePublicAppOrigin(request);
+}

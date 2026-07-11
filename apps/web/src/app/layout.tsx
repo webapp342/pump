@@ -4,7 +4,6 @@ import { PwaProvider } from "@/components/pwa/PwaProvider";
 import { TelegramMiniAppBootstrap } from "@/components/telegram/TelegramMiniAppBootstrap";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import { geistMono, geistSans, brandWordmark } from "@/lib/fonts";
-import { CHUNK_LOAD_RECOVERY_SCRIPT } from "@/lib/chunk-load-recovery-script";
 import "@/lib/fontawesome-config";
 import "./globals.css";
 
@@ -78,11 +77,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       className={`${geistSans.variable} ${geistMono.variable} ${brandWordmark.variable}`}
     >
       <body className={geistSans.className}>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: CHUNK_LOAD_RECOVERY_SCRIPT,
-          }}
-        />
         <PwaProvider>
           <TelegramMiniAppBootstrap />
         <script

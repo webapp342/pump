@@ -11,7 +11,7 @@ import {
   walletAuthJsonResponse,
 } from "@/lib/telegram/wallet-auth-response";
 import { isTelegramServerConfigured } from "@/lib/telegram-config";
-import { resolvePublicAppOrigin } from "@/lib/telegram/public-app-origin";
+import { resolveAuthRedirectOrigin } from "@/lib/telegram/public-app-origin";
 import { authCookieOptions } from "@/lib/auth/session-cookie";
 
 function readOidcCookie(request: NextRequest): TelegramOidcCookiePayload | null {
@@ -75,7 +75,7 @@ export async function GET(request: NextRequest) {
     const sessionResponse = walletAuthJsonResponse(wallet, true, request);
     clearOidcCookie(sessionResponse, request);
 
-    const completeUrl = new URL("/auth/telegram/complete", resolvePublicAppOrigin(request));
+    const completeUrl = new URL("/auth/telegram/complete", resolveAuthRedirectOrigin(request));
     completeUrl.searchParams.set("status", "ok");
     const redirect = NextResponse.redirect(completeUrl);
     for (const cookie of sessionResponse.cookies.getAll()) {

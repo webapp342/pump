@@ -57,39 +57,67 @@ function hasPumpSessionHint(): boolean {
   }
 }
 
-async function fetchWalletSessionFromMe(): Promise<PumpAccountSession> {
-  const response = await fetch("/api/auth/me", {
-    method: "GET",
-    cache: "no-store",
-    credentials: "same-origin",
-  });
+async function fetchWalletSessionFromMe(timeoutMs?: number): Promise<PumpAccountSession> {
+  const controller = new AbortController();
+  const timer =
+    timeoutMs != null
+      ? setTimeout(() => controller.abort(), timeoutMs)
+      : undefined;
 
-  const body = (await response.json()) as {
-    data?: WalletApiPayload;
-    error?: string;
-  };
+  try {
+    const response = await fetch("/api/auth/me", {
+      method: "GET",
+      cache: "no-store",
+      credentials: "same-origin",
+      signal: controller.signal,
+    });
 
-  if (!response.ok || !body.data?.privateKey) {
-    if (response.status === 401) {
-      throw new Error("Not authenticated");
+    const body = (await response.json()) as {
+      data?: WalletApiPayload;
+      error?: string;
+    };
+
+    if (!response.ok || !body.data?.privateKey) {
+      if (response.status === 401) {
+        throw new Error("Not authenticated");
+      }
+      throw new Error(body.error ?? "Could not load wallet session.");
     }
-    throw new Error(body.error ?? "Could not load wallet session.");
+
+    const kernel = await buildKernelWalletSession({
+      telegramId: body.data.telegramId || body.data.accountId,
+      telegramUsername: body.data.telegramUsername,
+      firstName: body.data.firstName ?? body.data.displayName,
+      privateKey: body.data.privateKey,
+    });
+
+    return {
+      ...kernel,
+      authProvider: body.data.authProvider,
+      accountId: body.data.accountId,
+      displayName: body.data.displayName,
+      email: body.data.email,
+    };
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw new Error("Sign-in timed out. Check your connection and try again.");
+    }
+    throw error;
+  } finally {
+    if (timer) clearTimeout(timer);
   }
+}
 
-  const kernel = await buildKernelWalletSession({
-    telegramId: body.data.telegramId || body.data.accountId,
-    telegramUsername: body.data.telegramUsername,
-    firstName: body.data.firstName ?? body.data.displayName,
-    privateKey: body.data.privateKey,
-  });
+/** Post-OAuth redirect: set hint, load session cookie, build kernel client. */
+export async function completePumpSignIn(timeoutMs = 30_000): Promise<PumpAccountSession> {
+  markPumpSessionHint();
 
-  return {
-    ...kernel,
-    authProvider: body.data.authProvider,
-    accountId: body.data.accountId,
-    displayName: body.data.displayName,
-    email: body.data.email,
-  };
+  try {
+    return await fetchWalletSessionFromMe(timeoutMs);
+  } catch (error) {
+    clearPumpSessionHint();
+    throw error;
+  }
 }
 
 export async function restorePumpKernelSession(): Promise<PumpAccountSession | null> {

@@ -5,7 +5,7 @@ import {
   type TelegramLoginPayload,
 } from "@/lib/telegram/verify-login";
 import { redirectAfterTelegramLogin, walletAuthJsonResponse } from "@/lib/telegram/wallet-auth-response";
-import { resolvePublicAppOrigin } from "@/lib/telegram/public-app-origin";
+import { resolveAuthRedirectOrigin } from "@/lib/telegram/public-app-origin";
 import { isTelegramServerConfigured } from "@/lib/telegram-config";
 
 function legacyPayloadFromSearchParams(url: URL): TelegramLoginPayload | null {
@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
     });
 
     const sessionResponse = walletAuthJsonResponse(wallet, true, request);
-    const completeUrl = new URL("/auth/telegram/complete", resolvePublicAppOrigin(request));
+    const completeUrl = new URL("/auth/telegram/complete", resolveAuthRedirectOrigin(request));
     completeUrl.searchParams.set("status", "ok");
     const redirect = NextResponse.redirect(completeUrl);
     for (const cookie of sessionResponse.cookies.getAll()) {
