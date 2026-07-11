@@ -649,7 +649,7 @@ export function PortfolioPanel({
   const enrichGenerationRef = useRef(0);
   const holdingsReadyRef = useRef(false);
   const isInitialPortfolioLoadRef = useRef(!hasSsrPortfolio);
-  const ssrHydratedRef = useRef(hasSsrPortfolio);
+  const ssrHydratedRef = useRef(false);
   const lastEnrichFingerprintRef = useRef(
     hasSsrPortfolio && initialPortfolio ? portfolioFingerprint(initialPortfolio) : ""
   );
@@ -909,16 +909,27 @@ export function PortfolioPanel({
   }, [address, isConnected]);
 
   useEffect(() => {
+    const resolvedWallet = address ?? sessionAddress ?? ssrWalletAddress ?? null;
+    const cachedPortfolio = portfolioDataRef.current;
+    const hasCachedPortfolio =
+      cachedPortfolio != null &&
+      resolvedWallet != null &&
+      portfolioMatchesWallet(cachedPortfolio as PortfolioSnapshot, resolvedWallet);
+
+    const walletStackBooting =
+      !pumpReady ||
+      isConnecting ||
+      isReconnecting ||
+      (walletSessionActive && !isConnected) ||
+      (isConnected && !address);
+
+    if (walletStackBooting) {
+      if (hasSsrPortfolio || hasCachedPortfolio) return;
+      return;
+    }
+
     if (!isConnected || !address) {
-      if (
-        (!pumpReady ||
-          isConnecting ||
-          isReconnecting ||
-          (walletSessionActive && !isConnected)) &&
-        (hasSsrPortfolio || data)
-      ) {
-        return;
-      }
+      if (walletSessionActive || hasCachedPortfolio) return;
 
       loadGenerationRef.current += 1;
       enrichGenerationRef.current += 1;
@@ -941,21 +952,24 @@ export function PortfolioPanel({
 
     const ssrMatch =
       portfolioMatchesWallet(initialPortfolio, ssrWalletAddress) &&
-      portfolioMatchesWallet(initialPortfolio, address ?? sessionAddress);
+      portfolioMatchesWallet(initialPortfolio, address);
 
     if (ssrMatch && !ssrHydratedRef.current) {
-      const wallet = address ?? sessionAddress ?? ssrWalletAddress;
-      if (!wallet) return;
-
       ssrHydratedRef.current = true;
-      setData(initialPortfolio);
+      const portfolioForSync = initialPortfolio ?? cachedPortfolio;
+      if (initialPortfolio) {
+        setData(initialPortfolio);
+        portfolioDataRef.current = initialPortfolio;
+      }
       isInitialPortfolioLoadRef.current = false;
       holdingsReadyRef.current = false;
       setHoldingsReady(false);
       setLoading(false);
       setError(null);
-      void enrichHoldings(wallet, initialPortfolio!, { silent: true });
-      void loadPortfolio(wallet, PORTFOLIO_LAUNCHED_INITIAL, { silent: true });
+      if (portfolioForSync) {
+        void enrichHoldings(address, portfolioForSync, { silent: true });
+      }
+      void loadPortfolio(address, PORTFOLIO_LAUNCHED_INITIAL, { silent: true });
       return;
     }
 
@@ -963,17 +977,22 @@ export function PortfolioPanel({
       return;
     }
 
-    loadGenerationRef.current += 1;
-    enrichGenerationRef.current += 1;
+    const sameWalletCached = portfolioMatchesWallet(
+      cachedPortfolio as PortfolioSnapshot | null | undefined,
+      address
+    );
+
+    if (sameWalletCached) {
+      isInitialPortfolioLoadRef.current = false;
+      setLoading(false);
+      void loadPortfolio(address, PORTFOLIO_LAUNCHED_INITIAL, { silent: true });
+      return;
+    }
+
     isInitialPortfolioLoadRef.current = true;
     ssrHydratedRef.current = false;
     holdingsReadyRef.current = false;
     lastEnrichFingerprintRef.current = "";
-    setData(null);
-    setWalletHoldings([]);
-    setOnChainBalances({});
-    setHoldingsReady(false);
-    setHoldingsEnriching(false);
     setLoading(true);
     createdLimitRef.current = PORTFOLIO_LAUNCHED_INITIAL;
     setCreatedLimit(PORTFOLIO_LAUNCHED_INITIAL);
@@ -982,13 +1001,12 @@ export function PortfolioPanel({
   }, [
     address,
     sessionAddress,
-    data,
+    ssrWalletAddress,
     isConnected,
     isConnecting,
     isReconnecting,
     hasSsrPortfolio,
     initialPortfolio,
-    ssrWalletAddress,
     loadPortfolio,
     enrichHoldings,
     pumpReady,

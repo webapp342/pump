@@ -17,6 +17,14 @@ export function resolveVerifiedTokenBalance(
   }
 
   if (onChainBalance <= ON_CHAIN_BALANCE_EPSILON) {
+    if (indexedBalance > ON_CHAIN_BALANCE_EPSILON) {
+      return {
+        displayBalance: indexedBalance,
+        hidden: false,
+        verified: false,
+        pending: true,
+      };
+    }
     return { displayBalance: 0, hidden: true, verified: true, pending: false };
   }
 
