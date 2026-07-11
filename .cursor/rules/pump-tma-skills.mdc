@@ -7,25 +7,40 @@ alwaysApply: true
 
 ## UI/UX priority (this repo)
 
+**Apply on every UI prompt automatically** — user should not need to repeat ui-ux-pro-max, design-system, or logo/symbol rules.
+
 When skills conflict, follow this order:
 
 1. **`pump-tma-design-system`** — tokens, nav, typography, fintech dark/light (source of truth)
 2. **`pump-tma-ui-ux`** — component classes, pages, trading patterns in `apps/web/src/`
-3. **`ui-ux-pro-max`** — research only: UX checklist, anti-patterns, accessibility, industry reasoning via search script
-4. **Ignore for Pump UI:** shadcn/MUI patterns, generic landing-page palettes from ui-ux-pro-max
+3. **`ui-ux-pro-max`** — UX checklist + reasoning via search script; **then** read `.cursor/design-system/MASTER.md` and page overrides
+4. **Ignore for Pump UI:** shadcn/MUI, generic palettes, bento/block action cards from skill output
 
 **Never** replace Pump `pump-*` tokens or `globals.css` component classes with ui-ux-pro-max generated colors/fonts unless the user explicitly asks for a full rebrand.
 
-### ui-ux-pro-max search (optional research)
+### ui-ux-pro-max workflow (Pump)
 
-From repo root (Python 3 required):
+1. Read `.cursor/design-system/MASTER.md` (+ `pages/<page>.md` if exists)
+2. Run **domain ux/chart** searches first for components (touch, loading, charts)
+3. Use `--design-system --density 8 --motion 3` only for tone research — map to Pump tokens
+4. Implement using existing `portfolio-*` / `panel-surface` / `PumpIcon` patterns
 
 ```powershell
-python .cursor/skills/ui-ux-pro-max/scripts/search.py "fintech crypto trading launchpad" --design-system -p "Pump"
-python .cursor/skills/ui-ux-pro-max/scripts/search.py "dashboard data density accessibility" --domain ux
+python .cursor/skills/ui-ux-pro-max/scripts/search.py "touch target icon button row 44px" --domain ux
+python .cursor/skills/ui-ux-pro-max/scripts/search.py "fintech trading terminal dark" --design-system --density 8 --motion 3 -p "Pump" -f markdown
 ```
 
-Use output for UX review and checklist — map recommendations onto existing Pump tokens and patterns.
+Persisted page specs: `.cursor/design-system/pages/portfolio.md` (wallet actions, Launched=Holdings grid, Earnings cards).
+
+### Persistent UI conventions (always)
+
+| Rule | Implementation |
+|------|----------------|
+| User avatars | Circle only (`UserAvatarForAddress`) |
+| Token / chain logos | Square tile — `TokenAvatar` default `shape="rounded"`, `NativeLogo` |
+| Token symbols in UI | No leading `$` — display `symbol` as stored |
+| Portfolio Launched tab | Same grid as Holdings: Coin · Amount · Value/PNL (mobile); + Entry · P/L (desktop) |
+| Portfolio Earnings tab | `PortfolioEarningsCard` — title, description, Available (hero), Claimed, Claim CTA |
 
 ## Skill routing
 

@@ -89,7 +89,6 @@ function HoldingChip({ holding }: { holding: TopHoldingSummary }) {
           symbol={holding.symbol}
           logoUrl={holding.logoUrl}
           size={14}
-          shape="rounded"
           className="portfolio-summary-strip__holding-chip-logo !ring-0"
         />
       ) : null}

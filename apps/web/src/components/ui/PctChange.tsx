@@ -6,6 +6,8 @@ type PctChangeProps = {
   decimals?: number;
   /** Override automatic success/danger tone */
   toneClassName?: string;
+  /** Omit render when value is missing (no em dash). */
+  hideWhenEmpty?: boolean;
 };
 
 export function PctChange({
@@ -13,8 +15,10 @@ export function PctChange({
   className = "",
   decimals = 2,
   toneClassName,
+  hideWhenEmpty = false,
 }: PctChangeProps) {
   if (value == null || !Number.isFinite(value)) {
+    if (hideWhenEmpty) return null;
     return <span className={`financial-value ${className}`}>—</span>;
   }
 

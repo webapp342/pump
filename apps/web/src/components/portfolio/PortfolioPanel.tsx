@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { formatEther, parseUnits } from "viem";
 import { useOpenConnectModal } from "@/hooks/useOpenConnectModal";
 import { useAccount } from "wagmi";
@@ -16,6 +16,11 @@ import { PortfolioHero } from "@/components/portfolio/PortfolioHero";
 import { PortfolioMobileHero } from "@/components/portfolio/PortfolioMobileHero";
 import { PortfolioSummaryStrip } from "@/components/portfolio/PortfolioSummaryStrip";
 import { PortfolioHoldingMobileCard } from "@/components/portfolio/PortfolioHoldingMobileCard";
+import { PortfolioLaunchedList } from "@/components/portfolio/PortfolioLaunchedList";
+import {
+  PortfolioHoldingsGridHead,
+  PortfolioHoldingsMobileHeader,
+} from "@/components/portfolio/PortfolioHoldingsSortControls";
 import { PortfolioFeesTab } from "@/components/portfolio/PortfolioFeesTab";
 import { PortfolioAirdropsSection } from "@/components/portfolio/PortfolioAirdropsSection";
 import { resolveTopHoldingSummary } from "@/lib/portfolio-summary";
@@ -25,11 +30,11 @@ import { FollowNetworkModal } from "@/components/portfolio/FollowNetworkModal";
 import { AvatarPickerModal } from "@/components/user/AvatarPickerModal";
 import { resolveDisplayUsername } from "@/lib/username";
 import { useUserAvatar } from "@/components/user/UserAvatarProvider";
-import { TokenBoardTable } from "@/components/arena/TokenBoardTable";
 import { PortfolioPanelSkeleton } from "@/components/portfolio/PortfolioPanelSkeleton";
 import { HubDiscoveryScrollLock } from "@/components/layout/HubDiscoveryScrollLock";
 import { HoldingSwipeRow } from "@/components/portfolio/HoldingSwipeRow";
 import { HoldingsSwipeHint } from "@/components/portfolio/HoldingsSwipeHint";
+import { TOKEN_LOGO_SIZE_INLINE } from "@/lib/token-logo-sizes";
 import { TokenAvatar } from "@/components/token/TokenAvatar";
 import { NativeLogo } from "@/components/token/NativeLogo";
 import { TradeSheet } from "@/components/token/TradeSheet";
@@ -66,6 +71,12 @@ import {
 } from "@/lib/portfolio-live-delta";
 import { writePortfolioWalletCookie } from "@/lib/portfolio-wallet-cookie";
 import { parsePortfolioTab, type PortfolioTab } from "@/lib/portfolio-tabs";
+import {
+  sortPortfolioHoldingRows,
+  togglePortfolioHoldingsSort,
+  type PortfolioHoldingsSortDir,
+  type PortfolioHoldingsSortKey,
+} from "@/lib/portfolio-holdings-sort";
 import { publishWalletTotal } from "@/lib/wallet-total-balance";
 
 type PortfolioPosition = {
@@ -330,7 +341,7 @@ function NativeCashMobileRow({
 
   return (
     <PortfolioHoldingMobileCard
-      logo={<NativeLogo size={28} />}
+      logo={<NativeLogo size={TOKEN_LOGO_SIZE_INLINE} className="portfolio-holdings-grid__coin-mark" />}
       title={<p className="truncate">{NATIVE_SYMBOL}</p>}
       amount={formatTokenBalance(nativeBnb)}
       valueUsd={nativeUsd}
@@ -351,7 +362,7 @@ function NativeCashDesktopRow({
     <tr className="group border-b border-pump-border/10">
       <td className="px-4 py-3">
         <div className="portfolio-holdings-grid__coin-row flex min-w-0 items-center gap-2">
-          <NativeLogo size={20} className="portfolio-holdings-grid__coin-mark" />
+          <NativeLogo size={TOKEN_LOGO_SIZE_INLINE} className="portfolio-holdings-grid__coin-mark" />
           <p className="portfolio-holdings-grid__coin-symbol truncate">{NATIVE_SYMBOL}</p>
         </div>
       </td>
@@ -392,12 +403,11 @@ function WalletHoldingMobileRow({
             address={holding.tokenAddress}
             symbol={holding.symbol}
             logoUrl={holding.logoUrl}
-            size={28}
           />
         }
         title={
           <Link href={`/token/${holding.tokenAddress}`} className="truncate">
-            ${holding.symbol}
+            {holding.symbol}
           </Link>
         }
         amount={formatTokenBalance(balance)}
@@ -432,11 +442,9 @@ function WalletHoldingDesktopRow({
             address={holding.tokenAddress}
             symbol={holding.symbol}
             logoUrl={holding.logoUrl}
-            size={20}
-            shape="rounded"
             className="portfolio-holdings-grid__coin-mark !ring-0"
           />
-          <p className="portfolio-holdings-grid__coin-symbol truncate">${holding.symbol}</p>
+          <p className="portfolio-holdings-grid__coin-symbol truncate">{holding.symbol}</p>
         </Link>
       </td>
       <HoldingsGridActionsCell
@@ -458,6 +466,11 @@ type PortfolioHoldingRow =
   | { kind: "position"; view: VerifiedPositionView; estimatedValueBnb: number }
   | { kind: "wallet"; holding: WalletLaunchpadHolding; estimatedValueBnb: number };
 
+function getPortfolioHoldingRowAmount(row: PortfolioHoldingRow): number {
+  if (row.kind === "position") return row.view.balance;
+  return Number(row.holding.tokenBalance);
+}
+
 function buildPortfolioHoldingRows(
   verifiedPositionViews: VerifiedPositionView[],
   walletHoldings: WalletLaunchpadHolding[]
@@ -475,7 +488,7 @@ function buildPortfolioHoldingRows(
     })),
   ];
 
-  return rows.sort((a, b) => b.estimatedValueBnb - a.estimatedValueBnb);
+  return rows;
 }
 
 const BURST_DURATION_MS = 60_000;
@@ -630,6 +643,8 @@ export function PortfolioPanel({
   const [createdLimit, setCreatedLimit] = useState(PORTFOLIO_LAUNCHED_INITIAL);
   const createdLimitRef = useRef(PORTFOLIO_LAUNCHED_INITIAL);
   const [holdingsVisibleLimit, setHoldingsVisibleLimit] = useState(PORTFOLIO_HOLDINGS_INITIAL);
+  const [holdingsSortKey, setHoldingsSortKey] = useState<PortfolioHoldingsSortKey>("value");
+  const [holdingsSortDir, setHoldingsSortDir] = useState<PortfolioHoldingsSortDir>("desc");
   const [loadingMoreCreated, setLoadingMoreCreated] = useState(false);
   const [quickTradeTarget, setQuickTradeTarget] = useState<PortfolioQuickTradeTarget | null>(null);
   const [fundingBlockedTradeTarget, setFundingBlockedTradeTarget] =
@@ -1204,6 +1219,20 @@ export function PortfolioPanel({
     (row) => !isPortfolioDustHolding(row.estimatedValueBnb, bnbUsdForDust)
   );
 
+  const sortedHoldingsRows = useMemo(() => {
+    const enriched = displayHoldingsRows.map((row) => ({
+      ...row,
+      amount: getPortfolioHoldingRowAmount(row),
+    }));
+    return sortPortfolioHoldingRows(enriched, holdingsSortKey, holdingsSortDir);
+  }, [displayHoldingsRows, holdingsSortKey, holdingsSortDir]);
+
+  function onHoldingsSort(column: PortfolioHoldingsSortKey) {
+    const next = togglePortfolioHoldingsSort(holdingsSortKey, holdingsSortDir, column);
+    setHoldingsSortKey(next.key);
+    setHoldingsSortDir(next.dir);
+  }
+
   const metricViews = verifiedPositionViews.filter(
     (view) =>
       !isPortfolioDustHolding(
@@ -1250,10 +1279,10 @@ export function PortfolioPanel({
   const topHolding = resolveTopHoldingSummary(displayHoldingsRows, nativeBnb, bnbUsd);
   const claimedBnb = data.creatorFeesClaimedBnb ?? 0;
   const pendingBnb = pendingWei != null ? Number(formatEther(pendingWei)) : 0;
-  const tokenHoldingsCount = displayHoldingsRows.length;
+  const tokenHoldingsCount = sortedHoldingsRows.length;
   const holdingsCount = tokenHoldingsCount + 1;
-  const visibleHoldingsRows = displayHoldingsRows.slice(0, holdingsVisibleLimit);
-  const hasMoreHoldings = visibleHoldingsRows.length < displayHoldingsRows.length;
+  const visibleHoldingsRows = sortedHoldingsRows.slice(0, holdingsVisibleLimit);
+  const hasMoreHoldings = visibleHoldingsRows.length < sortedHoldingsRows.length;
   const showEmptyHoldings = tokenHoldingsCount === 0 && nativeBnb <= 0;
 
   const isOwnPortfolio =
@@ -1368,6 +1397,7 @@ export function PortfolioPanel({
           }}
           followingCount={data.followingCount ?? 0}
           followerCount={data.followerCount ?? 0}
+          showWalletActions={isOwnPortfolio && isConnected}
         />
 
         <PortfolioSummaryStrip
@@ -1404,11 +1434,11 @@ export function PortfolioPanel({
               ) : (
                 <section className="panel-surface portfolio-section-surface portfolio-tab-panel__surface">
                   <div className="lg:hidden portfolio-holdings-mobile">
-                    <div className="portfolio-holdings-mobile__header">
-                      <span>Coin</span>
-                      <span className="portfolio-holdings-mobile__amount-col">Amount</span>
-                      <span className="portfolio-holdings-mobile__value-col">Value/PNL</span>
-                    </div>
+                    <PortfolioHoldingsMobileHeader
+                      sortKey={holdingsSortKey}
+                      sortDir={holdingsSortDir}
+                      onSort={onHoldingsSort}
+                    />
                     <div className="portfolio-holdings-mobile__body">
                     <NativeCashMobileRow nativeBnb={nativeBnb} bnbUsd={bnbUsd} />
                     {visibleHoldingsRows.map((row, index) => {
@@ -1453,12 +1483,11 @@ export function PortfolioPanel({
                                 address={position.tokenAddress}
                                 symbol={position.symbol}
                                 logoUrl={position.logoUrl}
-                                size={28}
                               />
                             }
                             title={
                               <Link href={`/token/${position.tokenAddress}`} className="truncate">
-                                ${position.symbol}
+                                {position.symbol}
                               </Link>
                             }
                             amount={formatHoldingAmount(balance)}
@@ -1485,14 +1514,11 @@ export function PortfolioPanel({
                         <col className="portfolio-holdings-grid__col-pnl" />
                       </colgroup>
                       <thead>
-                        <tr>
-                          <th>Coin</th>
-                          <th className="portfolio-holdings-grid__actions-head" aria-label="Actions" />
-                          <th className="portfolio-holdings-grid__num">Amount</th>
-                          <th className="portfolio-holdings-grid__num">Value</th>
-                          <th className="portfolio-holdings-grid__num">Entry</th>
-                          <th className="portfolio-holdings-grid__num">P/L</th>
-                        </tr>
+                        <PortfolioHoldingsGridHead
+                          sortKey={holdingsSortKey}
+                          sortDir={holdingsSortDir}
+                          onSort={onHoldingsSort}
+                        />
                       </thead>
                       <tbody>
                         <NativeCashDesktopRow nativeBnb={nativeBnb} bnbUsd={bnbUsd} />
@@ -1547,12 +1573,10 @@ export function PortfolioPanel({
                                     address={position.tokenAddress}
                                     symbol={position.symbol}
                                     logoUrl={position.logoUrl}
-                                    size={20}
-                                    shape="rounded"
                                     className="portfolio-holdings-grid__coin-mark !ring-0"
                                   />
                                   <p className="portfolio-holdings-grid__coin-symbol truncate">
-                                    ${position.symbol}
+                                    {position.symbol}
                                   </p>
                                 </Link>
                               </td>
@@ -1611,7 +1635,7 @@ export function PortfolioPanel({
         ) : null}
 
         {activeTab === "launched" ? (
-          <div className="portfolio-tab-panel space-y-2 md:space-y-3">
+          <div className="portfolio-tab-panel">
               {data.createdTokens.length === 0 ? (
                 <div className="panel-surface empty-state">
                   <p className="empty-state-copy">
@@ -1623,56 +1647,7 @@ export function PortfolioPanel({
                 </div>
               ) : (
                 <section className="panel-surface portfolio-section-surface portfolio-tab-panel__surface">
-                  <div className="portfolio-tab-scroll lg:hidden divide-y divide-pump-border/10">
-                    {data.createdTokens.map((token) => {
-                      const mcapUsd = bnbToUsd(Number(token.marketCapBnb), bnbUsd);
-                      const vol24hUsd = bnbToUsd(Number(token.volume24hBnb ?? 0), bnbUsd);
-                      return (
-                        <article
-                          key={token.address}
-                          className="grid grid-cols-[1.75rem_1fr] gap-x-2 gap-y-2 p-2.5"
-                        >
-                          <TokenAvatar
-                            address={token.address}
-                            symbol={token.symbol}
-                            logoUrl={token.logoUrl}
-                            size={28}
-                            className="row-span-2 self-start"
-                          />
-                          <Link
-                            href={`/token/${token.address}`}
-                            className="self-center truncate text-body-sm font-medium text-pump-text"
-                          >
-                            ${token.symbol}
-                          </Link>
-                          <div className="col-start-2 flex w-full items-center justify-between gap-1 text-[11px] leading-tight">
-                            <span className="financial-value min-w-0 truncate text-pump-text">
-                              <span className="text-pump-muted">MCAP </span>
-                              {formatCapForBoard(mcapUsd)}
-                            </span>
-                            <span className="financial-value min-w-0 truncate text-pump-text">
-                              <span className="text-pump-muted">TXN </span>
-                              {token.tradeCount ?? 0}
-                            </span>
-                            <span className="financial-value min-w-0 truncate text-pump-text">
-                              <span className="text-pump-muted">VOL </span>
-                              {formatUsdReadable(vol24hUsd, { compact: true })}
-                            </span>
-                            <span className="financial-value shrink-0 text-right">
-                              <span className="text-pump-muted">24H </span>
-                              <PctChange
-                                value={token.change24hPct ?? null}
-                                className="inline-flex"
-                              />
-                            </span>
-                          </div>
-                        </article>
-                      );
-                    })}
-                  </div>
-                  <div className="hidden lg:block">
-                    <TokenBoardTable tokens={data.createdTokens} bnbUsd={bnbUsd} variant="created" />
-                  </div>
+                  <PortfolioLaunchedList tokens={data.createdTokens} bnbUsd={bnbUsd} />
                   {data.createdTokens.length < data.createdTokensTotal ? (
                     <div className="flex justify-center border-t border-pump-border/10 px-3 py-3">
                       <button

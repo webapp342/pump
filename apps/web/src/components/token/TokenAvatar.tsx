@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { resolveLaunchpadLogoUri } from "@/lib/assets";
+import { TOKEN_LOGO_SIZE_INLINE } from "@/lib/token-logo-sizes";
 
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 
@@ -12,7 +13,7 @@ type TokenAvatarProps = {
   /** Local blob/data URL shown before upload completes. */
   previewUrl?: string | null;
   size?: number;
-  /** circle = default avatar; rounded = corporate tile (sidebar, tables). */
+  /** circle = user avatars only; rounded = token / chain logos (default). */
   shape?: "circle" | "rounded";
   className?: string;
 };
@@ -23,17 +24,29 @@ export function TokenAvatar({
   logoUrl,
   previewUrl,
   size = 40,
-  shape = "circle",
+  shape = "rounded",
   className = "",
 }: TokenAvatarProps) {
   const [imgError, setImgError] = useState(false);
   const letter = symbol.charAt(0).toUpperCase() || "?";
   const isPlaceholder = address.toLowerCase() === ZERO_ADDRESS;
-  const radiusClass = shape === "rounded" ? "rounded-[var(--radius-sm)]" : "rounded-full";
-  const ringClass =
-    shape === "rounded"
-      ? "ring-1 ring-pump-border/25"
-      : "ring-2 ring-pump-border/15";
+  const isCircle = shape === "circle";
+  const useInlineTile = !isCircle && size === 40;
+  const resolvedSize = useInlineTile ? TOKEN_LOGO_SIZE_INLINE : size;
+  const shapeClass = isCircle
+    ? "token-avatar-circle"
+    : useInlineTile
+      ? "token-logo-mark token-logo-mark--inline"
+      : "token-logo-mark";
+  const ringClass = isCircle ? "ring-2 ring-pump-border/15" : "";
+  const tileStyle = useInlineTile
+    ? undefined
+    : {
+        width: resolvedSize,
+        height: resolvedSize,
+        minWidth: resolvedSize,
+        minHeight: resolvedSize,
+      };
 
   const src =
     previewUrl ??
@@ -47,8 +60,8 @@ export function TokenAvatar({
 
   const fallback = (
     <span
-      className={`flex shrink-0 items-center justify-center overflow-hidden border border-pump-border/20 bg-pump-surface/70 text-sm font-semibold text-pump-text ${radiusClass} ${ringClass} ${className}`}
-      style={{ width: size, height: size, minWidth: size, minHeight: size }}
+      className={`flex shrink-0 items-center justify-center overflow-hidden text-sm font-semibold text-pump-text ${shapeClass} ${ringClass} ${className}`}
+      style={tileStyle}
     >
       {letter}
     </span>
@@ -60,11 +73,11 @@ export function TokenAvatar({
     <img
       src={src}
       alt=""
-      width={size}
-      height={size}
+      width={resolvedSize}
+      height={resolvedSize}
       referrerPolicy="no-referrer"
-      className={`shrink-0 object-cover ${radiusClass} ${ringClass} ${className}`}
-      style={{ width: size, height: size }}
+      className={`shrink-0 object-cover ${shapeClass} ${ringClass} ${className}`}
+      style={tileStyle}
       onError={() => setImgError(true)}
     />
   );

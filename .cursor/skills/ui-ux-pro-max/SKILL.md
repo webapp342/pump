@@ -5,8 +5,54 @@ description: Comprehensive design guide for web, mobile, and desktop application
 # ui-ux-pro-max
 
 > **Pump TMA:** This repo has its own design system (`pump-tma-design-system`). Use this skill for UX guidelines, checklists, and industry reasoning — not to replace Pump `pump-*` tokens, Geist fonts, or `globals.css` components. No shadcn.
+>
+> **Persisted Pump rules:** `.cursor/design-system/MASTER.md` + `.cursor/design-system/pages/<page>.md` — read before implementing; they override generic skill output.
 
 Comprehensive design guide for web, mobile, and desktop applications. Contains 67 styles, 161 color palettes, 57 font pairings, 99 UX guidelines, and 25 chart types across 22 technology stacks. Searchable database with priority-based recommendations.
+
+---
+
+## Pump TMA workflow (read this first in pump-tma)
+
+Generic `--design-system` output often suggests **bento blocks, marketing palettes, and Lucide** — wrong for Pump's fintech terminal. Use this sequence:
+
+### 1. Read project overrides
+
+```
+.cursor/design-system/MASTER.md
+.cursor/design-system/pages/<page>.md   # e.g. portfolio.md
+pump-tma-design-system → pump-tma-ui-ux
+```
+
+### 2. Search by intent (not always `--design-system`)
+
+| Intent | Command |
+|--------|---------|
+| Wallet / action buttons / touch | `--domain ux "touch target icon button row 44px fintech"` |
+| Loading / skeleton / flash | `--domain ux "skeleton loading feedback"` |
+| Charts / PnL | `--domain chart "real-time trading financial"` |
+| Page tone / density (research only) | `--design-system --density 8 --motion 3 -p "Pump" -f markdown` |
+
+From repo root (Windows: `python`, not `python3`):
+
+```powershell
+python .cursor/skills/ui-ux-pro-max/scripts/search.py "touch target spacing mobile" --domain ux -n 6
+```
+
+### 3. Map to Pump (never copy skill colors/fonts)
+
+- Colors → `pump-*` tokens in `globals.css`
+- Wallet quick actions → **segmented bar** ~44px, single border (see `pages/portfolio.md`)
+- Icons → `PumpIcon`; size with **`font-size` + `1em`**, not px width/height alone
+- Buttons → extend `primary-button` / `secondary-button` / existing `portfolio-*` classes
+
+### 4. Anti-patterns specific to Pump
+
+- Do **not** build 4-column tall action cards for Receive/Send/Deposit
+- Do **not** use skill "Bento Grid Showcase" for in-app wallet chrome
+- Do **not** run `--design-system` alone and paste hex/Inter into components
+
+---
 
 # Prerequisites
 

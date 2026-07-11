@@ -57,25 +57,31 @@ export function TokenBoardTable({
 
   return (
     <div className="overflow-x-auto">
-      <table className={`sheet-grid ${isArena ? "min-w-[1180px]" : "min-w-[900px]"}`}>
+      <table className={`sheet-grid ${isArena ? "min-w-[1180px]" : "min-w-[520px]"}`}>
         <thead>
           <tr>
             {isArena ? <th /> : null}
             <th>Coin</th>
-            <th><TableHeaderLabel icon={MetricIcons.graph}>Graph</TableHeaderLabel></th>
-            <th><TableHeaderLabel icon={MetricIcons.mcap}>MCAP</TableHeaderLabel></th>
-            <th><TableHeaderLabel icon={MetricIcons.ath}>ATH</TableHeaderLabel></th>
-            <th><TableHeaderLabel icon={MetricIcons.age}>Age</TableHeaderLabel></th>
-            <th><TableHeaderLabel icon={MetricIcons.txns}>TXNS</TableHeaderLabel></th>
-            <th><TableHeaderLabel icon={MetricIcons.vol24h}>24H VOL</TableHeaderLabel></th>
             {isArena ? (
               <>
+                <th><TableHeaderLabel icon={MetricIcons.graph}>Graph</TableHeaderLabel></th>
+                <th><TableHeaderLabel icon={MetricIcons.mcap}>MCAP</TableHeaderLabel></th>
+                <th><TableHeaderLabel icon={MetricIcons.ath}>ATH</TableHeaderLabel></th>
+                <th><TableHeaderLabel icon={MetricIcons.age}>Age</TableHeaderLabel></th>
+                <th><TableHeaderLabel icon={MetricIcons.txns}>TXNS</TableHeaderLabel></th>
+                <th><TableHeaderLabel icon={MetricIcons.vol24h}>24H VOL</TableHeaderLabel></th>
                 <th><TableHeaderLabel icon={MetricIcons.traders}>TRADERS</TableHeaderLabel></th>
                 <th><TableHeaderLabel icon={MetricIcons.change1h}>1H</TableHeaderLabel></th>
                 <th><TableHeaderLabel icon={MetricIcons.change6h}>6H</TableHeaderLabel></th>
                 <th><TableHeaderLabel icon={MetricIcons.change24h}>24H</TableHeaderLabel></th>
               </>
-            ) : null}
+            ) : (
+              <>
+                <th><TableHeaderLabel icon={MetricIcons.mcap}>MCAP</TableHeaderLabel></th>
+                <th><TableHeaderLabel icon={MetricIcons.change24h}>24H</TableHeaderLabel></th>
+                <th><TableHeaderLabel icon={MetricIcons.age}>Age</TableHeaderLabel></th>
+              </>
+            )}
           </tr>
         </thead>
         <tbody>
@@ -118,24 +124,24 @@ export function TokenBoardTable({
                     </div>
                   </Link>
                 </td>
-                <td className="px-4 py-3">
-                  <TrendSparkline points={trendPoints} positive={trendPositive} />
-                </td>
-                <td className="px-4 py-3 financial-value font-semibold text-pump-text">
-                  {formatCapForBoard(mcapUsd)}
-                </td>
-                <td className="px-4 py-3 financial-value text-pump-text">
-                  {formatCapForBoard(athMcapUsd)}
-                </td>
-                <td className="px-4 py-3 text-pump-text">{formatAge(token.createdAt)}</td>
-                <td className="px-4 py-3 financial-value text-pump-text">
-                  {token.tradeCount ?? 0}
-                </td>
-                <td className="px-4 py-3 financial-value text-pump-text">
-                  {formatUsdReadable(vol24hUsd, { compact: true })}
-                </td>
                 {isArena ? (
                   <>
+                    <td className="px-4 py-3">
+                      <TrendSparkline points={trendPoints} positive={trendPositive} />
+                    </td>
+                    <td className="px-4 py-3 financial-value font-semibold text-pump-text">
+                      {formatCapForBoard(mcapUsd)}
+                    </td>
+                    <td className="px-4 py-3 financial-value text-pump-text">
+                      {formatCapForBoard(athMcapUsd)}
+                    </td>
+                    <td className="px-4 py-3 text-pump-text">{formatAge(token.createdAt)}</td>
+                    <td className="px-4 py-3 financial-value text-pump-text">
+                      {token.tradeCount ?? 0}
+                    </td>
+                    <td className="px-4 py-3 financial-value text-pump-text">
+                      {formatUsdReadable(vol24hUsd, { compact: true })}
+                    </td>
                     <td className="px-4 py-3 financial-value text-pump-text">
                       {token.traders24h ?? 0}
                     </td>
@@ -149,7 +155,17 @@ export function TokenBoardTable({
                       <PctChange value={token.change24hPct ?? null} />
                     </td>
                   </>
-                ) : null}
+                ) : (
+                  <>
+                    <td className="px-4 py-3 financial-value font-semibold text-pump-text">
+                      {formatCapForBoard(mcapUsd)}
+                    </td>
+                    <td className="px-4 py-3">
+                      <PctChange value={token.change24hPct ?? null} />
+                    </td>
+                    <td className="px-4 py-3 text-pump-text">{formatAge(token.createdAt)}</td>
+                  </>
+                )}
               </tr>
             );
           })}

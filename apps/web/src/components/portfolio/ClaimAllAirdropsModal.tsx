@@ -108,7 +108,7 @@ function CampaignRow({
   return (
     <li className="flex items-center justify-between gap-3 py-2.5">
       <div className="flex min-w-0 items-center gap-2.5">
-        <TokenAvatar address={item.linkedToken} symbol={symbol} size={28} className="shrink-0" />
+        <TokenAvatar address={item.linkedToken} symbol={symbol} className="shrink-0 portfolio-holdings-grid__coin-mark !ring-0" />
         <div className="min-w-0">
           <p className="truncate text-body-sm font-medium text-pump-text">{tickerLabel(item)}</p>
           {sub ? <p className="mt-0.5 text-caption text-pump-muted">{sub}</p> : null}

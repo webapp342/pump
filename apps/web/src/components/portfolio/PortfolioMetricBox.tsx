@@ -37,13 +37,13 @@ export function PortfolioMetricBox({
           <IconLabel
             icon={icon}
             hideIconMobile
-            className="section-label portfolio-metric-box-label"
+            className="card-title portfolio-metric-box-label"
             iconClassName="h-3.5 w-3.5 shrink-0 opacity-75"
           >
             {label}
           </IconLabel>
         ) : (
-          <span className="section-label portfolio-metric-box-label">{label}</span>
+          <span className="card-title portfolio-metric-box-label">{label}</span>
         )}
 
         <div className="portfolio-metric-box-body">

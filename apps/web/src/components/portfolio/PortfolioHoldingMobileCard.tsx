@@ -12,6 +12,7 @@ type PortfolioHoldingMobileCardProps = {
   amount: ReactNode;
   valueUsd: number | null;
   pnlUsd?: number | null;
+  pnlSlot?: ReactNode;
   valueFlashClass?: string;
 };
 
@@ -27,9 +28,11 @@ export function PortfolioHoldingMobileCard({
   amount,
   valueUsd,
   pnlUsd,
+  pnlSlot,
   valueFlashClass = "",
 }: PortfolioHoldingMobileCardProps) {
-  const showPnl = pnlUsd != null && Number.isFinite(pnlUsd);
+  const showPnlUsd = pnlUsd != null && Number.isFinite(pnlUsd);
+  const showPnlSlot = pnlSlot != null;
 
   return (
     <article className="portfolio-holding-mobile">
@@ -42,10 +45,12 @@ export function PortfolioHoldingMobileCard({
         <span className={`portfolio-holding-mobile__value-main ${valueFlashClass}`.trim()}>
           {formatPortfolioHoldingValueUsd(valueUsd)}
         </span>
-        {showPnl ? (
+        {showPnlUsd ? (
           <span className={`portfolio-holding-mobile__value-pnl ${pnlTone(pnlUsd)}`}>
             {formatUsdSignedTwoDecimals(pnlUsd)}
           </span>
+        ) : showPnlSlot ? (
+          pnlSlot
         ) : null}
       </div>
     </article>

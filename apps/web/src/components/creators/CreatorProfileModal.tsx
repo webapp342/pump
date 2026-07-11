@@ -333,14 +333,14 @@ export function CreatorProfileModal({ open, onClose, creatorAddress }: CreatorPr
                 <h3 className="section-heading">Earnings</h3>
                 <div className="mt-2 grid grid-cols-2 gap-2.5">
                   <StatCard
-                    label="Creator fees"
+                    label="Creator earnings"
                     value={formatUsdReadable(
                       bnbToUsd(profile.creatorFeesTotalBnb, bnbUsd),
                       { compact: true }
                     )}
                   />
                   <StatCard
-                    label="Referral fees"
+                    label="Referral earnings"
                     value={formatUsdReadable(
                       bnbToUsd(profile.referralFeesTotalBnb, bnbUsd),
                       { compact: true }

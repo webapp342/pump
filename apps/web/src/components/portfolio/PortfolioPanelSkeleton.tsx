@@ -23,8 +23,8 @@ export function PortfolioPanelSkeleton() {
           </div>
           <Skeleton className="mx-auto h-10 w-36" />
           <div className="portfolio-mobile-hero__actions">
-            {Array.from({ length: 4 }).map((_, index) => (
-              <Skeleton key={index} className="h-[4.5rem] rounded-2xl" />
+            {Array.from({ length: 3 }).map((_, index) => (
+              <Skeleton key={index} className="h-11 flex-1 rounded-md" />
             ))}
           </div>
         </section>

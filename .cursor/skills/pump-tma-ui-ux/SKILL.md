@@ -65,6 +65,17 @@ Two Coinbase CDS themes via `data-theme` on `<html>`: `light`, `dark`. CSS vars 
   - Bottom tab bar hidden on token routes
   - Deep links: `?trade=buy` / `?trade=sell` via `parseTradePrefillFromSearchParams`
   - Desktop `lg+`: inline `TradePanel` in sticky aside; no dock
+- **Portfolio mobile hero** (`PortfolioMobileHero`, `< md`):
+  - Balance + PnL centered; quick actions = **3 inline pills** (icon + label row)
+  - Labels: `--text-caption` **sentence case** (not section-label uppercase)
+  - Icons: `south_west` deposit, `north_east` withdraw — see `.cursor/design-system/pages/portfolio.md`
+- **Portfolio desktop hero** (`PortfolioHero`, `≥ md`):
+  - Own wallet: **Deposit + Withdraw** in toolbar aside; others: Share
+- **Portfolio Earnings tab** (`PortfolioFeesTab`, tab id `fees`):
+  - Tab label: **Earnings** · `PortfolioEarningsCard` (title, description, Available hero, Claimed, Claim)
+  - URL slug `?tab=earnings` · see `.cursor/design-system/pages/portfolio.md`
+- **Portfolio Launched tab** — **same grid as Holdings** (`PortfolioLaunchedList`); MCAP in Amount/Value columns; 24H in P/L slot
+- **Token logos in lists** — `TokenAvatar` `shape="rounded"`; **no `$`** before symbols in portfolio UI
 - **Graduation UI disabled** — do not show `progressBps` or graduation progress bars; field may exist in token data for future use
 - Non-token mobile pages: `padding-bottom: var(--mobile-bottom-nav-height)` on main
 

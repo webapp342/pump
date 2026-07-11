@@ -83,6 +83,7 @@ export const faShare = faShareNodes;
 export const faInviteLink = faLink;
 export const faSearch = faMagnifyingGlass;
 export const faArrowUpRight = ms("north_east");
+export const faArrowSouthWest = ms("south_west");
 export const faCircleDollarSign = ms("paid", true);
 export const faExternalLink = faArrowUpRightFromSquare;
 export const faArrowLeftRight = faRightLeft;

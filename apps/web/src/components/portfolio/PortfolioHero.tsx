@@ -2,9 +2,18 @@
 
 import { useMemo, useState } from "react";
 import { ShareSheetModal } from "@/components/ui/ShareSheetModal";
+import { useWalletFunding } from "@/components/wallet/WalletFundingProvider";
 import { shortAddress } from "@/config/chain";
 import { copyToClipboard } from "@/lib/copy-to-clipboard";
-import { PumpIcon, faCheck, faCopy, faPen, faShare } from "@/lib/icons";
+import {
+  PumpIcon,
+  faArrowSouthWest,
+  faArrowUpRight,
+  faCheck,
+  faCopy,
+  faPen,
+  faShare,
+} from "@/lib/icons";
 import { portfolioSharePayload } from "@/lib/share-links";
 import { UserAvatarForAddress } from "@/components/user/UserAvatarForAddress";
 
@@ -18,6 +27,7 @@ type PortfolioHeroProps = {
   followingCount: number;
   followerCount: number;
   guestMode?: boolean;
+  showWalletActions?: boolean;
 };
 
 function WalletAddressChip({
@@ -137,8 +147,10 @@ export function PortfolioHero({
   followingCount,
   followerCount,
   guestMode = false,
+  showWalletActions = false,
 }: PortfolioHeroProps) {
   const [shareOpen, setShareOpen] = useState(false);
+  const { openDeposit, openWithdraw } = useWalletFunding();
 
   const sharePayload = useMemo(
     () =>
@@ -232,16 +244,37 @@ export function PortfolioHero({
 
             {!guestMode ? (
               <div className="portfolio-toolbar__aside">
-                <div className="portfolio-toolbar__profile-actions">
-                  <button
-                    type="button"
-                    onClick={() => setShareOpen(true)}
-                    className="portfolio-toolbar__share-btn"
-                  >
-                    <PumpIcon icon={faShare} className="h-3.5 w-3.5" />
-                    <span>Share</span>
-                  </button>
-                </div>
+                {showWalletActions ? (
+                  <div className="portfolio-toolbar__funding">
+                    <button
+                      type="button"
+                      onClick={() => openDeposit()}
+                      className="portfolio-toolbar__share-btn"
+                    >
+                      <PumpIcon icon={faArrowSouthWest} className="portfolio-toolbar__action-icon" fixedWidth />
+                      <span>Deposit</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => openWithdraw()}
+                      className="portfolio-toolbar__share-btn"
+                    >
+                      <PumpIcon icon={faArrowUpRight} className="portfolio-toolbar__action-icon" fixedWidth />
+                      <span>Withdraw</span>
+                    </button>
+                  </div>
+                ) : (
+                  <div className="portfolio-toolbar__profile-actions">
+                    <button
+                      type="button"
+                      onClick={() => setShareOpen(true)}
+                      className="portfolio-toolbar__share-btn"
+                    >
+                      <PumpIcon icon={faShare} className="portfolio-toolbar__action-icon" />
+                      <span>Share</span>
+                    </button>
+                  </div>
+                )}
               </div>
             ) : null}
           </div>

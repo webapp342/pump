@@ -116,7 +116,7 @@ export function ClaimCreatorFeesModal({
         <div className="flex items-start justify-between gap-3 border-b border-pump-border/45 pb-3">
           <div>
             <h2 id="claim-creator-fees-title" className="text-h3 font-semibold text-pump-text">
-              Creator fees
+              Creator earnings
             </h2>
             <p className="mt-0.5 text-caption text-pump-muted">
               Earnings from tokens you launched

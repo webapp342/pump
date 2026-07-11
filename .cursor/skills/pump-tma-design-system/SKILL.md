@@ -19,6 +19,8 @@ Authoritative visual and layout spec for Pump. Supersedes spreadsheet/Excel meta
 5. **Semantic color discipline** — Green/red for P&L only (universal trading convention). Accent for brand/actions. Muted for labels. WCAG 4.5:1 on body text; supplement red/green with +/- signs.
 6. **4px spacing grid** — All padding, gaps, and min-heights on multiples of 4. Touch targets ≥ 44px on primary trade actions.
 7. **Motion with purpose** — 100–150ms transitions on hover/focus; live price flash animations preserved. Respect `prefers-reduced-motion`.
+8. **Avatar vs logo shape** — **User avatars: circle only.** Token logos, chain marks, list/table marks: **square tile** (`TokenAvatar` default `shape="rounded"`, `NativeLogo`). Do not circle-crop token logos.
+9. **Token symbols in UI** — Display `symbol` as stored; **no leading `$`** in portfolio, tables, or modals.
 
 ## Supplementary research
 

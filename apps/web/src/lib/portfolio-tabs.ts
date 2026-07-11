@@ -3,19 +3,26 @@ export const PORTFOLIO_TABS = ["holdings", "launched", "fees", "airdrops"] as co
 export type PortfolioTab = (typeof PORTFOLIO_TABS)[number];
 
 export function parsePortfolioTab(value: string | null | undefined): PortfolioTab {
+  if (value === "earnings" || value === "rewards") return "fees";
   if (value === "launched" || value === "fees" || value === "airdrops") return value;
-  if (value === "rewards") return "fees";
   return "holdings";
 }
 
 export function portfolioTabHref(tab: PortfolioTab): string {
   if (tab === "holdings") return "/portfolio";
-  return `/portfolio?tab=${tab}`;
+  const slug = tab === "fees" ? "earnings" : tab;
+  return `/portfolio?tab=${slug}`;
 }
 
 export const PORTFOLIO_TAB_LABELS: Record<PortfolioTab, string> = {
   holdings: "Holdings",
   launched: "Launched",
-  fees: "Fees",
+  fees: "Earnings",
   airdrops: "Airdrops",
 };
+
+/** User-facing card titles on the Earnings tab (sentence case — not fee jargon). */
+export const PORTFOLIO_EARNINGS_CARD_LABELS = {
+  creator: "Creator earnings",
+  referral: "Referral earnings",
+} as const;

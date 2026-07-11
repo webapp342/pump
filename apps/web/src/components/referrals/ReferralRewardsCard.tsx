@@ -2,10 +2,10 @@
 
 import { useMemo, useState } from "react";
 import { formatEther } from "viem";
-import { PortfolioFeesBreakdown } from "@/components/portfolio/PortfolioFeesBreakdown";
-import { PortfolioMetricBox } from "@/components/portfolio/PortfolioMetricBox";
+import { PortfolioEarningsCard } from "@/components/portfolio/PortfolioEarningsCard";
 import { ShareSheetModal } from "@/components/ui/ShareSheetModal";
 import { PumpIcon, faInviteLink } from "@/lib/icons";
+import { PORTFOLIO_EARNINGS_CARD_LABELS } from "@/lib/portfolio-tabs";
 import { referralSharePayload } from "@/lib/share-links";
 
 type ReferralRewardsCardProps = {
@@ -32,33 +32,23 @@ export function ReferralRewardsCard({
 
   return (
     <>
-      <PortfolioMetricBox
+      <PortfolioEarningsCard
         className={className}
-        label="Referral fees"
-        value={
-          <PortfolioFeesBreakdown
-            availableBnb={pendingBnb}
-            claimedBnb={claimedBnb}
-            bnbUsd={bnbUsd}
-          />
-        }
-        valueClassName=""
-        actionsLayout="split"
-        actionsInlineFromMd
-        actions={
-          <>
-            <button
-              type="button"
-              onClick={() => setShareOpen(true)}
-              className="secondary-button inline-flex items-center justify-center gap-1.5"
-            >
-              <PumpIcon icon={faInviteLink} className="h-3.5 w-3.5 shrink-0 opacity-80" />
-              Share
-            </button>
-            <button type="button" onClick={onOpenModal} className="secondary-button">
-              Claim
-            </button>
-          </>
+        title={PORTFOLIO_EARNINGS_CARD_LABELS.referral}
+        description="When friends trade through your invite link."
+        availableBnb={pendingBnb}
+        claimedBnb={claimedBnb}
+        bnbUsd={bnbUsd}
+        onClaim={onOpenModal}
+        secondaryAction={
+          <button
+            type="button"
+            onClick={() => setShareOpen(true)}
+            className="secondary-button inline-flex items-center justify-center gap-1.5"
+          >
+            <PumpIcon icon={faInviteLink} className="h-3.5 w-3.5 shrink-0 opacity-80" />
+            Share
+          </button>
         }
       />
 

@@ -138,12 +138,10 @@ export function ClaimReferrerFeesModal({
         <div className="flex items-start justify-between gap-3 border-b border-pump-border/45 pb-3">
           <div>
             <h2 id="claim-referrer-fees-title" className="text-h3 font-semibold text-pump-text">
-              Fees
+              Referral earnings
             </h2>
             <p className="mt-0.5 text-caption text-pump-muted">
-              {address
-                ? `Referrer ${displayUsername ?? shortAddress(address)}`
-                : "Referral program"}
+              Earnings from friends you invited
             </p>
           </div>
           <button

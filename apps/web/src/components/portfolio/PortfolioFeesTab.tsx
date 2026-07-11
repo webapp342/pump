@@ -25,14 +25,14 @@ export function PortfolioFeesTab({
   onOpenReferrerClaim,
 }: PortfolioFeesTabProps) {
   return (
-    <div className="portfolio-fees-tab">
-      <div className="portfolio-fees-tab__grid">
+    <div className="portfolio-earnings-tab">
+      <div className="portfolio-earnings-tab__stack">
         <CreatorFeesCard
           claimedBnb={creatorClaimedBnb}
           pendingBnb={creatorPendingBnb}
           bnbUsd={bnbUsd}
           onOpenModal={onOpenCreatorClaim}
-          className="portfolio-fees-tab__card"
+          className="portfolio-earnings-tab__card"
         />
         <ReferralRewardsCard
           address={walletAddress}
@@ -40,7 +40,7 @@ export function PortfolioFeesTab({
           pendingWei={pendingReferrerWei}
           bnbUsd={bnbUsd}
           onOpenModal={onOpenReferrerClaim}
-          className="portfolio-fees-tab__card"
+          className="portfolio-earnings-tab__card"
         />
       </div>
     </div>

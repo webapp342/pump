@@ -42,7 +42,7 @@ export function PortfolioTabNav({
                 <span className="portfolio-tab-nav__count financial-value">{count}</span>
               ) : null}
               {showDot ? (
-                <span className="portfolio-tab-nav__dot" aria-label="Claimable fees" />
+                <span className="portfolio-tab-nav__dot" aria-label="Claimable earnings" />
               ) : null}
             </Link>
           );

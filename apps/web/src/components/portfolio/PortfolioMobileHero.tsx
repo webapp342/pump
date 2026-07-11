@@ -14,15 +14,14 @@ import { copyToClipboard } from "@/lib/copy-to-clipboard";
 import { formatPortfolioHoldingValueUsd, formatUsdSignedTwoDecimals } from "@/lib/format-usd";
 import {
   PumpIcon,
+  faArrowSouthWest,
   faArrowUpRight,
   faBolt,
   faCheck,
-  faCircleDollarSign,
   faCopy,
   faMenu,
   faPen,
   faPlus,
-  faQrcode,
   faShare,
 } from "@/lib/icons";
 import { portfolioSharePayload } from "@/lib/share-links";
@@ -147,7 +146,7 @@ export function PortfolioMobileHero({
 
   const showPnl = !guestMode && totalValueUsd != null;
 
-  function onAction(action: "deposit" | "receive" | "send" | "create") {
+  function onAction(action: "deposit" | "withdraw" | "create") {
     if (guestMode) {
       onSignIn?.();
       return;
@@ -156,11 +155,11 @@ export function PortfolioMobileHero({
       onSignIn?.();
       return;
     }
-    if (action === "deposit" || action === "receive") {
+    if (action === "deposit") {
       openDeposit();
       return;
     }
-    if (action === "send") {
+    if (action === "withdraw") {
       openWithdraw();
     }
   }
@@ -256,56 +255,54 @@ export function PortfolioMobileHero({
         </div>
 
         {guestMode || showWalletActions ? (
-          <div className="portfolio-mobile-hero__actions">
-          <button
-            type="button"
-            onClick={() => onAction("deposit")}
-            className="portfolio-mobile-hero__action portfolio-mobile-hero__action--primary"
-          >
-            <span className="portfolio-mobile-hero__action-icon" aria-hidden>
-              <PumpIcon icon={faCircleDollarSign} />
-            </span>
-            <span className="portfolio-mobile-hero__action-label">Deposit</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => onAction("receive")}
-            className="portfolio-mobile-hero__action"
-          >
-            <span className="portfolio-mobile-hero__action-icon" aria-hidden>
-              <PumpIcon icon={faQrcode} />
-            </span>
-            <span className="portfolio-mobile-hero__action-label">Receive</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => onAction("send")}
-            className="portfolio-mobile-hero__action"
-          >
-            <span className="portfolio-mobile-hero__action-icon" aria-hidden>
-              <PumpIcon icon={faArrowUpRight} />
-            </span>
-            <span className="portfolio-mobile-hero__action-label">Send</span>
-          </button>
-          {guestMode ? (
+          <div className="portfolio-mobile-hero__actions" role="group" aria-label="Wallet actions">
             <button
               type="button"
-              onClick={() => onSignIn?.()}
+              onClick={() => onAction("deposit")}
               className="portfolio-mobile-hero__action"
             >
               <span className="portfolio-mobile-hero__action-icon" aria-hidden>
-                <PumpIcon icon={faPlus} />
+                <PumpIcon
+                  icon={faArrowSouthWest}
+                  className="portfolio-mobile-hero__action-glyph"
+                  fixedWidth
+                />
               </span>
-              <span className="portfolio-mobile-hero__action-label">Create</span>
+              <span className="portfolio-mobile-hero__action-label">Deposit</span>
             </button>
-          ) : (
-            <Link href="/create" className="portfolio-mobile-hero__action">
+            <button
+              type="button"
+              onClick={() => onAction("withdraw")}
+              className="portfolio-mobile-hero__action"
+            >
               <span className="portfolio-mobile-hero__action-icon" aria-hidden>
-                <PumpIcon icon={faPlus} />
+                <PumpIcon
+                  icon={faArrowUpRight}
+                  className="portfolio-mobile-hero__action-glyph"
+                  fixedWidth
+                />
               </span>
-              <span className="portfolio-mobile-hero__action-label">Create</span>
-            </Link>
-          )}
+              <span className="portfolio-mobile-hero__action-label">Withdraw</span>
+            </button>
+            {guestMode ? (
+              <button
+                type="button"
+                onClick={() => onSignIn?.()}
+                className="portfolio-mobile-hero__action"
+              >
+                <span className="portfolio-mobile-hero__action-icon" aria-hidden>
+                  <PumpIcon icon={faPlus} className="portfolio-mobile-hero__action-glyph" fixedWidth />
+                </span>
+                <span className="portfolio-mobile-hero__action-label">Create</span>
+              </button>
+            ) : (
+              <Link href="/create" className="portfolio-mobile-hero__action">
+                <span className="portfolio-mobile-hero__action-icon" aria-hidden>
+                  <PumpIcon icon={faPlus} className="portfolio-mobile-hero__action-glyph" fixedWidth />
+                </span>
+                <span className="portfolio-mobile-hero__action-label">Create</span>
+              </Link>
+            )}
           </div>
         ) : null}
       </section>

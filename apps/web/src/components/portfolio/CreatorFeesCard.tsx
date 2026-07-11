@@ -1,7 +1,7 @@
 "use client";
 
-import { PortfolioFeesBreakdown } from "@/components/portfolio/PortfolioFeesBreakdown";
-import { PortfolioMetricBox } from "@/components/portfolio/PortfolioMetricBox";
+import { PortfolioEarningsCard } from "@/components/portfolio/PortfolioEarningsCard";
+import { PORTFOLIO_EARNINGS_CARD_LABELS } from "@/lib/portfolio-tabs";
 
 type CreatorFeesCardProps = {
   claimedBnb: number;
@@ -19,23 +19,14 @@ export function CreatorFeesCard({
   className = "",
 }: CreatorFeesCardProps) {
   return (
-    <PortfolioMetricBox
+    <PortfolioEarningsCard
       className={className}
-      label="Creator fees"
-      value={
-        <PortfolioFeesBreakdown
-          availableBnb={pendingBnb}
-          claimedBnb={claimedBnb}
-          bnbUsd={bnbUsd}
-        />
-      }
-      valueClassName=""
-      actionsInlineFromMd
-      actions={
-        <button type="button" onClick={onOpenModal} className="secondary-button">
-          Claim
-        </button>
-      }
+      title={PORTFOLIO_EARNINGS_CARD_LABELS.creator}
+      description="From tokens you launched on the bonding curve."
+      availableBnb={pendingBnb}
+      claimedBnb={claimedBnb}
+      bnbUsd={bnbUsd}
+      onClaim={onOpenModal}
     />
   );
 }

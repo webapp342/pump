@@ -284,9 +284,13 @@ function AirdropMobileRow({
   const countdown = countdownDisplay(item);
 
   return (
-    <article className="relative grid grid-cols-[1.75rem_1fr_auto] gap-x-2 gap-y-1.5 p-2.5 transition active:bg-pump-border/8">
+    <article className="relative grid grid-cols-[var(--token-logo-size-inline)_1fr_auto] gap-x-2 gap-y-1.5 p-2.5 transition active:bg-pump-border/8">
       <Link href={href} className="absolute inset-0 z-0 rounded-[inherit]" aria-label={`${tickerLabel(item)} airdrop`} />
-      <TokenAvatar address={item.linkedToken} symbol={symbol} size={28} className="relative z-10 row-span-2 self-start" />
+      <TokenAvatar
+        address={item.linkedToken}
+        symbol={symbol}
+        className="relative z-10 row-span-2 self-center portfolio-holdings-grid__coin-mark !ring-0"
+      />
       <div className="relative z-10 flex min-w-0 items-center gap-1.5 overflow-hidden">
         <p className="truncate text-body-sm font-medium text-pump-text">{tickerLabel(item)}</p>
         {countdown.show ? (
@@ -355,7 +359,11 @@ export function JoinedAirdropsList({
                       href={`/airdrops/${item.id}`}
                       className="flex min-w-0 items-center gap-3"
                     >
-                      <TokenAvatar address={item.linkedToken} symbol={symbol} size={30} />
+                      <TokenAvatar
+                        address={item.linkedToken}
+                        symbol={symbol}
+                        className="portfolio-holdings-grid__coin-mark !ring-0"
+                      />
                       <p className="truncate text-body-sm font-medium text-pump-text">
                         {tickerLabel(item)}
                       </p>

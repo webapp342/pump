@@ -1,14 +1,14 @@
 "use client";
 
-import { TokenBoardTable } from "@/components/arena/TokenBoardTable";
+import { PortfolioEarningsCard } from "@/components/portfolio/PortfolioEarningsCard";
 import { PortfolioHero } from "@/components/portfolio/PortfolioHero";
+import { PortfolioLaunchedList } from "@/components/portfolio/PortfolioLaunchedList";
 import { PortfolioMobileHero } from "@/components/portfolio/PortfolioMobileHero";
 import { PortfolioSummaryStrip } from "@/components/portfolio/PortfolioSummaryStrip";
-import { PortfolioFeesBreakdown } from "@/components/portfolio/PortfolioFeesBreakdown";
-import { PortfolioMetricBox } from "@/components/portfolio/PortfolioMetricBox";
 import { PortfolioTabNav } from "@/components/portfolio/PortfolioTabNav";
 import { formatUsdSignedTwoDecimals } from "@/lib/format-usd";
 import type { PortfolioTab } from "@/lib/portfolio-tabs";
+import { PORTFOLIO_EARNINGS_CARD_LABELS } from "@/lib/portfolio-tabs";
 import { HubDiscoveryScrollLock } from "@/components/layout/HubDiscoveryScrollLock";
 
 const GUEST_WALLET = "0x0000000000000000000000000000000000000000";
@@ -29,7 +29,7 @@ function GuestSignInFooter({ onSignIn }: { onSignIn: () => void }) {
       <div className="portfolio-sign-in-banner__copy">
         <p className="portfolio-sign-in-banner__title">Sign in to unlock your portfolio</p>
         <p className="portfolio-sign-in-banner__desc">
-          Track holdings, creator fees, launched tokens, and airdrop rewards after you sign in.
+          Track holdings, creator earnings, launched tokens, and airdrop rewards after you sign in.
         </p>
       </div>
       <button type="button" onClick={onSignIn} className="primary-button portfolio-sign-in-banner__cta">
@@ -79,8 +79,8 @@ function GuestHoldingsTab({ onSignIn }: { onSignIn: () => void }) {
 function GuestLaunchedTab({ onSignIn }: { onSignIn: () => void }) {
   return (
     <div className="portfolio-guest-tab">
-      <section className="panel-surface portfolio-section-surface hidden lg:block">
-        <TokenBoardTable tokens={[]} bnbUsd={null} variant="created" />
+      <section className="panel-surface portfolio-section-surface">
+        <PortfolioLaunchedList tokens={[]} bnbUsd={null} />
       </section>
       <GuestSignInFooter onSignIn={onSignIn} />
     </div>
@@ -89,30 +89,26 @@ function GuestLaunchedTab({ onSignIn }: { onSignIn: () => void }) {
 
 function GuestFeesTab({ onSignIn }: { onSignIn: () => void }) {
   return (
-    <div className="portfolio-fees-tab">
-      <div className="portfolio-fees-tab__grid">
-        <PortfolioMetricBox
-          className="portfolio-fees-tab__card"
-          label="Creator fees"
-          value={<PortfolioFeesBreakdown availableBnb={0} claimedBnb={0} bnbUsd={null} />}
-          valueClassName=""
-          actionsInlineFromMd
-          actions={
-            <button type="button" onClick={onSignIn} className="secondary-button">
-              Claim
-            </button>
-          }
+    <div className="portfolio-earnings-tab">
+      <div className="portfolio-earnings-tab__stack">
+        <PortfolioEarningsCard
+          className="portfolio-earnings-tab__card"
+          title={PORTFOLIO_EARNINGS_CARD_LABELS.creator}
+          description="From tokens you launched on the bonding curve."
+          availableBnb={0}
+          claimedBnb={0}
+          bnbUsd={null}
+          onClaim={onSignIn}
         />
-        <PortfolioMetricBox
-          className="portfolio-fees-tab__card"
-          label="Referral fees"
-          value={<PortfolioFeesBreakdown availableBnb={0} claimedBnb={0} bnbUsd={null} />}
-          valueClassName=""
-          actions={
-            <button type="button" onClick={onSignIn} className="secondary-button">
-              Claim
-            </button>
-          }
+        <PortfolioEarningsCard
+          className="portfolio-earnings-tab__card"
+          title={PORTFOLIO_EARNINGS_CARD_LABELS.referral}
+          description="When friends trade through your invite link."
+          availableBnb={0}
+          claimedBnb={0}
+          bnbUsd={null}
+          onClaim={onSignIn}
+          claimLabel="Sign in"
         />
       </div>
     </div>

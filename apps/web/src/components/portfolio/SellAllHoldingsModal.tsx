@@ -462,11 +462,11 @@ export function SellAllHoldingsModal({
                       address={target.tokenAddress}
                       symbol={target.symbol}
                       logoUrl={target.logoUrl}
-                      size={28}
+                      className="portfolio-holdings-grid__coin-mark !ring-0"
                     />
                     <div className="min-w-0">
                       <p className="truncate text-body-sm font-medium text-pump-text">
-                        ${target.symbol}
+                        {target.symbol}
                       </p>
                       <p className="truncate text-caption text-pump-muted">{target.name}</p>
                     </div>
