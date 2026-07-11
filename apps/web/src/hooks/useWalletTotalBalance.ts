@@ -63,21 +63,30 @@ export function useWalletTotalBalance(address?: Address) {
   const nativeBnb = balance ? Number(formatEther(balance.value)) : 0;
   const nativeUsd = bnbToUsd(nativeBnb, bnbUsd) ?? 0;
 
+  const indexedHoldingsBnb = useMemo(() => {
+    if (!positions.length) return 0;
+    return positions.reduce((sum, position) => {
+      const balance = Number(position.tokenBalance);
+      const price = Number(position.lastPriceBnb);
+      if (!Number.isFinite(balance) || !Number.isFinite(price)) return sum;
+      return sum + balance * price;
+    }, 0);
+  }, [positions]);
+
   const verifiedHoldingsBnb = useMemo(() => {
     if (!positions.length) return 0;
     if (!onChainQuery.data) return null;
     return sumVerifiedHoldingsBnb(positions, onChainQuery.data);
   }, [positions, onChainQuery.data]);
 
-  const verifiedHoldingsUsd =
-    verifiedHoldingsBnb != null ? (bnbToUsd(verifiedHoldingsBnb, bnbUsd) ?? 0) : null;
+  const holdingsBnb = verifiedHoldingsBnb ?? indexedHoldingsBnb;
+  const holdingsUsd = bnbToUsd(holdingsBnb, bnbUsd) ?? 0;
 
-  const holdingsUsd =
-    published?.address.toLowerCase() === normalized
-      ? published.holdingsUsd
-      : (verifiedHoldingsUsd ?? 0);
+  const publishedHoldingsUsd =
+    published?.address.toLowerCase() === normalized ? published.holdingsUsd : null;
 
-  const totalUsd = holdingsUsd + nativeUsd;
+  const resolvedHoldingsUsd = publishedHoldingsUsd ?? holdingsUsd;
+  const totalUsd = resolvedHoldingsUsd + nativeUsd;
 
   useEffect(() => {
     if (!normalized || verifiedHoldingsBnb == null) return;
@@ -85,17 +94,17 @@ export function useWalletTotalBalance(address?: Address) {
 
     publishWalletTotal({
       address: normalized,
-      holdingsUsd: verifiedHoldingsUsd ?? 0,
+      holdingsUsd,
       nativeBnb,
       nativeUsd,
-      totalUsd: (verifiedHoldingsUsd ?? 0) + nativeUsd,
+      totalUsd: holdingsUsd + nativeUsd,
     });
-  }, [normalized, verifiedHoldingsBnb, verifiedHoldingsUsd, nativeBnb, nativeUsd, published]);
+  }, [normalized, verifiedHoldingsBnb, holdingsUsd, nativeBnb, nativeUsd, published]);
 
   return {
     nativeBnb,
     nativeUsd,
-    holdingsUsd,
+    holdingsUsd: resolvedHoldingsUsd,
     totalUsd,
     isPortfolioEnriched:
       published?.address.toLowerCase() === normalized || verifiedHoldingsBnb != null,

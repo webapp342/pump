@@ -9,7 +9,7 @@ export function resolveVerifiedTokenBalance(
   if (onChainBalance == null || !Number.isFinite(onChainBalance)) {
     const hasIndexedHint = indexedBalance > ON_CHAIN_BALANCE_EPSILON;
     return {
-      displayBalance: 0,
+      displayBalance: hasIndexedHint ? indexedBalance : 0,
       hidden: !hasIndexedHint,
       verified: false,
       pending: hasIndexedHint,
@@ -42,7 +42,7 @@ export function sumVerifiedHoldingsBnb(
       indexedBalance,
       onChainBalance
     );
-    if (hidden || pending) return sum;
+    if (hidden) return sum;
 
     const price = Number(position.lastPriceBnb);
     if (!Number.isFinite(price)) return sum;

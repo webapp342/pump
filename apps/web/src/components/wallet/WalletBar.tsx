@@ -134,26 +134,39 @@ function ConnectedWalletButton({ address }: { address: string }) {
 
 export function WalletBar() {
   const { ready, authenticated, scwAddress, login } = usePumpWallet();
-  const { isConnected } = useAccount();
+  const { isConnected, isConnecting, isReconnecting } = useAccount();
 
-  const walletReady =
-    ready && authenticated && Boolean(scwAddress) && isConnected;
+  const sessionActive = ready && authenticated && Boolean(scwAddress);
+  const wagmiBooting = isConnecting || isReconnecting || (sessionActive && !isConnected);
+  const walletReady = sessionActive && (isConnected || wagmiBooting);
 
   if (!isPumpAuthConfigured()) {
     return <span className="text-caption text-pump-muted">Configure sign-in to continue</span>;
   }
 
-  return (
-    <div
-      {...(!ready && {
-        "aria-hidden": true,
-        style: {
+  if (!ready || wagmiBooting) {
+    if (sessionActive && scwAddress) {
+      return <ConnectedWalletButton address={scwAddress} />;
+    }
+
+    return (
+      <div
+        aria-hidden
+        style={{
           opacity: 0,
           pointerEvents: "none",
           userSelect: "none",
-        },
-      })}
-    >
+        }}
+      >
+        <button type="button" tabIndex={-1} className="app-header-sign-in-btn">
+          Sign in
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div>
       {!walletReady ? (
         <button type="button" onClick={login} className="app-header-sign-in-btn">
           Sign in

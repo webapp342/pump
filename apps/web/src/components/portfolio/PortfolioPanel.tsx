@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import { formatEther, parseUnits } from "viem";
 import { useOpenConnectModal } from "@/hooks/useOpenConnectModal";
 import { useAccount } from "wagmi";
+import { usePumpWallet } from "@/components/wallet/PumpWalletProvider";
 import { useReadContract } from "wagmi";
 import { contracts, pumpChain, NATIVE_SYMBOL } from "@/config/chain";
 import { bondingCurveManagerAbi } from "@/lib/bonding-curve";
@@ -175,10 +176,10 @@ function buildVerifiedPositionView(
   if (hidden) return null;
 
   const remainingCostBasis = pending
-    ? 0
+    ? fullCostBasis
     : scaleCostBasisForBalance(fullCostBasis, indexedBalance, displayBalance);
   const remainingCostBasisUsd = pending
-    ? 0
+    ? fullCostBasisUsd
     : scaleCostBasisUsdForBalance(fullCostBasisUsd, indexedBalance, displayBalance);
 
   return {
@@ -188,7 +189,7 @@ function buildVerifiedPositionView(
     remainingCostBasis,
     remainingCostBasisUsd,
     avgEntry:
-      !pending && displayBalance > 0 ? remainingCostBasis / displayBalance : null,
+      displayBalance > 0 ? remainingCostBasis / displayBalance : null,
     realizedPnlBnb: Number(position.realizedPnlBnb),
     realizedPnlUsd: Number(position.realizedPnlUsd ?? 0),
   };
@@ -240,8 +241,7 @@ function formatTokenBalance(value: number): string {
   return value.toFixed(4);
 }
 
-function formatHoldingAmount(value: number, pending = false): string {
-  if (pending) return "…";
+function formatHoldingAmount(value: number): string {
   return formatTokenBalance(value);
 }
 
@@ -466,9 +466,7 @@ function buildPortfolioHoldingRows(
     ...verifiedPositionViews.map((view) => ({
       kind: "position" as const,
       view,
-      estimatedValueBnb: view.balancePending
-        ? 0
-        : view.balance * Number(view.position.lastPriceBnb),
+      estimatedValueBnb: view.balance * Number(view.position.lastPriceBnb),
     })),
     ...walletHoldings.map((holding) => ({
       kind: "wallet" as const,
@@ -607,9 +605,11 @@ export function PortfolioPanel({
   const activeTab = parsePortfolioTab(searchParams.get("tab") ?? initialTab);
   const hasSsrPortfolio = portfolioMatchesWallet(initialPortfolio, ssrWalletAddress);
   const { address, isConnected, isConnecting, isReconnecting } = useAccount();
+  const { authenticated, scwAddress: sessionAddress, ready: pumpReady } = usePumpWallet();
+  const walletSessionActive = pumpReady && authenticated && Boolean(sessionAddress);
   const { openConnectModal } = useOpenConnectModal();
   const { bnbUsd } = useBnbUsdPrice();
-  const scwAddress = (address ?? ssrWalletAddress) as `0x${string}` | undefined;
+  const scwAddress = (address ?? sessionAddress ?? ssrWalletAddress) as `0x${string}` | undefined;
   const { data: scwBalance } = useScwBalance(scwAddress);
   const [data, setData] = useState<PortfolioData | null>(
     hasSsrPortfolio ? initialPortfolio : null
@@ -910,7 +910,13 @@ export function PortfolioPanel({
 
   useEffect(() => {
     if (!isConnected || !address) {
-      if ((isConnecting || isReconnecting) && hasSsrPortfolio) {
+      if (
+        (!pumpReady ||
+          isConnecting ||
+          isReconnecting ||
+          (walletSessionActive && !isConnected)) &&
+        (hasSsrPortfolio || data)
+      ) {
         return;
       }
 
@@ -935,9 +941,12 @@ export function PortfolioPanel({
 
     const ssrMatch =
       portfolioMatchesWallet(initialPortfolio, ssrWalletAddress) &&
-      portfolioMatchesWallet(initialPortfolio, address);
+      portfolioMatchesWallet(initialPortfolio, address ?? sessionAddress);
 
     if (ssrMatch && !ssrHydratedRef.current) {
+      const wallet = address ?? sessionAddress ?? ssrWalletAddress;
+      if (!wallet) return;
+
       ssrHydratedRef.current = true;
       setData(initialPortfolio);
       isInitialPortfolioLoadRef.current = false;
@@ -945,8 +954,8 @@ export function PortfolioPanel({
       setHoldingsReady(false);
       setLoading(false);
       setError(null);
-      void enrichHoldings(address, initialPortfolio!, { silent: true });
-      void loadPortfolio(address, PORTFOLIO_LAUNCHED_INITIAL, { silent: true });
+      void enrichHoldings(wallet, initialPortfolio!, { silent: true });
+      void loadPortfolio(wallet, PORTFOLIO_LAUNCHED_INITIAL, { silent: true });
       return;
     }
 
@@ -970,7 +979,21 @@ export function PortfolioPanel({
     setCreatedLimit(PORTFOLIO_LAUNCHED_INITIAL);
     setHoldingsVisibleLimit(PORTFOLIO_HOLDINGS_INITIAL);
     void loadPortfolio(address, PORTFOLIO_LAUNCHED_INITIAL);
-  }, [address, isConnected, isConnecting, isReconnecting, hasSsrPortfolio, initialPortfolio, ssrWalletAddress, loadPortfolio, enrichHoldings]);
+  }, [
+    address,
+    sessionAddress,
+    data,
+    isConnected,
+    isConnecting,
+    isReconnecting,
+    hasSsrPortfolio,
+    initialPortfolio,
+    ssrWalletAddress,
+    loadPortfolio,
+    enrichHoldings,
+    pumpReady,
+    walletSessionActive,
+  ]);
 
   const schedulePoll = useCallback(() => {
     if (!address) return;
@@ -1107,15 +1130,21 @@ export function PortfolioPanel({
     walletHoldings,
   ]);
 
-  const walletReconnecting = isConnecting || isReconnecting;
+  const walletReconnecting =
+    !pumpReady ||
+    isConnecting ||
+    isReconnecting ||
+    (walletSessionActive && !isConnected);
   const ssrPreview =
-    hasSsrPortfolio && walletReconnecting && !isConnected && Boolean(data);
+    hasSsrPortfolio && Boolean(data) && !isConnected && walletReconnecting;
 
-  if (!isConnected && !ssrPreview) {
-    if (walletReconnecting && hasSsrPortfolio) {
+  if (!pumpReady) {
+    if (data || hasSsrPortfolio) {
+      // Session restoring — keep SSR portfolio visible, never flash guest UI.
+    } else {
       return <PortfolioPanelSkeleton />;
     }
-
+  } else if (!isConnected && !walletSessionActive && !ssrPreview) {
     return (
       <PortfolioGuestPanel
         activeTab={activeTab}
@@ -1159,7 +1188,6 @@ export function PortfolioPanel({
 
   const metricViews = verifiedPositionViews.filter(
     (view) =>
-      !view.balancePending &&
       !isPortfolioDustHolding(
         view.balance * Number(view.position.lastPriceBnb),
         bnbUsdForDust
@@ -1387,13 +1415,12 @@ export function PortfolioPanel({
                         );
                       }
 
-                      const { position, balance, balancePending } = row.view;
-                      const positionValueUsd = balancePending
-                        ? null
-                        : bnbToUsd(balance * Number(position.lastPriceBnb), bnbUsd);
-                      const openPnlUsd = balancePending
-                        ? null
-                        : holdingOpenPnlUsd(row.view, bnbUsd);
+                      const { position, balance } = row.view;
+                      const positionValueUsd = bnbToUsd(
+                        balance * Number(position.lastPriceBnb),
+                        bnbUsd
+                      );
+                      const openPnlUsd = holdingOpenPnlUsd(row.view, bnbUsd);
 
                       return (
                         <HoldingSwipeRow
@@ -1416,7 +1443,7 @@ export function PortfolioPanel({
                                 ${position.symbol}
                               </Link>
                             }
-                            amount={formatHoldingAmount(balance, balancePending)}
+                            amount={formatHoldingAmount(balance)}
                             valueUsd={positionValueUsd}
                             pnlUsd={openPnlUsd}
                             valueFlashClass={flashText(
@@ -1472,29 +1499,24 @@ export function PortfolioPanel({
                             );
                           }
 
-                          const { position, balance, balancePending, remainingCostBasis, remainingCostBasisUsd } = row.view;
-                          const avgEntryUsd = balancePending
-                            ? null
-                            : positionAvgEntryUsd(
-                                balance,
-                                remainingCostBasisUsd,
-                                remainingCostBasis,
-                                bnbUsd
-                              );
-                          const positionValueUsd = balancePending
-                            ? null
-                            : bnbToUsd(balance * Number(position.lastPriceBnb), bnbUsd);
-                          const openPnlUsd = balancePending
-                            ? null
-                            : holdingOpenPnlUsd(row.view, bnbUsd);
-                          const openPnlPct = balancePending
-                            ? null
-                            : positionUnrealizedPct(
-                                openPnlUsd,
-                                remainingCostBasisUsd,
-                                remainingCostBasis,
-                                bnbUsd
-                              );
+                          const { position, balance, remainingCostBasis, remainingCostBasisUsd } = row.view;
+                          const avgEntryUsd = positionAvgEntryUsd(
+                            balance,
+                            remainingCostBasisUsd,
+                            remainingCostBasis,
+                            bnbUsd
+                          );
+                          const positionValueUsd = bnbToUsd(
+                            balance * Number(position.lastPriceBnb),
+                            bnbUsd
+                          );
+                          const openPnlUsd = holdingOpenPnlUsd(row.view, bnbUsd);
+                          const openPnlPct = positionUnrealizedPct(
+                            openPnlUsd,
+                            remainingCostBasisUsd,
+                            remainingCostBasis,
+                            bnbUsd
+                          );
 
                           return (
                             <tr key={position.tokenAddress} className="group">
@@ -1533,13 +1555,13 @@ export function PortfolioPanel({
                                 }
                               />
                               <td className="portfolio-holdings-grid__num portfolio-holdings-grid__data px-4 py-3 financial-value text-pump-text">
-                                {formatHoldingAmount(balance, balancePending)}
+                                {formatHoldingAmount(balance)}
                               </td>
                               <td className={`portfolio-holdings-grid__num portfolio-holdings-grid__data portfolio-holdings-grid__value-cell px-4 py-3 financial-value text-pump-text ${flashText(holdingFlashes[position.tokenAddress.toLowerCase()])}`}>
-                                {balancePending ? "…" : formatPortfolioHoldingValueUsd(positionValueUsd)}
+                                {formatPortfolioHoldingValueUsd(positionValueUsd)}
                               </td>
                               <td className="portfolio-holdings-grid__num portfolio-holdings-grid__data px-4 py-3 financial-value text-pump-text">
-                                {balancePending ? "…" : formatUsdReadable(avgEntryUsd, { compact: true })}
+                                {formatUsdReadable(avgEntryUsd, { compact: true })}
                               </td>
                               <td className="portfolio-holdings-grid__num w-[1%] whitespace-nowrap px-4 py-3">
                                 <PnlCell usd={openPnlUsd} pct={openPnlPct} align="end" />
