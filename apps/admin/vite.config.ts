@@ -23,6 +23,7 @@ export default defineConfig(({ mode }) => {
         "@": webSrc,
         buffer: "buffer",
         "next/link": path.resolve(__dirname, "src/shims/next-link.tsx"),
+        "next/font/local": path.resolve(__dirname, "src/shims/next-font-local.ts"),
       },
     },
     define: {

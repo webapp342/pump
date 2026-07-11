@@ -1,6 +1,6 @@
 "use client";
 
-import { materialSymbols } from "@/lib/fonts";
+import { materialSymbols } from "@/lib/material-symbols-font";
 
 export type MaterialSymbolSpec = {
   name: string;
