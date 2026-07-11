@@ -1186,6 +1186,60 @@ export function PortfolioPanel({
     walletHoldings,
   ]);
 
+  if (bnbUsd != null) {
+    bnbUsdForDustRef.current = bnbUsd;
+  }
+  const bnbUsdForDust = bnbUsd ?? bnbUsdForDustRef.current;
+
+  const portfolioDerived = useMemo(() => {
+    if (!data) {
+      return {
+        verifiedPositionViews: [] as VerifiedPositionView[],
+        allHoldingsRows: [] as PortfolioHoldingRow[],
+        displayHoldingsRows: [] as PortfolioHoldingRow[],
+        sortedHoldingsRows: [] as Array<PortfolioHoldingRow & { amount: number }>,
+        launchedHoldingMetricsByAddress: {} as Record<string, LaunchedTokenHoldingMetrics>,
+      };
+    }
+
+    const verifiedPositionViews = data.positions
+      .map((position) => buildVerifiedPositionView(position, onChainBalances))
+      .filter((view): view is VerifiedPositionView => view != null);
+
+    const allHoldingsRows = buildPortfolioHoldingRows(verifiedPositionViews, walletHoldings);
+    const displayHoldingsRows = allHoldingsRows.filter(
+      (row) => !isPortfolioDustHolding(row.estimatedValueBnb, bnbUsdForDust)
+    );
+    const sortedHoldingsRows = sortPortfolioHoldingRows(
+      displayHoldingsRows.map((row) => ({
+        ...row,
+        amount: getPortfolioHoldingRowAmount(row),
+      })),
+      holdingsSortKey,
+      holdingsSortDir
+    );
+    const launchedHoldingMetricsByAddress = buildLaunchedHoldingMetricsByAddress(
+      allHoldingsRows,
+      bnbUsd
+    );
+
+    return {
+      verifiedPositionViews,
+      allHoldingsRows,
+      displayHoldingsRows,
+      sortedHoldingsRows,
+      launchedHoldingMetricsByAddress,
+    };
+  }, [
+    data,
+    onChainBalances,
+    walletHoldings,
+    bnbUsdForDust,
+    bnbUsd,
+    holdingsSortKey,
+    holdingsSortDir,
+  ]);
+
   const walletReconnecting =
     !pumpReady ||
     isConnecting ||
@@ -1225,35 +1279,12 @@ export function PortfolioPanel({
 
   const walletAddress = address ?? ssrWalletAddress ?? data.address;
 
-  const verifiedPositionViews =
-    data.positions
-      .map((position) =>
-        buildVerifiedPositionView(position, onChainBalances)
-      )
-      .filter((view): view is VerifiedPositionView => view != null);
-
-  if (bnbUsd != null) {
-    bnbUsdForDustRef.current = bnbUsd;
-  }
-  const bnbUsdForDust = bnbUsd ?? bnbUsdForDustRef.current;
-
-  const allHoldingsRows = buildPortfolioHoldingRows(verifiedPositionViews, walletHoldings);
-  const displayHoldingsRows = allHoldingsRows.filter(
-    (row) => !isPortfolioDustHolding(row.estimatedValueBnb, bnbUsdForDust)
-  );
-
-  const sortedHoldingsRows = useMemo(() => {
-    const enriched = displayHoldingsRows.map((row) => ({
-      ...row,
-      amount: getPortfolioHoldingRowAmount(row),
-    }));
-    return sortPortfolioHoldingRows(enriched, holdingsSortKey, holdingsSortDir);
-  }, [displayHoldingsRows, holdingsSortKey, holdingsSortDir]);
-
-  const launchedHoldingMetricsByAddress = useMemo(
-    () => buildLaunchedHoldingMetricsByAddress(allHoldingsRows, bnbUsd),
-    [allHoldingsRows, bnbUsd]
-  );
+  const {
+    verifiedPositionViews,
+    displayHoldingsRows,
+    sortedHoldingsRows,
+    launchedHoldingMetricsByAddress,
+  } = portfolioDerived;
 
   function onHoldingsSort(column: PortfolioHoldingsSortKey) {
     const next = togglePortfolioHoldingsSort(holdingsSortKey, holdingsSortDir, column);
