@@ -2,7 +2,7 @@
 /// <reference lib="webworker" />
 import { defaultCache } from "@serwist/turbopack/worker";
 import type { PrecacheEntry, SerwistGlobalConfig } from "serwist";
-import { NetworkOnly, Serwist } from "serwist";
+import { NetworkFirst, NetworkOnly, Serwist } from "serwist";
 
 declare global {
   interface WorkerGlobalScope extends SerwistGlobalConfig {
@@ -21,6 +21,14 @@ const serwist = new Serwist({
     {
       matcher: ({ url }) => url.origin === self.location.origin && url.pathname.startsWith("/api/"),
       handler: new NetworkOnly(),
+    },
+    {
+      matcher: ({ url }) =>
+        url.origin === self.location.origin && url.pathname.startsWith("/_next/static/"),
+      handler: new NetworkFirst({
+        cacheName: "next-static",
+        networkTimeoutSeconds: 4,
+      }),
     },
     ...defaultCache,
   ],

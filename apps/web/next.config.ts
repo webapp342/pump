@@ -19,10 +19,9 @@ const scriptSrc =
 const contentSecurityPolicy = [
   "default-src 'self'",
   `script-src ${scriptSrc}`,
-  `script-src-elem ${scriptSrc}`,
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob: https:",
-  "font-src 'self'",
+  "font-src 'self' data:",
   "connect-src 'self' https: wss: https://oauth.telegram.org https://accounts.google.com https://appleid.apple.com https://static.cloudflareinsights.com",
   "child-src 'self' https://oauth.telegram.org https://telegram.org https://accounts.google.com https://appleid.apple.com",
   "frame-src 'self' https://oauth.telegram.org https://telegram.org https://accounts.google.com https://appleid.apple.com",
@@ -32,6 +31,17 @@ const contentSecurityPolicy = [
   "form-action 'self' https://oauth.telegram.org https://accounts.google.com https://appleid.apple.com",
   "frame-ancestors 'none'",
 ].join("; ");
+
+const securityHeaders = [
+  {
+    key: "Content-Security-Policy",
+    value: contentSecurityPolicy,
+  },
+  {
+    key: "Cross-Origin-Opener-Policy",
+    value: "same-origin-allow-popups",
+  },
+];
 
 const nextConfig: NextConfig = {
   cacheComponents: true,
@@ -51,17 +61,15 @@ const nextConfig: NextConfig = {
         ],
       },
       {
-        source: "/:path*",
+        source: "/auth/:path*",
         headers: [
-          {
-            key: "Content-Security-Policy",
-            value: contentSecurityPolicy,
-          },
-          {
-            key: "Cross-Origin-Opener-Policy",
-            value: "same-origin-allow-popups",
-          },
+          { key: "Cache-Control", value: "no-store, must-revalidate" },
+          ...securityHeaders,
         ],
+      },
+      {
+        source: "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|woff2|ico)$).*)",
+        headers: securityHeaders,
       },
     ];
   },
