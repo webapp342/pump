@@ -322,8 +322,6 @@ function formatTokenCompact(value: string | number): string {
   return n.toLocaleString(undefined, { maximumFractionDigits: 4 });
 }
 
-const TRADE_TEETH_COUNT = 100;
-
 function TradeOrderValueStrip({
   side,
   tokenAddress,
@@ -1116,45 +1114,9 @@ export function TradePanel({
   /** Slider tracks wallet % only when amount ≤ max; manual over-max decouples (Coinbase/Jupiter pattern). */
   const [buySliderPct, setBuySliderPct] = useState(0);
   const [sellSliderPct, setSellSliderPct] = useState(0);
-  const [teethDragging, setTeethDragging] = useState(false);
-  const [teethDragPct, setTeethDragPct] = useState<number | null>(null);
-  const sliderDraggingRef = useRef(false);
-  const teethFrameRef = useRef<HTMLDivElement>(null);
-  const applySliderPercentRef = useRef<(pct: number) => void>(() => {});
-
-  useEffect(() => {
-    if (!teethDragging) return;
-    const onMove = (e: PointerEvent) => {
-      if (!sliderDraggingRef.current) return;
-      const frame = teethFrameRef.current;
-      if (!frame) return;
-      const rect = frame.getBoundingClientRect();
-      if (rect.width <= 0) return;
-      const pct = Math.max(
-        0,
-        Math.min(100, Math.round(((e.clientX - rect.left) / rect.width) * 100))
-      );
-      setTeethDragPct(pct);
-      applySliderPercentRef.current(pct);
-    };
-    const endDrag = () => {
-      sliderDraggingRef.current = false;
-      setTeethDragging(false);
-      setTeethDragPct(null);
-    };
-    window.addEventListener("pointermove", onMove);
-    window.addEventListener("pointerup", endDrag);
-    window.addEventListener("pointercancel", endDrag);
-    return () => {
-      window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("pointerup", endDrag);
-      window.removeEventListener("pointercancel", endDrag);
-    };
-  }, [teethDragging]);
 
   useEffect(() => {
     if (side !== "buy") return;
-    if (sliderDraggingRef.current) return;
     if (maxBuySpendWei === 0n || buyCostWei <= 0n) {
       setBuySliderPct(0);
       return;
@@ -1172,7 +1134,6 @@ export function TradePanel({
 
   useEffect(() => {
     if (side !== "sell") return;
-    if (sliderDraggingRef.current) return;
     if (maxSellTokenWei === 0n || sellTokenWei <= 0n) {
       setSellSliderPct(0);
       return;
@@ -2568,51 +2529,7 @@ export function TradePanel({
 
   const canUseSlider = side === "buy" ? canUseMaxBuy : canUseMaxSell;
   const applySliderPercent = side === "buy" ? applyBuySliderPercent : applySellSliderPercent;
-  applySliderPercentRef.current = applySliderPercent;
   const sliderPct = side === "buy" ? buySliderPct : sellSliderPct;
-  const displayTeethPct = teethDragPct ?? sliderPct;
-  const teethTooltipLeft =
-    displayTeethPct <= 4 ? 4 : displayTeethPct >= 96 ? 96 : displayTeethPct;
-
-  function updateTeethFromClientX(clientX: number) {
-    const frame = teethFrameRef.current;
-    if (!frame) return;
-    const rect = frame.getBoundingClientRect();
-    if (rect.width <= 0) return;
-    const pct = Math.max(
-      0,
-      Math.min(100, Math.round(((clientX - rect.left) / rect.width) * 100))
-    );
-    setTeethDragPct(pct);
-    applySliderPercent(pct);
-  }
-
-  function onTeethFramePointerDown(e: React.PointerEvent<HTMLDivElement>) {
-    if (!canUseSlider) return;
-    e.preventDefault();
-    sliderDraggingRef.current = true;
-    setTeethDragging(true);
-    updateTeethFromClientX(e.clientX);
-  }
-
-  function onTeethFramePointerMove(e: React.PointerEvent<HTMLDivElement>) {
-    if (!sliderDraggingRef.current || !canUseSlider) return;
-    e.preventDefault();
-    updateTeethFromClientX(e.clientX);
-  }
-
-  function endTeethDrag() {
-    if (!sliderDraggingRef.current) return;
-    sliderDraggingRef.current = false;
-    setTeethDragging(false);
-    setTeethDragPct(null);
-  }
-
-  function onTeethSliderInput(value: number) {
-    const clamped = Math.max(0, Math.min(100, value));
-    setTeethDragPct(clamped);
-    applySliderPercent(clamped);
-  }
 
   const useCustomAmountNumpad = Boolean(embedded && compact);
   const useQuickOrderHeader = Boolean(embedded && compact && sheetOnClose);
@@ -2711,39 +2628,61 @@ export function TradePanel({
     >
       <form onSubmit={onSubmit}>
         {!compact ? (
-          <div className="trade-panel-mode-tabs" role="tablist" aria-label="Order type">
-            <button
-              type="button"
-              role="tab"
-              aria-selected={tradeMode === "market"}
-              className={
-                tradeMode === "market"
-                  ? "trade-panel-mode-tab trade-panel-mode-tab--active"
-                  : "trade-panel-mode-tab"
-              }
-              onClick={() => {
-                setTradeMode("market");
-                setAssetMenuOpen(false);
-              }}
+          <div className="trade-panel-toolbar">
+            <div
+              className="trade-panel-mode-tabs trade-panel-mode-tabs--toolbar"
+              role="tablist"
+              aria-label="Order type"
             >
-              Market
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={tradeMode === "limit"}
-              className={
-                tradeMode === "limit"
-                  ? "trade-panel-mode-tab trade-panel-mode-tab--active"
-                  : "trade-panel-mode-tab"
-              }
-              onClick={() => {
-                setTradeMode("limit");
-                setAssetMenuOpen(false);
-              }}
-            >
-              Limit
-            </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={tradeMode === "market"}
+                className={
+                  tradeMode === "market"
+                    ? "trade-panel-mode-tab trade-panel-mode-tab--active"
+                    : "trade-panel-mode-tab"
+                }
+                onClick={() => {
+                  setTradeMode("market");
+                  setAssetMenuOpen(false);
+                }}
+              >
+                Market
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={tradeMode === "limit"}
+                className={
+                  tradeMode === "limit"
+                    ? "trade-panel-mode-tab trade-panel-mode-tab--active"
+                    : "trade-panel-mode-tab"
+                }
+                onClick={() => {
+                  setTradeMode("limit");
+                  setAssetMenuOpen(false);
+                }}
+              >
+                Limit
+              </button>
+            </div>
+            <div className="trade-side-group trade-side-group--toolbar">
+              <button
+                type="button"
+                onClick={() => switchTradeSide("buy")}
+                className={side === "buy" ? "trade-side-button-active-buy" : "trade-side-button"}
+              >
+                Buy
+              </button>
+              <button
+                type="button"
+                onClick={() => switchTradeSide("sell")}
+                className={side === "sell" ? "trade-side-button-active-sell" : "trade-side-button"}
+              >
+                Sell
+              </button>
+            </div>
           </div>
         ) : null}
 
@@ -2758,7 +2697,7 @@ export function TradePanel({
           />
         ) : null}
 
-        {tradeMode === "market" && !useQuickOrderHeader ? (
+        {tradeMode === "market" && compact && !useQuickOrderHeader ? (
           <div className="trade-panel-tabs">
             <div className="trade-side-group">
               <button
@@ -2904,7 +2843,23 @@ export function TradePanel({
               </div>
             </div>
 
-            {useCustomAmountNumpad && hasTradeAmount ? (
+            {amountInputHint ? (
+              <p className="trade-field-hint text-caption text-pump-danger" role="alert">
+                {amountInputHint}
+              </p>
+            ) : null}
+
+            <PumpAmountPresets
+              onPresetPercent={applyNumpadPreset}
+              onMax={() => applyNumpadPreset(100)}
+              activePreset={resolvedNumpadPreset}
+              presetsDisabled={!canUseSlider}
+              maxDisabled={side === "buy" ? !canUseMaxBuy : !canUseMaxSell}
+              disabled={paused}
+              side={side}
+            />
+
+            {hasTradeAmount ? (
               <TradeOrderValueStrip
                 side={side}
                 tokenAddress={tokenAddress}
@@ -2915,119 +2870,11 @@ export function TradePanel({
               />
             ) : null}
 
-            {amountInputHint ? (
-              <p className="trade-field-hint text-caption text-pump-danger" role="alert">
-                {amountInputHint}
-              </p>
-            ) : null}
-
-            {useCustomAmountNumpad ? (
-              <PumpAmountPresets
-                onPresetPercent={applyNumpadPreset}
-                onMax={() => applyNumpadPreset(100)}
-                activePreset={resolvedNumpadPreset}
-                presetsDisabled={!canUseSlider}
-                maxDisabled={side === "buy" ? !canUseMaxBuy : !canUseMaxSell}
-                disabled={paused}
-                side={side}
-              />
-            ) : null}
-
-            {!useCustomAmountNumpad ? (
-            <div
-              className={`trade-teeth-slider trade-teeth-slider--${side}${
-                teethDragging ? " trade-teeth-slider--dragging" : ""
-              }`}
-              data-sheet-drag-lock
-            >
-              <div
-                ref={teethFrameRef}
-                className={
-                  teethDragging
-                    ? "trade-teeth-slider__frame trade-teeth-slider__frame--dragging"
-                    : "trade-teeth-slider__frame"
-                }
-                onPointerDown={onTeethFramePointerDown}
-                onPointerMove={onTeethFramePointerMove}
-                onPointerUp={endTeethDrag}
-                onPointerCancel={endTeethDrag}
-              >
-              <div className="trade-teeth-stack" aria-hidden>
-                <div className="trade-teeth-row trade-teeth-row--idle">
-                  {Array.from({ length: TRADE_TEETH_COUNT }, (_, index) => (
-                    <span
-                      key={`idle-${index}`}
-                      className={`trade-teeth-tick${
-                        index % 10 === 9 ? " trade-teeth-tick--major" : " trade-teeth-tick--minor"
-                      }`}
-                    />
-                  ))}
-                </div>
-                <div
-                  className={`trade-teeth-row trade-teeth-row--fill trade-teeth-row--fill-${side}`}
-                  style={{ clipPath: `inset(0 ${100 - displayTeethPct}% 0 0)` }}
-                >
-                  {Array.from({ length: TRADE_TEETH_COUNT }, (_, index) => (
-                    <span
-                      key={`fill-${index}`}
-                      className={`trade-teeth-tick${
-                        index % 10 === 9 ? " trade-teeth-tick--major" : " trade-teeth-tick--minor"
-                      }`}
-                    />
-                  ))}
-                </div>
-              </div>
-              <input
-                type="range"
-                min={0}
-                max={100}
-                step={1}
-                value={displayTeethPct}
-                onChange={(e) => onTeethSliderInput(Number(e.target.value))}
-                onInput={(e) => onTeethSliderInput(Number(e.currentTarget.value))}
-                disabled={!canUseSlider}
-                className="trade-teeth-slider__input"
-                aria-label={side === "buy" ? "Buy amount slider" : "Sell amount slider"}
-                aria-valuenow={displayTeethPct}
-                aria-valuemin={0}
-                aria-valuemax={100}
-                aria-valuetext={
-                  amountOverMax
-                    ? "Over available balance"
-                    : atMaxSpend
-                      ? "Max"
-                      : `${sliderPct}% of ${side === "buy" ? "wallet balance" : "token balance"}`
-                }
-              />
-            </div>
-              {teethDragging ? (
-                <span
-                  className={`trade-teeth-tooltip trade-teeth-tooltip--${side}`}
-                  style={{ left: `${teethTooltipLeft}%` }}
-                  role="tooltip"
-                >
-                  {displayTeethPct}%
-                </span>
-              ) : null}
-            </div>
-            ) : null}
           </div>
         </div>
 
-        {hasTradeAmount && !useCustomAmountNumpad ? (
-        <div className="trade-panel-details-zone">
-          <TradeOrderValueStrip
-            side={side}
-            tokenAddress={tokenAddress}
-            symbol={symbol}
-            orderValuePrimary={orderValuePrimary}
-            orderValueUsd={orderValueUsd}
-          />
-        </div>
-        ) : null}
-
         {error ? (
-          <div className="notice-error mx-3 mb-2 px-3 py-2 text-caption" role="alert">
+          <div className="notice-error mx-4 mb-2 px-3 py-2 text-caption" role="alert">
             {error}
           </div>
         ) : null}

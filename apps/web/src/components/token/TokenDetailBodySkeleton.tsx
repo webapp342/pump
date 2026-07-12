@@ -19,6 +19,16 @@ export function TokenDetailBodySkeleton() {
   return (
     <div className="token-page" aria-busy="true" aria-label="Loading token">
       <div className="token-page-grid">
+        <div className="token-page-favorites-slot hidden lg:block" aria-hidden>
+          <div className="token-favorites-strip">
+            <div className="token-favorites-strip__scroll">
+              <Skeleton className="h-6 w-24 shrink-0 rounded-sm" />
+              <Skeleton className="h-6 w-28 shrink-0 rounded-sm" />
+              <Skeleton className="h-6 w-24 shrink-0 rounded-sm" />
+            </div>
+          </div>
+        </div>
+
         <div className="token-page-toolbar-slot hidden lg:block">{toolbarSkeleton}</div>
 
         <div className="token-page-stack token-page-stack--sidebar hidden lg:flex">

@@ -42,7 +42,7 @@ type TokenMarketSidebarRowProps = {
   volFlash?: FlashTone;
   rowClass?: string;
   isFavorite: boolean;
-  onToggleFavorite: (address: string) => void;
+  onToggleFavorite: (address: string, snapshot?: TokenListItem) => void;
   onTokenSelect?: () => void;
   onQuickTrade?: (side: "buy" | "sell") => void;
   /** Desktop sidebar — hover swaps data cell for Buy/Sell (MCAP compact / Last Price full). */
@@ -153,7 +153,7 @@ export function TokenMarketSidebarRow({
           onClick={(event) => {
             event.preventDefault();
             event.stopPropagation();
-            onToggleFavorite(token.address);
+            onToggleFavorite(token.address, token);
           }}
         >
           <FavoriteIcon active={isFavorite} className="h-3 w-3" />

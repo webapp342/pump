@@ -4,6 +4,7 @@
  */
 
 const FAVORITES_PREFIX = "pump:lf:favorites:";
+const FAVORITE_TOKENS_PREFIX = "pump:lf:favorite-tokens:";
 const PORTFOLIO_PREFIX = "pump:lf:portfolio:";
 const MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -56,6 +57,14 @@ export function setLocalFavorites(address: string, favorites: string[]): void {
   );
 }
 
+export function getLocalFavoriteTokens(address: string): Record<string, unknown>[] | null {
+  return readJson<Record<string, unknown>[]>(storageKey(FAVORITE_TOKENS_PREFIX, address));
+}
+
+export function setLocalFavoriteTokens(address: string, tokens: Record<string, unknown>[]): void {
+  writeJson(storageKey(FAVORITE_TOKENS_PREFIX, address), tokens);
+}
+
 export function getLocalPortfolioSnapshot(address: string): CachedPortfolioPayload | null {
   return readJson<CachedPortfolioPayload>(storageKey(PORTFOLIO_PREFIX, address));
 }
@@ -70,5 +79,6 @@ export function setLocalPortfolioSnapshot(
 export function clearLocalUserData(address: string): void {
   if (typeof window === "undefined") return;
   window.localStorage.removeItem(storageKey(FAVORITES_PREFIX, address));
+  window.localStorage.removeItem(storageKey(FAVORITE_TOKENS_PREFIX, address));
   window.localStorage.removeItem(storageKey(PORTFOLIO_PREFIX, address));
 }

@@ -3,6 +3,7 @@
 import {
   PumpIcon,
   faCheck,
+  faClock,
   faCopy,
   faExternalLink,
   faShare,
@@ -62,10 +63,9 @@ import {
   type TradePrefillConfig,
 } from "@/lib/token-trade-prefill";
 import { TradeTape } from "@/components/token/TradeTape";
+import { TokenFavoritesStrip } from "@/components/token/TokenFavoritesStrip";
 import { TokenMarketSidebar } from "@/components/token/TokenMarketSidebar";
-import { TokenSidebarCollapseToggle } from "@/components/token/TokenSidebarCollapseToggle";
-import { useTokenSidebarWidth, type TokenSidebarDensity } from "@/hooks/useTokenSidebarWidth";
-import { useTokenSidebarHeadAnchor } from "@/hooks/useTokenSidebarHeadAnchor";
+import { useTokenSidebarWidth } from "@/hooks/useTokenSidebarWidth";
 import { PriceChart } from "@/components/token/PriceChart";
 import { FavoriteIcon } from "@/components/icons/FavoriteIcon";
 import { useFavorites } from "@/components/favorites/FavoritesProvider";
@@ -75,7 +75,7 @@ import { CreatorRewardsCard } from "@/components/creators/CreatorRewardsCard";
 import { ShareSheetModal } from "@/components/ui/ShareSheetModal";
 import { TokenSocialLinksBar } from "@/components/token/TokenSocialLinksBar";
 import { hasSocialLinks } from "@/lib/token-social";
-import { formatAge } from "@/lib/arena-board-format";
+import { formatAge, isTokenAgeUnder1h } from "@/lib/arena-board-format";
 import { tokenSharePayload } from "@/lib/share-links";
 import { tokenDocumentTitle } from "@/lib/token-tab-title";
 import { writeLastTradeTokenAddress } from "@/lib/last-trade-token";
@@ -108,12 +108,6 @@ function formatToolbarChangePctOnly(change: PriceChange24h | null): string {
   if (!change) return "—";
   const pct = change.changePct;
   return `${pct >= 0 && pct !== 0 ? "+" : ""}${pct.toFixed(2)}%`;
-}
-
-function formatToolbarAge(createdAt: string): string {
-  const ms = Date.now() - new Date(createdAt).getTime();
-  if (ms < 60_000) return "just now";
-  return `${formatAge(createdAt)} ago`;
 }
 
 function changeToneClass(value: number | null | undefined): string {
@@ -283,16 +277,8 @@ export function TokenDetailLive({
   const router = useRouter();
   const { isConnected } = useAccount();
   const { bnbUsd } = useBnbUsdPrice();
-  const { expanded, sidebarWidth, toggleExpanded, gridStyle } = useTokenSidebarWidth();
-  const sidebarDensity: TokenSidebarDensity = expanded ? "full" : "compact";
-  const mainStackRef = useRef<HTMLDivElement>(null);
-  const headWrapRef = useRef<HTMLDivElement>(null);
-  const toggleTop = useTokenSidebarHeadAnchor(
-    mainStackRef,
-    headWrapRef,
-    `${sidebarWidth}:${expanded ? 1 : 0}`
-  );
-  const { isFavorite, toggleFavorite } = useFavorites();
+  const { gridStyle } = useTokenSidebarWidth();
+  const { isFavorite, toggleFavorite, upsertFavoriteSnapshots } = useFavorites();
   const burstUntilRef = useRef(0);
   const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const optimisticRef = useRef<TradeItem[]>([]);
@@ -764,6 +750,11 @@ export function TokenDetailLive({
 
   const favorited = isFavorite(streamAddress);
 
+  useEffect(() => {
+    if (!isFavorite(streamAddress)) return;
+    upsertFavoriteSnapshots([liveToken]);
+  }, [isFavorite, streamAddress, liveToken, upsertFavoriteSnapshots]);
+
   const tradeTapeProps = {
     tokenAddress: streamAddress,
     creatorAddress: liveToken.creatorAddress,
@@ -906,38 +897,30 @@ export function TokenDetailLive({
       }`}
     >
       <h1 className="sr-only">
-        {liveToken.name} ({liveToken.symbol}/USD)
+        {liveToken.name} ({liveToken.symbol})
       </h1>
       <div className="token-detail-toolbar__row">
         <div className="token-detail-toolbar__identity">
-          <button
-            type="button"
-            onClick={() => toggleFavorite(streamAddress)}
-            disabled={tradeLocked}
-            aria-label={favorited ? "Remove from favorites" : "Add to favorites"}
-            title={favorited ? "Remove from favorites" : "Add to favorites"}
-            className={
-              favorited
-                ? "token-detail-toolbar__fav-btn token-detail-toolbar__fav-btn--active"
-                : "token-detail-toolbar__fav-btn"
-            }
-          >
-            <FavoriteIcon active={favorited} className="token-detail-toolbar__fav-icon" />
-          </button>
           <TokenAvatar
             address={liveToken.address}
             symbol={liveToken.symbol}
             logoUrl={liveToken.logoUrl}
-            size={28}
             className="token-detail-toolbar__logo shrink-0 !ring-0"
           />
           <div className="token-detail-toolbar__pair-meta">
             <div className="token-detail-toolbar__symbol-row">
               <span className="token-detail-toolbar__symbol financial-value">
-                {liveToken.symbol}/USD
+                {liveToken.symbol}
               </span>
             </div>
-            <span className="token-detail-toolbar__age">{formatToolbarAge(liveToken.createdAt)}</span>
+            <span
+              className={`token-detail-toolbar__age${
+                isTokenAgeUnder1h(liveToken.createdAt) ? " token-detail-toolbar__age--fresh" : ""
+              }`}
+            >
+              <PumpIcon icon={faClock} className="token-detail-toolbar__age-icon" aria-hidden />
+              <span className="financial-value">{formatAge(liveToken.createdAt)}</span>
+            </span>
           </div>
         </div>
 
@@ -1018,6 +1001,20 @@ export function TokenDetailLive({
         <div className="token-detail-toolbar__actions">
           <button
             type="button"
+            onClick={() => toggleFavorite(streamAddress, liveToken)}
+            disabled={tradeLocked}
+            aria-label={favorited ? "Remove from favorites" : "Add to favorites"}
+            title={favorited ? "Remove from favorites" : "Add to favorites"}
+            className={
+              favorited
+                ? "token-detail-toolbar__fav-btn token-detail-toolbar__fav-btn--active"
+                : "token-detail-toolbar__fav-btn"
+            }
+          >
+            <FavoriteIcon active={favorited} className="token-detail-toolbar__fav-icon" />
+          </button>
+          <button
+            type="button"
             onClick={() => setShareOpen(true)}
             className="token-detail-toolbar__share-btn"
             aria-label="Share token"
@@ -1036,27 +1033,23 @@ export function TokenDetailLive({
       aria-busy={isRefreshing || undefined}
     >
       <div className="token-page-grid" style={gridStyle}>
+        {isConnected ? (
+          <div className="token-page-favorites-slot hidden lg:block">
+            <TokenFavoritesStrip activeTokenAddress={tokenAddress} />
+          </div>
+        ) : null}
+
         <div className="token-page-toolbar-slot hidden lg:block">{tokenToolbar}</div>
 
         <div className="token-page-stack token-page-stack--sidebar hidden lg:flex">
           <TokenMarketSidebar
             id="token-market-sidebar"
             activeTokenAddress={tokenAddress}
-            density={sidebarDensity}
-            headWrapRef={headWrapRef}
             showQuickTrade
           />
         </div>
 
-        <div className="token-page-stack token-page-stack--main" ref={mainStackRef}>
-          {toggleTop != null ? (
-            <TokenSidebarCollapseToggle
-              expanded={expanded}
-              onToggle={toggleExpanded}
-              className="token-sidebar-collapse-toggle--chart-side hidden lg:flex"
-              style={{ top: toggleTop }}
-            />
-          ) : null}
+        <div className="token-page-stack token-page-stack--main">
           <div className="token-mobile-toolbar-host shrink-0 lg:hidden">
             <TokenMobileHero
               token={liveToken}
@@ -1068,7 +1061,7 @@ export function TokenDetailLive({
               favorited={favorited}
               tradeLocked={tradeLocked}
               copiedAddress={copiedAddress}
-              onToggleFavorite={() => toggleFavorite(streamAddress)}
+              onToggleFavorite={() => toggleFavorite(streamAddress, liveToken)}
               onCopyAddress={() => void onCopyAddress()}
               isRefreshing={isRefreshing}
             />

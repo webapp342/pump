@@ -66,10 +66,15 @@ export function useArenaExploreBoard(options: UseArenaExploreBoardOptions = {}) 
   const [activeFilter, setActiveFilter] = useState<BoardFilter>("new");
   const [sortKey, setSortKey] = useState<BoardSortKey>("age");
   const [sortDir, setSortDir] = useState<BoardSortDir>("desc");
-  const [favoriteListTokens, setFavoriteListTokens] = useState<TokenListItem[]>([]);
   const [search, setSearch] = useState("");
   const { address, isConnected } = useAccount();
-  const { favorites, isFavorite, toggleFavorite } = useFavorites();
+  const {
+    favorites,
+    favoriteTokens,
+    isFavorite,
+    toggleFavorite: toggleFavoriteBase,
+    upsertFavoriteSnapshots,
+  } = useFavorites();
   const { bnbUsd: hookBnbUsd } = useBnbUsdPrice();
   const effectiveBnbUsd = resolveDisplayNativeUsd(hookBnbUsd, apiBnbUsd);
   const effectiveBnbUsdRef = useRef(effectiveBnbUsd);
@@ -83,35 +88,18 @@ export function useArenaExploreBoard(options: UseArenaExploreBoardOptions = {}) 
   const apiSortKey: BoardSortKey = activeFilter === "movers" ? "h24" : sortKey;
   const apiSortDir: BoardSortDir = sortDir;
   const useServerBoardOrder = activeFilter !== "favorites";
-  const favoriteAddressKey = useMemo(() => [...favorites].sort().join("|"), [favorites]);
 
-  const loadFavoriteTokens = useCallback(async () => {
-    if (!address || favorites.size === 0) {
-      setFavoriteListTokens([]);
-      return;
-    }
-
-    try {
-      const response = await fetch(
-        `/api/favorites?address=${encodeURIComponent(address)}&include=tokens`,
-        { cache: "no-store" }
-      );
-      const body = (await response.json()) as {
-        tokens?: TokenListItem[];
-        error?: string;
-      };
-      if (!response.ok) {
-        throw new Error(body.error ?? "Failed to load favorites");
-      }
-      setFavoriteListTokens(body.tokens ?? []);
-    } catch {
-      setFavoriteListTokens([]);
-    }
-  }, [address, favorites.size, favoriteAddressKey]);
-
-  useEffect(() => {
-    void loadFavoriteTokens();
-  }, [loadFavoriteTokens]);
+  const toggleFavorite = useCallback(
+    (tokenAddress: string, snapshot?: TokenListItem) => {
+      const key = tokenAddress.toLowerCase();
+      const resolved =
+        snapshot ??
+        tokensRef.current?.find((token) => token.address.toLowerCase() === key) ??
+        favoriteTokens.find((token) => token.address.toLowerCase() === key);
+      toggleFavoriteBase(tokenAddress, resolved);
+    },
+    [toggleFavoriteBase, favoriteTokens]
+  );
 
   useEffect(() => {
     void (async () => {
@@ -342,6 +330,12 @@ export function useArenaExploreBoard(options: UseArenaExploreBoardOptions = {}) 
 
   tokensRef.current = tokens;
 
+  useEffect(() => {
+    if (!tokens?.length) return;
+    const favSnapshots = tokens.filter((token) => favorites.has(token.address.toLowerCase()));
+    if (favSnapshots.length) upsertFavoriteSnapshots(favSnapshots);
+  }, [tokens, favorites, upsertFavoriteSnapshots]);
+
   const loadMore = useCallback(async () => {
     if (loadingMore || !hasMore) return;
     const nextLimit = listLimitRef.current + ARENA_BOARD_PAGE_INCREMENT;
@@ -358,8 +352,6 @@ export function useArenaExploreBoard(options: UseArenaExploreBoardOptions = {}) 
   loadRef.current = load;
   const loadMoreRefFn = useRef(loadMore);
   loadMoreRefFn.current = loadMore;
-  const loadFavoriteTokensRef = useRef(loadFavoriteTokens);
-  loadFavoriteTokensRef.current = loadFavoriteTokens;
   const lastArenaWsSeqRef = useRef(0);
 
   const applyArenaWsMessages = useCallback(
@@ -399,7 +391,6 @@ export function useArenaExploreBoard(options: UseArenaExploreBoardOptions = {}) 
 
         if (payload.type === "board_delta") {
           void loadRef.current(listLimitRef.current, { silent: true });
-          void loadFavoriteTokensRef.current();
         }
       }
     },
@@ -545,7 +536,7 @@ export function useArenaExploreBoard(options: UseArenaExploreBoardOptions = {}) 
 
   const marketTokens = useMemo(() => {
     const searchTerm = search.trim().toLowerCase();
-    const sourceTokens = activeFilter === "favorites" ? favoriteListTokens : resolvedTokens;
+    const sourceTokens = activeFilter === "favorites" ? favoriteTokens : resolvedTokens;
 
     const filtered = sourceTokens.filter((token) => {
       if (
@@ -604,7 +595,7 @@ export function useArenaExploreBoard(options: UseArenaExploreBoardOptions = {}) 
     return withMetrics.map((entry) => entry.token);
   }, [
     resolvedTokens,
-    favoriteListTokens,
+    favoriteTokens,
     search,
     activeFilter,
     favorites,
@@ -674,7 +665,8 @@ export function useArenaExploreBoard(options: UseArenaExploreBoardOptions = {}) 
     loadMoreRef,
     isConnected,
     favorites,
-    favoriteListTokens,
+    favoriteTokens,
+    favoriteListTokens: favoriteTokens,
     search,
     setSearch,
   };

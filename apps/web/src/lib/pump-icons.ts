@@ -7,6 +7,8 @@ function ms(name: string, filled = false): PumpIconDefinition {
 /** Material Symbols Rounded — sole icon set for Pump web UI. */
 export const faArrowLeft = ms("arrow_back");
 export const faArrowRight = ms("arrow_forward");
+export const faArrowDown = ms("arrow_downward");
+export const faArrowUp = ms("arrow_upward");
 export const faArrowTrendUp = ms("trending_up");
 export const faArrowUpRightFromSquare = ms("open_in_new");
 export const faArrowsRotate = ms("sync");
@@ -41,6 +43,7 @@ export const faLink = ms("link");
 export const faListUl = ms("format_list_bulleted");
 export const faLayerGroup = ms("stacks", true);
 export const faLock = ms("lock", true);
+export const faLogout = ms("logout");
 export const faMagnifyingGlass = ms("search");
 export const faMoon = ms("dark_mode", true);
 export const faParachuteBox = ms("paragliding", true);

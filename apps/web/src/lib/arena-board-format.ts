@@ -93,9 +93,8 @@ export function formatArenaVolumeUsd(value: number | null | undefined): string {
 }
 
 export function formatHoldPct(value: number | null | undefined): string {
-  if (value == null || !Number.isFinite(value) || value <= 0) return "0%";
+  if (value == null || !Number.isFinite(value) || value < 0.01) return "0%";
   if (value >= 99.95) return "100%";
   if (value >= 10) return `${value.toFixed(1)}%`;
-  if (value >= 0.01) return `${value.toFixed(2)}%`;
-  return `${value.toFixed(4)}%`;
+  return `${value.toFixed(2)}%`;
 }

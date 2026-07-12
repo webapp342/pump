@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { ShareSheetModal } from "@/components/ui/ShareSheetModal";
 import { AccountSheet } from "@/components/wallet/AccountSheet";
-import { ExportWalletModal } from "@/components/wallet/ExportWalletModal";
 import { useWalletFunding } from "@/components/wallet/WalletFundingProvider";
 import { usePumpWallet } from "@/components/wallet/PumpWalletProvider";
 import { UserAvatarForAddress } from "@/components/user/UserAvatarForAddress";
@@ -124,12 +123,11 @@ export function PortfolioMobileHero({
 }: PortfolioMobileHeroProps) {
   const [shareOpen, setShareOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
-  const [exportOpen, setExportOpen] = useState(false);
   const [showBnb, setShowBnb] = useState(false);
   const { openDeposit, openWithdraw } = useWalletFunding();
   const { scwAddress, logout } = usePumpWallet();
   const accountAddress = (scwAddress ?? walletAddress) as `0x${string}`;
-  const { totalUsd, nativeBnb } = useWalletTotalBalance(accountAddress);
+  const { nativeBnb, nativeUsd } = useWalletTotalBalance(accountAddress);
 
   const sharePayload = useMemo(
     () =>
@@ -166,13 +164,12 @@ export function PortfolioMobileHero({
 
   const accountPanelProps = {
     address: accountAddress,
-    bnbAmount: nativeBnb,
-    usdAmount: totalUsd,
+    nativeBnb,
+    nativeUsd,
     showBnb,
     onToggleBalanceUnit: () => setShowBnb((value) => !value),
     onClose: () => setAccountOpen(false),
     onLogout: () => void logout(),
-    onExportWallet: () => setExportOpen(true),
   };
 
   return (
@@ -317,10 +314,7 @@ export function PortfolioMobileHero({
       ) : null}
 
       {showWalletActions ? (
-        <>
-          <AccountSheet open={accountOpen} {...accountPanelProps} />
-          <ExportWalletModal open={exportOpen} onClose={() => setExportOpen(false)} />
-        </>
+        <AccountSheet open={accountOpen} {...accountPanelProps} />
       ) : null}
     </>
   );

@@ -1,9 +1,9 @@
 import {
   DiscordBrandIcon,
   TelegramBrandIcon,
+  WebsiteBrandIcon,
   XBrandIcon,
 } from "@/components/icons/BrandIcons";
-import { PumpIcon, faGlobe } from "@/lib/icons";
 import { hasSocialLinks, type TokenSocialLinks } from "@/lib/token-social";
 
 type TokenSocialLinksBarProps = {
@@ -24,7 +24,7 @@ function SocialIcon({ type }: { type: (typeof LINK_ITEMS)[number]["key"] }) {
     case "twitter":
       return <XBrandIcon className="h-3.5 w-3.5" />;
     case "website":
-      return <PumpIcon icon={faGlobe} className="h-3.5 w-3.5" />;
+      return <WebsiteBrandIcon className="h-3.5 w-3.5" />;
     case "telegram":
       return <TelegramBrandIcon className="h-3.5 w-3.5" />;
     case "discord":

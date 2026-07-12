@@ -90,7 +90,7 @@ export function WatchlistContent({
             <div className="toolbar-sheet-row">
               <button
                 type="button"
-                onClick={() => toggleFavorite(token.address)}
+                onClick={() => toggleFavorite(token.address, token)}
                 className="toolbar-sheet-row__action text-pump-accent"
                 aria-label="Remove from watchlist"
               >

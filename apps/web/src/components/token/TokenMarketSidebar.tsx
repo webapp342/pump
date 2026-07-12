@@ -6,6 +6,7 @@ import { useArenaQuickTrade } from "@/hooks/useArenaQuickTrade";
 import { bnbToUsd } from "@/lib/format-usd";
 import { listTokenPriceUsd } from "@/lib/arena-board-format";
 import { emptyExploreFilterCopy } from "@/lib/arena-explore-board-core";
+import { TokenMarketSidebarArenaRow } from "@/components/token/TokenMarketSidebarArenaRow";
 import { TokenMarketSidebarRow } from "@/components/token/TokenMarketSidebarRow";
 import { TokenMarketSidebarHead } from "@/components/token/TokenMarketSidebarHead";
 import { TokenMarketSidebarFilterStrip } from "@/components/token/TokenMarketSidebarFilterStrip";
@@ -57,6 +58,7 @@ export function TokenMarketSidebar({
   const openQuickTrade = onOpenQuickTrade ?? internalQuickTrade.openQuickTrade;
   const quickTradeSheet = renderQuickTradeSheet ? internalQuickTrade.quickTradeSheet : null;
   const effectiveQuickTrade = showQuickTrade || mobileSheet;
+  const useArenaRows = !mobileSheet;
   const swipeHintLabels = quickTradeSwipeLabels();
 
   const assignSearchInputRef = (node: HTMLInputElement | null) => {
@@ -111,6 +113,7 @@ export function TokenMarketSidebar({
   const sectionClass = [
     "token-market-sidebar",
     mobileSheet ? "token-market-sidebar--mobile-sheet" : "panel-surface",
+    useArenaRows ? "token-market-sidebar--arena-list" : "",
     className,
     searchActive ? "token-market-sidebar--search-active" : "",
   ]
@@ -191,7 +194,9 @@ export function TokenMarketSidebar({
         ) : null}
       </div>
 
-      {!searchActive ? (
+      {!searchActive && useArenaRows ? (
+        <div ref={headWrapRef} className="token-market-sidebar__arena-anchor" aria-hidden="true" />
+      ) : !searchActive ? (
         <div className="token-market-sidebar__head-wrap" ref={headWrapRef}>
           <TokenMarketSidebarHead density={density} />
         </div>
@@ -223,6 +228,27 @@ export function TokenMarketSidebar({
               animatedCaps[`${addressKey}:cap:vol24h`] ??
               bnbToUsd(Number(token.volume24hBnb ?? 0), effectiveBnbUsd);
 
+            if (useArenaRows) {
+              return (
+                <TokenMarketSidebarArenaRow
+                  key={addressKey}
+                  token={token}
+                  activeTokenAddress={activeTokenAddress}
+                  mcapUsd={mcapUsd}
+                  vol24hUsd={vol24hUsd}
+                  mcapFlash={flashes[`${addressKey}:mcap`]}
+                  rowClass={boardRowClass(addressKey)}
+                  onTokenSelect={onTokenSelect}
+                  onQuickTrade={
+                    effectiveQuickTrade
+                      ? (side) => openQuickTrade(token.address, token.symbol, side)
+                      : undefined
+                  }
+                  showRowQuickActions={effectiveQuickTrade}
+                />
+              );
+            }
+
             return (
               <TokenMarketSidebarRow
                 key={addressKey}
@@ -245,7 +271,7 @@ export function TokenMarketSidebar({
                     ? (side) => openQuickTrade(token.address, token.symbol, side)
                     : undefined
                 }
-                showRowQuickActions={effectiveQuickTrade && !mobileSheet}
+                showRowQuickActions={false}
                 enableSwipeTrade={mobileSheet && effectiveQuickTrade}
                 peekSwipeOnMount={mobileSheet && index === 0}
               />

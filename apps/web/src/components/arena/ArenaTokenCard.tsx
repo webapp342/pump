@@ -79,7 +79,7 @@ type ArenaTokenCardProps = {
   mcapUsd: number | null;
   mcapFlash?: FlashTone;
   isFavorite: boolean;
-  onToggleFavorite: (address: string) => void;
+  onToggleFavorite: (address: string, snapshot?: TokenListItem) => void;
   onQuickTrade: (side: "buy" | "sell") => void;
   compact?: boolean;
 };
@@ -217,7 +217,7 @@ export function ArenaTokenCard({
           type="button"
           onClick={(event) => {
             event.stopPropagation();
-            onToggleFavorite(token.address);
+            onToggleFavorite(token.address, token);
           }}
           className={`arena-token-card__favorite ${isFavorite ? "arena-token-card__favorite--active" : ""}`}
           aria-label={isFavorite ? "Remove from favorites" : "Add to favorites"}
