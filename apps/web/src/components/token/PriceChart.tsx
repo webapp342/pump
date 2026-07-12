@@ -105,7 +105,11 @@ function chartAutoscaleInfoProvider(
   };
 }
 
-function shouldUseLogPriceScale(candles: CandleBar[]): boolean {
+function shouldUseLogPriceScale(
+  candles: CandleBar[],
+  currency: "usd" | "mcap" = "usd"
+): boolean {
+  if (currency === "mcap") return false;
   let min = Number.POSITIVE_INFINITY;
   let max = 0;
   for (const c of candles) {
@@ -492,9 +496,14 @@ export function PriceChart({
   const candlesForChart = candles;
   const volumesForChart = volumes;
 
+  const useLogPriceScale = useMemo(
+    () => shouldUseLogPriceScale(candlesForChart, currency),
+    [candlesForChart, currency]
+  );
+
   const priceFormat = useMemo(
-    () => resolveChartPriceFormat(candlesForChart, currency, bnbUsd),
-    [candlesForChart, currency, bnbUsd]
+    () => resolveChartPriceFormat(candlesForChart, currency, bnbUsd, useLogPriceScale),
+    [candlesForChart, currency, bnbUsd, useLogPriceScale]
   );
 
   const chartPriceFormatter = useCallback(
@@ -512,7 +521,7 @@ export function PriceChart({
     if (!ts || !rightScale || candlesForChart.length === 0) return false;
 
     rightScale.setAutoScale(true);
-    const useLog = shouldUseLogPriceScale(candlesForChart);
+    const useLog = useLogPriceScale;
     rightScale.applyOptions({
       mode: useLog ? PriceScaleMode.Logarithmic : PriceScaleMode.Normal,
     });
@@ -520,7 +529,7 @@ export function PriceChart({
     ts.setVisibleLogicalRange({ from, to });
     ts.scrollToRealTime();
     return true;
-  }, [candlesForChart]);
+  }, [candlesForChart, useLogPriceScale]);
 
   // Defer viewport fit until lightweight-charts has laid out setData (fixes flat line on first paint).
   const scheduleFitViewport = useCallback(() => {
@@ -773,16 +782,15 @@ export function PriceChart({
     });
   }, [theme]);
 
-  // Log scale when price range is wide (meme launch curves); linear for flat/stable tokens.
+  // Log scale when price range is wide (meme launch curves); MCAP stays linear.
   useEffect(() => {
     const rightScale = chartRef.current?.priceScale("right");
     if (!rightScale) return;
-    const useLog = shouldUseLogPriceScale(candles);
     rightScale.applyOptions({
-      mode: useLog ? PriceScaleMode.Logarithmic : PriceScaleMode.Normal,
+      mode: useLogPriceScale ? PriceScaleMode.Logarithmic : PriceScaleMode.Normal,
       autoScale: true,
     });
-  }, [candles, currency]);
+  }, [candles, currency, useLogPriceScale]);
 
   // Local timezone labels on chart axis.
   useEffect(() => {

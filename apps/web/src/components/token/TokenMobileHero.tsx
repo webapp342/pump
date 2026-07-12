@@ -6,9 +6,9 @@ import { PumpSubscriptPrice } from "@/components/ui/PumpSubscriptPrice";
 import { FavoriteIcon } from "@/components/icons/FavoriteIcon";
 import { TokenAvatar } from "@/components/token/TokenAvatar";
 import { TokenSocialLinksBar } from "@/components/token/TokenSocialLinksBar";
-import { PumpIcon, faArrowLeft, faBolt, faCheck, faCopy } from "@/lib/icons";
+import { PumpIcon, faArrowLeft, faCheck, faClock, faCopy } from "@/lib/icons";
 import { shortAddress } from "@/config/chain";
-import { formatAge } from "@/lib/arena-board-format";
+import { formatAge, isTokenAgeUnder1h } from "@/lib/arena-board-format";
 import { hapticTap } from "@/lib/haptic";
 
 type TokenMobileHeroProps = {
@@ -94,6 +94,8 @@ export function TokenMobileHero({
   onCopyAddress,
   isRefreshing = false,
 }: TokenMobileHeroProps) {
+  const ageIsFresh = isTokenAgeUnder1h(token.createdAt);
+
   const handleCopyAddress = () => {
     hapticTap(6);
     onCopyAddress();
@@ -122,8 +124,12 @@ export function TokenMobileHero({
         <div className="token-mobile-hero__chrome-meta">
           <span className="token-mobile-hero__chrome-symbol">{token.symbol}</span>
           <span className="token-mobile-hero__chrome-divider" aria-hidden />
-          <span className="token-mobile-hero__chrome-age financial-value">
-            <PumpIcon icon={faBolt} className="token-mobile-hero__chrome-age-icon" aria-hidden />
+          <span
+            className={`token-mobile-hero__chrome-age financial-value${
+              ageIsFresh ? " token-mobile-hero__chrome-age--fresh" : ""
+            }`}
+          >
+            <PumpIcon icon={faClock} className="token-mobile-hero__chrome-age-icon" aria-hidden />
             {formatAge(token.createdAt)}
           </span>
         </div>

@@ -1098,7 +1098,78 @@ export type ChartCustomPriceFormat = {
   type: "custom";
   formatter: (price: number) => string;
   base: number;
+  tickmarksFormatter?: (prices: number[]) => string[];
 };
+
+type ChartLogFormula = {
+  logicalOffset: number;
+  coordOffset: number;
+};
+
+function candleNativeRange(candles: CandleBar[]): { min: number; max: number } | null {
+  let min = Number.POSITIVE_INFINITY;
+  let max = 0;
+  for (const candle of candles) {
+    if (candle.low > 0) min = Math.min(min, candle.low);
+    max = Math.max(max, candle.high, candle.close);
+  }
+  if (!Number.isFinite(min) || min <= 0 || max <= 0) return null;
+  return { min, max };
+}
+
+/** Mirror LWC logFormulaForPriceRange for axis label conversion. */
+function chartLogFormulaForRange(min: number, max: number): ChartLogFormula {
+  const diff = Math.abs(max - min);
+  if (diff >= 1 || diff < 1e-15) {
+    return { logicalOffset: 0, coordOffset: 0 };
+  }
+  const digits = Math.ceil(Math.abs(Math.log10(diff)));
+  return {
+    logicalOffset: digits,
+    coordOffset: 1 / Math.pow(10, digits),
+  };
+}
+
+function chartToLog(price: number, formula: ChartLogFormula): number {
+  const magnitude = Math.abs(price);
+  if (magnitude < 1e-15) return 0;
+  return Math.log10(magnitude + formula.coordOffset) + formula.logicalOffset;
+}
+
+function chartFromLog(logical: number, formula: ChartLogFormula): number {
+  const magnitude = Math.abs(logical);
+  if (magnitude < 1e-15) return 0;
+  return Math.pow(10, magnitude - formula.logicalOffset) - formula.coordOffset;
+}
+
+/**
+ * LWC log-scale axis passes logical coordinates to priceFormatter for tick marks,
+ * but actual prices for the last-value label. Convert logical ticks back to native price.
+ */
+function wrapChartFormatterForLogScale(
+  formatter: (price: number) => string,
+  candles: CandleBar[]
+): ChartCustomPriceFormat["formatter"] {
+  const range = candleNativeRange(candles);
+  if (!range) return formatter;
+
+  const formula = chartLogFormulaForRange(range.min, range.max);
+  const logMin = chartToLog(range.min, formula);
+  const logMax = chartToLog(range.max, formula);
+  const logLo = Math.min(logMin, logMax) - 1e-6;
+  const logHi = Math.max(logMin, logMax) + 1e-6;
+
+  return (value: number) => {
+    if (!Number.isFinite(value)) return formatter(value);
+    if (value >= range.min && value <= range.max) {
+      return formatter(value);
+    }
+    if (value >= logLo && value <= logHi) {
+      return formatter(chartFromLog(value, formula));
+    }
+    return formatter(value);
+  };
+}
 
 export type ChartBuiltinPriceFormat = {
   type: "price";
@@ -1142,7 +1213,8 @@ export function resolveChartPriceBase(candles: CandleBar[]): number {
 export function chartPriceFormatFromBase(
   base: number,
   currency: "bnb" | "usd" | "mcap",
-  bnbUsd?: number | null
+  bnbUsd?: number | null,
+  options?: { candles?: CandleBar[]; useLogScale?: boolean }
 ): ChartCustomPriceFormat {
   const safeBase =
     Number.isFinite(base) && base > 0
@@ -1154,34 +1226,46 @@ export function chartPriceFormatFromBase(
   );
   const usdRate = bnbUsd != null && bnbUsd > 0 ? bnbUsd : 1;
 
+  const formatNative = (price: number) => {
+    if (!Number.isFinite(price)) return "—";
+    if (price === 0) return currency === "usd" || currency === "mcap" ? "$0" : "0";
+    if (currency === "mcap") {
+      const usd = price * usdRate;
+      if (!Number.isFinite(usd) || usd <= 0) return "$0";
+      if (usd >= 1_000_000) return `$${(usd / 1_000_000).toFixed(2)}M`;
+      if (usd >= 10_000) return `$${(usd / 1_000).toFixed(1)}K`;
+      return `$${usd.toFixed(2)}`;
+    }
+    if (currency === "usd") {
+      return formatPumpSubscriptPriceAxis(price * usdRate, "$");
+    }
+    if (price >= 0.001) return price.toFixed(Math.min(6, precision));
+    return formatPumpSubscriptPriceAxis(price, "") + ` ${NATIVE_SYMBOL}`;
+  };
+
+  const formatter =
+    options?.useLogScale && options.candles?.length
+      ? wrapChartFormatterForLogScale(formatNative, options.candles)
+      : formatNative;
+
   return {
     type: "custom",
     base: safeBase,
-    formatter: (price: number) => {
-      if (!Number.isFinite(price)) return "—";
-      if (price === 0) return currency === "usd" || currency === "mcap" ? "$0" : "0";
-      if (currency === "mcap") {
-        const usd = price * usdRate;
-        if (!Number.isFinite(usd) || usd <= 0) return "$0";
-        if (usd >= 1_000_000) return `$${(usd / 1_000_000).toFixed(2)}M`;
-        if (usd >= 10_000) return `$${(usd / 1_000).toFixed(1)}K`;
-        return `$${usd.toFixed(2)}`;
-      }
-      if (currency === "usd") {
-        return formatPumpSubscriptPriceAxis(price * usdRate, "$");
-      }
-      if (price >= 0.001) return price.toFixed(Math.min(6, precision));
-      return formatPumpSubscriptPriceAxis(price, "") + ` ${NATIVE_SYMBOL}`;
-    },
+    formatter,
+    tickmarksFormatter: (prices) => prices.map((price) => formatter(price)),
   };
 }
 
 export function resolveChartPriceFormat(
   candles: CandleBar[],
   currency: "bnb" | "usd" | "mcap",
-  bnbUsd?: number | null
+  bnbUsd?: number | null,
+  useLogScale = false
 ): ChartCustomPriceFormat {
-  return chartPriceFormatFromBase(resolveChartPriceBase(candles), currency, bnbUsd);
+  return chartPriceFormatFromBase(resolveChartPriceBase(candles), currency, bnbUsd, {
+    candles,
+    useLogScale,
+  });
 }
 
 /** Built-in LWC price format fallback when custom base/minMove is rejected. */

@@ -94,7 +94,7 @@ export function TokenMarketSidebarFilterStrip({
                 type="button"
                 role="tab"
                 aria-selected={isActive}
-                aria-label={isFavorites ? "Favorites" : (label ?? key)}
+                aria-label={isFavorites ? "Watchlist" : (label ?? key)}
                 onClick={() => onSelect(key)}
                 className={`token-market-sidebar__filter-tab ${
                   isActive ? "token-market-sidebar__filter-tab--active" : ""

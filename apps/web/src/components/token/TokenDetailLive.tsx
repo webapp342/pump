@@ -63,7 +63,7 @@ import {
   type TradePrefillConfig,
 } from "@/lib/token-trade-prefill";
 import { TradeTape } from "@/components/token/TradeTape";
-import { TokenFavoritesStrip } from "@/components/token/TokenFavoritesStrip";
+import { TokenWatchlistStrip } from "@/components/token/TokenFavoritesStrip";
 import { TokenMarketSidebar } from "@/components/token/TokenMarketSidebar";
 import { useTokenSidebarWidth } from "@/hooks/useTokenSidebarWidth";
 import { PriceChart } from "@/components/token/PriceChart";
@@ -1035,7 +1035,7 @@ export function TokenDetailLive({
       <div className="token-page-grid" style={gridStyle}>
         {isConnected ? (
           <div className="token-page-favorites-slot hidden lg:block">
-            <TokenFavoritesStrip activeTokenAddress={tokenAddress} />
+            <TokenWatchlistStrip activeTokenAddress={tokenAddress} />
           </div>
         ) : null}
 

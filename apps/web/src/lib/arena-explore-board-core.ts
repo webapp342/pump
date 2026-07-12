@@ -92,10 +92,10 @@ export function emptyExploreFilterCopy(
     case "favorites":
       if (!options.isConnected) return "Connect wallet to sync starred tokens.";
       if (options.favoritesCount === 0) {
-        return "Star tokens in Explore coins to add them here.";
+        return "Star tokens in Explore coins to add them to your watchlist.";
       }
-      if (!options.favoriteListLoaded) return "Loading favorites…";
-      return "No favorites to show.";
+      if (!options.favoriteListLoaded) return "Loading watchlist…";
+      return "No watchlist tokens to show.";
     case "movers":
       return "No movers with 1%+ 24h change right now.";
     case "kothContenders":

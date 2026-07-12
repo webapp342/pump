@@ -21,6 +21,10 @@ export function TokenDetailBodySkeleton() {
       <div className="token-page-grid">
         <div className="token-page-favorites-slot hidden lg:block" aria-hidden>
           <div className="token-favorites-strip">
+            <div className="token-favorites-strip__label">
+              <Skeleton className="h-3.5 w-3.5 shrink-0 rounded-sm" />
+              <Skeleton className="h-3 w-16 shrink-0" />
+            </div>
             <div className="token-favorites-strip__scroll">
               <Skeleton className="h-6 w-24 shrink-0 rounded-sm" />
               <Skeleton className="h-6 w-28 shrink-0 rounded-sm" />

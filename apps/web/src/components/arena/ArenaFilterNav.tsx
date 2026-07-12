@@ -43,7 +43,7 @@ function ArenaFilterTabs({
           type="button"
           role="tab"
           aria-selected={favoritesActive}
-          aria-label="Favorites"
+          aria-label="Watchlist"
           onClick={() => onSelect("favorites")}
           className={
             favoritesActive

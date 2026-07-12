@@ -220,11 +220,11 @@ function CreatorBadge({ iconOnly = false }: { iconOnly?: boolean }) {
   if (iconOnly) {
     return (
       <span
-        className="token-tape-creator-icon inline-flex shrink-0 items-center justify-center rounded-sm bg-pump-accent/15 text-pump-accent ring-1 ring-inset ring-pump-accent/30"
+        className="token-tape-creator-icon inline-flex shrink-0 items-center justify-center text-pump-accent"
         title="Creator"
         aria-label="Creator"
       >
-        <PumpIcon icon={faCrown} className="h-3 w-3 text-pump-accent" />
+        <PumpIcon icon={faCrown} className="token-tape-creator-icon__glyph" aria-hidden />
       </span>
     );
   }
