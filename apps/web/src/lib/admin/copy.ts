@@ -142,6 +142,29 @@ export const ADMIN_COPY = {
       recipientPlaceholder: "Recipient",
       warning: "Halts curve trading",
     },
+    curveRecovery: {
+      title: "Curve recovery",
+      halted: "Trading halted — new buys and sells are blocked until you resume.",
+      ready: "Escrow empty — curve is ready for new tokens and trades.",
+      recipient: "Send recovered BNB to",
+      resetDb: "Reset app database after recovery (recommended for a clean slate)",
+      recoverAndResume: "Recover escrow & resume trading",
+      resumeOnly: "Resume trading",
+      recovering: "Recovering…",
+      resuming: "Resuming…",
+      hint:
+        "Sweeps leftover curve escrow to the recipient, then re-enables trading automatically.",
+      confirmSweep:
+        "Recover {amount} BNB from the bonding curve to {to}? Trading will pause briefly, then resume automatically.",
+      confirmSweepWithWipe:
+        "Recover {amount} BNB to {to}, resume trading, and wipe all app data (tokens, trades, indexer cursor)?",
+      confirmResume: "Re-enable curve trading (setEmergencyHalt false)?",
+      confirmResumeWithWipe:
+        "Re-enable curve trading and wipe all app data for a fresh start?",
+      success: "Curve trading is live again. You can create tokens and trade.",
+      successWithWipe: "Curve trading is live and app data was reset.",
+      wipeFailed: "Trading resumed, but database reset failed:",
+    },
   },
 
   feeExempt: {
