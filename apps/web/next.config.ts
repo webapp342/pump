@@ -36,6 +36,9 @@ const contentSecurityPolicy = [
 const nextConfig: NextConfig = {
   cacheComponents: true,
   output: "standalone",
+  devIndicators: {
+    position: "bottom-right",
+  },
   outputFileTracingRoot: monorepoRoot,
   turbopack: {
     root: monorepoRoot,
