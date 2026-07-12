@@ -130,7 +130,7 @@ gen_secret() {
 install_apt_packages() {
   log "Installing system packages"
   run apt-get update -qq
-  run DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
+  run env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
     curl git rsync jq ufw nginx redis-server postgresql postgresql-contrib \
     ca-certificates gnupg lsb-release build-essential
 
