@@ -15,6 +15,7 @@ out/
 !.env.example
 !**/.env.example
 cloudflare.txt
+deploy/vm/bootstrap.env
 **/ssl/*.key
 **/ssl/*.pem
 apps/indexer/.env

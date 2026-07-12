@@ -413,22 +413,33 @@ Deploy sonrası: VM indexer `.env` → `INDEXER_START_BLOCK`, local `.env` → `
 
 ## 6. Yeni VM kurulumu (ilk kez)
 
-VM zaten ayarlıysa bu bölümü atla.
+Tek seferlik bootstrap script — PostgreSQL, nginx + Cloudflare Origin SSL, PM2, indexer systemd, CI/CD deploy key.
 
-```powershell
-cd C:\Users\DARK\Desktop\pump-tma
-
-# Önce şemayı VM'den çek (Bölüm 2)
-ssh -p 22022 root@104.207.64.115 "mkdir -p /root/pump-setup"
-scp -P 22022 schema.sql deploy\pump_db_grants.sql deploy\vm-setup.sh deploy\nginx-pump.conf root@104.207.64.115:/root/pump-setup/
-```
-
-VM'de (`pump_db` oluşturulmuş olmalı):
+**VM'de (root):**
 
 ```bash
-chmod +x /root/pump-setup/vm-setup.sh
-/root/pump-setup/vm-setup.sh
+# 1) Repo
+git clone https://github.com/CadaFinance/pump.git /var/www/pump/tma
+cd /var/www/pump/tma
+
+# 2) Cloudflare Origin cert (local cloudflare.txt — asla git'e ekleme)
+# scp cloudflare.txt root@YENI_IP:/root/cloudflare.txt
+
+# 3) Bootstrap config
+cp deploy/vm/bootstrap.env.example deploy/vm/bootstrap.env
+nano deploy/vm/bootstrap.env   # ALCHEMY_RPC_KEY, AUTH secrets, domain, CF path
+
+# 4) Preflight (değişiklik yapmaz)
+bash deploy/vm/bootstrap-production.sh
+
+# 5) Kurulum
+bash deploy/vm/bootstrap-production.sh --confirm
 ```
+
+Script bittiğinde ekranda **GitHub Secrets**, Cloudflare DNS ve `.env` checklist'i çıkar.  
+Sonraki deploy'lar: `main` push → `.github/workflows/deploy.yml` (eskisi gibi).
+
+Eski manuel yol: `deploy/vm-setup.sh` + `schema.sql` (bootstrap bunları otomatik yapar).
 
 ---
 
