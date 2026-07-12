@@ -5728,9 +5728,9 @@ code,
     border-left: 1px solid rgb(var(--pump-border) / 0.28);
   }
 
+  /* Keep class hook for future subtle busy affordance — no opacity dim (feels like a flash). */
   .token-detail-toolbar--refreshing {
-    opacity: 0.82;
-    transition: opacity 0.18s ease;
+    transition: none;
   }
 
   .token-favorites-strip {
@@ -6003,11 +6003,7 @@ code,
     min-height: 1.125rem;
   }
 
-  .token-page--switching .token-page-chart-slot,
-  .token-page--switching .token-page-tape-slot {
-    opacity: 0.88;
-    transition: opacity 0.18s ease;
-  }
+  /* Token switch — trade lock only; no panel opacity flash on chart/tape/sidebar/strip. */
 
   .token-page-trade-lock {
     position: absolute;

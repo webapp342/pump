@@ -52,6 +52,7 @@ function StripTokenChip({
   return (
     <Link
       href={`/token/${token.address}`}
+      scroll={false}
       className={
         isActive
           ? "token-favorites-strip__chip token-favorites-strip__chip--active"

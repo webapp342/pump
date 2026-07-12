@@ -68,6 +68,9 @@ export function TokenMarketSidebarArenaRow({
     if (Date.now() < suppressNavUntilRef.current) return;
     seedTokenDetailFromListItem(token);
     onTokenSelect?.();
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
     router.push(tokenHref, { scroll: false });
   }, [onTokenSelect, router, token, tokenHref]);
 

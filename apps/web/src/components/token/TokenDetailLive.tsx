@@ -1027,7 +1027,7 @@ export function TokenDetailLive({
 
   return (
     <div
-      className={`token-page ${!contentSynced ? "token-page--switching" : ""}`}
+      className="token-page"
       aria-busy={isRefreshing || undefined}
     >
       <div className="token-page-grid">

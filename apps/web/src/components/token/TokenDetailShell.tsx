@@ -44,6 +44,28 @@ function bundleFromPayload(payload: TokenDetailBundle): ResolvedBundle {
   };
 }
 
+/** Peek session cache during render — avoids one-frame switching dim on sidebar clicks. */
+function resolveRouteBundle(
+  normalized: string,
+  resolved: ResolvedBundle | null,
+  optimisticToken: TokenDetail | null
+): ResolvedBundle | null {
+  if (resolved?.token.address.toLowerCase() === normalized) {
+    return resolved;
+  }
+
+  const cached = peekTokenDetailBundle(normalized);
+  if (cached) {
+    return bundleFromPayload(cached);
+  }
+
+  if (optimisticToken?.address.toLowerCase() === normalized) {
+    return { token: optimisticToken, trades: [], holders: [] };
+  }
+
+  return resolved;
+}
+
 export function TokenDetailShell({
   address,
   initialBundle = null,
@@ -92,8 +114,9 @@ export function TokenDetailShell({
   const pollUntilRef = useRef(0);
   const loadGenerationRef = useRef(0);
 
+  const routeBundle = resolveRouteBundle(normalized, resolved, optimisticToken);
   const contentSynced =
-    resolved != null && resolved.token.address.toLowerCase() === normalized;
+    routeBundle != null && routeBundle.token.address.toLowerCase() === normalized;
 
   const load = useCallback(
     async (options: { silent?: boolean } = {}) => {
@@ -193,7 +216,7 @@ export function TokenDetailShell({
     return () => clearInterval(timer);
   }, [contentSynced, fatalError, load, optimisticToken]);
 
-  const showFullSkeleton = !layoutMountedRef.current && !resolved && !optimisticToken;
+  const showFullSkeleton = !layoutMountedRef.current && !routeBundle;
 
   if (showFullSkeleton) {
     return (
@@ -221,8 +244,7 @@ export function TokenDetailShell({
     );
   }
 
-  const display = resolved ?? (optimisticToken ? { token: optimisticToken, trades: [], holders: [] } : null);
-  if (!display) {
+  if (!routeBundle) {
     return (
       <AppShell wide>
         <TokenDetailBodySkeleton />
@@ -240,14 +262,14 @@ export function TokenDetailShell({
 
       <TokenDetailLive
         tokenAddress={normalized}
-        symbol={display.token.symbol}
-        status={display.token.status}
-        initialToken={display.token}
-        initialTrades={display.trades}
-        initialHolders={display.holders}
-        initialCandles={display.initialCandles}
+        symbol={routeBundle.token.symbol}
+        status={routeBundle.token.status}
+        initialToken={routeBundle.token}
+        initialTrades={routeBundle.trades}
+        initialHolders={routeBundle.holders}
+        initialCandles={routeBundle.initialCandles}
         contentSynced={contentSynced}
-        isRefreshing={refreshing || !contentSynced}
+        isRefreshing={refreshing}
       />
     </AppShell>
   );
