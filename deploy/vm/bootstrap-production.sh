@@ -81,7 +81,11 @@ load_env() {
   GIT_REF="${GIT_REF:-main}"
   NEXT_PUBLIC_APP_URL="${NEXT_PUBLIC_APP_URL:-https://${PUMP_DOMAIN}}"
   NEXT_PUBLIC_WS_URL="${NEXT_PUBLIC_WS_URL:-wss://${PUMP_DOMAIN}/ws}"
+  NEXT_PUBLIC_CHAIN_ID="${NEXT_PUBLIC_CHAIN_ID:-84532}"
+  [[ "$NEXT_PUBLIC_CHAIN_ID" == "84" ]] && NEXT_PUBLIC_CHAIN_ID="84532"
   SKIP_FIRST_DEPLOY="${SKIP_FIRST_DEPLOY:-0}"
+  SKIP_ALTO_BUNDLER="${SKIP_ALTO_BUNDLER:-0}"
+  BUNDLER_RPC_PORT="${BUNDLER_RPC_PORT:-4337}"
 
   SECRETS_FILE="/root/pump-bootstrap-secrets.txt"
   INDEXER_DIR="/var/www/pump/Indexer"
@@ -371,6 +375,19 @@ patch_env_file() {
   sed -i "s|NEXT_PUBLIC_APP_URL=http://localhost:3012|NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}|g" "$file"
   grep -q '^NEXT_PUBLIC_WS_URL=' "$file" || echo "NEXT_PUBLIC_WS_URL=${NEXT_PUBLIC_WS_URL}" >> "$file"
   sed -i "s|NEXT_PUBLIC_WS_URL=.*|NEXT_PUBLIC_WS_URL=${NEXT_PUBLIC_WS_URL}|g" "$file"
+  local chain_id="${NEXT_PUBLIC_CHAIN_ID:-84532}"
+  [[ "$chain_id" == "84" ]] && chain_id="84532"
+  if grep -q '^NEXT_PUBLIC_CHAIN_ID=' "$file"; then
+    sed -i "s|^NEXT_PUBLIC_CHAIN_ID=.*|NEXT_PUBLIC_CHAIN_ID=${chain_id}|g" "$file"
+  else
+    echo "NEXT_PUBLIC_CHAIN_ID=${chain_id}" >> "$file"
+  fi
+  local bundler_url="http://127.0.0.1:${BUNDLER_RPC_PORT:-4337}/rpc"
+  if grep -q '^BUNDLER_RPC_URL=' "$file"; then
+    sed -i "s|^BUNDLER_RPC_URL=.*|BUNDLER_RPC_URL=${bundler_url}|g" "$file"
+  else
+    echo "BUNDLER_RPC_URL=${bundler_url}" >> "$file"
+  fi
   grep -q '^PGBOUNCER_ENABLED=' "$file" || echo 'PGBOUNCER_ENABLED=true' >> "$file"
   grep -q '^USE_REDIS_ARENA_CACHE=' "$file" || echo 'USE_REDIS_ARENA_CACHE=true' >> "$file"
 }
@@ -428,6 +445,63 @@ install_systemd_units() {
   run cp "$REPO_ROOT/deploy/pump-airdrop-keeper.service" /etc/systemd/system/
   run systemctl daemon-reload
   run systemctl enable pump-indexer pump-airdrop-keeper
+}
+
+setup_alto_bundler() {
+  if [[ "${SKIP_ALTO_BUNDLER:-0}" == "1" ]]; then
+    warn "SKIP_ALTO_BUNDLER=1 — skipping Alto bundler (SCW create/trade will 502 until installed)"
+    return 0
+  fi
+
+  local chain_id="${NEXT_PUBLIC_CHAIN_ID:-84532}"
+  [[ "$chain_id" == "84" ]] && chain_id="84532"
+  local alto_script="$REPO_ROOT/deploy/bundler/alto/setup-alto-pm2.sh"
+
+  if [[ -z "${BUNDLER_EXECUTOR_PRIVATE_KEYS:-}" && -z "${BUNDLER_RELAYER_PRIVATE_KEY:-}" ]]; then
+    warn "Alto bundler skipped — set BUNDLER_EXECUTOR_PRIVATE_KEYS in bootstrap.env"
+    warn "  Smart wallet token create/trade needs bundler at http://127.0.0.1:${BUNDLER_RPC_PORT:-4337}/rpc"
+    warn "  Later: fill keys in bootstrap.env and re-run setup-alto-pm2.sh"
+    return 0
+  fi
+
+  log "Alto bundler (EntryPoint 0.7 — SCW create / trade)"
+  run chmod +x "$alto_script" "$REPO_ROOT/deploy/bundler/alto/health.sh" 2>/dev/null || true
+
+  if [[ "$DRY_RUN" -eq 1 ]]; then
+    log "[dry-run] bash deploy/bundler/alto/setup-alto-pm2.sh (chain $chain_id)"
+    return 0
+  fi
+
+  export BUNDLER_CHAIN_ID="$chain_id"
+  export ALTO_PORT="${BUNDLER_RPC_PORT:-4337}"
+  export ALCHEMY_API_KEY="${ALCHEMY_API_KEY:-${ALCHEMY_RPC_KEY:-}}"
+
+  if [[ -z "${BUNDLER_CHAIN_RPC_URL:-}" && -n "${ALCHEMY_API_KEY:-}" ]]; then
+    case "$chain_id" in
+      84532) export BUNDLER_CHAIN_RPC_URL="https://base-sepolia.g.alchemy.com/v2/${ALCHEMY_API_KEY}" ;;
+      8453)  export BUNDLER_CHAIN_RPC_URL="https://base-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}" ;;
+      *)     export BUNDLER_CHAIN_RPC_URL="https://bnb-testnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}" ;;
+    esac
+  fi
+
+  if [[ -z "${BUNDLER_CHAIN_RPC_URL:-}" ]]; then
+    warn "Alto skipped — set BUNDLER_CHAIN_RPC_URL or ALCHEMY_RPC_KEY in bootstrap.env"
+    return 0
+  fi
+
+  if [[ -z "${BUNDLER_EXECUTOR_PRIVATE_KEYS:-}" ]]; then
+    export BUNDLER_EXECUTOR_PRIVATE_KEYS="$BUNDLER_RELAYER_PRIVATE_KEY"
+  fi
+  if [[ -z "${BUNDLER_UTILITY_PRIVATE_KEY:-}" ]]; then
+    export BUNDLER_UTILITY_PRIVATE_KEY="${BUNDLER_RELAYER_PRIVATE_KEY:-${BUNDLER_EXECUTOR_PRIVATE_KEYS%%,*}}"
+  fi
+
+  if bash "$alto_script"; then
+    bash "$REPO_ROOT/deploy/bundler/alto/health.sh" || warn "Alto health check failed — fund executor with chain $chain_id ETH"
+    log "Alto OK — proxy via TMA BUNDLER_RPC_URL=http://127.0.0.1:${ALTO_PORT}/rpc"
+  else
+    warn "Alto setup failed — fund executor wallet and re-run: bash $alto_script"
+  fi
 }
 
 install_foundry() {
@@ -512,6 +586,9 @@ run_first_deploy() {
   run bash -c "cd '$REPO_ROOT' && ./deploy/tma-deploy.sh"
   if [[ "$DRY_RUN" -eq 0 ]] && command -v pm2 >/dev/null 2>&1; then
     pm2 save || true
+    if pm2 describe pump-tma >/dev/null 2>&1; then
+      pm2 restart pump-tma --update-env || true
+    fi
   fi
 }
 
@@ -567,17 +644,21 @@ print_post_install_checklist() {
    ssh -p ${BOOTSTRAP_SSH_PORT} -i ${DEPLOY_KEY} root@${vm_ip} "echo ok"
 
 4) Fill missing .env secrets (if placeholders remain)
+   nano ${REPO_ROOT}/deploy/vm/bootstrap.env   # bundler keys if Alto was skipped
    nano ${REPO_ROOT}/.env
    nano ${INDEXER_DIR}/.env
    Required: Telegram/OAuth, R2, TELEGRAM_*, indexer RPC, AIRDROP_KEEPER_PRIVATE_KEY
+   Bundler (SCW create/trade): BUNDLER_EXECUTOR_PRIVATE_KEYS + funded Base Sepolia ETH
 
 5) Restart after .env edits
    cd ${REPO_ROOT} && pm2 startOrRestart ecosystem.config.cjs --update-env
    systemctl restart pump-indexer pump-airdrop-keeper
+   pm2 restart pump-alto 2>/dev/null || true
 
 6) Health checks
    curl -sf https://${PUMP_DOMAIN}/api/health
    curl -sf https://${PUMP_DOMAIN}/api/tokens?limit=5
+   bash ${REPO_ROOT}/deploy/bundler/alto/health.sh
    bash ${REPO_ROOT}/deploy/vm/system-health.sh | jq .overall
 
 7) Update docs/ops-perf-playbook.md with new VM IP (${vm_ip})
@@ -610,6 +691,7 @@ main() {
   setup_pgbouncer || true
   build_contract_artifacts
   install_systemd_units
+  setup_alto_bundler || true
   setup_github_deploy_key
   configure_firewall
 

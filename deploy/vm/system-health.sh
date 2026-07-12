@@ -233,21 +233,22 @@ else
   append_check "pump_realtime" "Realtime (WS srv)" "down" "HTTP probe failed" "$probe" "pm2=$pm2_status dist=$dist_ok" "${http_ms:-0}" "$logs_json" "$timings_json"
 fi
 
-# --- WebSocket ---
-probe="ws-smoke → ws://127.0.0.1/ws"
+# --- WebSocket (realtime backend — direct; nginx /ws proxies here) ---
+WS_SMOKE_URL="${WS_SMOKE_URL:-ws://127.0.0.1:3013}"
+probe="ws-smoke → ${WS_SMOKE_URL}"
 ws_started="$(now_ms_fn)"
 ws_out=""
 if [[ -f "$APP_DIR/scripts/load/ws-smoke.mjs" ]]; then
-  ws_out="$(cd "$APP_DIR/apps/realtime" && node ../../scripts/load/ws-smoke.mjs --connections 1 --url ws://127.0.0.1/ws 2>&1 || true)"
+  ws_out="$(cd "$APP_DIR/apps/realtime" && node ../../scripts/load/ws-smoke.mjs --connections 1 --url "$WS_SMOKE_URL" 2>&1 || true)"
 fi
 ws_ms=$(( $(now_ms_fn) - ws_started ))
 ws_elapsed="$(echo "$ws_out" | grep -o '"elapsedMs":[0-9]*' | head -1 | cut -d: -f2)"
 timings_json="$(make_timings "{\"connect\":${ws_ms},\"smokeReport\":${ws_elapsed:-null}}")"
 logs_json="$(logs_to_json "$(echo "$ws_out" | tail -n 8)")"
 if echo "$ws_out" | grep -q '"failed": 0'; then
-  append_check "websocket" "WebSocket (/ws)" "healthy" "Connect OK · ${ws_ms}ms" "$probe" "$(echo "$ws_out" | tail -1)" "$ws_ms" "$logs_json" "$timings_json"
+  append_check "websocket" "WebSocket (realtime)" "healthy" "Connect OK · ${ws_ms}ms · nginx /ws → :3013" "$probe" "$(echo "$ws_out" | tail -1)" "$ws_ms" "$logs_json" "$timings_json"
 else
-  append_check "websocket" "WebSocket (/ws)" "down" "Smoke test failed · ${ws_ms}ms" "$probe" "$(echo "$ws_out" | tail -3 | tr '\n' ' ')" "$ws_ms" "$logs_json" "$timings_json"
+  append_check "websocket" "WebSocket (realtime)" "down" "Smoke test failed · ${ws_ms}ms" "$probe" "$(echo "$ws_out" | tail -3 | tr '\n' ' ')" "$ws_ms" "$logs_json" "$timings_json"
 fi
 
 # --- Indexer ---

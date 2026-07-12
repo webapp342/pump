@@ -6,7 +6,12 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ALTO_DIR="${ALTO_DIR:-/opt/alto}"
 ALTO_PORT="${ALTO_PORT:-4337}"
-CHAIN_ID="${BUNDLER_CHAIN_ID:-97}"
+CHAIN_ID="${BUNDLER_CHAIN_ID:-84532}"
+
+# bootstrap.env uses ALCHEMY_RPC_KEY; legacy scripts use ALCHEMY_API_KEY
+if [[ -z "${ALCHEMY_API_KEY:-}" && -n "${ALCHEMY_RPC_KEY:-}" ]]; then
+  export ALCHEMY_API_KEY="$ALCHEMY_RPC_KEY"
+fi
 
 # Skandha migration: reuse relayer key if executor keys not set
 if [[ -z "${BUNDLER_EXECUTOR_PRIVATE_KEYS:-}" && -n "${BUNDLER_RELAYER_PRIVATE_KEY:-}" ]]; then

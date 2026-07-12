@@ -2,6 +2,7 @@
  * WebSocket connection smoke test — run on VM after phase 4.
  *
  *   node scripts/load/ws-smoke.mjs --connections 1000 --url ws://127.0.0.1:3013
+ *   # Public path (browser): wss://your-domain/ws via nginx — do not use ws://127.0.0.1/ws (port 80 → HTTPS redirect)
  */
 import { WebSocket } from "ws";
 

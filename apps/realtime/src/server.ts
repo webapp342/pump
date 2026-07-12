@@ -112,9 +112,21 @@ function broadcast(room: string, payload: string): void {
   }
 }
 
-function originAllowed(origin: string | undefined): boolean {
+function originAllowed(origin: string | undefined, remoteAddress: string | undefined): boolean {
   if (!ALLOWED_ORIGINS.length) return true;
-  if (!origin) return false;
+  if (!origin) {
+    // Health probes / ws-smoke (no Origin header) from localhost
+    const addr = remoteAddress ?? "";
+    if (
+      addr === "127.0.0.1" ||
+      addr === "::1" ||
+      addr === "::ffff:127.0.0.1" ||
+      addr.startsWith("127.")
+    ) {
+      return true;
+    }
+    return false;
+  }
   return ALLOWED_ORIGINS.includes(origin);
 }
 
@@ -131,7 +143,7 @@ wss.on("connection", (ws, req) => {
     return;
   }
 
-  if (!originAllowed(req.headers.origin)) {
+  if (!originAllowed(req.headers.origin, req.socket.remoteAddress ?? undefined)) {
     ws.close(1008, "origin not allowed");
     return;
   }
