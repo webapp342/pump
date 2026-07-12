@@ -146,9 +146,11 @@ stop_conflicting_web_servers() {
   done
 
   if ss -tlnH 2>/dev/null | grep -q ':80 '; then
-    warn "Port 80 still in use after stopping panel services:"
-    ss -tlnp 2>/dev/null | grep ':80 ' || true
-    warn "Stop the process above manually, then re-run bootstrap or: systemctl start nginx"
+    if ss -tlnp 2>/dev/null | grep ':80 ' | grep -qv nginx; then
+      warn "Port 80 still in use by non-nginx process:"
+      ss -tlnp 2>/dev/null | grep ':80 ' || true
+      warn "Stop that process before HTTPS redirect works reliably"
+    fi
   fi
 }
 
@@ -408,16 +410,37 @@ install_systemd_units() {
   run systemctl enable pump-indexer pump-airdrop-keeper
 }
 
+install_foundry() {
+  if command -v forge >/dev/null 2>&1; then
+    return 0
+  fi
+  log "Installing Foundry (forge) — indexer needs contract artifacts"
+  if [[ "$DRY_RUN" -eq 1 ]]; then return 0; fi
+  curl -L https://foundry.paradigm.xyz | bash
+  export PATH="/root/.foundry/bin:${PATH}"
+  /root/.foundry/bin/foundryup -y 2>/dev/null || /root/.foundry/bin/foundryup
+  if ! command -v forge >/dev/null 2>&1 && [[ -x /root/.foundry/bin/forge ]]; then
+    ln -sf /root/.foundry/bin/forge /usr/local/bin/forge
+    ln -sf /root/.foundry/bin/cast /usr/local/bin/cast 2>/dev/null || true
+  fi
+  command -v forge >/dev/null 2>&1 || die "forge install failed — run foundryup manually"
+}
+
 build_contract_artifacts() {
   log "Contract artifacts for indexer"
   run mkdir -p /var/www/pump/contracts
-  if command -v forge >/dev/null 2>&1 && [[ -f "$REPO_ROOT/contracts/foundry.toml" ]]; then
+  if [[ -f "$REPO_ROOT/contracts/foundry.toml" ]]; then
+    install_foundry
     run bash -c "cd '$REPO_ROOT/contracts' && forge build"
     run rsync -a "$REPO_ROOT/contracts/out/" "$CONTRACTS_OUT/"
   elif [[ -d "$REPO_ROOT/contracts/out" ]]; then
     run rsync -a "$REPO_ROOT/contracts/out/" "$CONTRACTS_OUT/"
   else
-    warn "No forge and no contracts/out — scp built artifacts to $CONTRACTS_OUT before indexer start"
+    warn "No contracts/foundry.toml — scp forge out/ to $CONTRACTS_OUT"
+    return 0
+  fi
+  if [[ "$DRY_RUN" -eq 0 ]] && [[ ! -f "$CONTRACTS_OUT/MemeFactory.sol/MemeFactory.json" ]]; then
+    die "MemeFactory.json missing after forge build — check contracts compile"
   fi
 }
 
@@ -457,6 +480,9 @@ run_first_deploy() {
   log "First deploy (npm ci + build + PM2)"
   run chmod +x "$REPO_ROOT/deploy/tma-deploy.sh"
   run bash -c "cd '$REPO_ROOT' && ./deploy/tma-deploy.sh"
+  if [[ "$DRY_RUN" -eq 0 ]] && command -v pm2 >/dev/null 2>&1; then
+    pm2 save || true
+  fi
 }
 
 save_secrets_summary() {

@@ -107,7 +107,9 @@ fi
 if [[ "${SKIP_INDEXER_DEPLOY:-}" != "1" ]] && [[ -f "$REPO_ROOT/deploy/vm/indexer-deploy.sh" ]]; then
   log "Deploying indexer (sync + rebuild + restart)"
   chmod +x "$REPO_ROOT/deploy/vm/indexer-deploy.sh"
-  bash "$REPO_ROOT/deploy/vm/indexer-deploy.sh"
+  bash "$REPO_ROOT/deploy/vm/indexer-deploy.sh" || {
+    log "Indexer deploy failed — fix artifacts/.env/RPC and re-run: deploy/vm/indexer-deploy.sh"
+  }
 else
   log "Skipping indexer deploy (SKIP_INDEXER_DEPLOY=1 or script missing)"
 fi
