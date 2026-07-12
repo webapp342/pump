@@ -1167,6 +1167,17 @@ function wrapChartFormatterForLogScale(
     if (value >= logLo && value <= logHi) {
       return formatter(chartFromLog(value, formula));
     }
+    // Log scale can still be active briefly on MCAP first paint — ticks arrive as
+    // magnitude-shifted logical coords (often ~1000× native). Walk down by 10 until in range.
+    if (value > range.max * 2 || value < range.min * 0.5) {
+      let adjusted = value;
+      for (let attempt = 0; attempt < 8 && adjusted > range.max * 1.5; attempt += 1) {
+        adjusted /= 10;
+      }
+      if (adjusted >= range.min * 0.25 && adjusted <= range.max * 2) {
+        return formatter(adjusted);
+      }
+    }
     return formatter(value);
   };
 }
@@ -1224,12 +1235,13 @@ export function chartPriceFormatFromBase(
     CHART_PRICE_PRECISION_MIN,
     Math.min(CHART_PRICE_PRECISION_MAX, Math.round(Math.log10(safeBase)))
   );
-  const usdRate = bnbUsd != null && bnbUsd > 0 ? bnbUsd : 1;
+  const usdRate = bnbUsd != null && bnbUsd > 0 ? bnbUsd : null;
 
   const formatNative = (price: number) => {
     if (!Number.isFinite(price)) return "—";
     if (price === 0) return currency === "usd" || currency === "mcap" ? "$0" : "0";
     if (currency === "mcap") {
+      if (usdRate == null) return "—";
       const usd = price * usdRate;
       if (!Number.isFinite(usd) || usd <= 0) return "$0";
       if (usd >= 1_000_000) return `$${(usd / 1_000_000).toFixed(2)}M`;
@@ -1237,14 +1249,16 @@ export function chartPriceFormatFromBase(
       return `$${usd.toFixed(2)}`;
     }
     if (currency === "usd") {
+      if (usdRate == null) return "—";
       return formatPumpSubscriptPriceAxis(price * usdRate, "$");
     }
     if (price >= 0.001) return price.toFixed(Math.min(6, precision));
     return formatPumpSubscriptPriceAxis(price, "") + ` ${NATIVE_SYMBOL}`;
   };
 
+  // Always wrap when candles exist — LWC may pass log/logical ticks even on linear MCAP first paint.
   const formatter =
-    options?.useLogScale && options.candles?.length
+    options?.candles?.length
       ? wrapChartFormatterForLogScale(formatNative, options.candles)
       : formatNative;
 

@@ -642,7 +642,7 @@ export function PriceChart({
         borderColor,
         scaleMargins: { top: 0.08, bottom: SHOW_CHART_VOLUME ? 0.22 : 0.08 },
         autoScale: true,
-        mode: PriceScaleMode.Logarithmic,
+        mode: PriceScaleMode.Normal,
       },
       timeScale: {
         borderColor,
@@ -815,6 +815,11 @@ export function PriceChart({
 
     const candleSeries = candleSeriesRef.current;
     const volumeSeries = volumeSeriesRef.current;
+    const rightScale = chartRef.current?.priceScale("right");
+    rightScale?.applyOptions({
+      mode: useLogPriceScale ? PriceScaleMode.Logarithmic : PriceScaleMode.Normal,
+      autoScale: true,
+    });
     applyCandleSeriesPriceFormat(candleSeries, priceFormat, candlesForChart);
 
     const nextCandles = candlesForChart;
@@ -891,6 +896,7 @@ export function PriceChart({
     timeInterval,
     currency,
     candleUnitScale,
+    useLogPriceScale,
   ]);
 
   const showEmpty = !loading && !error && candles.length === 0;

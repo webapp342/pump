@@ -50,6 +50,9 @@ export function HoldingSwipeRow({
   const axisLock = useRef<"x" | "y" | null>(null);
   const peekPlayedRef = useRef(false);
   const offsetRef = useRef(0);
+  const touchActiveRef = useRef(false);
+  const suppressClickRef = useRef(false);
+  const draggingRef = useRef(false);
 
   const clamp = useCallback(
     (value: number) => Math.max(-ACTION_WIDTH, Math.min(ACTION_WIDTH, value)),
@@ -75,6 +78,10 @@ export function HoldingSwipeRow({
   }, [offset]);
 
   useEffect(() => {
+    draggingRef.current = dragging;
+  }, [dragging]);
+
+  useEffect(() => {
     if (!peekOnMount || disabled || peekPlayedRef.current) return;
     if (isHoldingsSwipeHintDismissed()) return;
 
@@ -95,13 +102,14 @@ export function HoldingSwipeRow({
     if (disabled) return;
     startX.current = event.touches[0].clientX;
     startY.current = event.touches[0].clientY;
-    startOffset.current = offset;
+    startOffset.current = offsetRef.current;
     axisLock.current = null;
-    setDragging(true);
+    touchActiveRef.current = true;
+    suppressClickRef.current = false;
   };
 
   const onTouchMove = (event: React.TouchEvent) => {
-    if (!dragging || disabled) return;
+    if (!touchActiveRef.current || disabled) return;
 
     const touch = event.touches[0];
     const deltaX = touch.clientX - startX.current;
@@ -110,9 +118,19 @@ export function HoldingSwipeRow({
     if (axisLock.current == null) {
       if (Math.abs(deltaX) < 6 && Math.abs(deltaY) < 6) return;
       axisLock.current = Math.abs(deltaX) > Math.abs(deltaY) ? "x" : "y";
+      if (axisLock.current === "y") {
+        touchActiveRef.current = false;
+        return;
+      }
     }
 
     if (axisLock.current !== "x") return;
+
+    if (!draggingRef.current) {
+      draggingRef.current = true;
+      setDragging(true);
+    }
+    suppressClickRef.current = true;
 
     if (Math.abs(deltaX) > 0 || startOffset.current !== 0) {
       event.preventDefault();
@@ -122,6 +140,14 @@ export function HoldingSwipeRow({
   };
 
   const onTouchEnd = () => {
+    touchActiveRef.current = false;
+
+    if (!draggingRef.current) {
+      axisLock.current = null;
+      return;
+    }
+
+    draggingRef.current = false;
     setDragging(false);
     axisLock.current = null;
     const current = offsetRef.current;
@@ -137,6 +163,13 @@ export function HoldingSwipeRow({
       return;
     }
     setOffset(0);
+  };
+
+  const onContentClickCapture = (event: React.MouseEvent) => {
+    if (!suppressClickRef.current) return;
+    event.preventDefault();
+    event.stopPropagation();
+    suppressClickRef.current = false;
   };
 
   const revealActions = dragging || Math.abs(offset) >= REVEAL_ACTIONS_OFFSET;
@@ -183,6 +216,7 @@ export function HoldingSwipeRow({
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
         onTouchCancel={onTouchEnd}
+        onClickCapture={onContentClickCapture}
       >
         {showEdgeHint && offset === 0 ? (
           <>

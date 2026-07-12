@@ -65,7 +65,6 @@ import {
 import { TradeTape } from "@/components/token/TradeTape";
 import { TokenWatchlistStrip } from "@/components/token/TokenFavoritesStrip";
 import { TokenMarketSidebar } from "@/components/token/TokenMarketSidebar";
-import { useTokenSidebarWidth } from "@/hooks/useTokenSidebarWidth";
 import { PriceChart } from "@/components/token/PriceChart";
 import { FavoriteIcon } from "@/components/icons/FavoriteIcon";
 import { useFavorites } from "@/components/favorites/FavoritesProvider";
@@ -277,7 +276,6 @@ export function TokenDetailLive({
   const router = useRouter();
   const { isConnected } = useAccount();
   const { bnbUsd } = useBnbUsdPrice();
-  const { gridStyle } = useTokenSidebarWidth();
   const { isFavorite, toggleFavorite, upsertFavoriteSnapshots } = useFavorites();
   const burstUntilRef = useRef(0);
   const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1032,7 +1030,7 @@ export function TokenDetailLive({
       className={`token-page ${!contentSynced ? "token-page--switching" : ""}`}
       aria-busy={isRefreshing || undefined}
     >
-      <div className="token-page-grid" style={gridStyle}>
+      <div className="token-page-grid">
         {isConnected ? (
           <div className="token-page-favorites-slot hidden lg:block">
             <TokenWatchlistStrip activeTokenAddress={tokenAddress} />
