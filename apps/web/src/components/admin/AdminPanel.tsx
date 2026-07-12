@@ -8,6 +8,7 @@ import {
   useAccount,
   useBalance,
   useDisconnect,
+  usePublicClient,
   useReadContract,
   useWaitForTransactionReceipt,
   useWriteContract,
@@ -185,8 +186,10 @@ export function AdminPanel() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [sweepingId, setSweepingId] = useState<string | null>(null);
-  const [bondingEmergencySweepPending, setBondingEmergencySweepPending] = useState(false);
-  const [bondingResumePending, setBondingResumePending] = useState(false);
+  const [curveRecoverBusy, setCurveRecoverBusy] = useState(false);
+  const [curveRecoverPhase, setCurveRecoverPhase] = useState<
+    "idle" | "wallet-sweep" | "chain-sweep" | "wallet-resume" | "chain-resume" | "wipe"
+  >("idle");
   const [curveRecoverResetDb, setCurveRecoverResetDb] = useState(true);
   const [curveRecoverSuccess, setCurveRecoverSuccess] = useState<string | null>(null);
   const [emergencySweepTo, setEmergencySweepTo] = useState("");
@@ -236,6 +239,20 @@ export function AdminPanel() {
   const memeFactoryOwner = protocol?.memeFactory.owner;
   const airdropAdmin = protocol?.airdropManager?.admin;
   const opsWallet = treasuryOwner ?? ADMIN_ADDRESS;
+  const curveRecoverButtonLabel = useMemo(() => {
+    switch (curveRecoverPhase) {
+      case "wallet-sweep":
+      case "chain-sweep":
+        return ADMIN_COPY.treasury.curveRecovery.recovering;
+      case "wallet-resume":
+      case "chain-resume":
+        return ADMIN_COPY.treasury.curveRecovery.resuming;
+      case "wipe":
+        return ADMIN_COPY.treasury.curveRecovery.wiping;
+      default:
+        return null;
+    }
+  }, [curveRecoverPhase]);
   const opsWalletsUnified = useMemo(() => {
     const wallets = [treasuryOwner, bondingOwner, airdropAdmin]
       .filter(Boolean)
@@ -265,10 +282,12 @@ export function AdminPanel() {
 
   const {
     writeContract,
+    writeContractAsync,
     data: adminTxHash,
     isPending: adminTxPending,
     reset: resetAdminTx,
   } = useWriteContract();
+  const publicClient = usePublicClient({ chainId: pumpChain.id });
   const { isSuccess: adminTxDone } = useWaitForTransactionReceipt({ hash: adminTxHash });
 
   const loadPromoTasks = useCallback(async () => {
@@ -352,20 +371,6 @@ export function AdminPanel() {
       return;
     }
 
-    if (bondingEmergencySweepPending) {
-      setBondingEmergencySweepPending(false);
-      resetAdminTx();
-      resumeCurveTrading();
-      return;
-    }
-
-    if (bondingResumePending) {
-      setBondingResumePending(false);
-      resetAdminTx();
-      void finishCurveRecovery();
-      return;
-    }
-
     setWithdrawAmount("");
     setWithdrawTokenAmount("");
     resetAdminTx();
@@ -376,8 +381,6 @@ export function AdminPanel() {
   }, [
     adminTxDone,
     sweepingId,
-    bondingEmergencySweepPending,
-    bondingResumePending,
     load,
     loadStats,
     resetAdminTx,
@@ -444,18 +447,64 @@ export function AdminPanel() {
     void loadStats();
   }
 
-  function resumeCurveTrading() {
-    if (!canEmergencySweepBonding || !contracts.bondingCurveManager) return;
+  async function runCurveRecovery(options: { sweepEscrow: boolean }) {
+    if (!canEmergencySweepBonding || !contracts.bondingCurveManager || !publicClient) {
+      setError("Connect the curve owner wallet on the correct chain.");
+      return;
+    }
+
+    const to = emergencySweepTo.trim();
+    if (options.sweepEscrow && !isAddress(to)) {
+      setError("Enter a valid recovery recipient address");
+      return;
+    }
 
     setError(null);
-    setBondingResumePending(true);
-    writeContract({
-      address: contracts.bondingCurveManager,
-      abi: bondingCurveManagerAbi,
-      functionName: "setEmergencyHalt",
-      args: [false],
-      chainId: pumpChain.id,
-    });
+    setCurveRecoverSuccess(null);
+    setCurveRecoverBusy(true);
+
+    try {
+      if (options.sweepEscrow) {
+        setCurveRecoverPhase("wallet-sweep");
+        const sweepHash = await writeContractAsync({
+          address: contracts.bondingCurveManager,
+          abi: bondingCurveManagerAbi,
+          functionName: "emergencySweepAllEth",
+          args: [to as `0x${string}`],
+          chainId: pumpChain.id,
+        });
+        setCurveRecoverPhase("chain-sweep");
+        await publicClient.waitForTransactionReceipt({ hash: sweepHash });
+      }
+
+      setCurveRecoverPhase("wallet-resume");
+      const resumeHash = await writeContractAsync({
+        address: contracts.bondingCurveManager,
+        abi: bondingCurveManagerAbi,
+        functionName: "setEmergencyHalt",
+        args: [false],
+        chainId: pumpChain.id,
+      });
+      setCurveRecoverPhase("chain-resume");
+      await publicClient.waitForTransactionReceipt({ hash: resumeHash });
+
+      if (curveRecoverResetDb) {
+        setCurveRecoverPhase("wipe");
+      }
+      await finishCurveRecovery();
+    } catch (err) {
+      const message =
+        err instanceof Error
+          ? err.message.includes("User rejected")
+            ? "Transaction cancelled in wallet."
+            : err.message
+          : "Curve recovery failed";
+      setError(message);
+    } finally {
+      setCurveRecoverBusy(false);
+      setCurveRecoverPhase("idle");
+      resetAdminTx();
+    }
   }
 
   function onRecoverCurveEscrow() {
@@ -487,17 +536,7 @@ export function AdminPanel() {
       confirmTemplate.replace("{amount}", balanceBnb).replace("{to}", to)
     );
     if (!confirmed) return;
-
-    setError(null);
-    setCurveRecoverSuccess(null);
-    setBondingEmergencySweepPending(true);
-    writeContract({
-      address: contracts.bondingCurveManager,
-      abi: bondingCurveManagerAbi,
-      functionName: "emergencySweepAllEth",
-      args: [to as `0x${string}`],
-      chainId: pumpChain.id,
-    });
+    void runCurveRecovery({ sweepEscrow: true });
   }
 
   function onResumeCurveTradingOnly() {
@@ -511,10 +550,7 @@ export function AdminPanel() {
       ? ADMIN_COPY.treasury.curveRecovery.confirmResumeWithWipe
       : ADMIN_COPY.treasury.curveRecovery.confirmResume;
     if (!window.confirm(confirmTemplate)) return;
-
-    setError(null);
-    setCurveRecoverSuccess(null);
-    resumeCurveTrading();
+    void runCurveRecovery({ sweepEscrow: false });
   }
 
   function onWithdrawTreasuryBnb() {
@@ -1112,23 +1148,21 @@ export function AdminPanel() {
                 {Number(protocol?.bondingCurveManager.contractBalanceBnb ?? "0") > 0 ? (
                   <AdminBtn
                     size="sm"
-                    onClick={onRecoverCurveEscrow}
-                    disabled={adminTxPending && (bondingEmergencySweepPending || bondingResumePending)}
+                    onClick={() => void onRecoverCurveEscrow()}
+                    disabled={curveRecoverBusy}
                   >
-                    {adminTxPending && bondingEmergencySweepPending
-                      ? ADMIN_COPY.treasury.curveRecovery.recovering
-                      : adminTxPending && bondingResumePending
-                        ? ADMIN_COPY.treasury.curveRecovery.resuming
-                        : ADMIN_COPY.treasury.curveRecovery.recoverAndResume}
+                    {curveRecoverBusy
+                      ? (curveRecoverButtonLabel ?? ADMIN_COPY.treasury.curveRecovery.recoverAndResume)
+                      : ADMIN_COPY.treasury.curveRecovery.recoverAndResume}
                   </AdminBtn>
                 ) : protocol?.bondingCurveManager.emergencyHalt ? (
                   <AdminBtn
                     size="sm"
-                    onClick={onResumeCurveTradingOnly}
-                    disabled={adminTxPending && bondingResumePending}
+                    onClick={() => void onResumeCurveTradingOnly()}
+                    disabled={curveRecoverBusy}
                   >
-                    {adminTxPending && bondingResumePending
-                      ? ADMIN_COPY.treasury.curveRecovery.resuming
+                    {curveRecoverBusy
+                      ? (curveRecoverButtonLabel ?? ADMIN_COPY.treasury.curveRecovery.resumeOnly)
                       : ADMIN_COPY.treasury.curveRecovery.resumeOnly}
                   </AdminBtn>
                 ) : null}

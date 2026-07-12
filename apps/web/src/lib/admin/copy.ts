@@ -152,6 +152,7 @@ export const ADMIN_COPY = {
       resumeOnly: "Resume trading",
       recovering: "Recovering…",
       resuming: "Resuming…",
+      wiping: "Resetting database…",
       hint:
         "Sweeps leftover curve escrow to the recipient, then re-enables trading automatically.",
       confirmSweep:
