@@ -22,20 +22,24 @@ DRY_RUN=0
 
 usage() {
   cat <<'EOF'
-Usage: bootstrap-production.sh [--env PATH] [--confirm] [--dry-run]
+Usage: bootstrap-production.sh [--env PATH] [--confirm] [--dry-run] [--no-git-sync]
 
   --env PATH     bootstrap.env (default: deploy/vm/bootstrap.env under repo)
   --confirm      required to apply changes (without it: preflight only)
   --dry-run      print planned steps, no mutations
+  --no-git-sync  do not git fetch/reset (use after a failed run — keeps local script fixes)
 
 EOF
 }
+
+NO_GIT_SYNC=0
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --confirm) CONFIRM=1; shift ;;
     --env) ENV_FILE="${2:-}"; shift 2 ;;
     --dry-run) DRY_RUN=1; CONFIRM=0; shift ;;
+    --no-git-sync) NO_GIT_SYNC=1; shift ;;
     -h|--help) usage; exit 0 ;;
     *) echo "Unknown option: $1"; usage; exit 1 ;;
   esac
@@ -127,6 +131,55 @@ gen_secret() {
   openssl rand -hex 24
 }
 
+# Hosting panels (LiteSpeed, Apache) often bind :80 before nginx — stop them for Pump.
+stop_conflicting_web_servers() {
+  log "Checking port 80/443 conflicts"
+  if [[ "$DRY_RUN" -eq 1 ]]; then return 0; fi
+
+  local svc
+  for svc in lsws lshttpd openlitespeed apache2; do
+    if systemctl is-active --quiet "$svc" 2>/dev/null; then
+      warn "  Stopping $svc (uses :80/:443 — Pump needs nginx)"
+      systemctl stop "$svc" || true
+      systemctl disable "$svc" 2>/dev/null || true
+    fi
+  done
+
+  if ss -tlnH 2>/dev/null | grep -q ':80 '; then
+    warn "Port 80 still in use after stopping panel services:"
+    ss -tlnp 2>/dev/null | grep ':80 ' || true
+    warn "Stop the process above manually, then re-run bootstrap or: systemctl start nginx"
+  fi
+}
+
+ensure_nginx_cloudflare_map_include() {
+  local conf="/etc/nginx/nginx.conf"
+  [[ -f "$conf" ]] || return 0
+  if grep -q "pump-cloudflare-map.conf" "$conf"; then return 0; fi
+  if [[ "$DRY_RUN" -eq 1 ]]; then
+    log "[dry-run] add cloudflare map include to nginx.conf"
+    return 0
+  fi
+  log "Adding pump-cloudflare-map include to $conf"
+  sed -i '/^http {/a \    include /etc/nginx/conf.d/pump-cloudflare-map.conf;' "$conf"
+}
+
+start_or_reload_nginx() {
+  if [[ "$DRY_RUN" -eq 1 ]]; then return 0; fi
+  stop_conflicting_web_servers
+  nginx -t
+  systemctl enable nginx
+  if systemctl is-active --quiet nginx; then
+    systemctl reload nginx
+  else
+    systemctl start nginx
+  fi
+  if ! systemctl is-active --quiet nginx; then
+    die "nginx failed to start — run: journalctl -xeu nginx.service ; ss -tlnp | grep ':80 '"
+  fi
+  log "nginx is active"
+}
+
 install_apt_packages() {
   log "Installing system packages"
   run apt-get update -qq
@@ -146,7 +199,12 @@ install_apt_packages() {
     run npm install -g pm2
   fi
 
-  run systemctl enable --now postgresql redis-server nginx
+  run systemctl enable --now postgresql redis-server
+  stop_conflicting_web_servers
+  run systemctl enable nginx
+  if [[ "$DRY_RUN" -eq 0 ]]; then
+    systemctl start nginx 2>/dev/null || warn "nginx not started yet — will retry after site config"
+  fi
 }
 
 configure_sshd_port() {
@@ -204,15 +262,16 @@ install_nginx() {
   ln -sf /etc/nginx/sites-available/pump /etc/nginx/sites-enabled/pump
   rm -f /etc/nginx/sites-enabled/default
 
-  if ! grep -q "pump-cloudflare-map.conf" /etc/nginx/nginx.conf 2>/dev/null; then
-    warn "Add to /etc/nginx/nginx.conf inside http { }: include /etc/nginx/conf.d/pump-cloudflare-map.conf;"
-  fi
-
-  nginx -t
-  systemctl reload nginx
+  ensure_nginx_cloudflare_map_include
+  start_or_reload_nginx
 }
 
 ensure_repo() {
+  if [[ "$NO_GIT_SYNC" -eq 1 ]]; then
+    log "Skipping git sync (--no-git-sync)"
+    [[ -d "$REPO_ROOT/.git" ]] || die "Repo missing at $REPO_ROOT"
+    return 0
+  fi
   log "Ensuring repo at $REPO_ROOT"
   if [[ -d "$REPO_ROOT/.git" ]]; then
     run git -C "$REPO_ROOT" fetch origin "$GIT_REF"
@@ -235,14 +294,6 @@ setup_postgres() {
     log "  pump_db exists — skipping CREATE DATABASE"
   fi
 
-  local tmp_grants
-  tmp_grants="$(mktemp)"
-  awk -v idx="$idx_pw" -v app="$app_pw" '
-    /CREATE USER pump_indexer/ { sub(/CHANGE_ME/, idx); print; next }
-    /CREATE USER pump_app/     { sub(/CHANGE_ME/, app); print; next }
-    { print }
-  ' "$REPO_ROOT/deploy/pump_db_grants.sql" > "$tmp_grants"
-
   if ! sudo -u postgres psql -d pump_db -tAc "SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='tokens' LIMIT 1" | grep -q 1; then
     log "  Applying schema.sql (first install)"
     sudo -u postgres psql -d pump_db -v ON_ERROR_STOP=1 -f "$REPO_ROOT/schema.sql"
@@ -250,8 +301,12 @@ setup_postgres() {
     warn "  tokens table exists — skipping schema.sql (use manual migration if upgrading)"
   fi
 
-  sudo -u postgres psql -d pump_db -v ON_ERROR_STOP=1 -f "$tmp_grants"
-  rm -f "$tmp_grants"
+  awk -v idx="$idx_pw" -v app="$app_pw" '
+    /CREATE USER pump_indexer/ { sub(/CHANGE_ME/, idx); print; next }
+    /CREATE USER pump_app/     { sub(/CHANGE_ME/, app); print; next }
+    { print }
+  ' "$REPO_ROOT/deploy/pump_db_grants.sql" \
+    | sudo -u postgres psql -d pump_db -v ON_ERROR_STOP=1 -f -
 }
 
 setup_pgbouncer() {
@@ -301,7 +356,7 @@ patch_env_file() {
 write_app_envs() {
   local app_pw="$1" idx_pw="$2"
   local db_port="6432"
-  if ! command -v pgbouncer >/dev/null 2>&1 || [[ ! -S /var/run/postgresql/.s.PGSQL.6432 ]] 2>/dev/null; then
+  if ! command -v pgbouncer >/dev/null 2>&1 || ! ss -tlnH 2>/dev/null | grep -q ':6432 '; then
     db_port="5432"
   fi
 
