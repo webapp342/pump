@@ -2,6 +2,15 @@ import type { NextRequest } from "next/server";
 
 const INVALID_PUBLIC_HOSTNAMES = new Set(["0.0.0.0", "[::]", "::", ""]);
 
+function isUsableAuthRedirectHostname(hostname: string): boolean {
+  const lower = hostname.toLowerCase();
+  if (INVALID_PUBLIC_HOSTNAMES.has(lower)) return false;
+  // nginx upstream / PM2 names (e.g. pump_tma) — not public browser hosts
+  if (lower.includes("_")) return false;
+  if (lower === "localhost" || lower === "127.0.0.1") return true;
+  return lower.includes(".");
+}
+
 function normalizeHostname(hostname: string): string {
   const lower = hostname.toLowerCase();
   if (INVALID_PUBLIC_HOSTNAMES.has(lower)) {
@@ -66,7 +75,7 @@ export function resolvePublicAppOrigin(request?: NextRequest): string {
 /**
  * Same-site redirects and session cookies after login — prefer the Host the user
  * actually hit (x-forwarded-*) so Set-Cookie domain matches the browser tab.
- * Falls back to NEXT_PUBLIC_APP_URL when the request host is unusable (0.0.0.0).
+ * Falls back to NEXT_PUBLIC_APP_URL when the request host is unusable (0.0.0.0, pump_tma, etc.).
  */
 export function resolveAuthRedirectOrigin(request: NextRequest): string {
   const forwardedHost = request.headers.get("x-forwarded-host")?.split(",")[0]?.trim();
@@ -82,7 +91,7 @@ export function resolveAuthRedirectOrigin(request: NextRequest): string {
     const fromRequest = originFromHost(host, proto);
     try {
       const requestHostname = new URL(fromRequest).hostname.toLowerCase();
-      if (!INVALID_PUBLIC_HOSTNAMES.has(requestHostname)) {
+      if (isUsableAuthRedirectHostname(requestHostname)) {
         return fromRequest;
       }
     } catch {
