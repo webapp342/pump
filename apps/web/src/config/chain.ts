@@ -1,9 +1,17 @@
 import { defineChain } from "viem";
 
-export const CHAIN_ID = Number(process.env.NEXT_PUBLIC_CHAIN_ID ?? 84532);
-
 const BASE_MAINNET_CHAIN_ID = 8453;
 const BASE_SEPOLIA_CHAIN_ID = 84532;
+
+/** Base Sepolia in .env.example was mistakenly `84` — normalize at runtime. */
+function resolveChainId(raw: string | undefined): number {
+  const parsed = Number(raw ?? BASE_SEPOLIA_CHAIN_ID);
+  if (!Number.isFinite(parsed) || parsed <= 0) return BASE_SEPOLIA_CHAIN_ID;
+  if (parsed === 84) return BASE_SEPOLIA_CHAIN_ID;
+  return parsed;
+}
+
+export const CHAIN_ID = resolveChainId(process.env.NEXT_PUBLIC_CHAIN_ID);
 
 export const rpcUrl =
   process.env.NEXT_PUBLIC_RPC_URL ?? "https://sepolia.base.org";

@@ -101,3 +101,13 @@ export function resolveAuthRedirectOrigin(request: NextRequest): string {
 
   return resolvePublicAppOrigin(request);
 }
+
+/** SIWE domain/URI for admin console — never use nginx upstream names (pump_tma). */
+export function resolveAdminSiweOrigin(request: NextRequest): { domain: string; uri: string } {
+  const origin = resolveAuthRedirectOrigin(request).replace(/\/$/, "");
+  const { hostname } = new URL(origin);
+  return {
+    domain: hostname,
+    uri: `${origin}/admin/`,
+  };
+}

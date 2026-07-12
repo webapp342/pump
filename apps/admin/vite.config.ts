@@ -7,7 +7,8 @@ export default defineConfig(({ mode }) => {
   const webSrc = path.resolve(__dirname, "../web/src");
   const env = loadEnv(mode, monorepoRoot, "");
 
-  const chainId = env.NEXT_PUBLIC_CHAIN_ID ?? "97";
+  const rawChainId = env.NEXT_PUBLIC_CHAIN_ID ?? "84532";
+  const chainId = Number(rawChainId) === 84 ? "84532" : rawChainId;
   const rpcUrl =
     env.NEXT_PUBLIC_RPC_URL ?? "https://data-seed-prebsc-1-s1.binance.org:8545";
   const tmaPort = env.VITE_PUMP_API_PORT ?? env.PORT ?? "3012";

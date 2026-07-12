@@ -1,5 +1,7 @@
 import { verifyMessage } from "viem";
+import type { NextRequest } from "next/server";
 import { CHAIN_ID } from "@/config/chain";
+import { resolveAdminSiweOrigin } from "@/lib/telegram/public-app-origin";
 
 export type ParsedSiweMessage = {
   domain: string;
@@ -69,27 +71,7 @@ export function requestOrigin(request: Pick<Request, "headers"> & { nextUrl?: UR
   domain: string;
   uri: string;
 } {
-  const host =
-    request.headers.get("x-forwarded-host")?.split(",")[0]?.trim() ??
-    request.headers.get("host")?.trim() ??
-    "localhost";
-
-  const cfVisitor = request.headers.get("cf-visitor");
-  const forwardedProto = request.headers.get("x-forwarded-proto")?.split(",")[0]?.trim();
-  const proto =
-    forwardedProto ??
-    (cfVisitor?.includes('"scheme":"https"') ? "https" : undefined) ??
-    (request.headers.get("cf-ray") ? "https" : undefined) ??
-    (host.startsWith("localhost") || host.startsWith("127.0.0.1") || host.startsWith("0.0.0.0")
-      ? "http"
-      : "https");
-
-  const hostname = host.split(":")[0] ?? host;
-
-  return {
-    domain: hostname,
-    uri: `${proto}://${host}/admin/`,
-  };
+  return resolveAdminSiweOrigin(request as NextRequest);
 }
 
 export async function verifyAdminSiweMessage(params: {
