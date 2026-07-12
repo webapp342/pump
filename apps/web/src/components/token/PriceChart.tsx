@@ -353,7 +353,6 @@ export function PriceChart({
       return;
     }
     setNowMs(Date.now());
-    shouldFitViewportRef.current = true;
 
     if (!ready || !candleSeriesRef.current) return;
 
@@ -763,7 +762,6 @@ export function PriceChart({
       rightPriceScale: {
         borderColor,
         scaleMargins: { top: 0.08, bottom: 0.22 },
-        autoScale: true,
       },
       timeScale: {
         borderColor,
@@ -783,14 +781,14 @@ export function PriceChart({
   }, [theme]);
 
   // Log scale when price range is wide (meme launch curves); MCAP stays linear.
+  // Do not force autoScale here — live updates were resetting manual Y-axis zoom.
   useEffect(() => {
     const rightScale = chartRef.current?.priceScale("right");
     if (!rightScale) return;
     rightScale.applyOptions({
       mode: useLogPriceScale ? PriceScaleMode.Logarithmic : PriceScaleMode.Normal,
-      autoScale: true,
     });
-  }, [candles, currency, useLogPriceScale]);
+  }, [currency, useLogPriceScale]);
 
   // Local timezone labels on chart axis.
   useEffect(() => {
@@ -818,7 +816,6 @@ export function PriceChart({
     const rightScale = chartRef.current?.priceScale("right");
     rightScale?.applyOptions({
       mode: useLogPriceScale ? PriceScaleMode.Logarithmic : PriceScaleMode.Normal,
-      autoScale: true,
     });
     applyCandleSeriesPriceFormat(candleSeries, priceFormat, candlesForChart);
 

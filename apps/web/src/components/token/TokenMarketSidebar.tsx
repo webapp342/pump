@@ -1,6 +1,13 @@
 "use client";
 
-import { useEffect, useRef, type FocusEvent, type Ref } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  type FocusEvent,
+  type Ref,
+} from "react";
 import { useArenaExploreBoard } from "@/hooks/useArenaExploreBoard";
 import { useArenaQuickTrade } from "@/hooks/useArenaQuickTrade";
 import { bnbToUsd } from "@/lib/format-usd";
@@ -16,6 +23,9 @@ import { FieldSearchInput } from "@/components/ui/FieldSearchInput";
 import { pinMobileWindowScroll } from "@/hooks/useMobileModalScrollLock";
 import { quickTradeSwipeLabels } from "@/lib/arena-quick-trade";
 import type { TokenSidebarDensity } from "@/hooks/useTokenSidebarWidth";
+
+/** Survives rare sidebar remounts — desktop trade list should not jump to top on token switch. */
+let persistentDesktopSidebarScrollTop = 0;
 
 type TokenMarketSidebarProps = {
   id?: string;
@@ -71,8 +81,30 @@ export function TokenMarketSidebar({
 
   useEffect(() => {
     if (!searchActive) return;
+    persistentDesktopSidebarScrollTop = 0;
     listRef.current?.scrollTo({ top: 0 });
   }, [searchActive]);
+
+  const restoreDesktopListScroll = useCallback(() => {
+    if (mobileSheet || searchActive) return;
+    const el = listRef.current;
+    if (!el || persistentDesktopSidebarScrollTop <= 0) return;
+    if (el.scrollTop !== persistentDesktopSidebarScrollTop) {
+      el.scrollTop = persistentDesktopSidebarScrollTop;
+    }
+  }, [mobileSheet, searchActive]);
+
+  useEffect(() => {
+    if (mobileSheet) return;
+    const el = listRef.current;
+    if (!el) return;
+    const onScroll = () => {
+      persistentDesktopSidebarScrollTop = el.scrollTop;
+    };
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => el.removeEventListener("scroll", onScroll);
+  }, [mobileSheet]);
+
   const {
     exploreBoardTokens,
     activeFilter,
@@ -94,6 +126,16 @@ export function TokenMarketSidebar({
     search,
     setSearch,
   } = useArenaExploreBoard({ animateRows: false });
+
+  useLayoutEffect(() => {
+    restoreDesktopListScroll();
+  }, [activeTokenAddress, exploreBoardTokens.length, restoreDesktopListScroll]);
+
+  useEffect(() => {
+    if (mobileSheet || searchActive) return;
+    const frame = requestAnimationFrame(() => restoreDesktopListScroll());
+    return () => cancelAnimationFrame(frame);
+  }, [activeTokenAddress, exploreBoardTokens.length, mobileSheet, searchActive, restoreDesktopListScroll]);
 
   const emptyCopy = emptyExploreFilterCopy(activeFilter, {
     search,
@@ -202,7 +244,11 @@ export function TokenMarketSidebar({
         </div>
       ) : null}
 
-      <div className="token-market-sidebar__list" ref={listRef}>
+      <div
+        className="token-market-sidebar__list"
+        ref={listRef}
+        data-persist-scroll={mobileSheet ? undefined : ""}
+      >
         {mobileSheet && !searchActive && exploreBoardTokens.length > 0 ? (
           <div className="token-market-sidebar__swipe-hint px-2 pt-2">
             <HoldingsSwipeHint

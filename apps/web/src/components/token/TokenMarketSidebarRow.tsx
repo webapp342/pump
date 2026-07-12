@@ -114,13 +114,19 @@ export function TokenMarketSidebarRow({
     if (Date.now() < suppressNavUntilRef.current) return;
     seedTokenDetailFromListItem(token);
     onTokenSelect?.();
-    router.push(tokenHref);
+    router.push(tokenHref, { scroll: false });
   }, [onTokenSelect, router, token, tokenHref]);
 
   const handleRowKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
     if (event.key !== "Enter" && event.key !== " ") return;
     if ((event.target as HTMLElement).closest("button")) return;
     event.preventDefault();
+    navigateToDetail();
+  };
+
+  const handleRowClick = (event: React.MouseEvent<HTMLDivElement>) => {
+    if ((event.target as HTMLElement).closest("button")) return;
+    if ((event.target as HTMLElement).closest(".token-market-sidebar__row-nav-shield")) return;
     navigateToDetail();
   };
 
@@ -134,16 +140,26 @@ export function TokenMarketSidebarRow({
     <div
       role="link"
       tabIndex={0}
-      onClick={navigateToDetail}
+      onClick={handleRowClick}
       onKeyDown={handleRowKeyDown}
       onMouseEnter={prefetchBundle}
       onFocus={prefetchBundle}
       className={`token-market-sidebar__row ${rowClass} ${
         isActive ? "token-market-sidebar__row--active" : ""
-      }`}
+      }${showRowQuickActions ? " token-market-sidebar__row--quick-trade" : ""}`}
       aria-label={`View ${token.symbol}`}
       aria-current={isActive ? "page" : undefined}
     >
+      {showRowQuickActions ? (
+        <div
+          className="token-market-sidebar__row-nav-shield"
+          aria-hidden
+          onClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+          }}
+        />
+      ) : null}
       <div className="token-market-sidebar__cell token-market-sidebar__cell--name">
         <button
           type="button"

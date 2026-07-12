@@ -68,7 +68,7 @@ export function TokenMarketSidebarArenaRow({
     if (Date.now() < suppressNavUntilRef.current) return;
     seedTokenDetailFromListItem(token);
     onTokenSelect?.();
-    router.push(tokenHref);
+    router.push(tokenHref, { scroll: false });
   }, [onTokenSelect, router, token, tokenHref]);
 
   const runQuickTrade = (side: "buy" | "sell") => {
@@ -85,6 +85,7 @@ export function TokenMarketSidebarArenaRow({
 
   const handleRowClick = (event: React.MouseEvent<HTMLDivElement>) => {
     if ((event.target as HTMLElement).closest("button, a")) return;
+    if ((event.target as HTMLElement).closest(".token-market-sidebar__row-nav-shield")) return;
     navigateToDetail();
   };
 
@@ -128,6 +129,16 @@ export function TokenMarketSidebarArenaRow({
       aria-label={`View ${token.symbol}`}
       aria-current={isActive ? "page" : undefined}
     >
+      {showRowQuickActions ? (
+        <div
+          className="token-market-sidebar__row-nav-shield"
+          aria-hidden
+          onClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+          }}
+        />
+      ) : null}
       <ArenaBoardTokenRow
         token={token}
         mcapUsd={mcapUsd}

@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useAccount } from "wagmi";
-import { FavoriteIcon } from "@/components/icons/FavoriteIcon";
 import { TokenAvatar } from "@/components/token/TokenAvatar";
 import { useFavorites } from "@/components/favorites/FavoritesProvider";
 import { useBnbUsdPrice } from "@/hooks/useBnbUsdPrice";
@@ -17,12 +16,9 @@ import type { TokenListItem } from "@/lib/db/launchpad";
 import {
   readTokenWatchlistStripMode,
   resolveTokenWatchlistStripFilter,
-  tokenWatchlistStripIcon,
   tokenWatchlistStripLabel,
-  tokenWatchlistStripModeIcon,
   TOKEN_WATCHLIST_STRIP_SOURCE_OPTIONS,
   writeTokenWatchlistStripMode,
-  type TokenWatchlistStripIcon,
   type TokenWatchlistStripMode,
 } from "@/lib/token-watchlist-strip-prefs";
 
@@ -76,27 +72,6 @@ function StripTokenChip({
         {formatArenaQuoteUsd(mcapUsd)}
       </span>
     </Link>
-  );
-}
-
-function StripLabelIcon({
-  icon,
-  active,
-}: {
-  icon: TokenWatchlistStripIcon;
-  active?: boolean;
-}) {
-  if (icon === "watchlist") {
-    return (
-      <FavoriteIcon
-        active={active ?? false}
-        className="token-favorites-strip__label-icon"
-      />
-    );
-  }
-
-  return (
-    <PumpIcon icon={icon} className="token-favorites-strip__label-icon" aria-hidden />
   );
 }
 
@@ -192,7 +167,6 @@ export function TokenWatchlistStrip({ activeTokenAddress }: TokenWatchlistStripP
 
   const activeKey = activeTokenAddress.toLowerCase();
   const label = tokenWatchlistStripLabel(effectiveFilter);
-  const labelIcon = tokenWatchlistStripIcon(effectiveFilter);
   const labelActive = effectiveFilter === "favorites" && hasWatchlist;
 
   const selectMode = useCallback((mode: TokenWatchlistStripMode) => {
@@ -205,6 +179,64 @@ export function TokenWatchlistStrip({ activeTokenAddress }: TokenWatchlistStripP
 
   return (
     <section className="token-favorites-strip" aria-label="Watchlist strip">
+      <div ref={settingsRef} className="token-favorites-strip__settings">
+        <button
+          ref={settingsBtnRef}
+          type="button"
+          className={`token-favorites-strip__settings-btn${
+            settingsOpen ? " token-favorites-strip__settings-btn--open" : ""
+          }`}
+          aria-label="Strip display settings"
+          aria-expanded={settingsOpen}
+          aria-haspopup="menu"
+          onClick={() => setSettingsOpen((open) => !open)}
+        >
+          <PumpIcon icon={faSettings2} className="token-favorites-strip__settings-icon" aria-hidden />
+        </button>
+
+        {settingsOpen && settingsMenuPos && typeof document !== "undefined"
+          ? createPortal(
+              <div
+                ref={settingsMenuRef}
+                className="token-favorites-strip__settings-menu token-favorites-strip__settings-menu--portal"
+                role="menu"
+                style={{ top: settingsMenuPos.top, left: settingsMenuPos.left }}
+              >
+                <p className="token-favorites-strip__settings-heading">Display source</p>
+                {TOKEN_WATCHLIST_STRIP_SOURCE_OPTIONS.map(
+                  ({ key, label: optionLabel, description }) => {
+                    const selected = stripMode === key;
+                    return (
+                      <button
+                        key={key}
+                        type="button"
+                        role="menuitemradio"
+                        aria-checked={selected}
+                        className={
+                          selected
+                            ? "token-favorites-strip__settings-item token-favorites-strip__settings-item--active"
+                            : "token-favorites-strip__settings-item"
+                        }
+                        onClick={() => selectMode(key)}
+                      >
+                        <span className="token-favorites-strip__settings-item-copy">
+                          <span className="token-favorites-strip__settings-item-label">
+                            {optionLabel}
+                          </span>
+                          <span className="token-favorites-strip__settings-item-desc">
+                            {description}
+                          </span>
+                        </span>
+                      </button>
+                    );
+                  }
+                )}
+              </div>,
+              document.body
+            )
+          : null}
+      </div>
+
       <div
         className={
           labelActive
@@ -212,80 +244,7 @@ export function TokenWatchlistStrip({ activeTokenAddress }: TokenWatchlistStripP
             : "token-favorites-strip__label"
         }
       >
-        <StripLabelIcon icon={labelIcon} active={labelActive} />
         <span className="token-favorites-strip__label-text">{label}</span>
-
-        <div ref={settingsRef} className="token-favorites-strip__settings">
-          <button
-            ref={settingsBtnRef}
-            type="button"
-            className={`token-favorites-strip__settings-btn${
-              settingsOpen ? " token-favorites-strip__settings-btn--open" : ""
-            }`}
-            aria-label="Strip display settings"
-            aria-expanded={settingsOpen}
-            aria-haspopup="menu"
-            onClick={() => setSettingsOpen((open) => !open)}
-          >
-            <PumpIcon icon={faSettings2} className="token-favorites-strip__settings-icon" aria-hidden />
-          </button>
-
-          {settingsOpen && settingsMenuPos && typeof document !== "undefined"
-            ? createPortal(
-                <div
-                  ref={settingsMenuRef}
-                  className="token-favorites-strip__settings-menu token-favorites-strip__settings-menu--portal"
-                  role="menu"
-                  style={{ top: settingsMenuPos.top, left: settingsMenuPos.left }}
-                >
-                  <p className="token-favorites-strip__settings-heading">Display source</p>
-                  {TOKEN_WATCHLIST_STRIP_SOURCE_OPTIONS.map(
-                    ({ key, label: optionLabel, description }) => {
-                      const selected = stripMode === key;
-                      const optionIcon = tokenWatchlistStripModeIcon(key);
-                      return (
-                        <button
-                          key={key}
-                          type="button"
-                          role="menuitemradio"
-                          aria-checked={selected}
-                          className={
-                            selected
-                              ? "token-favorites-strip__settings-item token-favorites-strip__settings-item--active"
-                              : "token-favorites-strip__settings-item"
-                          }
-                          onClick={() => selectMode(key)}
-                        >
-                          <span className="token-favorites-strip__settings-item-icon" aria-hidden>
-                            {optionIcon === "watchlist" ? (
-                              <FavoriteIcon
-                                active={selected}
-                                className="token-favorites-strip__settings-item-glyph"
-                              />
-                            ) : (
-                              <PumpIcon
-                                icon={optionIcon}
-                                className="token-favorites-strip__settings-item-glyph"
-                              />
-                            )}
-                          </span>
-                          <span className="token-favorites-strip__settings-item-copy">
-                            <span className="token-favorites-strip__settings-item-label">
-                              {optionLabel}
-                            </span>
-                            <span className="token-favorites-strip__settings-item-desc">
-                              {description}
-                            </span>
-                          </span>
-                        </button>
-                      );
-                    }
-                  )}
-                </div>,
-                document.body
-              )
-            : null}
-        </div>
       </div>
 
       <div

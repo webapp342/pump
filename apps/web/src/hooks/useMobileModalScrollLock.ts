@@ -46,7 +46,8 @@ const MODAL_SCROLL_SELECTORS = [
   ".modal-sheet-host",
   ".modal-sheet-panel",
   ".token-mobile-market-sheet__body",
-  ".token-market-sidebar__list",
+  /* Desktop trade sidebar persists scroll — only reset the mobile sheet list. */
+  ".token-mobile-market-sheet__body .token-market-sidebar__list",
 ] as const;
 
 function resetScrollContainers(selectors: readonly string[]) {
