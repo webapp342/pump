@@ -4,15 +4,18 @@ const { Pool } = pg;
 export function createPools(launchpadDatabaseUrl, vm1MainDatabaseUrl) {
     const viaBouncer = process.env.PGBOUNCER_ENABLED === "true";
     const max = viaBouncer ? Number(process.env.PG_POOL_MAX ?? 4) : 10;
+    const poolOpts = {
+        connectionString: launchpadDatabaseUrl,
+        max,
+        ...(viaBouncer ? { prepareThreshold: 0 } : {}),
+    };
     return {
-        launchpad: new Pool({
-            connectionString: launchpadDatabaseUrl,
-            max,
-        }),
+        launchpad: new Pool(poolOpts),
         vm1: vm1MainDatabaseUrl
             ? new Pool({
                 connectionString: vm1MainDatabaseUrl,
-                max: 4
+                max: 4,
+                ...(viaBouncer ? { prepareThreshold: 0 } : {}),
             })
             : undefined
     };

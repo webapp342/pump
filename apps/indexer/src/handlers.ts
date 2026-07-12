@@ -224,11 +224,12 @@ export class LaunchpadEventHandlers {
       const decoded = parseEventLogs({ abi: memeFactoryAbi, logs: rawLogs, strict: false });
       for (const entry of decoded) {
         if (entry.eventName !== "TokenCreated") continue;
-        const created = dbAddress(asString(entry.args.token));
+        const args = entry.args as Record<string, unknown>;
+        const created = dbAddress(asString(args.token));
         if (created !== token) continue;
         await this.handleTokenCreated({
           eventName: entry.eventName,
-          args: entry.args as Record<string, unknown>,
+          args,
           address: entry.address,
           blockNumber: entry.blockNumber,
           transactionHash: entry.transactionHash,

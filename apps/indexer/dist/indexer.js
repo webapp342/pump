@@ -204,9 +204,17 @@ function isLogRangeLimitError(error) {
     const e = error;
     if (e.code === -32005 || e.code === 429)
         return true;
-    if (typeof e.details === "string" && e.details.toLowerCase().includes("limit"))
+    const blob = [e.details, e.shortMessage, e.message]
+        .filter((part) => typeof part === "string")
+        .join(" ")
+        .toLowerCase();
+    if (blob.includes("limit"))
         return true;
-    if (typeof e.shortMessage === "string" && e.shortMessage.toLowerCase().includes("limit"))
+    // Alchemy free tier: eth_getLogs max 10 blocks (code -32600, no "limit" in message)
+    if (blob.includes("block range") || blob.includes("free tier") || blob.includes("eth_getlogs")) {
+        return true;
+    }
+    if (e.code === -32600 && blob.includes("block"))
         return true;
     if (e.cause)
         return isLogRangeLimitError(e.cause);
