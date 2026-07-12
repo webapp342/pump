@@ -309,6 +309,22 @@ setup_postgres() {
     { print }
   ' "$REPO_ROOT/deploy/pump_db_grants.sql" \
     | sudo -u postgres psql -d pump_db -v ON_ERROR_STOP=1 -f -
+
+  # Always align role passwords (CREATE USER only runs on first install)
+  sudo -u postgres psql -v ON_ERROR_STOP=1 -c "ALTER USER pump_indexer WITH PASSWORD '${idx_pw}';"
+  sudo -u postgres psql -v ON_ERROR_STOP=1 -c "ALTER USER pump_app WITH PASSWORD '${app_pw}';"
+  log "  pump_app + pump_indexer passwords synced"
+
+  if [[ -f "$REPO_ROOT/db/migrations/003_mv_ownership.sql" ]]; then
+    sudo -u postgres psql -d pump_db -v ON_ERROR_STOP=1 -f "$REPO_ROOT/db/migrations/003_mv_ownership.sql" \
+      || warn "003_mv_ownership.sql failed (run manually as postgres)"
+  fi
+
+  log "  REFRESH materialized views (required after schema — created WITH NO DATA)"
+  sudo -u postgres psql -d pump_db -v ON_ERROR_STOP=1 -c "REFRESH MATERIALIZED VIEW mv_token_trade_stats;" \
+    || warn "mv_token_trade_stats refresh failed"
+  sudo -u postgres psql -d pump_db -v ON_ERROR_STOP=1 -c "REFRESH MATERIALIZED VIEW mv_token_price_anchors;" \
+    || warn "mv_token_price_anchors refresh failed"
 }
 
 setup_pgbouncer() {
@@ -336,6 +352,10 @@ patch_env_file() {
   sed -i "s|postgres://pump_indexer:CHANGE_ME@127.0.0.1:6432/pump_db|postgres://pump_indexer:${idx_pw}@127.0.0.1:${db_port}/pump_db|g" "$file"
   sed -i "s|postgres://pump_indexer:CHANGE_ME@127.0.0.1:5432/pump_db|postgres://pump_indexer:${idx_pw}@127.0.0.1:${db_port}/pump_db|g" "$file"
   sed -i "s|DATABASE_URL=postgres://pump_app:CHANGE_ME|DATABASE_URL=postgres://pump_app:${app_pw}|g" "$file"
+  # Force-update credentials on re-run (hex passwords from gen_secret are URL-safe)
+  sed -i "s|postgres://pump_app:[^@]*@127.0.0.1:${db_port}/pump_db|postgres://pump_app:${app_pw}@127.0.0.1:${db_port}/pump_db|g" "$file"
+  sed -i "s|postgres://pump_indexer:[^@]*@127.0.0.1:${db_port}/pump_db|postgres://pump_indexer:${idx_pw}@127.0.0.1:${db_port}/pump_db|g" "$file"
+  sed -i 's|127.0.0.1:15432|127.0.0.1:'"${db_port}"'|g' "$file"
 
   if [[ -n "${ALCHEMY_RPC_KEY:-}" ]]; then
     sed -i "s|YOUR_ALCHEMY_API_KEY|${ALCHEMY_RPC_KEY}|g" "$file"
@@ -424,6 +444,16 @@ install_foundry() {
     ln -sf /root/.foundry/bin/cast /usr/local/bin/cast 2>/dev/null || true
   fi
   command -v forge >/dev/null 2>&1 || die "forge install failed — run foundryup manually"
+}
+
+seed_contract_registry() {
+  log "contract_registry (indexer requires meme_factory + bonding_curve_manager)"
+  run chmod +x "$REPO_ROOT/deploy/vm/seed-contract-registry.sh" 2>/dev/null || true
+  if [[ "$DRY_RUN" -eq 1 ]]; then
+    log "[dry-run] bash deploy/vm/seed-contract-registry.sh"
+    return 0
+  fi
+  bash "$REPO_ROOT/deploy/vm/seed-contract-registry.sh" || warn "seed failed — run: sudo -u postgres psql -d pump_db -f db/scripts/seed_base_sepolia_registry.sql"
 }
 
 build_contract_artifacts() {
@@ -575,8 +605,9 @@ main() {
   install_cloudflare_origin_cert "$CF_ORIGIN_FILE" "$PUMP_DOMAIN"
   install_nginx "$PUMP_DOMAIN"
   setup_postgres "$APP_PW" "$IDX_PW"
-  setup_pgbouncer || true
+  seed_contract_registry
   write_app_envs "$APP_PW" "$IDX_PW"
+  setup_pgbouncer || true
   build_contract_artifacts
   install_systemd_units
   setup_github_deploy_key

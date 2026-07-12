@@ -1,5 +1,7 @@
 import pg from "pg";
-import type { Hash, PublicClient } from "viem";
+import type { Hash, PublicClient, Address } from "viem";
+import { parseEventLogs } from "viem";
+import { memeFactoryAbi } from "./abi.js";
 import { withTransaction } from "./db.js";
 import { dbAddress, eventId, ratioWeiToDecimal, weiToDecimal } from "./utils.js";
 import { applyTradeToPositionCost } from "./position-cost.js";
@@ -200,11 +202,61 @@ export class LaunchpadEventHandlers {
     );
   }
 
+  /** Trade FK requires tokens row — replay TokenCreated in same block if decode order missed it. */
+  private async ensureTokenRowForTrade(token: string, log: ParsedLaunchpadLog): Promise<boolean> {
+    const exists = await this.context.launchpadPool.query(`SELECT 1 FROM tokens WHERE address = $1 LIMIT 1`, [
+      token,
+    ]);
+    if (exists.rowCount) return true;
+
+    const reg = await this.context.launchpadPool.query<{ address: string }>(
+      `SELECT address FROM contract_registry WHERE contract_key = 'meme_factory' AND is_active = true LIMIT 1`
+    );
+    const factory = reg.rows[0]?.address as Address | undefined;
+    if (!factory) return false;
+
+    try {
+      const rawLogs = await this.context.publicClient.getLogs({
+        address: factory,
+        fromBlock: log.blockNumber,
+        toBlock: log.blockNumber,
+      });
+      const decoded = parseEventLogs({ abi: memeFactoryAbi, logs: rawLogs, strict: false });
+      for (const entry of decoded) {
+        if (entry.eventName !== "TokenCreated") continue;
+        const created = dbAddress(asString(entry.args.token));
+        if (created !== token) continue;
+        await this.handleTokenCreated({
+          eventName: entry.eventName,
+          args: entry.args as Record<string, unknown>,
+          address: entry.address,
+          blockNumber: entry.blockNumber,
+          transactionHash: entry.transactionHash,
+          logIndex: entry.logIndex,
+        });
+        const again = await this.context.launchpadPool.query(`SELECT 1 FROM tokens WHERE address = $1 LIMIT 1`, [
+          token,
+        ]);
+        if (again.rowCount) return true;
+      }
+    } catch (error) {
+      console.warn(`ensureTokenRowForTrade backfill failed for ${token}:`, error);
+    }
+
+    return false;
+  }
+
   private async handleTrade(log: ParsedLaunchpadLog): Promise<void> {
     const txHash = requiredTxHash(log);
     const logIndex = requiredLogIndex(log);
     const blockTime = await this.getBlockTime(log.blockNumber);
     const token = dbAddress(asString(log.args.token));
+    if (!(await this.ensureTokenRowForTrade(token, log))) {
+      console.warn(
+        `skip Trade: token ${token} missing at block ${log.blockNumber} (tx ${txHash}) — pre-start launch or backfill gap`
+      );
+      return;
+    }
     const trader = dbAddress(asString(log.args.trader));
     const isBuy = Boolean(log.args.isBuy);
     const zugAmount = asBigInt(log.args.ethAmount ?? log.args.zugAmount);

@@ -29,4 +29,19 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO pu
 GRANT EXECUTE ON FUNCTION launchpad_ensure_user(text, jsonb) TO pump_indexer, pump_app;
 GRANT EXECUTE ON FUNCTION launchpad_award_points(text, text, text, text, date, jsonb) TO pump_indexer, pump_app;
 
+-- Indexer runs REFRESH MATERIALIZED VIEW CONCURRENTLY (must be MV owner)
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE c.relname = 'mv_token_trade_stats' AND c.relkind = 'm'
+  ) THEN
+    ALTER MATERIALIZED VIEW mv_token_trade_stats OWNER TO pump_indexer;
+    ALTER MATERIALIZED VIEW mv_token_price_anchors OWNER TO pump_indexer;
+    GRANT SELECT ON mv_token_trade_stats TO pump_app;
+    GRANT SELECT ON mv_token_price_anchors TO pump_app;
+  END IF;
+END $$;
+
 COMMIT;
