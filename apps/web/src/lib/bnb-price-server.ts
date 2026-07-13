@@ -4,7 +4,7 @@ import { fetchNativeUsdPrice } from "@/lib/native-usd-price";
 export async function fetchBnbUsdPrice(): Promise<{
   bnbUsd: number | null;
   quote: "USDT";
-  source: "cache" | "binance" | "unavailable";
+  source: "cache" | "binance" | "coingecko" | "unavailable";
 }> {
   const { nativeUsd, source } = await fetchNativeUsdPrice();
   return {

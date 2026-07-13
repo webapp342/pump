@@ -6,6 +6,7 @@ export async function GET() {
 
   return NextResponse.json(
     {
+      /** @deprecated legacy name — same as nativeUsd (ETH on Base, BNB on BSC). */
       bnbUsd: nativeUsd,
       nativeUsd,
       quote,
