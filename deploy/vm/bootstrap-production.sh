@@ -88,6 +88,10 @@ load_env() {
   BUNDLER_RPC_PORT="${BUNDLER_RPC_PORT:-4337}"
   INDEXER_HEAD_OFFSET="${INDEXER_HEAD_OFFSET:-1000}"
 
+  if [[ -n "${ALCHEMY_RPC_KEY:-}" && "${ALCHEMY_RPC_KEY}" == *"://"* ]]; then
+    warn "ALCHEMY_RPC_KEY looks like a URL — use the Alchemy dashboard key only (not https://sepolia.base.org)"
+  fi
+
   SECRETS_FILE="/root/pump-bootstrap-secrets.txt"
   INDEXER_DIR="/var/www/pump/Indexer"
   CONTRACTS_OUT="/var/www/pump/contracts/out"

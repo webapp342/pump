@@ -13,6 +13,17 @@ if [[ -z "${ALCHEMY_API_KEY:-}" && -n "${ALCHEMY_RPC_KEY:-}" ]]; then
   export ALCHEMY_API_KEY="$ALCHEMY_RPC_KEY"
 fi
 
+# Common mistake: full RPC URL in ALCHEMY_RPC_KEY → .../v2/https://sepolia.base.org
+if [[ -n "${ALCHEMY_API_KEY:-}" && "${ALCHEMY_API_KEY}" == *"://"* ]]; then
+  echo "ERROR: ALCHEMY_RPC_KEY must be the Alchemy API key only — not a full URL."
+  echo "  You set: ${ALCHEMY_API_KEY}"
+  echo "  Fix bootstrap.env:"
+  echo "    ALCHEMY_RPC_KEY=your_alchemy_key_from_dashboard"
+  echo "  Or set full URL explicitly:"
+  echo "    BUNDLER_CHAIN_RPC_URL=https://base-sepolia.g.alchemy.com/v2/your_key"
+  exit 1
+fi
+
 # Skandha migration: reuse relayer key if executor keys not set
 if [[ -z "${BUNDLER_EXECUTOR_PRIVATE_KEYS:-}" && -n "${BUNDLER_RELAYER_PRIVATE_KEY:-}" ]]; then
   export BUNDLER_EXECUTOR_PRIVATE_KEYS="$BUNDLER_RELAYER_PRIVATE_KEY"
@@ -44,6 +55,14 @@ else
   echo "Set BUNDLER_CHAIN_RPC_URL or ALCHEMY_API_KEY (paid tier recommended for bundler getLogs)."
   exit 1
 fi
+
+if [[ "$CHAIN_RPC" == *"/v2/http"* || "$CHAIN_RPC" == *"/v2/https"* ]]; then
+  echo "ERROR: Malformed chain RPC URL (API key looks like a URL):"
+  echo "  $CHAIN_RPC"
+  echo "  Fix ALCHEMY_RPC_KEY in deploy/vm/bootstrap.env (key only, not https://...)"
+  exit 1
+fi
+echo "Alto chain RPC: $(echo "$CHAIN_RPC" | sed -E 's|/v2/[^/?#]+|/v2/***REDACTED***|')"
 
 # Chain-specific Alto timing (see Alto CLI: block-time, max-bundle-interval, chain-type)
 case "$CHAIN_ID" in
