@@ -408,6 +408,55 @@ patch_env_file() {
   sed -i 's|^NEXT_PUBLIC_WS_ENABLED=.*|NEXT_PUBLIC_WS_ENABLED=true|g' "$file"
 }
 
+# Indexer needs explicit RPC/WS lines — sed YOUR_KEY breaks when ALCHEMY_RPC_KEY is a URL or empty.
+patch_indexer_rpc_env() {
+  local idx_env="$1"
+  [[ -f "$idx_env" ]] || return 0
+  if [[ "$DRY_RUN" -eq 1 ]]; then return 0; fi
+
+  local chain_id="${NEXT_PUBLIC_CHAIN_ID:-84532}"
+  [[ "$chain_id" == "84" ]] && chain_id="84532"
+  local key="${ALCHEMY_RPC_KEY:-}"
+  if [[ -z "$key" || "$key" == *"://"* ]]; then
+    warn "Indexer RPC not patched — set ALCHEMY_RPC_KEY (key only) in bootstrap.env"
+    return 0
+  fi
+
+  local http_rpc wss_rpc
+  case "$chain_id" in
+    84532)
+      http_rpc="https://base-sepolia.g.alchemy.com/v2/${key},https://sepolia.base.org"
+      wss_rpc="wss://base-sepolia.g.alchemy.com/v2/${key}"
+      ;;
+    8453)
+      http_rpc="https://base-mainnet.g.alchemy.com/v2/${key}"
+      wss_rpc="wss://base-mainnet.g.alchemy.com/v2/${key}"
+      ;;
+    *)
+      http_rpc="https://bnb-testnet.g.alchemy.com/v2/${key}"
+      wss_rpc="wss://bnb-testnet.g.alchemy.com/v2/${key}"
+      ;;
+  esac
+
+  if grep -q '^RPC_URL=' "$idx_env"; then
+    sed -i "s|^RPC_URL=.*|RPC_URL=${http_rpc}|" "$idx_env"
+  else
+    echo "RPC_URL=${http_rpc}" >> "$idx_env"
+  fi
+  if grep -q '^WS_RPC_URL=' "$idx_env"; then
+    sed -i "s|^WS_RPC_URL=.*|WS_RPC_URL=${wss_rpc}|" "$idx_env"
+  else
+    echo "WS_RPC_URL=${wss_rpc}" >> "$idx_env"
+  fi
+  if grep -q '^INDEXER_CHUNK_SIZE=' "$idx_env"; then
+    sed -i 's|^INDEXER_CHUNK_SIZE=.*|INDEXER_CHUNK_SIZE=10|' "$idx_env"
+  else
+    echo 'INDEXER_CHUNK_SIZE=10' >> "$idx_env"
+  fi
+  grep -q '^INDEXER_USE_WS_BLOCKS=' "$idx_env" || echo 'INDEXER_USE_WS_BLOCKS=true' >> "$idx_env"
+  log "  Indexer RPC/WS patched (Alchemy + fallback)"
+}
+
 resolve_bootstrap_rpc_url() {
   if [[ -n "${BUNDLER_CHAIN_RPC_URL:-}" ]]; then
     echo "$BUNDLER_CHAIN_RPC_URL"
@@ -522,6 +571,7 @@ write_app_envs() {
     run cp "$OLD_INDEXER_ENV" "$idx_env"
   fi
   patch_env_file "$idx_env" "$app_pw" "$idx_pw" "$db_port"
+  patch_indexer_rpc_env "$idx_env"
   if [[ -n "${AIRDROP_KEEPER_PRIVATE_KEY:-}" && "$DRY_RUN" -eq 0 ]]; then
     sed -i "s|AIRDROP_KEEPER_PRIVATE_KEY=0xCHANGE_ME_64_HEX_CHARS|AIRDROP_KEEPER_PRIVATE_KEY=${AIRDROP_KEEPER_PRIVATE_KEY}|g" "$idx_env"
   fi
