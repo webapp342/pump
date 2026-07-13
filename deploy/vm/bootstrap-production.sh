@@ -74,7 +74,7 @@ load_env() {
   set -a && source "$ENV_FILE" && set +a
 
   REPO_ROOT="${REPO_ROOT:-/var/www/pump/tma}"
-  PUMP_DOMAIN="${PUMP_DOMAIN:-pump.zugchain.org}"
+  PUMP_DOMAIN="${PUMP_DOMAIN:-spaceship.zugchain.org}"
   CF_ORIGIN_FILE="${CF_ORIGIN_FILE:-/root/cloudflare.txt}"
   BOOTSTRAP_SSH_PORT="${BOOTSTRAP_SSH_PORT:-22022}"
   GIT_REPO_URL="${GIT_REPO_URL:-https://github.com/CadaFinance/pump.git}"
@@ -86,6 +86,7 @@ load_env() {
   SKIP_FIRST_DEPLOY="${SKIP_FIRST_DEPLOY:-0}"
   SKIP_ALTO_BUNDLER="${SKIP_ALTO_BUNDLER:-0}"
   BUNDLER_RPC_PORT="${BUNDLER_RPC_PORT:-4337}"
+  INDEXER_HEAD_OFFSET="${INDEXER_HEAD_OFFSET:-1000}"
 
   SECRETS_FILE="/root/pump-bootstrap-secrets.txt"
   INDEXER_DIR="/var/www/pump/Indexer"
@@ -103,6 +104,14 @@ preflight() {
   log "  CF origin:     $CF_ORIGIN_FILE"
   log "  SSH port:      $BOOTSTRAP_SSH_PORT"
   log "  Confirm:       $CONFIRM  Dry-run: $DRY_RUN"
+  log "  Indexer seed:  chain head minus ${INDEXER_HEAD_OFFSET} blocks"
+  if [[ "${SKIP_ALTO_BUNDLER:-0}" == "1" ]]; then
+    log "  Alto bundler:  SKIP (SKIP_ALTO_BUNDLER=1)"
+  elif [[ -n "${BUNDLER_EXECUTOR_PRIVATE_KEYS:-}" || -n "${BUNDLER_RELAYER_PRIVATE_KEY:-}" ]]; then
+    log "  Alto bundler:  install"
+  else
+    log "  Alto bundler:  skip (set BUNDLER_EXECUTOR_PRIVATE_KEYS in bootstrap.env)"
+  fi
 
   [[ -f "$CF_ORIGIN_FILE" ]] || die "Cloudflare origin file missing: $CF_ORIGIN_FILE (scp cloudflare.txt to VM)"
   grep -q "BEGIN CERTIFICATE" "$CF_ORIGIN_FILE" || die "$CF_ORIGIN_FILE: no CERTIFICATE block"
@@ -263,7 +272,8 @@ install_nginx() {
     return 0
   fi
 
-  sed "s/pump\\.zugchain\\.org/${domain}/g" "$REPO_ROOT/deploy/nginx-pump-ssl.conf" \
+  sed -e "s/pump\\.zugchain\\.org/${domain}/g" -e "s/spaceship\\.zugchain\\.org/${domain}/g" \
+    "$REPO_ROOT/deploy/nginx-pump-ssl.conf" \
     > /etc/nginx/sites-available/pump
   ln -sf /etc/nginx/sites-available/pump /etc/nginx/sites-enabled/pump
   rm -f /etc/nginx/sites-enabled/default
@@ -390,6 +400,84 @@ patch_env_file() {
   fi
   grep -q '^PGBOUNCER_ENABLED=' "$file" || echo 'PGBOUNCER_ENABLED=true' >> "$file"
   grep -q '^USE_REDIS_ARENA_CACHE=' "$file" || echo 'USE_REDIS_ARENA_CACHE=true' >> "$file"
+  grep -q '^NEXT_PUBLIC_WS_ENABLED=' "$file" || echo 'NEXT_PUBLIC_WS_ENABLED=true' >> "$file"
+  sed -i 's|^NEXT_PUBLIC_WS_ENABLED=.*|NEXT_PUBLIC_WS_ENABLED=true|g' "$file"
+}
+
+resolve_bootstrap_rpc_url() {
+  if [[ -n "${BUNDLER_CHAIN_RPC_URL:-}" ]]; then
+    echo "$BUNDLER_CHAIN_RPC_URL"
+    return 0
+  fi
+  if [[ -n "${ALCHEMY_RPC_KEY:-}" ]]; then
+    local chain_id="${NEXT_PUBLIC_CHAIN_ID:-84532}"
+    [[ "$chain_id" == "84" ]] && chain_id="84532"
+    case "$chain_id" in
+      84532) echo "https://base-sepolia.g.alchemy.com/v2/${ALCHEMY_RPC_KEY}" ;;
+      8453)  echo "https://base-mainnet.g.alchemy.com/v2/${ALCHEMY_RPC_KEY}" ;;
+      *)     echo "https://bnb-testnet.g.alchemy.com/v2/${ALCHEMY_RPC_KEY}" ;;
+    esac
+    return 0
+  fi
+  return 1
+}
+
+# Fresh VM: start indexer near chain head (avoids 400k+ block catch-up from .env.example).
+seed_indexer_near_chain_head() {
+  if [[ "${SKIP_INDEXER_HEAD_SEED:-0}" == "1" ]]; then
+    warn "SKIP_INDEXER_HEAD_SEED=1 — keeping INDEXER_START_BLOCK from indexer .env"
+    return 0
+  fi
+
+  local offset="${INDEXER_HEAD_OFFSET:-1000}"
+  local rpc idx_env="$INDEXER_DIR/.env"
+  if ! rpc="$(resolve_bootstrap_rpc_url)"; then
+    warn "No ALCHEMY_RPC_KEY — cannot set INDEXER_START_BLOCK to head-${offset}"
+    warn "  Set ALCHEMY_RPC_KEY in bootstrap.env and re-run, or edit $idx_env manually"
+    return 0
+  fi
+
+  log "Seeding indexer at chain head minus ${offset} blocks"
+  if [[ "$DRY_RUN" -eq 1 ]]; then
+    log "[dry-run] INDEXER_START_BLOCK = head - ${offset}"
+    return 0
+  fi
+
+  [[ -f "$idx_env" ]] || die "Indexer .env missing: $idx_env"
+
+  local head start state_key seed_block
+  head="$(curl -sf -X POST "$rpc" -H 'content-type: application/json' \
+    -d '{"jsonrpc":"2.0","id":1,"method":"eth_blockNumber","params":[]}' \
+    | python3 -c "import sys,json; r=json.load(sys.stdin).get('result','0x0'); print(int(r,16))" 2>/dev/null || echo 0)"
+  if [[ ! "$head" =~ ^[0-9]+$ ]] || [[ "$head" -le 0 ]]; then
+    warn "eth_blockNumber failed — set INDEXER_START_BLOCK manually in $idx_env"
+    return 0
+  fi
+
+  start=$((head - offset))
+  [[ "$start" -lt 0 ]] && start=0
+  seed_block=$((start > 0 ? start - 1 : 0))
+
+  if grep -q '^INDEXER_START_BLOCK=' "$idx_env"; then
+    sed -i "s/^INDEXER_START_BLOCK=.*/INDEXER_START_BLOCK=${start}/" "$idx_env"
+  else
+    echo "INDEXER_START_BLOCK=${start}" >> "$idx_env"
+  fi
+  if grep -q '^INDEXER_CHUNK_SIZE=' "$idx_env"; then
+    sed -i 's/^INDEXER_CHUNK_SIZE=.*/INDEXER_CHUNK_SIZE=10/' "$idx_env"
+  else
+    echo "INDEXER_CHUNK_SIZE=10" >> "$idx_env"
+  fi
+
+  state_key="$(grep '^INDEXER_STATE_KEY=' "$idx_env" 2>/dev/null | cut -d= -f2- | tr -d ' "' || true)"
+  [[ -n "$state_key" ]] || state_key="launchpad_indexer"
+
+  sudo -u postgres psql -d pump_db -v ON_ERROR_STOP=1 -c \
+    "DELETE FROM indexer_state WHERE key = '${state_key}';
+     INSERT INTO indexer_state (key, last_block_number, updated_at)
+     VALUES ('${state_key}', ${seed_block}, now());"
+
+  log "  head=${head} INDEXER_START_BLOCK=${start} cursor=${seed_block} (key=${state_key})"
 }
 
 write_app_envs() {
@@ -644,11 +732,10 @@ print_post_install_checklist() {
    ssh -p ${BOOTSTRAP_SSH_PORT} -i ${DEPLOY_KEY} root@${vm_ip} "echo ok"
 
 4) Fill missing .env secrets (if placeholders remain)
-   nano ${REPO_ROOT}/deploy/vm/bootstrap.env   # bundler keys if Alto was skipped
+   nano ${REPO_ROOT}/deploy/vm/bootstrap.env   # Telegram, R2, bundler keys if Alto skipped
    nano ${REPO_ROOT}/.env
-   nano ${INDEXER_DIR}/.env
-   Required: Telegram/OAuth, R2, TELEGRAM_*, indexer RPC, AIRDROP_KEEPER_PRIVATE_KEY
-   Bundler (SCW create/trade): BUNDLER_EXECUTOR_PRIVATE_KEYS + funded Base Sepolia ETH
+   Required: Telegram/OAuth, R2, TELEGRAM_*
+   Indexer start block: auto head-${INDEXER_HEAD_OFFSET:-1000} (see ${INDEXER_DIR}/.env)
 
 5) Restart after .env edits
    cd ${REPO_ROOT} && pm2 startOrRestart ecosystem.config.cjs --update-env
@@ -688,6 +775,7 @@ main() {
   setup_postgres "$APP_PW" "$IDX_PW"
   seed_contract_registry
   write_app_envs "$APP_PW" "$IDX_PW"
+  seed_indexer_near_chain_head || true
   setup_pgbouncer || true
   build_contract_artifacts
   install_systemd_units
