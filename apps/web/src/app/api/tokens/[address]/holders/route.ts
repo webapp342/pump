@@ -20,7 +20,7 @@ type HolderResponse = Array<{
   realizedPnlBnb: string;
   remainingCostBasisBnb: string;
   remainingCostBasisUsd?: string;
-  onChainBalance: string;
+  onChainBalance?: string;
 }>;
 
 function parseLimit(value: string | null): number {
@@ -87,7 +87,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
       realizedPnlBnb: holder.realizedPnlBnb,
       remainingCostBasisBnb: holder.remainingCostBasisBnb,
       remainingCostBasisUsd: holder.remainingCostBasisUsd,
-      onChainBalance: onChain.get(holder.address.toLowerCase()) ?? "0",
+      onChainBalance: onChain.get(holder.address.toLowerCase()),
     }));
 
     setHoldersCache(cacheKey, data);

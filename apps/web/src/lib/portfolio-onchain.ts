@@ -115,8 +115,8 @@ export async function fetchOnChainTokenBalancesForHolders(
     if (results) {
       chunk.forEach((holderAddress, index) => {
         const result = results[index];
-        const wei = result?.status === "success" ? result.result : 0n;
-        balances.set(holderAddress.toLowerCase(), formatUnits(wei, 18));
+        if (result?.status !== "success") return;
+        balances.set(holderAddress.toLowerCase(), formatUnits(result.result, 18));
       });
       continue;
     }
@@ -132,7 +132,7 @@ export async function fetchOnChainTokenBalancesForHolders(
           });
           balances.set(holderAddress.toLowerCase(), formatUnits(wei, 18));
         } catch {
-          balances.set(holderAddress.toLowerCase(), "0");
+          // Omit — UI falls back to indexer balance instead of treating as zero.
         }
       })
     );

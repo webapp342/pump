@@ -170,11 +170,11 @@ function mapApiHoldersToRows(holders: TokenHolderSnapshot[]): HolderRow[] {
       const indexedBalance = Number(holder.tokenBalance);
       const onChainBalance =
         holder.onChainBalance != null ? Number(holder.onChainBalance) : undefined;
-      const { displayBalance, hidden, pending } = resolveVerifiedTokenBalance(
+      const { displayBalance, hidden } = resolveVerifiedTokenBalance(
         indexedBalance,
         onChainBalance
       );
-      if (hidden || pending) return [];
+      if (hidden) return [];
 
       const fullCostBasis = Math.max(0, Number(holder.remainingCostBasisBnb));
       const fullCostBasisUsd = Math.max(0, Number(holder.remainingCostBasisUsd ?? 0));
