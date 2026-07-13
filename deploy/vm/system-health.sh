@@ -233,6 +233,26 @@ else
   append_check "pump_realtime" "Realtime (WS srv)" "down" "HTTP probe failed" "$probe" "pm2=$pm2_status dist=$dist_ok" "${http_ms:-0}" "$logs_json" "$timings_json"
 fi
 
+# --- Alto bundler (SCW create / trade — /api/bundler/rpc upstream) ---
+BUNDLER_RPC="${BUNDLER_RPC_URL:-http://127.0.0.1:4337/rpc}"
+probe="POST ${BUNDLER_RPC} eth_chainId"
+pm2_status="$(pm2_field pump-alto status)"
+logs_json="$(logs_to_json "$(pm2_logs pump-alto)")"
+listening="no"; port_listening 4337 && listening="yes"
+alto_started="$(now_ms_fn)"
+alto_out="$(curl -sf -X POST "$BUNDLER_RPC" \
+  -H 'content-type: application/json' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"eth_chainId","params":[]}' 2>/dev/null || true)"
+alto_ms=$(( $(now_ms_fn) - alto_started ))
+timings_json="$(make_timings "{\"rpc\":${alto_ms}}")"
+if [[ -n "$alto_out" && "$alto_out" == *"result"* ]]; then
+  append_check "pump_alto" "Alto bundler" "healthy" "RPC OK · ${alto_ms}ms · port 4337" "$probe" "pm2=$pm2_status" "$alto_ms" "$logs_json" "$timings_json"
+elif [[ "$pm2_status" == "online" && "$listening" == "yes" ]]; then
+  append_check "pump_alto" "Alto bundler" "degraded" "PM2 online · RPC failed · ${alto_ms}ms" "$probe" "${alto_out:-no response}" "$alto_ms" "$logs_json" "$timings_json"
+else
+  append_check "pump_alto" "Alto bundler" "down" "SCW create/trade 502 until Alto runs" "$probe" "pm2=$pm2_status port4337=$listening" "$alto_ms" "$logs_json" "$timings_json"
+fi
+
 # --- WebSocket (realtime backend — direct; nginx /ws proxies here) ---
 WS_SMOKE_URL="${WS_SMOKE_URL:-ws://127.0.0.1:3013}"
 probe="ws-smoke → ${WS_SMOKE_URL}"
