@@ -7,7 +7,7 @@ import { formatAirdropRewardCompact } from "@/lib/airdrop-board-format";
 type AirdropPoolAmountProps = {
   totalFunded: string;
   rewardToken: string | null;
-  rewardSymbol: string;
+  rewardSymbol: string | null;
   /** Campaign / pool token logo fallback when reward is ERC-20 without a clear mark. */
   linkedToken?: string | null;
   linkedSymbol?: string | null;
@@ -48,7 +48,7 @@ export function AirdropPoolAmount({
           className="airdrop-pool-amount__mark shrink-0 !ring-0"
         />
       ) : null}
-      <span className={`min-w-0 truncate ${symbolClassName}`.trim()}>{rewardSymbol}</span>
+      <span className={`min-w-0 truncate ${symbolClassName}`.trim()}>{markSymbol}</span>
     </span>
   );
 }
