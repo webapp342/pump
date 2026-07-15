@@ -19,6 +19,7 @@ import {
   pinMobileWindowScroll,
   settleMobileViewportAfterSheetClose,
 } from "@/hooks/useMobileModalScrollLock";
+import { writeLastTradeTokenAddress } from "@/lib/last-trade-token";
 
 const POLL_MS = 2_000;
 const POLL_MAX_MS = 90_000;
@@ -90,6 +91,11 @@ export function TokenDetailShell({
     pinMobileWindowScroll();
     requestAnimationFrame(() => pinMobileWindowScroll());
     settleMobileViewportAfterSheetClose();
+  }, [normalized]);
+
+  /** Remember last token detail for `/` · `/trade` (localStorage + cookie). */
+  useEffect(() => {
+    writeLastTradeTokenAddress(normalized);
   }, [normalized]);
 
   useEffect(() => {

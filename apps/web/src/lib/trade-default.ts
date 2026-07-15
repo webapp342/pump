@@ -8,7 +8,13 @@ import {
 /** Arena/indexer write top:mcap:20 — always read that list and take [0]. */
 const TOP_MCAP_CACHE_LIMIT = 20;
 
-/** Highest market-cap token — fallback when no last-visited token is saved locally. */
+/**
+ * Server-only cold fallback for `/` and `/trade` when the user has no
+ * last-visited token in localStorage/cookie.
+ *
+ * Personal last token is client-only (`pump-last-trade-token`) — never stored
+ * in Redis. Middleware + TradeHomeBootstrap prefer local first.
+ */
 export async function resolveDefaultTradeTokenAddress(): Promise<string | null> {
   if (useRedisArenaCache()) {
     const sticky = await readDefaultTradeTokenCache();
