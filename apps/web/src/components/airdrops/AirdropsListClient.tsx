@@ -13,7 +13,6 @@ import { AirdropCampaignList } from "@/components/airdrops/AirdropCampaignList";
 import {
   airdropCampaignTitle,
   airdropPoolSymbol,
-  airdropStatusSortWeight,
   enrichAirdropItem,
   matchesAirdropFilter,
   type AirdropFilter,
@@ -34,7 +33,7 @@ export function AirdropsListClient({
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [activeFilter, setActiveFilter] = useState<AirdropFilter>("qualifying");
-  const [sortKey, setSortKey] = useState<AirdropSortKey>("reward");
+  const [sortKey, setSortKey] = useState<AirdropSortKey>("value");
   const [sortDir, setSortDir] = useState<AirdropSortDir>("desc");
   const [mineIds, setMineIds] = useState<Set<string>>(new Set());
   const { bnbUsd } = useBnbUsdPrice();
@@ -142,13 +141,10 @@ export function AirdropsListClient({
 
     const sorted = [...filtered].sort((a, b) => {
       let delta = 0;
-      if (sortKey === "reward") delta = a.rewardUsd - b.rewardUsd;
-      else if (sortKey === "end") {
-        delta = new Date(a.qualifyEnd).getTime() - new Date(b.qualifyEnd).getTime();
-      } else if (sortKey === "start") {
-        delta = new Date(a.qualifyStart).getTime() - new Date(b.qualifyStart).getTime();
+      if (sortKey === "value") {
+        delta = a.rewardUsd - b.rewardUsd;
       } else {
-        delta = airdropStatusSortWeight(a.displayStatus) - airdropStatusSortWeight(b.displayStatus);
+        delta = new Date(a.qualifyEnd).getTime() - new Date(b.qualifyEnd).getTime();
       }
       return sortDir === "asc" ? delta : -delta;
     });
@@ -165,7 +161,13 @@ export function AirdropsListClient({
       return;
     }
     setSortKey(nextKey);
-    setSortDir(nextKey === "reward" ? "desc" : "asc");
+    setSortDir(nextKey === "value" ? "desc" : "asc");
+  }
+
+  function onSelectFilter(filter: AirdropFilter) {
+    setActiveFilter(filter);
+    setSortKey("value");
+    setSortDir("desc");
   }
 
   if (items === null && !error) {
@@ -187,7 +189,7 @@ export function AirdropsListClient({
               filterCounts={filterCounts}
               search={search}
               onSearchChange={setSearch}
-              onSelect={setActiveFilter}
+              onSelect={onSelectFilter}
             />
           </div>
           <div className="airdrops-body">
@@ -210,7 +212,7 @@ export function AirdropsListClient({
             filterCounts={filterCounts}
             search={search}
             onSearchChange={setSearch}
-            onSelect={setActiveFilter}
+            onSelect={onSelectFilter}
           />
         </div>
 

@@ -20,7 +20,7 @@ export type AirdropFilter =
   | "saved"
   | "mine";
 
-export type AirdropSortKey = "reward" | "end" | "start" | "status";
+export type AirdropSortKey = "value" | "end";
 export type AirdropSortDir = "asc" | "desc";
 
 export type EnrichedAirdrop = AirdropListItem & {
@@ -30,6 +30,14 @@ export type EnrichedAirdrop = AirdropListItem & {
 };
 
 export const ENDING_SOON_HOURS = 48;
+
+/** Pool USD band classes: < $10 blue, $10–$50 yellow, > $50 green. */
+export function airdropValueUsdToneClass(usd: number | null | undefined): string {
+  if (usd == null || !Number.isFinite(usd)) return "airdrop-value-usd--muted";
+  if (usd < 10) return "airdrop-value-usd--low";
+  if (usd <= 50) return "airdrop-value-usd--mid";
+  return "airdrop-value-usd--high";
+}
 
 export function rewardUsdValue(
   item: Pick<AirdropListItem, "totalFunded" | "rewardToken" | "rewardPriceBnb">,

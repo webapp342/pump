@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import type { TokenListItem } from "@/lib/db/launchpad";
-import { TokenAvatar } from "@/components/token/TokenAvatar";
+import { UserAvatarForAddress } from "@/components/user/UserAvatarForAddress";
 import { UserDisplayName } from "@/components/user/UserDisplayName";
 import { ArenaBoardRowQuickActions } from "@/components/arena/ArenaBoardRowQuickActions";
 import { resolveLaunchpadLogoUri } from "@/lib/assets";
@@ -139,10 +139,6 @@ export function ArenaTokenCard({
     token.creatorUsername ?? (
       <UserDisplayName address={token.creatorAddress} compact />
     );
-  const creatorAvatarSymbol =
-    token.creatorDisplayUsername ??
-    token.creatorUsername ??
-    token.creatorAddress.slice(0, 1).toUpperCase();
   const tokenHref = tokenDetailPath(token.address);
 
   const prefetchBundle = () => {
@@ -265,12 +261,7 @@ export function ArenaTokenCard({
           {mcapLabel === "—" ? "—" : `${mcapLabel} MC`}
         </p>
         <div className="arena-token-card__meta">
-          <TokenAvatar
-            address={token.creatorAddress}
-            symbol={creatorAvatarSymbol}
-            size={18}
-            className="!ring-0"
-          />
+          <UserAvatarForAddress address={token.creatorAddress} size={18} />
           <span className="arena-token-card__creator truncate">{creatorLabel}</span>
           <PumpIcon icon={faBolt} className="arena-token-card__age-icon shrink-0" aria-hidden />
           <span className="arena-token-card__age financial-value shrink-0">

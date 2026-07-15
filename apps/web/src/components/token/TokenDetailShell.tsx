@@ -114,6 +114,14 @@ export function TokenDetailShell({
   const pollUntilRef = useRef(0);
   const loadGenerationRef = useRef(0);
 
+  useLayoutEffect(() => {
+    if (!initialBundle) return;
+    if (initialBundle.token.address.toLowerCase() !== normalized) return;
+    setResolved(bundleFromPayload(initialBundle));
+    layoutMountedRef.current = true;
+    setFatalError(null);
+  }, [initialBundle, normalized]);
+
   const routeBundle = resolveRouteBundle(normalized, resolved, optimisticToken);
   const contentSynced =
     routeBundle != null && routeBundle.token.address.toLowerCase() === normalized;

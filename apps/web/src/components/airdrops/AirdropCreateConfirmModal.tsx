@@ -6,7 +6,6 @@ import { ModalPortal } from "@/components/ui/ModalPortal";
 import {
   BnbAmountDisplay,
   RewardAmountDisplay,
-  TokenAssetChip,
 } from "@/components/token/AssetAmountDisplay";
 import { TokenAvatar } from "@/components/token/TokenAvatar";
 import { FormExecutionStatus } from "@/components/ui/FormExecutionStatus";
@@ -17,28 +16,18 @@ import {
   useMobileModalScrollLock,
 } from "@/hooks/useMobileModalScrollLock";
 import { useMobileSheetDragDismiss } from "@/hooks/useMobileSheetDragDismiss";
-import { AirdropQualifyRulesPreview } from "@/components/airdrops/AirdropQualifyRules";
-import { AirdropSocialTasksPreview } from "@/components/airdrops/AirdropSocialTasks";
-import type { AirdropSocialTaskInput } from "@/lib/airdrop-rules";
 
 type AirdropCreateConfirmModalProps = {
   open: boolean;
   loading: boolean;
   error: string | null;
   title: string;
-  description: string;
   linkedToken: TokenListItem | null;
   rewardAmountLabel: string;
-  /** When set, shown as primary USD; rewardAmountLabel may still be asset for fallback. */
+  /** Asset amount line when rewardAmountLabel is USD-primary. */
   rewardUsdSecondary?: string | null;
   isBnbReward: boolean;
   rewardToken: TokenListItem | null;
-  qualifyLabel: string;
-  minHoldTokens: string;
-  minBuyBnb: string;
-  minBuyUsdLabel?: string | null;
-  holdUsdLabel?: string | null;
-  socialTasks: AirdropSocialTaskInput[];
   createFeeLabel: string;
   feeExempt: boolean;
   totalBnbLabel: string;
@@ -49,13 +38,11 @@ type AirdropCreateConfirmModalProps = {
   onConfirm: () => void;
 };
 
-function SummaryRow({ label, children }: { label: string; children: ReactNode }) {
+function ConfirmRow({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="airdrop-create-confirm-row">
-      <dt className="airdrop-create-confirm-row__label text-caption text-pump-muted">{label}</dt>
-      <dd className="airdrop-create-confirm-row__value min-w-0 text-right text-body-sm text-pump-text">
-        {children}
-      </dd>
+    <div className="trade-confirm-row">
+      <dt className="trade-confirm-row__label text-caption text-pump-muted">{label}</dt>
+      <dd className="trade-confirm-row__content">{children}</dd>
     </div>
   );
 }
@@ -65,18 +52,11 @@ export function AirdropCreateConfirmModal({
   loading,
   error,
   title,
-  description,
   linkedToken,
   rewardAmountLabel,
   rewardUsdSecondary = null,
   isBnbReward,
   rewardToken,
-  qualifyLabel,
-  minHoldTokens,
-  minBuyBnb,
-  minBuyUsdLabel = null,
-  holdUsdLabel = null,
-  socialTasks,
   createFeeLabel,
   feeExempt,
   totalBnbLabel,
@@ -99,6 +79,7 @@ export function AirdropCreateConfirmModal({
   if (!open) return null;
 
   const busy = loading || submitPhase !== null;
+  const showCreateFee = !feeExempt;
 
   return (
     <ModalPortal open={open}>
@@ -112,7 +93,7 @@ export function AirdropCreateConfirmModal({
         <div className="modal-sheet-host z-[121]" role="presentation">
           <div
             ref={panelRef}
-            className="airdrop-create-confirm-modal modal-panel modal-sheet-panel max-w-md select-none rounded-t-2xl border-x-0 border-b-0 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:rounded-xl sm:border-x sm:border-b sm:p-5"
+            className="airdrop-create-confirm-modal trade-confirm-modal modal-panel modal-sheet-panel max-w-md select-none rounded-t-2xl border-x-0 border-b-0 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:rounded-xl sm:border-x sm:border-b sm:p-5"
             role="dialog"
             aria-modal="true"
             aria-labelledby="airdrop-create-confirm-title"
@@ -126,94 +107,71 @@ export function AirdropCreateConfirmModal({
             <h2 id="airdrop-create-confirm-title" className="text-h3 font-semibold text-pump-text">
               Create airdrop?
             </h2>
-            <p className="mt-1 text-caption text-pump-muted">
-              Funds lock on-chain until qualify ends. TOP 100 wallets split the pool.
-            </p>
 
-            <div className="mt-4 flex items-center gap-2.5 rounded-lg border border-pump-border/20 bg-pump-surface/40 p-3">
+            <div className="mt-3 flex min-w-0 items-center gap-2.5">
               {linkedToken ? (
                 <TokenAvatar
                   address={linkedToken.address}
                   symbol={linkedToken.symbol}
                   logoUrl={linkedToken.logoUrl}
-                  size={40}
+                  size={28}
                   shape="rounded"
+                  className="!ring-0"
                 />
               ) : (
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-dashed border-pump-border/30 bg-pump-surface/40 text-caption text-pump-muted">
+                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-dashed border-pump-border/30 bg-pump-surface/40 text-caption text-pump-muted">
                   ?
                 </div>
               )}
-              <div className="min-w-0">
-                <p className="truncate text-body-sm font-semibold text-pump-text">{title}</p>
-                {linkedToken ? (
-                  <p className="mt-0.5 inline-flex flex-wrap items-center gap-1 text-caption text-pump-muted">
-                    Pool
-                    <TokenAssetChip
-                      address={linkedToken.address}
-                      symbol={linkedToken.symbol}
-                      logoUrl={linkedToken.logoUrl}
-                      size={14}
-                    />
-                  </p>
-                ) : null}
-              </div>
+              <p className="min-w-0 truncate text-body-sm font-medium text-pump-text">{title}</p>
             </div>
 
-            {description.trim() ? (
-              <p className="mt-2 text-caption leading-snug text-pump-muted line-clamp-3">
-                {description.trim()}
-              </p>
-            ) : null}
-
-            <dl className="mt-4 space-y-2.5 border-t border-pump-border/15 pt-4">
-              <SummaryRow label="Reward pool">
+            <dl className="mt-4 space-y-3 border-t border-pump-border/15 pt-4">
+              <ConfirmRow label="Reward pool">
                 {rewardUsdSecondary ? (
-                  <div className="text-right">
-                    <p className="financial-value text-body-sm font-medium tabular-nums text-pump-text">
+                  <div className="trade-confirm-row__value">
+                    <span className="financial-value text-body-sm font-semibold tabular-nums text-pump-text">
                       {rewardAmountLabel}
-                    </p>
-                    <p className="text-caption text-pump-muted">{rewardUsdSecondary}</p>
+                    </span>
+                    <span className="trade-confirm-row__usd financial-value text-caption text-pump-muted">
+                      {rewardUsdSecondary}
+                    </span>
                   </div>
                 ) : (
                   <RewardAmountDisplay
                     amount={rewardAmountLabel}
                     isBnb={isBnbReward}
                     token={rewardToken}
-                    amountClassName="financial-value text-body-sm font-medium tabular-nums text-pump-text"
-                    logoSize={16}
+                    amountClassName="financial-value text-body-sm font-semibold tabular-nums text-pump-text"
+                    logoSize={18}
                   />
                 )}
-              </SummaryRow>
-              <SummaryRow label="Qualify window">
-                <span className="financial-value">{qualifyLabel}</span>
-              </SummaryRow>
-              <SummaryRow label="Rules">
-                <AirdropQualifyRulesPreview
-                  linkedToken={linkedToken}
-                  minHoldTokens={minHoldTokens}
-                  minBuyBnb={minBuyBnb}
-                  minBuyUsdLabel={minBuyUsdLabel}
-                  holdUsdLabel={holdUsdLabel}
-                />
-              </SummaryRow>
-              <SummaryRow label="Create fee">
-                {feeExempt ? (
-                  <span className="text-caption font-medium text-pump-accent">Free (exempt)</span>
-                ) : (
-                  <BnbAmountDisplay amount={createFeeLabel} logoSize={16} />
-                )}
-              </SummaryRow>
-              <SummaryRow label={`Total ${NATIVE_SYMBOL}`}>
+              </ConfirmRow>
+
+              {showCreateFee ? (
+                <ConfirmRow label="Create fee">
+                  <BnbAmountDisplay
+                    amount={createFeeLabel}
+                    logoSize={18}
+                    amountClassName="financial-value text-body-sm font-semibold tabular-nums text-pump-text"
+                  />
+                </ConfirmRow>
+              ) : null}
+
+              <ConfirmRow label={`Debit ${NATIVE_SYMBOL}`}>
                 <BnbAmountDisplay
                   amount={totalBnbLabel}
                   logoSize={18}
-                  amountClassName="financial-value font-semibold tabular-nums text-pump-text"
+                  amountClassName="financial-value text-body-sm font-semibold tabular-nums text-pump-text"
                 />
-              </SummaryRow>
+              </ConfirmRow>
             </dl>
 
-            <AirdropSocialTasksPreview tasks={socialTasks} />
+            <p className="mt-3 text-caption leading-snug text-pump-muted">
+              {isBnbReward
+                ? "Reward pool locks on-chain until the qualify window ends."
+                : `Token pool is approved separately. Create fee and gas use ${NATIVE_SYMBOL}.`}
+            </p>
 
             {error ? (
               <div className="notice-error mt-3 px-3 py-2 text-caption" role="alert">
@@ -249,7 +207,7 @@ export function AirdropCreateConfirmModal({
                     <span>{submitLabel}</span>
                   </>
                 ) : (
-                  "Confirm & create"
+                  "Confirm"
                 )}
               </button>
             </div>

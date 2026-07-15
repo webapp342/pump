@@ -2,6 +2,8 @@ import type { ArenaHomeFetchOptions, ArenaHomePayload } from "@/lib/arena-server
 import { readCacheJson, writeCacheJson } from "@/lib/redis/client";
 
 const ARENA_CACHE_TTL_SEC = 2;
+const DEFAULT_TRADE_TOKEN_TTL_SEC = 30;
+const DEFAULT_TRADE_TOKEN_KEY = "pump:cache:default-trade-token";
 
 export function buildArenaCacheKey(options: ArenaHomeFetchOptions): string {
   const limit = options.limit ?? 50;
@@ -38,9 +40,29 @@ export async function readTopMcapCache(
   return readCacheJson<ArenaHomePayload["topByMcap"]>(buildTopMcapCacheKey(limit));
 }
 
+export async function readDefaultTradeTokenCache(): Promise<string | null> {
+  const row = await readCacheJson<{ address: string }>(DEFAULT_TRADE_TOKEN_KEY);
+  const address = row?.address?.trim().toLowerCase();
+  return address || null;
+}
+
+export async function writeDefaultTradeTokenCache(address: string): Promise<void> {
+  const normalized = address.trim().toLowerCase();
+  if (!normalized) return;
+  await writeCacheJson(
+    DEFAULT_TRADE_TOKEN_KEY,
+    { address: normalized },
+    DEFAULT_TRADE_TOKEN_TTL_SEC
+  );
+}
+
 export async function writeTopMcapCache(
   limit: number,
   topByMcap: ArenaHomePayload["topByMcap"]
 ): Promise<void> {
   await writeCacheJson(buildTopMcapCacheKey(limit), topByMcap, ARENA_CACHE_TTL_SEC);
+  const top = topByMcap[0]?.address;
+  if (top) {
+    await writeDefaultTradeTokenCache(top);
+  }
 }

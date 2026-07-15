@@ -33,6 +33,7 @@ const HOT_ARENA_CACHE_KEYS = [
   "pump:cache:arena:all:mcap:desc:50",
   "pump:cache:arena:all:age:desc:50",
   "pump:cache:top:mcap:20",
+  "pump:cache:default-trade-token",
   "pump:cache:filter:counts",
 ] as const;
 

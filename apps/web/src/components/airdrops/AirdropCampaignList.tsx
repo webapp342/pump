@@ -5,12 +5,9 @@ import {
   airdropStatusBadgeClass,
   formatAirdropDisplayStatus,
 } from "@/lib/airdrop-status";
-import {
-  airdropRewardUsd,
-  formatAirdropReward,
-} from "@/lib/airdrop-board-format";
-import { formatUsdReadable } from "@/lib/format-usd";
+import { airdropRewardUsd } from "@/lib/airdrop-board-format";
 import { AirdropMobileCampaignRow } from "@/components/airdrops/AirdropMobileCampaignRow";
+import { AirdropPoolAmount } from "@/components/airdrops/AirdropPoolAmount";
 import { TokenAvatar } from "@/components/token/TokenAvatar";
 import { HourglassIcon } from "@/components/ui/HourglassIcon";
 import {
@@ -18,6 +15,7 @@ import {
   airdropPoolSymbol,
   airdropShowsCountdown,
   airdropTimeCaption,
+  airdropValueUsdToneClass,
   type AirdropSortDir,
   type AirdropSortKey,
   type EnrichedAirdrop,
@@ -34,13 +32,8 @@ function AirdropCampaignRow({
   const title = airdropCampaignTitle(item);
   const timeCaption = airdropTimeCaption(item);
   const href = `/airdrops/${item.id}`;
-  const isBnb = !item.rewardToken;
-  const poolLabel = formatAirdropReward(item.totalFunded, {
-    isBnb,
-    symbol: item.rewardSymbol,
-  });
   const usd = airdropRewardUsd(item, bnbUsd);
-  const usdLabel = usd != null ? formatUsdReadable(usd, { compact: true }) : null;
+  const usdLabel = usd != null && Number.isFinite(usd) ? `$${usd.toFixed(2)}` : null;
   const statusLabel = formatAirdropDisplayStatus(item.displayStatus);
   const footLabel = timeCaption ?? statusLabel;
   const showCountdown = Boolean(timeCaption && airdropShowsCountdown(item.displayStatus));
@@ -48,7 +41,7 @@ function AirdropCampaignRow({
   return (
     <Link href={href} className="airdrops-list__row">
       <div className="airdrops-list__cell airdrops-list__cell--campaign">
-        <TokenAvatar address={item.linkedToken} symbol={symbol} size={24} className="shrink-0" />
+        <TokenAvatar address={item.linkedToken} symbol={symbol} size={24} shape="rounded" className="shrink-0" />
         <div className="min-w-0 flex-1">
           <p className="airdrops-list__title airdrops-list__title--desktop truncate" title={title}>
             {title}
@@ -57,13 +50,26 @@ function AirdropCampaignRow({
         </div>
       </div>
 
-      <div className="airdrops-list__cell airdrops-list__cell--pool financial-value">
-        <span className="airdrops-list__pool-token">{poolLabel}</span>
-        {usdLabel ? <span className="airdrops-list__pool-usd">{usdLabel}</span> : null}
+      <div className="airdrops-list__cell airdrops-list__cell--pool">
+        <AirdropPoolAmount
+          totalFunded={item.totalFunded}
+          rewardToken={item.rewardToken}
+          rewardSymbol={item.rewardSymbol}
+          linkedToken={item.linkedToken}
+          linkedSymbol={symbol}
+          size={14}
+          className="airdrops-list__pool-token"
+          amountClassName="financial-value text-body-sm font-medium tabular-nums text-pump-text"
+          symbolClassName="text-caption text-pump-muted"
+        />
       </div>
 
       <div className="airdrops-list__cell airdrops-list__cell--value financial-value">
-        {usdLabel ? <span className="airdrops-list__value-usd">{usdLabel}</span> : <span className="airdrops-list__dash">—</span>}
+        {usdLabel ? (
+          <span className={`airdrops-list__value-usd ${airdropValueUsdToneClass(usd)}`}>{usdLabel}</span>
+        ) : (
+          <span className="airdrops-list__dash">—</span>
+        )}
       </div>
 
       <div className="airdrops-list__cell airdrops-list__cell--status">
@@ -140,25 +146,16 @@ export function AirdropCampaignList({
       <section className="airdrops-list airdrops-list--desktop hidden md:flex" aria-label="Airdrop campaigns">
         <div className="airdrops-list__head">
           <span className="airdrops-list__head-cell airdrops-list__head-cell--campaign">Campaign</span>
+          <span className="airdrops-list__head-cell airdrops-list__head-cell--pool">Pool</span>
           <SortButton
-            label="Pool"
-            sortKey="reward"
+            label="Value"
+            sortKey="value"
             activeKey={sortKey}
             sortDir={sortDir}
             onSort={onSort}
-            className="airdrops-list__head-cell airdrops-list__head-cell--pool"
+            className="airdrops-list__head-value airdrops-list__head-cell airdrops-list__head-cell--value"
           />
-          <span className="airdrops-list__head-value airdrops-list__head-cell airdrops-list__head-cell--value">
-            Value
-          </span>
-          <SortButton
-            label="Status"
-            sortKey="status"
-            activeKey={sortKey}
-            sortDir={sortDir}
-            onSort={onSort}
-            className="airdrops-list__head-cell airdrops-list__head-cell--status"
-          />
+          <span className="airdrops-list__head-cell airdrops-list__head-cell--status">Status</span>
           <SortButton
             label="Ends"
             sortKey="end"

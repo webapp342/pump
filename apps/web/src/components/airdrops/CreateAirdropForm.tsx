@@ -1742,7 +1742,6 @@ export function CreateAirdropForm({
         loading={busy}
         error={displayError}
         title={displayTitle}
-        description={description}
         linkedToken={selectedLinkedToken}
         rewardAmountLabel={rewardUsdLabel ?? rewardAmountValue}
         rewardUsdSecondary={
@@ -1750,12 +1749,6 @@ export function CreateAirdropForm({
         }
         isBnbReward={isBnbReward}
         rewardToken={selectedRewardToken}
-        qualifyLabel={qualifyDurationLabel ?? "—"}
-        minHoldTokens={minHoldTokens}
-        minBuyBnb={minBuyBnb}
-        minBuyUsdLabel={minBuyUsdLabel}
-        holdUsdLabel={holdUsdHint}
-        socialTasks={socialTasksForSync}
         createFeeLabel={createFeeValue}
         feeExempt={feeWei === 0n}
         totalBnbLabel={totalBnbValue}

@@ -1,13 +1,12 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
-import { formatAirdropDisplayStatus, airdropStatusBadgeClass } from "@/lib/airdrop-status";
 import {
-  airdropRewardUsd,
-  formatAirdropReward,
-} from "@/lib/airdrop-board-format";
-import { formatUsdReadable } from "@/lib/format-usd";
-import { PumpIcon, faParachuteBox } from "@/lib/icons";
+  formatAirdropDisplayStatus,
+  type AirdropDisplayStatus,
+} from "@/lib/airdrop-status";
+import { airdropRewardUsd } from "@/lib/airdrop-board-format";
+import { AirdropPoolAmount } from "@/components/airdrops/AirdropPoolAmount";
 import { TokenAvatar } from "@/components/token/TokenAvatar";
 import { HourglassIcon } from "@/components/ui/HourglassIcon";
 import {
@@ -15,6 +14,7 @@ import {
   airdropPoolSymbol,
   airdropShowsCountdown,
   airdropTimeCaption,
+  airdropValueUsdToneClass,
   type EnrichedAirdrop,
 } from "@/lib/airdrops-list-ui";
 
@@ -23,19 +23,29 @@ type AirdropMobileCampaignRowProps = {
   bnbUsd: number | null;
 };
 
+/** Compact list tone — text only (no bordered badge) so row height matches logo. */
+function statusToneClass(status: AirdropDisplayStatus): string {
+  switch (status) {
+    case "UPCOMING":
+      return "text-pump-accent";
+    case "QUALIFYING":
+    case "CLAIMABLE":
+      return "text-pump-success";
+    case "FINALIZING":
+      return "text-pump-warning";
+    case "CLOSED":
+      return "text-pump-muted";
+  }
+}
+
 export function AirdropMobileCampaignRow({ item, bnbUsd }: AirdropMobileCampaignRowProps) {
   const symbol = airdropPoolSymbol(item);
   const title = airdropCampaignTitle(item);
   const timeCaption = airdropTimeCaption(item);
   const statusLabel = formatAirdropDisplayStatus(item.displayStatus);
   const href = `/airdrops/${item.id}`;
-  const isBnb = !item.rewardToken;
-  const poolLabel = formatAirdropReward(item.totalFunded, {
-    isBnb,
-    symbol: item.rewardSymbol,
-  });
   const usd = airdropRewardUsd(item, bnbUsd);
-  const usdLabel = usd != null ? formatUsdReadable(usd, { compact: true }) : "—";
+  const usdLabel = usd != null && Number.isFinite(usd) ? `$${usd.toFixed(2)}` : "—";
   const showCountdown = Boolean(timeCaption && airdropShowsCountdown(item.displayStatus));
   const countdownLabel = timeCaption ?? "—";
 
@@ -54,15 +64,20 @@ export function AirdropMobileCampaignRow({ item, bnbUsd }: AirdropMobileCampaign
       <div className="airdrop-mobile-campaign-row__main min-w-0">
         <div className="airdrop-mobile-campaign-row__head">
           <p className="airdrop-mobile-campaign-row__name truncate">{title}</p>
-          <div className="airdrop-mobile-campaign-row__meta-line">
-            <span className="airdrop-mobile-campaign-row__symbol">{symbol}</span>
-          </div>
+          <p className="airdrop-mobile-campaign-row__symbol truncate">{symbol}</p>
         </div>
         <div className="airdrop-mobile-campaign-row__stats">
-          <span className="airdrop-mobile-campaign-row__stat">
-            <PumpIcon icon={faParachuteBox} className="airdrop-mobile-campaign-row__stat-icon" aria-hidden />
-            <span className="financial-value">{poolLabel}</span>
-          </span>
+          <AirdropPoolAmount
+            totalFunded={item.totalFunded}
+            rewardToken={item.rewardToken}
+            rewardSymbol={item.rewardSymbol}
+            linkedToken={item.linkedToken}
+            linkedSymbol={symbol}
+            size={12}
+            className="airdrop-mobile-campaign-row__stat"
+            amountClassName="financial-value tabular-nums text-pump-text"
+            symbolClassName="text-pump-muted"
+          />
         </div>
       </div>
 
@@ -72,22 +87,22 @@ export function AirdropMobileCampaignRow({ item, bnbUsd }: AirdropMobileCampaign
             !timeCaption ? " airdrop-mobile-campaign-row__countdown--empty" : ""
           }`}
         >
-          {showCountdown ? <HourglassIcon size={11} aria-hidden /> : null}
+          {showCountdown ? <HourglassIcon size={12} aria-hidden /> : null}
           <span>{countdownLabel}</span>
         </div>
         <span
-          className={`airdrop-mobile-campaign-row__status ${airdropStatusBadgeClass(item.displayStatus)}`}
+          className={`airdrop-mobile-campaign-row__status ${statusToneClass(item.displayStatus)}`}
         >
           {statusLabel}
         </span>
-        <div className="airdrop-mobile-campaign-row__quote">
-          <div className="airdrop-mobile-campaign-row__metric">
-            <span className="airdrop-mobile-campaign-row__metric-label">Pool</span>
-            <span className="airdrop-mobile-campaign-row__metric-value airdrop-mobile-campaign-row__metric-value--pool financial-value">
-              {usdLabel}
-            </span>
-          </div>
-        </div>
+        <p className="airdrop-mobile-campaign-row__value">
+          <span className="airdrop-mobile-campaign-row__value-label">Value</span>
+          <span
+            className={`airdrop-mobile-campaign-row__value-amount financial-value ${airdropValueUsdToneClass(usd)}`}
+          >
+            {usdLabel}
+          </span>
+        </p>
       </div>
     </Link>
   );

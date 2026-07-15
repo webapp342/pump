@@ -338,6 +338,13 @@ setup_postgres() {
       || warn "003_mv_ownership.sql failed (run manually as postgres)"
   fi
 
+  # System missions (Daily Swap, Launch Meme, …) — schema creates empty table only
+  if [[ -f "$REPO_ROOT/db/migrations/006_seed_system_missions.sql" ]]; then
+    log "  Seeding launchpad_tasks (system missions)"
+    sudo -u postgres psql -d pump_db -v ON_ERROR_STOP=1 -f "$REPO_ROOT/db/migrations/006_seed_system_missions.sql" \
+      || warn "006_seed_system_missions.sql failed — Missions will be empty until seeded"
+  fi
+
   log "  REFRESH materialized views (required after schema — created WITH NO DATA)"
   sudo -u postgres psql -d pump_db -v ON_ERROR_STOP=1 -c "REFRESH MATERIALIZED VIEW mv_token_trade_stats;" \
     || warn "mv_token_trade_stats refresh failed"

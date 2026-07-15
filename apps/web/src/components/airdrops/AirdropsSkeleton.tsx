@@ -41,16 +41,18 @@ export function AirdropsSkeleton() {
           <div className="airdrops-mobile-list airdrops-mobile-list--mobile md:hidden">
             {Array.from({ length: 6 }).map((_, index) => (
               <div key={index} className="airdrop-mobile-campaign-row airdrop-mobile-campaign-row--skeleton">
-                <Skeleton className="h-[3.25rem] w-[3.25rem] shrink-0 rounded-md" />
-                <div className="min-w-0 flex-1 space-y-2">
-                  <Skeleton className="h-4 w-32" />
-                  <Skeleton variant="line" className="h-3 w-24" />
-                  <Skeleton variant="line" className="h-3 w-20" />
+                <Skeleton className="airdrop-mobile-campaign-row__media h-[3.25rem] w-[3.25rem] shrink-0 rounded-md" />
+                <div className="airdrop-mobile-campaign-row__main min-w-0">
+                  <div className="space-y-1">
+                    <Skeleton className="h-3.5 w-28" />
+                    <Skeleton className="h-3 w-12" />
+                  </div>
+                  <Skeleton className="h-3 w-24" />
                 </div>
-                <div className="space-y-1.5 text-right">
-                  <Skeleton variant="line" className="ml-auto h-3 w-10" />
-                  <Skeleton variant="line" className="ml-auto h-3 w-12" />
-                  <Skeleton className="ml-auto h-4 w-14" />
+                <div className="airdrop-mobile-campaign-row__aside">
+                  <Skeleton className="h-3 w-12" />
+                  <Skeleton className="h-3 w-14" />
+                  <Skeleton className="h-3 w-10" />
                 </div>
               </div>
             ))}

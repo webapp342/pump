@@ -38,6 +38,7 @@ import {
   type BoardSortDir,
   type BoardSortKey,
   type FlashTone,
+  type BoardCacheEntry,
   arenaExploreBoardCache,
 } from "@/lib/arena-explore-board-core";
 
@@ -47,15 +48,24 @@ export type UseArenaExploreBoardOptions = {
   animateRows?: boolean;
 };
 
+function peekDefaultNewBoard(): BoardCacheEntry | null {
+  return arenaExploreBoardCache.get(boardCacheKey("new", "age", "desc", "")) ?? null;
+}
+
 export function useArenaExploreBoard(options: UseArenaExploreBoardOptions = {}) {
   const pageSize = options.pageSize ?? ARENA_BOARD_PAGE_INITIAL;
   const animateRows = options.animateRows !== false;
   const queryClient = useQueryClient();
-  const [tokens, setTokens] = useState<TokenListItem[] | null>(null);
-  const [loadedBoardKey, setLoadedBoardKey] = useState("");
-  const [topByMcap, setTopByMcap] = useState<TokenListItem[]>([]);
-  const [serverFilterCounts, setServerFilterCounts] = useState<ArenaFilterCounts | null>(null);
-  const [hasMore, setHasMore] = useState(false);
+  const seededBoard = peekDefaultNewBoard();
+  const [tokens, setTokens] = useState<TokenListItem[] | null>(() => seededBoard?.tokens ?? null);
+  const [loadedBoardKey, setLoadedBoardKey] = useState(() =>
+    seededBoard ? boardCacheKey("new", "age", "desc", "") : ""
+  );
+  const [topByMcap, setTopByMcap] = useState<TokenListItem[]>(() => seededBoard?.topByMcap ?? []);
+  const [serverFilterCounts, setServerFilterCounts] = useState<ArenaFilterCounts | null>(
+    () => seededBoard?.serverFilterCounts ?? null
+  );
+  const [hasMore, setHasMore] = useState(() => seededBoard?.hasMore ?? false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [boardRefreshing, setBoardRefreshing] = useState(false);
   const [apiBnbUsd, setApiBnbUsd] = useState<number | null>(null);
@@ -82,7 +92,7 @@ export function useArenaExploreBoard(options: UseArenaExploreBoardOptions = {}) 
   const flashTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const capAnimFrameRef = useRef<Record<string, number>>({});
   const animatedCapsRef = useRef<Record<string, number>>({});
-  const tokensRef = useRef<TokenListItem[] | null>(null);
+  const tokensRef = useRef<TokenListItem[] | null>(seededBoard?.tokens ?? null);
   const loadMoreRef = useRef<HTMLDivElement>(null);
   const listLimitRef = useRef(pageSize);
   const apiSortKey: BoardSortKey = activeFilter === "movers" ? "h24" : sortKey;

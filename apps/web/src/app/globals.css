@@ -11321,21 +11321,6 @@ code,
     }
   }
 
-  .airdrop-create-confirm-row {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 0.75rem;
-  }
-
-  .airdrop-create-confirm-row__label {
-    flex-shrink: 0;
-  }
-
-  .airdrop-create-confirm-row__value {
-    min-width: 0;
-  }
-
   .airdrops-page .airdrop-detail-topbar {
     display: flex;
     align-items: center;
@@ -16813,7 +16798,7 @@ code,
       grid-template-columns: var(--airdrop-mobile-row-logo-size) minmax(0, 1fr) auto;
       align-items: center;
       column-gap: 0.75rem;
-      padding: 0.8125rem 0.75rem;
+      padding: 0.75rem;
       border-bottom: 1px solid rgb(var(--pump-border) / 0.14);
       color: inherit;
       text-decoration: none;
@@ -16847,6 +16832,7 @@ code,
       display: flex;
       flex-direction: column;
       justify-content: space-between;
+      height: var(--airdrop-mobile-row-logo-size);
       min-height: var(--airdrop-mobile-row-logo-size);
       min-width: 0;
     }
@@ -16854,7 +16840,6 @@ code,
     .airdrop-mobile-campaign-row__aside {
       align-items: flex-end;
       flex-shrink: 0;
-      gap: 0.125rem;
       min-width: 4.75rem;
     }
 
@@ -16869,45 +16854,23 @@ code,
       margin: 0;
       font-size: var(--text-body-sm);
       font-weight: var(--weight-emphasis);
-      line-height: var(--leading-tight);
+      line-height: 1.2;
       letter-spacing: -0.01em;
       color: rgb(var(--pump-text));
     }
 
-    .airdrop-mobile-campaign-row__meta-line {
-      display: flex;
-      align-items: center;
-      gap: 0.375rem;
-      min-width: 0;
-    }
-
     .airdrop-mobile-campaign-row__symbol {
-      font-size: var(--text-label);
+      margin: 0;
+      font-size: var(--text-caption);
       font-weight: var(--weight-ui);
-      line-height: var(--leading-tight);
-      letter-spacing: var(--tracking-label);
+      line-height: 1.2;
       color: rgb(var(--pump-muted));
-      text-transform: uppercase;
-      flex-shrink: 0;
-    }
-
-    .airdrop-mobile-campaign-row__status {
-      flex-shrink: 0;
-      max-width: 100%;
-      font-size: 9px;
-      line-height: 1.1;
-      letter-spacing: 0.03em;
-      white-space: nowrap;
     }
 
     .airdrop-mobile-campaign-row__stats {
       display: flex;
       align-items: center;
-      gap: 0.625rem;
-      font-size: var(--text-label);
-      font-weight: var(--weight-ui);
-      line-height: var(--leading-tight);
-      color: rgb(var(--pump-muted));
+      min-width: 0;
     }
 
     .airdrop-mobile-campaign-row__stat {
@@ -16915,62 +16878,18 @@ code,
       align-items: center;
       gap: 0.25rem;
       min-width: 0;
-    }
-
-    .airdrop-mobile-campaign-row__stat-icon {
-      width: 0.6875rem;
-      height: 0.6875rem;
-      flex-shrink: 0;
-      opacity: 0.72;
-    }
-
-    .airdrop-mobile-campaign-row__quote {
-      display: flex;
-      flex-direction: column;
-      align-items: flex-end;
-      gap: 0.125rem;
-    }
-
-    .airdrop-mobile-campaign-row__metric {
-      display: flex;
-      align-items: baseline;
-      gap: 0.375rem;
-      justify-content: flex-end;
-    }
-
-    .airdrop-mobile-campaign-row__metric-label {
-      flex-shrink: 0;
-      min-width: 1.75rem;
-      font-size: var(--text-label);
-      font-weight: var(--weight-overline);
-      line-height: var(--leading-tight);
-      letter-spacing: var(--tracking-label);
-      text-transform: uppercase;
-      text-align: right;
-      color: rgb(var(--pump-muted) / 0.72);
-    }
-
-    .airdrop-mobile-campaign-row__metric-value {
-      font-variant-numeric: tabular-nums;
-      white-space: nowrap;
-    }
-
-    .airdrop-mobile-campaign-row__metric-value--pool {
-      font-size: var(--text-body-sm);
-      font-weight: var(--weight-metric);
-      line-height: var(--leading-tight);
-      letter-spacing: var(--tracking-metric);
-      color: rgb(var(--pump-accent));
+      font-size: var(--text-caption);
+      line-height: 1.2;
     }
 
     .airdrop-mobile-campaign-row__countdown {
       display: inline-flex;
-      align-items: baseline;
+      align-items: center;
       justify-content: flex-end;
       gap: 0.25rem;
-      font-size: var(--text-label);
+      font-size: var(--text-caption);
       font-weight: var(--weight-ui);
-      line-height: var(--leading-tight);
+      line-height: 1.2;
       color: rgb(var(--pump-muted));
       font-variant-numeric: tabular-nums;
       white-space: nowrap;
@@ -16978,6 +16897,39 @@ code,
 
     .airdrop-mobile-campaign-row__countdown--empty {
       color: rgb(var(--pump-muted) / 0.65);
+    }
+
+    .airdrop-mobile-campaign-row__status {
+      font-size: var(--text-caption);
+      font-weight: var(--weight-emphasis);
+      line-height: 1.2;
+      white-space: nowrap;
+    }
+
+    .airdrop-mobile-campaign-row__value {
+      display: inline-flex;
+      align-items: baseline;
+      justify-content: flex-end;
+      gap: 0.375rem;
+      margin: 0;
+      line-height: 1.2;
+      white-space: nowrap;
+    }
+
+    .airdrop-mobile-campaign-row__value-label {
+      font-size: var(--text-label);
+      font-weight: var(--weight-ui);
+      line-height: 1.2;
+      letter-spacing: 0;
+      text-transform: none;
+      color: rgb(var(--pump-muted));
+    }
+
+    .airdrop-mobile-campaign-row__value-amount {
+      font-size: var(--text-caption);
+      font-weight: var(--weight-emphasis);
+      letter-spacing: var(--tracking-metric);
+      font-variant-numeric: tabular-nums;
     }
 
     .airdrop-mobile-campaign-row__ends {
@@ -17462,7 +17414,22 @@ code,
     font-size: var(--text-caption);
     font-weight: var(--weight-emphasis);
     line-height: 1.2;
-    color: rgb(var(--pump-text));
+  }
+
+  .airdrop-value-usd--low {
+    color: rgb(var(--pump-accent));
+  }
+
+  .airdrop-value-usd--mid {
+    color: rgb(var(--pump-warning));
+  }
+
+  .airdrop-value-usd--high {
+    color: rgb(var(--pump-success));
+  }
+
+  .airdrop-value-usd--muted {
+    color: rgb(var(--pump-muted));
   }
 
   .airdrops-page .airdrops-list__cell--pool,
@@ -17544,9 +17511,14 @@ code,
     }
 
     .airdrops-page .airdrops-list__pool-token {
-      display: inline;
+      display: inline-flex;
     }
 
+    .airdrops-page .airdrops-list__cell--pool {
+      min-width: 0;
+    }
+
+    .airdrops-page .airdrops-list__pool-usd,
     .airdrops-page .airdrops-list__pool-usd--mobile {
       display: none;
     }

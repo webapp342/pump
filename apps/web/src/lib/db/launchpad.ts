@@ -1120,6 +1120,38 @@ export type TokenHolderSnapshot = {
   realizedPnlUsd?: string;
 };
 
+/** Cheap top-mcap address for trade default redirect when Redis is cold. */
+export async function getTopTokenAddressByMcap(): Promise<string | null> {
+  const db = getLaunchpadReadPool();
+
+  if (useTokenBoardStats()) {
+    const board = await db.query<{ token_address: string }>(
+      `
+      SELECT tbs.token_address
+      FROM token_board_stats tbs
+      INNER JOIN tokens t ON t.address = tbs.token_address AND t.is_hidden = false
+      ORDER BY tbs.market_cap_zug DESC NULLS LAST
+      LIMIT 1
+      `
+    );
+    if (board.rows[0]?.token_address) {
+      return board.rows[0].token_address.toLowerCase();
+    }
+  }
+
+  const bonding = await db.query<{ token_address: string }>(
+    `
+    SELECT b.token_address
+    FROM bonding_states b
+    INNER JOIN tokens t ON t.address = b.token_address AND t.is_hidden = false
+    WHERE b.market_cap_zug > 0
+    ORDER BY b.market_cap_zug DESC
+    LIMIT 1
+    `
+  );
+  return bonding.rows[0]?.token_address?.toLowerCase() ?? null;
+}
+
 export async function getTokenByAddress(address: string): Promise<TokenDetail | null> {
   const db = getLaunchpadReadPool();
   const normalized = address.toLowerCase();

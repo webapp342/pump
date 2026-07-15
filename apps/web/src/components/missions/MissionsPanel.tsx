@@ -66,7 +66,7 @@ export function MissionsPanel() {
       return;
     }
 
-    setData(null);
+    /** Soft refresh — keep prior missions painted while refetching. */
     setLoading(true);
     void loadMissions(address);
   }, [address, isConnected, loadMissions]);

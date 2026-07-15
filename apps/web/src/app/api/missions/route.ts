@@ -31,18 +31,29 @@ export async function GET(request: NextRequest) {
 
     let missionsChanged = false;
 
-    const smartBuyTrade = await getFirstSmartBuyQualifyingTrade(address);
-    if (smartBuyTrade) {
-      const changed = await ensureFirstSmartBuyAward(address, {
-        eventId: smartBuyTrade.eventId,
-        txHash: smartBuyTrade.txHash,
-        tokenAddress: smartBuyTrade.tokenAddress,
-        zugAmountBnb: smartBuyTrade.zugAmountBnb,
-      });
-      missionsChanged = missionsChanged || changed;
+    const smartBuyAlreadyDone = snapshot.missions.some(
+      (mission) => mission.taskKey === FIRST_SMART_BUY_KEY && mission.completed
+    );
+    const volumeMonsterAlreadyDone = snapshot.missions.some(
+      (mission) => mission.taskKey === VOLUME_MONSTER_KEY && mission.completed
+    );
+
+    /** Expensive trade scan — skip when the award is already completed. */
+    let smartBuyTrade = null as Awaited<ReturnType<typeof getFirstSmartBuyQualifyingTrade>>;
+    if (!smartBuyAlreadyDone) {
+      smartBuyTrade = await getFirstSmartBuyQualifyingTrade(address);
+      if (smartBuyTrade) {
+        const changed = await ensureFirstSmartBuyAward(address, {
+          eventId: smartBuyTrade.eventId,
+          txHash: smartBuyTrade.txHash,
+          tokenAddress: smartBuyTrade.tokenAddress,
+          zugAmountBnb: smartBuyTrade.zugAmountBnb,
+        });
+        missionsChanged = missionsChanged || changed;
+      }
     }
 
-    if (volumeBnb >= VOLUME_MONSTER_TARGET) {
+    if (!volumeMonsterAlreadyDone && volumeBnb >= VOLUME_MONSTER_TARGET) {
       const changed = await ensureVolumeMonsterAward(address);
       missionsChanged = missionsChanged || changed;
     }
