@@ -1,6 +1,12 @@
 "use client";
 
-import type { PushDisplayMode, PushPlatform, PushStatus, PushSubscriptionPayload } from "@/lib/push/types";
+import type {
+  PushDisplayMode,
+  PushPlatform,
+  PushPreferences,
+  PushStatus,
+  PushSubscriptionPayload,
+} from "@/lib/push/types";
 import { detectPushPlatform, iosPushNeedsInstall, isMobilePwaClient } from "@/lib/push/platform";
 
 const PUSH_ENDPOINT_STORAGE_KEY = "pump_push_endpoint";
@@ -706,7 +712,12 @@ export async function fetchPushStatus(): Promise<PushStatus> {
       platform,
       standalone,
       needsInstall,
-      preferences: { airdropUpdates: true, tradeAlerts: true, favoriteMoves: true },
+      preferences: {
+        airdropUpdates: true,
+        tradeAlerts: true,
+        favoriteMoves: true,
+        followerAnnouncements: true,
+      },
     };
   }
 
@@ -736,8 +747,33 @@ export async function fetchPushStatus(): Promise<PushStatus> {
       airdropUpdates: true,
       tradeAlerts: true,
       favoriteMoves: true,
+      followerAnnouncements: true,
     },
   };
+}
+
+export async function updatePushPreferencesClient(
+  patch: Partial<PushPreferences>
+): Promise<PushPreferences> {
+  const response = await fetch("/api/push/preferences", {
+    method: "PATCH",
+    credentials: "same-origin",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(patch),
+  });
+  const body = (await response.json()) as {
+    error?: string;
+    data?: { preferences?: PushPreferences };
+  };
+  if (!response.ok) throw new Error(body.error ?? "Could not update preferences");
+  return (
+    body.data?.preferences ?? {
+      airdropUpdates: true,
+      tradeAlerts: true,
+      favoriteMoves: true,
+      followerAnnouncements: true,
+    }
+  );
 }
 
 export async function readLocalPushSubscriptionEndpoint(): Promise<string | null> {

@@ -2,6 +2,7 @@
 
 import {
   PumpIcon,
+  faCampaign,
   faCheck,
   faClock,
   faCopy,
@@ -69,6 +70,7 @@ import { PriceChart } from "@/components/token/PriceChart";
 import { FavoriteIcon } from "@/components/icons/FavoriteIcon";
 import { useFavorites } from "@/components/favorites/FavoritesProvider";
 import { TokenAvatar } from "@/components/token/TokenAvatar";
+import { TokenAnnouncementsPanel } from "@/components/token/TokenAnnouncementsPanel";
 import { CreatorProfileModal } from "@/components/creators/CreatorProfileModal";
 import { CreatorRewardsCard } from "@/components/creators/CreatorRewardsCard";
 import { ShareSheetModal } from "@/components/ui/ShareSheetModal";
@@ -94,6 +96,8 @@ import {
   type TokenTradeWsPayload,
 } from "@/lib/token-live-delta";
 import { hapticTap } from "@/lib/haptic";
+import { useOpenConnectModal } from "@/hooks/useOpenConnectModal";
+import { toast } from "@/lib/toast";
 
 const CHAIN_LIVE_POLL_MS = 2_000;
 const BURST_POLL_MS = 1_500;
@@ -276,9 +280,12 @@ export function TokenDetailLive({
   const tradePrefillCapturedRef = useRef(false);
   const searchParams = useSearchParams();
   const router = useRouter();
-  const { isConnected } = useAccount();
+  const { address, isConnected } = useAccount();
+  const { openConnectModal } = useOpenConnectModal();
   const { bnbUsd } = useBnbUsdPrice();
   const { isFavorite, toggleFavorite, upsertFavoriteSnapshots } = useFavorites();
+  const [announceBusy, setAnnounceBusy] = useState(false);
+  const [announcementsRefreshKey, setAnnouncementsRefreshKey] = useState(0);
   const burstUntilRef = useRef(0);
   const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const optimisticRef = useRef<TradeItem[]>([]);
@@ -750,6 +757,52 @@ export function TokenDetailLive({
 
   const favorited = isFavorite(streamAddress);
 
+  const onAnnounce = useCallback(async () => {
+    hapticTap();
+    if (!isConnected || !address) {
+      openConnectModal();
+      return;
+    }
+    if (announceBusy || tradeLocked) return;
+
+    setAnnounceBusy(true);
+    try {
+      const response = await fetch("/api/tokens/announce", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ address, tokenAddress: streamAddress }),
+      });
+      const body = (await response.json()) as {
+        error?: string;
+        data?: { announcement?: { multiplierX?: number } };
+      };
+      if (!response.ok) {
+        toast.error("Announce failed", body.error ?? "Could not announce this token.");
+        return;
+      }
+      const x = body.data?.announcement?.multiplierX;
+      const xLabel =
+        x != null && Number.isFinite(x)
+          ? x >= 10
+            ? `${x.toFixed(1)}x`
+            : `${x.toFixed(2)}x`
+          : null;
+      toast.success(xLabel ? `Announced at ${xLabel}` : "Announced", "Added to Callouts.");
+      setAnnouncementsRefreshKey((key) => key + 1);
+    } catch {
+      toast.error("Announce failed", "Network error. Try again.");
+    } finally {
+      setAnnounceBusy(false);
+    }
+  }, [
+    address,
+    announceBusy,
+    isConnected,
+    openConnectModal,
+    streamAddress,
+    tradeLocked,
+  ]);
+
   useEffect(() => {
     if (!isFavorite(streamAddress)) return;
     upsertFavoriteSnapshots([liveToken]);
@@ -770,6 +823,7 @@ export function TokenDetailLive({
     launchTxHash: liveToken.launchTxHash,
     followerCount: liveToken.creatorFollowerCount,
     tokenDescription: liveToken.description,
+    announcementsRefreshKey,
   };
 
   useEffect(() => {
@@ -1015,6 +1069,16 @@ export function TokenDetailLive({
           </button>
           <button
             type="button"
+            onClick={() => void onAnnounce()}
+            disabled={tradeLocked || announceBusy}
+            aria-label="Announce token"
+            title="Announce"
+            className="token-detail-toolbar__announce-btn"
+          >
+            <PumpIcon icon={faCampaign} className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
             onClick={() => setShareOpen(true)}
             className="token-detail-toolbar__share-btn"
             aria-label="Share token"
@@ -1061,7 +1125,9 @@ export function TokenDetailLive({
               favorited={favorited}
               tradeLocked={tradeLocked}
               copiedAddress={copiedAddress}
+              announceBusy={announceBusy}
               onToggleFavorite={() => toggleFavorite(streamAddress, liveToken)}
+              onAnnounce={() => void onAnnounce()}
               onCopyAddress={() => void onCopyAddress()}
               isRefreshing={isRefreshing}
             />
@@ -1146,6 +1212,11 @@ export function TokenDetailLive({
               {liveToken.description?.trim() || "No description provided."}
             </p>
           </section>
+          <TokenAnnouncementsPanel
+            tokenAddress={streamAddress}
+            refreshKey={announcementsRefreshKey}
+            onOpenProfile={setProfileAddress}
+          />
         </aside>
       </div>
 

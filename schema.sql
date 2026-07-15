@@ -1126,6 +1126,7 @@ CREATE TABLE public.push_preferences (
     airdrop_updates boolean DEFAULT true NOT NULL,
     trade_alerts boolean DEFAULT true NOT NULL,
     favorite_moves boolean DEFAULT true NOT NULL,
+    follower_announcements boolean DEFAULT true NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     CONSTRAINT push_preferences_user_address_check CHECK ((user_address = lower(user_address)))
 );
@@ -1311,6 +1312,45 @@ CREATE TABLE public.token_favorites (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     CONSTRAINT token_favorites_user_address_check CHECK ((user_address = lower(user_address)))
 );
+
+
+--
+-- Name: token_announcements; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.token_announcements (
+    id bigint NOT NULL,
+    token_address text NOT NULL,
+    announcer_address text NOT NULL,
+    market_cap_zug_at_announce numeric NOT NULL,
+    launch_mcap_zug numeric NOT NULL,
+    multiplier_x numeric NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT token_announcements_token_address_check CHECK ((token_address = lower(token_address))),
+    CONSTRAINT token_announcements_announcer_address_check CHECK ((announcer_address = lower(announcer_address))),
+    CONSTRAINT token_announcements_mcap_check CHECK ((market_cap_zug_at_announce > (0)::numeric)),
+    CONSTRAINT token_announcements_launch_mcap_check CHECK ((launch_mcap_zug > (0)::numeric)),
+    CONSTRAINT token_announcements_multiplier_check CHECK ((multiplier_x > (0)::numeric))
+);
+
+
+--
+-- Name: token_announcements_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.token_announcements_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: token_announcements_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.token_announcements_id_seq OWNED BY public.token_announcements.id;
 
 
 --

@@ -27,6 +27,7 @@ import { useLiveTradeAnimations } from "@/hooks/useLiveTradeAnimations";
 import { useInfiniteScrollSentinel } from "@/hooks/useInfiniteScrollSentinel";
 import { useUserDisplayNames } from "@/hooks/useUserDisplayNames";
 import { CreatorRewardsCard } from "@/components/creators/CreatorRewardsCard";
+import { TokenAnnouncementsPanel } from "@/components/token/TokenAnnouncementsPanel";
 
 type ActivityTab = "holders" | "trades" | "social" | "about";
 
@@ -304,6 +305,7 @@ export function TradeTape({
   launchTxHash = "",
   followerCount = 0,
   tokenDescription,
+  announcementsRefreshKey = 0,
 }: {
   tokenAddress: string;
   creatorAddress: string;
@@ -328,6 +330,7 @@ export function TradeTape({
   launchTxHash?: string;
   followerCount?: number;
   tokenDescription?: string | null;
+  announcementsRefreshKey?: number;
 }) {
   const creatorKey = creatorAddress.toLowerCase();
   const [internalTab, setInternalTab] = useState<ActivityTab>("trades");
@@ -528,7 +531,12 @@ export function TradeTape({
 
       <div className="token-trade-tape__scroll scrollbar-corporate">
         {tab === "social" ? (
-          <div className="token-tape-social-panel" aria-label="Social" />
+          <TokenAnnouncementsPanel
+            tokenAddress={tokenAddress}
+            refreshKey={announcementsRefreshKey}
+            onOpenProfile={onAddressClick}
+            variant="tape"
+          />
         ) : tab === "about" ? (
           <div className="token-tape-about-panel">
             <CreatorRewardsCard

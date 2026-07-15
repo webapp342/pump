@@ -195,9 +195,10 @@ export async function getPushPreferences(userAddress: string): Promise<PushPrefe
     airdrop_updates: boolean;
     trade_alerts: boolean;
     favorite_moves: boolean;
+    follower_announcements: boolean;
   }>(
     `
-    SELECT airdrop_updates, trade_alerts, favorite_moves
+    SELECT airdrop_updates, trade_alerts, favorite_moves, follower_announcements
     FROM push_preferences
     WHERE user_address = $1
   `,
@@ -210,6 +211,7 @@ export async function getPushPreferences(userAddress: string): Promise<PushPrefe
       airdropUpdates: true,
       tradeAlerts: true,
       favoriteMoves: true,
+      followerAnnouncements: true,
     };
   }
 
@@ -217,7 +219,55 @@ export async function getPushPreferences(userAddress: string): Promise<PushPrefe
     airdropUpdates: row.airdrop_updates,
     tradeAlerts: row.trade_alerts,
     favoriteMoves: row.favorite_moves,
+    followerAnnouncements: row.follower_announcements,
   };
+}
+
+export async function updatePushPreferences(
+  userAddress: string,
+  patch: Partial<PushPreferences>
+): Promise<PushPreferences> {
+  const db = getLaunchpadPool();
+  const address = userAddress.toLowerCase();
+
+  await db.query(
+    `
+    INSERT INTO push_preferences (user_address)
+    VALUES ($1)
+    ON CONFLICT (user_address) DO NOTHING
+    `,
+    [address]
+  );
+
+  const current = await getPushPreferences(address);
+  const next: PushPreferences = {
+    airdropUpdates: patch.airdropUpdates ?? current.airdropUpdates,
+    tradeAlerts: patch.tradeAlerts ?? current.tradeAlerts,
+    favoriteMoves: patch.favoriteMoves ?? current.favoriteMoves,
+    followerAnnouncements: patch.followerAnnouncements ?? current.followerAnnouncements,
+  };
+
+  await db.query(
+    `
+    UPDATE push_preferences
+    SET
+      airdrop_updates = $2,
+      trade_alerts = $3,
+      favorite_moves = $4,
+      follower_announcements = $5,
+      updated_at = now()
+    WHERE user_address = $1
+    `,
+    [
+      address,
+      next.airdropUpdates,
+      next.tradeAlerts,
+      next.favoriteMoves,
+      next.followerAnnouncements,
+    ]
+  );
+
+  return next;
 }
 
 export async function markPushSubscriptionSent(subscriptionId: number): Promise<void> {

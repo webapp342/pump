@@ -24,6 +24,7 @@ import {
 import { PnlCell } from "@/components/portfolio/PortfolioPnlCell";
 import { PortfolioFeesTab } from "@/components/portfolio/PortfolioFeesTab";
 import { PortfolioAirdropsSection } from "@/components/portfolio/PortfolioAirdropsSection";
+import { PortfolioCalloutsSection } from "@/components/portfolio/PortfolioCalloutsSection";
 import { resolveTopHoldingSummary } from "@/lib/portfolio-summary";
 import { PortfolioTabNav } from "@/components/portfolio/PortfolioTabNav";
 import { ClaimReferrerFeesModal } from "@/components/portfolio/ClaimReferrerFeesModal";
@@ -1750,6 +1751,12 @@ export function PortfolioPanel({
             pendingReferrerWei={pendingReferrerWei}
             onOpenReferrerClaim={() => setReferrerClaimOpen(true)}
           />
+          </div>
+        ) : null}
+
+        {activeTab === "callouts" ? (
+          <div className="portfolio-tab-panel">
+            <PortfolioCalloutsSection address={walletAddress} />
           </div>
         ) : null}
 

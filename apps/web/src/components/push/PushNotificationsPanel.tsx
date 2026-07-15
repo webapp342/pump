@@ -11,6 +11,7 @@ import {
   subscribePushActivityLog,
   subscribeToPushNotifications,
   unsubscribeFromPushNotifications,
+  updatePushPreferencesClient,
   type PushActivityEntry,
   type PushSubscribeProgress,
 } from "@/lib/push/client";
@@ -79,6 +80,7 @@ export function PushNotificationsPanel({ className = "" }: PushNotificationsPane
   const [status, setStatus] = useState<PushStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [prefsBusy, setPrefsBusy] = useState(false);
   const [busyStep, setBusyStep] = useState<PushSubscribeProgress | null>(null);
   const [activityLog, setActivityLog] = useState<readonly PushActivityEntry[]>(getPushActivityLog);
   const [error, setError] = useState<string | null>(null);
@@ -153,6 +155,35 @@ export function PushNotificationsPanel({ className = "" }: PushNotificationsPane
     }
   }
 
+  async function onToggleFollowerAnnouncements(next: boolean) {
+    if (!status) return;
+    setPrefsBusy(true);
+    setError(null);
+    const previous = status.preferences.followerAnnouncements;
+    setStatus({
+      ...status,
+      preferences: { ...status.preferences, followerAnnouncements: next },
+    });
+    try {
+      const preferences = await updatePushPreferencesClient({ followerAnnouncements: next });
+      setStatus((current) =>
+        current ? { ...current, preferences } : current
+      );
+    } catch (err) {
+      setStatus((current) =>
+        current
+          ? {
+              ...current,
+              preferences: { ...current.preferences, followerAnnouncements: previous },
+            }
+          : current
+      );
+      setError(err instanceof Error ? err.message : "Could not update callout alerts");
+    } finally {
+      setPrefsBusy(false);
+    }
+  }
+
   if (!supported) {
     return null;
   }
@@ -221,6 +252,23 @@ export function PushNotificationsPanel({ className = "" }: PushNotificationsPane
               Tap Enable once per device. After that, alerts work without repeating setup.
             </p>
           )}
+
+          {enabledOnThisDevice ? (
+            <label className="mt-3 flex cursor-pointer items-center justify-between gap-3">
+              <span className="min-w-0 text-caption text-pump-muted">
+                Callouts from people you follow
+              </span>
+              <input
+                type="checkbox"
+                className="h-4 w-4 accent-[rgb(var(--pump-accent))]"
+                checked={status.preferences.followerAnnouncements}
+                disabled={busy || prefsBusy}
+                onChange={(event) => {
+                  void onToggleFollowerAnnouncements(event.target.checked);
+                }}
+              />
+            </label>
+          ) : null}
 
           {busy && busyStep ? <PushSetupProgressBar label={busyStep.label} percent={busyStep.percent} /> : null}
 

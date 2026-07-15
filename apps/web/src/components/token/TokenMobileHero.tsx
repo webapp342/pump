@@ -6,7 +6,7 @@ import { PumpSubscriptPrice } from "@/components/ui/PumpSubscriptPrice";
 import { FavoriteIcon } from "@/components/icons/FavoriteIcon";
 import { TokenAvatar } from "@/components/token/TokenAvatar";
 import { TokenSocialLinksBar } from "@/components/token/TokenSocialLinksBar";
-import { PumpIcon, faArrowLeft, faCheck, faClock, faCopy } from "@/lib/icons";
+import { PumpIcon, faArrowLeft, faCampaign, faCheck, faClock, faCopy } from "@/lib/icons";
 import { shortAddress } from "@/config/chain";
 import { formatAge, isTokenAgeUnder1h } from "@/lib/arena-board-format";
 import { hapticTap } from "@/lib/haptic";
@@ -21,7 +21,9 @@ type TokenMobileHeroProps = {
   favorited: boolean;
   tradeLocked: boolean;
   copiedAddress: boolean;
+  announceBusy?: boolean;
   onToggleFavorite: () => void;
+  onAnnounce: () => void;
   onCopyAddress: () => void;
   isRefreshing?: boolean;
 };
@@ -90,7 +92,9 @@ export function TokenMobileHero({
   favorited,
   tradeLocked,
   copiedAddress,
+  announceBusy = false,
   onToggleFavorite,
+  onAnnounce,
   onCopyAddress,
   isRefreshing = false,
 }: TokenMobileHeroProps) {
@@ -99,6 +103,11 @@ export function TokenMobileHero({
   const handleCopyAddress = () => {
     hapticTap(6);
     onCopyAddress();
+  };
+
+  const handleAnnounce = () => {
+    hapticTap(6);
+    onAnnounce();
   };
 
   return (
@@ -147,6 +156,15 @@ export function TokenMobileHero({
             }
           >
             <FavoriteIcon active={favorited} className="token-mobile-hero__fav-icon" />
+          </button>
+          <button
+            type="button"
+            onClick={handleAnnounce}
+            disabled={tradeLocked || announceBusy}
+            aria-label="Announce token"
+            className="token-mobile-hero__icon-btn"
+          >
+            <PumpIcon icon={faCampaign} className="token-mobile-hero__fav-icon" aria-hidden />
           </button>
         </div>
       </div>

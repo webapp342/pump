@@ -1,10 +1,23 @@
-export const PORTFOLIO_TABS = ["holdings", "launched", "fees", "airdrops"] as const;
+export const PORTFOLIO_TABS = [
+  "holdings",
+  "launched",
+  "callouts",
+  "fees",
+  "airdrops",
+] as const;
 
 export type PortfolioTab = (typeof PORTFOLIO_TABS)[number];
 
 export function parsePortfolioTab(value: string | null | undefined): PortfolioTab {
   if (value === "earnings" || value === "rewards") return "fees";
-  if (value === "launched" || value === "fees" || value === "airdrops") return value;
+  if (
+    value === "launched" ||
+    value === "callouts" ||
+    value === "fees" ||
+    value === "airdrops"
+  ) {
+    return value;
+  }
   return "holdings";
 }
 
@@ -17,6 +30,7 @@ export function portfolioTabHref(tab: PortfolioTab): string {
 export const PORTFOLIO_TAB_LABELS: Record<PortfolioTab, string> = {
   holdings: "Holdings",
   launched: "Launched",
+  callouts: "Callouts",
   fees: "Earnings",
   airdrops: "Airdrops",
 };

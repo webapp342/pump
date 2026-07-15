@@ -17,6 +17,7 @@ export type PushPreferences = {
   airdropUpdates: boolean;
   tradeAlerts: boolean;
   favoriteMoves: boolean;
+  followerAnnouncements: boolean;
 };
 
 export type PushNotificationPayload = {

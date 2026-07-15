@@ -27,6 +27,7 @@ export async function GET(request: NextRequest) {
             airdropUpdates: true,
             tradeAlerts: true,
             favoriteMoves: true,
+            followerAnnouncements: true,
           },
         },
       });

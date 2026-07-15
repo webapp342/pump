@@ -2615,6 +2615,142 @@ code,
     border-top: none;
   }
 
+  .token-page-stack--aside > .token-announcements-panel {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    border-bottom: none;
+  }
+
+  .token-announcements-panel__list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+  }
+
+  .token-announcements-panel__row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    min-height: 2.75rem;
+  }
+
+  .token-announcements-panel__identity {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 0;
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: inherit;
+    text-align: left;
+    text-decoration: none;
+    cursor: pointer;
+  }
+
+  .token-announcements-panel__identity:hover .token-announcements-panel__name {
+    color: rgb(var(--pump-accent));
+  }
+
+  .token-announcements-panel__name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--text-body-sm);
+    font-weight: 600;
+    color: rgb(var(--pump-text));
+  }
+
+  .token-announcements-panel__meta {
+    display: flex;
+    flex-shrink: 0;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.125rem;
+  }
+
+  .token-announcements-panel__x {
+    font-size: var(--text-body-sm);
+    font-weight: 700;
+    color: rgb(var(--pump-accent));
+  }
+
+  .token-announcements-panel__time {
+    font-size: var(--text-caption);
+    color: rgb(var(--pump-muted));
+  }
+
+  .portfolio-callouts__list {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .portfolio-callouts__row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    min-height: 3.25rem;
+    padding: 0.75rem 1rem;
+    text-decoration: none;
+    color: inherit;
+    border-bottom: 1px solid rgb(var(--pump-border) / 0.12);
+    transition: background 0.12s ease;
+  }
+
+  .portfolio-callouts__row:last-child {
+    border-bottom: none;
+  }
+
+  .portfolio-callouts__row:hover {
+    background: rgb(var(--pump-border) / 0.06);
+  }
+
+  .portfolio-callouts__token {
+    display: flex;
+    min-width: 0;
+    flex: 1 1 auto;
+    flex-direction: column;
+    gap: 0.125rem;
+  }
+
+  .portfolio-callouts__symbol {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--text-body-sm);
+    font-weight: 600;
+  }
+
+  .portfolio-callouts__name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--text-caption);
+  }
+
+  .portfolio-callouts__meta {
+    display: flex;
+    flex-shrink: 0;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.125rem;
+  }
+
+  .portfolio-callouts__x {
+    font-size: var(--text-body-sm);
+    font-weight: 700;
+    color: rgb(var(--pump-accent));
+  }
+
+  .portfolio-callouts__time {
+    font-size: var(--text-caption);
+    color: rgb(var(--pump-muted));
+  }
+
   .token-page-stack--aside > .creator-rewards-card {
     flex-shrink: 0;
     gap: 0.625rem;
@@ -3243,6 +3379,12 @@ code,
 
     .token-tape-social-panel {
       min-height: 4rem;
+      padding: 0.75rem 0.875rem 1rem;
+    }
+
+    .token-announcements-panel__list--tape {
+      margin-top: 0;
+      gap: 0.625rem;
     }
 
     .token-mobile-toolbar-host {
@@ -5671,6 +5813,7 @@ code,
   }
 
   .token-detail-toolbar__fav-btn,
+  .token-detail-toolbar__announce-btn,
   .token-detail-toolbar__share-btn {
     box-sizing: border-box;
     display: inline-flex;
@@ -5695,9 +5838,15 @@ code,
     background: transparent;
   }
 
+  .token-detail-toolbar__announce-btn:hover,
   .token-detail-toolbar__share-btn:hover {
     color: rgb(var(--pump-text));
     background: rgb(var(--pump-border) / 0.08);
+  }
+
+  .token-detail-toolbar__announce-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
   }
 
   .token-detail-toolbar__fav-btn--active {
@@ -5711,6 +5860,7 @@ code,
   }
 
   .token-detail-toolbar__fav-btn .material-symbols-rounded,
+  .token-detail-toolbar__announce-btn .material-symbols-rounded,
   .token-detail-toolbar__share-btn .material-symbols-rounded,
   .token-detail-toolbar__fav-icon.material-symbols-rounded {
     font-size: var(--toolbar-icon-glyph);
@@ -5722,6 +5872,7 @@ code,
   }
 
   .token-detail-toolbar__fav-btn svg,
+  .token-detail-toolbar__announce-btn svg,
   .token-detail-toolbar__share-btn svg,
   .token-detail-toolbar__fav-icon {
     width: var(--toolbar-icon-glyph) !important;
@@ -18061,6 +18212,12 @@ code,
 
 .sign-in-modal__close-text:hover {
   color: rgb(var(--pump-text));
+}
+
+@media (min-width: 640px) {
+  .sign-in-modal__close-text {
+    display: none;
+  }
 }
 
 .sign-in-modal__stack {
