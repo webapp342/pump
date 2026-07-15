@@ -1242,10 +1242,26 @@ export function chartPriceFormatFromBase(
     if (price === 0) return currency === "usd" || currency === "mcap" ? "$0" : "0";
     if (currency === "mcap") {
       if (usdRate == null) return "—";
-      const usd = price * usdRate;
+      // Series stores native MCAP (spot × supply). Guard against stale log ticks /
+      // double-scaled outliers — LWC can briefly pass magnitude-shifted coords.
+      const range = options?.candles?.length ? candleNativeRange(options.candles) : null;
+      let native = price;
+      if (range && (price > range.max * 50 || price < range.min * 0.02)) {
+        let adjusted = price;
+        for (let attempt = 0; attempt < 12 && adjusted > range.max * 2; attempt += 1) {
+          adjusted /= 10;
+        }
+        if (adjusted >= range.min * 0.25 && adjusted <= range.max * 4) {
+          native = adjusted;
+        } else {
+          return "—";
+        }
+      }
+      const usd = native * usdRate;
       if (!Number.isFinite(usd) || usd <= 0) return "$0";
+      if (usd >= 1_000_000_000) return `$${(usd / 1_000_000_000).toFixed(2)}B`;
       if (usd >= 1_000_000) return `$${(usd / 1_000_000).toFixed(2)}M`;
-      if (usd >= 10_000) return `$${(usd / 1_000).toFixed(1)}K`;
+      if (usd >= 10_000) return `$${(usd / 1_000).toFixed(2)}K`;
       return `$${usd.toFixed(2)}`;
     }
     if (currency === "usd") {
@@ -1256,9 +1272,10 @@ export function chartPriceFormatFromBase(
     return formatPumpSubscriptPriceAxis(price, "") + ` ${NATIVE_SYMBOL}`;
   };
 
-  // Always wrap when candles exist — LWC may pass log/logical ticks even on linear MCAP first paint.
+  // Log-scale ticks need logical→price unwrap. MCAP is always linear — never wrap
+  // (wrapping stale log coords produced $xxM ghost axis while last value looked correct).
   const formatter =
-    options?.candles?.length
+    options?.useLogScale && options?.candles?.length
       ? wrapChartFormatterForLogScale(formatNative, options.candles)
       : formatNative;
 

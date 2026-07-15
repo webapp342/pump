@@ -446,7 +446,8 @@ export function PriceChart({
     const { candles, volumes } = buildCandlesFromTrades(
       fallbackTrades,
       timeInterval,
-      candleUnitScale,
+      /** Always native spot — `deriveChartSeries` applies MCAP scale once. */
+      1,
       {
         fillGaps: true,
         endTimeMs: chartEndTimeMs,
@@ -466,7 +467,6 @@ export function PriceChart({
     seriesState,
     fallbackTrades,
     timeInterval,
-    candleUnitScale,
     chartEndTimeMs,
     curveSnapshot?.virtualZugReserve,
     curveSnapshot?.virtualTokenReserve,
@@ -519,11 +519,12 @@ export function PriceChart({
     const rightScale = chart?.priceScale("right");
     if (!ts || !rightScale || candlesForChart.length === 0) return false;
 
-    rightScale.setAutoScale(true);
-    const useLog = useLogPriceScale;
+    // LWC v5: after mode switch / setData, re-enable autoscale so Y-axis snaps to series
+    // (otherwise stale log ranges label as ghost $xxM on MCAP).
     rightScale.applyOptions({
-      mode: useLog ? PriceScaleMode.Logarithmic : PriceScaleMode.Normal,
+      mode: useLogPriceScale ? PriceScaleMode.Logarithmic : PriceScaleMode.Normal,
     });
+    rightScale.setAutoScale(true);
     const { from, to } = visibleLogicalRange(candlesForChart, DEFAULT_VISIBLE_CANDLES);
     ts.setVisibleLogicalRange({ from, to });
     ts.scrollToRealTime();
@@ -781,14 +782,16 @@ export function PriceChart({
   }, [theme]);
 
   // Log scale when price range is wide (meme launch curves); MCAP stays linear.
-  // Do not force autoScale here — live updates were resetting manual Y-axis zoom.
+  // Force Normal + autoscale when leaving log (interval/currency switch) so axis
+  // ticks match series — LWC otherwise keeps stale log logical ranges.
   useEffect(() => {
     const rightScale = chartRef.current?.priceScale("right");
     if (!rightScale) return;
     rightScale.applyOptions({
       mode: useLogPriceScale ? PriceScaleMode.Logarithmic : PriceScaleMode.Normal,
     });
-  }, [currency, useLogPriceScale]);
+    rightScale.setAutoScale(true);
+  }, [currency, useLogPriceScale, timeInterval]);
 
   // Local timezone labels on chart axis.
   useEffect(() => {
@@ -817,6 +820,9 @@ export function PriceChart({
     rightScale?.applyOptions({
       mode: useLogPriceScale ? PriceScaleMode.Logarithmic : PriceScaleMode.Normal,
     });
+    if (shouldFitViewportRef.current) {
+      rightScale?.setAutoScale(true);
+    }
     applyCandleSeriesPriceFormat(candleSeries, priceFormat, candlesForChart);
 
     const nextCandles = candlesForChart;
