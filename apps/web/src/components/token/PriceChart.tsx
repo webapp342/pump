@@ -3,18 +3,16 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from "react";
 import {
   createChart,
-  CandlestickSeries,
-  HistogramSeries,
   PriceScaleMode,
-  type CandlestickData,
-  type HistogramData,
   type IChartApi,
   type ISeriesApi,
+  type SeriesType,
   type Time,
   ColorType,
   CrosshairMode,
 } from "lightweight-charts";
-import { PumpSubscriptPrice } from "@/components/ui/PumpSubscriptPrice";
+import { PumpIcon } from "@/components/icons/PumpIcon";
+import { faChevronDown } from "@/lib/pump-icons";
 import {
   applyCandleSeriesPriceFormat,
   buildCandlesFromTrades,
@@ -29,6 +27,17 @@ import {
   type CandleWsUpdate,
   type VolumeBar,
 } from "@/lib/candles";
+import {
+  candleToMainChartPoint,
+  candlesToMainChartData,
+  CHART_DISPLAY_STYLE_OPTIONS,
+  chartDisplayStyleIcon,
+  createMainChartSeries,
+  readChartDisplayStyle,
+  resolveChartSeriesColors,
+  writeChartDisplayStyle,
+  type ChartDisplayStyle,
+} from "@/lib/chart-display-style";
 import type { TradeItem } from "@/lib/db/launchpad";
 import type { InitialChartCandles } from "@/lib/token-server";
 import {
@@ -46,10 +55,7 @@ import {
 } from "@/lib/chart-observability";
 import type { BondingCurveSnapshot } from "@/lib/bonding-curve";
 import { useTheme } from "@/components/theme/ThemeProvider";
-import {
-  bnbToUsd,
-  DEFAULT_TOKEN_TOTAL_SUPPLY,
-} from "@/lib/format-usd";
+import { DEFAULT_TOKEN_TOTAL_SUPPLY } from "@/lib/format-usd";
 
 type PriceChartProps = {
   tokenAddress: string;
@@ -78,9 +84,6 @@ type PriceChartProps = {
 
 const POLL_MS = 4_000;
 const WS_FALLBACK_POLL_MS = 30_000;
-const VOLUME_SCALE_ID = "volume";
-/** Chart volume histogram — hidden in UI; flip to re-enable. */
-const SHOW_CHART_VOLUME = false;
 const DEFAULT_VISIBLE_CANDLES = 120;
 /** Minimum Y-axis span so micro-cap moves don't fill the entire chart height. */
 const MIN_CHART_PRICE_RANGE_RATIO = 0.04;
@@ -145,7 +148,10 @@ function chartHeightPx(): number {
 }
 
 function resolveChartHeight(el: HTMLElement | null, fillContainer: boolean): number {
-  if (fillContainer && el && el.clientHeight > 0) return el.clientHeight;
+  if (fillContainer && el) {
+    // Collapsed split pane — keep LWC alive with a 1px canvas (ResizeObserver restores size).
+    return Math.max(1, el.clientHeight);
+  }
   return chartHeightPx();
 }
 
@@ -185,29 +191,6 @@ function formatLocalChartTick(time: Time, showSeconds: boolean): string {
   return `${hh}:${mm}:${ss}`;
 }
 
-function scaleVolumeBars(volumes: VolumeBar[], scale: number): VolumeBar[] {
-  if (scale === 1) return volumes;
-  return volumes.map((v) => ({ ...v, value: v.value * scale }));
-}
-
-function candleToChartData(c: CandleBar): CandlestickData {
-  return {
-    time: c.time as CandlestickData["time"],
-    open: c.open,
-    high: c.high,
-    low: c.low,
-    close: c.close,
-  };
-}
-
-function volumeToChartData(v: VolumeBar): HistogramData {
-  return {
-    time: v.time as HistogramData["time"],
-    value: v.value,
-    color: v.color,
-  };
-}
-
 /** True when we can patch tail buckets with series.update() instead of setData(). */
 function canIncrementalChartPatch(prev: CandleBar[], next: CandleBar[]): boolean {
   return canSafeIncrementalUpdate(prev, next);
@@ -215,8 +198,8 @@ function canIncrementalChartPatch(prev: CandleBar[], next: CandleBar[]): boolean
 
 export function PriceChart({
   tokenAddress,
-  symbol,
-  status,
+  symbol: _symbol,
+  status: _status,
   initialCandles,
   actorOptimisticSpot = null,
   curveSnapshot,
@@ -233,24 +216,31 @@ export function PriceChart({
   const [hideTimeAxis, setHideTimeAxis] = useState(isMobileChartViewport);
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
-  const candleSeriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
-  const volumeSeriesRef = useRef<ISeriesApi<"Histogram"> | null>(null);
+  const mainSeriesRef = useRef<ISeriesApi<SeriesType> | null>(null);
   /** Fit viewport only on first paint or interval/currency change — not every poll. */
   const shouldFitViewportRef = useRef(true);
   const lastTradeBucketCountRef = useRef(0);
   const prevPriceScaleRef = useRef<number | null>(null);
   const renderedCandlesRef = useRef<CandleBar[]>([]);
-  const renderedVolumesRef = useRef<VolumeBar[]>([]);
   const renderedFingerprintRef = useRef("");
+  const chartStyleRef = useRef<ChartDisplayStyle>("candles");
 
   const [timeInterval, setTimeInterval] = useState<CandleInterval>(DEFAULT_CHART_INTERVAL);
   const [internalCurrency, setInternalCurrency] = useState<"usd" | "mcap">("mcap");
   const currency = currencyProp ?? internalCurrency;
+  const [chartStyle, setChartStyle] = useState<ChartDisplayStyle>("candles");
+  const [styleMenuOpen, setStyleMenuOpen] = useState(false);
   const [seriesState, dispatchSeries] = useReducer(chartSeriesReducer, initialChartSeriesState);
   const [loading, setLoading] = useState(() => !initialCandles?.candles.length);
   const [error, setError] = useState<string | null>(null);
   const [nowMs, setNowMs] = useState(() => Date.now());
   const [ready, setReady] = useState(false);
+
+  chartStyleRef.current = chartStyle;
+
+  useEffect(() => {
+    setChartStyle(readChartDisplayStyle());
+  }, []);
 
   const frozen = false;
   /** Series values: BNB spot (usd) or BNB mcap — USD only in formatters. */
@@ -329,7 +319,6 @@ export function PriceChart({
     dispatchSeries({ type: "reset" });
     shouldFitViewportRef.current = true;
     renderedCandlesRef.current = [];
-    renderedVolumesRef.current = [];
     renderedFingerprintRef.current = "";
     setLoading(true);
     void fetchCandles();
@@ -354,7 +343,7 @@ export function PriceChart({
     }
     setNowMs(Date.now());
 
-    if (!ready || !candleSeriesRef.current) return;
+    if (!ready || !mainSeriesRef.current) return;
 
     const sig = `${actorOptimisticSpot.blockTimeMs}|${actorOptimisticSpot.spotAfterBnb}|${actorOptimisticSpot.side}`;
     if (lastOptimisticSigRef.current === sig) return;
@@ -373,13 +362,9 @@ export function PriceChart({
     );
     if (!opt) return;
 
-    const candleSeries = candleSeriesRef.current;
-    const volumeSeries = volumeSeriesRef.current;
+    const mainSeries = mainSeriesRef.current;
 
-    candleSeries.update(candleToChartData(opt.candle));
-    if (volumeSeries && opt.volume) {
-      volumeSeries.update(volumeToChartData(opt.volume));
-    }
+    mainSeries.update(candleToMainChartPoint(chartStyleRef.current, opt.candle) as never);
 
     // Keep our incremental tracking in sync so a subsequent derive doesn't force a disruptive setData.
     const prevC = renderedCandlesRef.current;
@@ -387,13 +372,6 @@ export function PriceChart({
     renderedCandlesRef.current = prevC.length === 0 || prevC[prevC.length-1]!.time < newLast.time
       ? [...prevC, newLast]
       : [...prevC.slice(0, -1), newLast];
-
-    if (opt.volume) {
-      const prevV = renderedVolumesRef.current;
-      renderedVolumesRef.current = prevV.length === 0 || prevV[prevV.length-1]!.time < opt.volume.time
-        ? [...prevV, opt.volume]
-        : [...prevV.slice(0, -1), opt.volume];
-    }
 
     // Scroll the live edge into view for the trader
     const ts = chartRef.current?.timeScale();
@@ -519,8 +497,8 @@ export function PriceChart({
     const rightScale = chart?.priceScale("right");
     if (!ts || !rightScale || candlesForChart.length === 0) return false;
 
-    // LWC v5: after mode switch / setData, re-enable autoscale so Y-axis snaps to series
-    // (otherwise stale log ranges label as ghost $xxM on MCAP).
+    // Only force autoscale on intentional fit (token / interval / currency / Fit button).
+    // Live polls must NOT call setAutoScale(true) — that flattens manual Y zoom.
     rightScale.applyOptions({
       mode: useLogPriceScale ? PriceScaleMode.Logarithmic : PriceScaleMode.Normal,
     });
@@ -552,7 +530,6 @@ export function PriceChart({
   const selectInterval = useCallback((id: CandleInterval) => {
     shouldFitViewportRef.current = true;
     renderedCandlesRef.current = [];
-    renderedVolumesRef.current = [];
     renderedFingerprintRef.current = "";
     setTimeInterval((prev) => {
       if (prev === id) {
@@ -564,7 +541,6 @@ export function PriceChart({
 
   useEffect(() => {
     renderedCandlesRef.current = [];
-    renderedVolumesRef.current = [];
     renderedFingerprintRef.current = "";
     lastTradeBucketCountRef.current = 0;
     shouldFitViewportRef.current = true;
@@ -620,8 +596,6 @@ export function PriceChart({
     const borderColor = `rgb(${cssVar("--pump-border", "96 116 148")} / 0.22)`;
     const gridColor = `rgb(${cssVar("--pump-border", "96 116 148")} / 0.12)`;
     const crosshairColor = `rgb(${cssVar("--pump-border", "96 116 148")} / 0.32)`;
-    const upColor = `rgb(${cssVar("--pump-success", "56 197 129")})`;
-    const downColor = `rgb(${cssVar("--pump-danger", "227 95 95")})`;
     const chartAxisFontSize = resolveChartAxisFontSize();
     const chart = createChart(el, {
       layout: {
@@ -640,7 +614,7 @@ export function PriceChart({
       },
       rightPriceScale: {
         borderColor,
-        scaleMargins: { top: 0.08, bottom: SHOW_CHART_VOLUME ? 0.22 : 0.08 },
+        scaleMargins: { top: 0.08, bottom: 0.08 },
         autoScale: true,
         mode: PriceScaleMode.Normal,
       },
@@ -676,31 +650,15 @@ export function PriceChart({
       },
     });
 
-    const candleSeries = chart.addSeries(CandlestickSeries, {
-      upColor,
-      downColor,
-      borderUpColor: upColor,
-      borderDownColor: downColor,
-      wickUpColor: upColor,
-      wickDownColor: downColor,
-      borderVisible: true,
-      wickVisible: true,
-      autoscaleInfoProvider: chartAutoscaleInfoProvider,
-    });
-
-    const volumeSeries = chart.addSeries(HistogramSeries, {
-      priceFormat: { type: "volume" },
-      priceScaleId: VOLUME_SCALE_ID,
-      visible: SHOW_CHART_VOLUME,
-    });
-    chart.priceScale(VOLUME_SCALE_ID).applyOptions({
-      scaleMargins: { top: 0.8, bottom: 0 },
-      visible: false,
-    });
+    const candleSeries = createMainChartSeries(
+      chart,
+      chartStyleRef.current,
+      resolveChartSeriesColors(),
+      { autoscaleInfoProvider: chartAutoscaleInfoProvider }
+    );
 
     chartRef.current = chart;
-    candleSeriesRef.current = candleSeries;
-    volumeSeriesRef.current = volumeSeries;
+    mainSeriesRef.current = candleSeries;
     setReady(true);
 
     const ro = new ResizeObserver(() => {
@@ -719,8 +677,7 @@ export function PriceChart({
       ro.disconnect();
       chart.remove();
       chartRef.current = null;
-      candleSeriesRef.current = null;
-      volumeSeriesRef.current = null;
+      mainSeriesRef.current = null;
       setReady(false);
     };
   }, [fillContainer]);
@@ -735,15 +692,13 @@ export function PriceChart({
   }, [hideTimeAxis]);
 
   useEffect(() => {
-    if (!chartRef.current || !candleSeriesRef.current) return;
+    if (!chartRef.current) return;
 
     const bgColor = `rgb(${cssVar("--pump-bg", "10 11 13")})`;
     const textColor = `rgb(${cssVar("--pump-muted", "142 157 181")})`;
     const borderColor = `rgb(${cssVar("--pump-border", "96 116 148")} / 0.22)`;
     const gridColor = `rgb(${cssVar("--pump-border", "96 116 148")} / 0.12)`;
     const crosshairColor = `rgb(${cssVar("--pump-border", "96 116 148")} / 0.32)`;
-    const upColor = `rgb(${cssVar("--pump-success", "56 197 129")})`;
-    const downColor = `rgb(${cssVar("--pump-danger", "227 95 95")})`;
 
     chartRef.current.applyOptions({
       layout: {
@@ -762,35 +717,54 @@ export function PriceChart({
       },
       rightPriceScale: {
         borderColor,
-        scaleMargins: { top: 0.08, bottom: 0.22 },
+        scaleMargins: { top: 0.08, bottom: 0.08 },
       },
       timeScale: {
         borderColor,
       },
     });
-
-    candleSeriesRef.current.applyOptions({
-      upColor,
-      downColor,
-      borderUpColor: upColor,
-      borderDownColor: downColor,
-      wickUpColor: upColor,
-      wickDownColor: downColor,
-      borderVisible: true,
-      wickVisible: true,
-    });
   }, [theme]);
 
+  // Swap Candles / Line / Area / … — same OHLC, no refetch. Recolor on theme.
+  const appliedChartStyleRef = useRef<string>("");
+  useEffect(() => {
+    const chart = chartRef.current;
+    if (!ready || !chart || !mainSeriesRef.current) return;
+
+    const styleKey = `${chartStyle}|${theme}`;
+    if (appliedChartStyleRef.current === styleKey) return;
+    appliedChartStyleRef.current = styleKey;
+
+    const prev = mainSeriesRef.current;
+    chart.removeSeries(prev);
+    const source = renderedCandlesRef.current;
+    const baselinePrice = source[0]?.close ?? 0;
+    const next = createMainChartSeries(chart, chartStyle, resolveChartSeriesColors(), {
+      autoscaleInfoProvider: chartAutoscaleInfoProvider,
+      baselinePrice,
+    });
+    mainSeriesRef.current = next;
+    renderedFingerprintRef.current = "";
+    shouldFitViewportRef.current = true;
+    if (source.length > 0) {
+      next.setData(candlesToMainChartData(chartStyle, source) as never);
+      scheduleFitViewport();
+    }
+  }, [chartStyle, theme, ready, scheduleFitViewport]);
   // Log scale when price range is wide (meme launch curves); MCAP stays linear.
-  // Force Normal + autoscale when leaving log (interval/currency switch) so axis
-  // ticks match series — LWC otherwise keeps stale log logical ranges.
+  // Do not setAutoScale here — live candle ticks would wipe manual Y-axis zoom.
+  // Autoscale only via fitChartViewport (interval / currency / token / Fit).
+  const lastPriceScaleModeRef = useRef<PriceScaleMode | null>(null);
   useEffect(() => {
     const rightScale = chartRef.current?.priceScale("right");
     if (!rightScale) return;
-    rightScale.applyOptions({
-      mode: useLogPriceScale ? PriceScaleMode.Logarithmic : PriceScaleMode.Normal,
-    });
-    rightScale.setAutoScale(true);
+    const nextMode = useLogPriceScale ? PriceScaleMode.Logarithmic : PriceScaleMode.Normal;
+    if (lastPriceScaleModeRef.current === nextMode) return;
+    lastPriceScaleModeRef.current = nextMode;
+    rightScale.applyOptions({ mode: nextMode });
+    if (shouldFitViewportRef.current) {
+      rightScale.setAutoScale(true);
+    }
   }, [currency, useLogPriceScale, timeInterval]);
 
   // Local timezone labels on chart axis.
@@ -812,39 +786,35 @@ export function PriceChart({
 
   // Push candle data — setData on structural changes; series.update() for live tail.
   useEffect(() => {
-    if (!ready || !candleSeriesRef.current || !volumeSeriesRef.current) return;
+    if (!ready || !mainSeriesRef.current) return;
 
-    const candleSeries = candleSeriesRef.current;
-    const volumeSeries = volumeSeriesRef.current;
+    const mainSeries = mainSeriesRef.current;
     const rightScale = chartRef.current?.priceScale("right");
-    rightScale?.applyOptions({
-      mode: useLogPriceScale ? PriceScaleMode.Logarithmic : PriceScaleMode.Normal,
-    });
+    const nextMode = useLogPriceScale ? PriceScaleMode.Logarithmic : PriceScaleMode.Normal;
+    if (lastPriceScaleModeRef.current !== nextMode) {
+      lastPriceScaleModeRef.current = nextMode;
+      rightScale?.applyOptions({ mode: nextMode });
+    }
     if (shouldFitViewportRef.current) {
+      rightScale?.applyOptions({ mode: nextMode });
       rightScale?.setAutoScale(true);
     }
-    applyCandleSeriesPriceFormat(candleSeries, priceFormat, candlesForChart);
+    applyCandleSeriesPriceFormat(mainSeries, priceFormat, candlesForChart);
 
     const nextCandles = candlesForChart;
     const nextVolumes = volumesForChart;
-    const fingerprint = `${tokenAddress}|${timeInterval}|${currency}|${candleUnitScale}`;
+    const fingerprint = `${tokenAddress}|${timeInterval}|${currency}|${candleUnitScale}|${chartStyle}`;
     const prevCandles = renderedCandlesRef.current;
 
     const applyFullSeries = () => {
-      const candleData = nextCandles.map(candleToChartData);
-      const volumeData = nextVolumes.map(volumeToChartData);
-      candleSeries.setData(candleData);
-      volumeSeries.setData(volumeData);
+      mainSeries.setData(candlesToMainChartData(chartStyle, nextCandles) as never);
       renderedCandlesRef.current = nextCandles;
-      renderedVolumesRef.current = nextVolumes;
       renderedFingerprintRef.current = fingerprint;
     };
 
     if (nextCandles.length === 0) {
-      candleSeries.setData([]);
-      volumeSeries.setData([]);
+      mainSeries.setData([]);
       renderedCandlesRef.current = [];
-      renderedVolumesRef.current = [];
       renderedFingerprintRef.current = fingerprint;
       return;
     }
@@ -863,13 +833,10 @@ export function PriceChart({
       const startIdx = incrementalPatchStartIndex(prevCandles, nextCandles);
       for (let i = startIdx; i < nextCandles.length; i++) {
         const candle = nextCandles[i];
-        const volume = nextVolumes[i];
         if (!candle) continue;
-        candleSeries.update(candleToChartData(candle));
-        if (volume) volumeSeries.update(volumeToChartData(volume));
+        mainSeries.update(candleToMainChartPoint(chartStyle, candle) as never);
       }
       renderedCandlesRef.current = nextCandles;
-      renderedVolumesRef.current = nextVolumes;
     }
 
     const ts = chartRef.current?.timeScale();
@@ -900,11 +867,42 @@ export function PriceChart({
     currency,
     candleUnitScale,
     useLogPriceScale,
+    chartStyle,
   ]);
 
   const showEmpty = !loading && !error && candles.length === 0;
   const showError = !loading && error && candles.length === 0;
   const chromeBlockClass = fillContainer ? "shrink-0" : "";
+
+  const selectChartStyle = useCallback((next: ChartDisplayStyle) => {
+    writeChartDisplayStyle(next);
+    setChartStyle(next);
+    setStyleMenuOpen(false);
+  }, []);
+
+  useEffect(() => {
+    if (!styleMenuOpen) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setStyleMenuOpen(false);
+    };
+    /** Defer so the opening click does not immediately close the menu. */
+    const timer = window.setTimeout(() => {
+      const onPointer = (event: MouseEvent) => {
+        const target = event.target as HTMLElement | null;
+        if (target?.closest?.(".price-chart-style-menu")) return;
+        setStyleMenuOpen(false);
+      };
+      window.addEventListener("mousedown", onPointer);
+      cleanupPointer = () => window.removeEventListener("mousedown", onPointer);
+    }, 0);
+    let cleanupPointer: (() => void) | undefined;
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.clearTimeout(timer);
+      cleanupPointer?.();
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [styleMenuOpen]);
 
   return (
     <section
@@ -914,27 +912,78 @@ export function PriceChart({
           : "panel-surface overflow-hidden"
       }
     >
-      <div className={`price-chart-toolbar ${chromeBlockClass}`}>
-        <div className="price-chart-toolbar__intervals">
-          <div className="price-chart-toolbar__interval-row">
-            <div className="segment-control">
-              {CANDLE_INTERVALS.map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => selectInterval(item.id)}
-                  className={`price-chart-toolbar__btn shrink-0 transition ${
-                    timeInterval === item.id
-                      ? "chip-button-active"
-                      : "chip-button chip-button-ghost"
-                  }`}
-                >
-                  {item.label}
-                </button>
-              ))}
+      <div
+        className={`price-chart-toolbar ${chromeBlockClass}${
+          styleMenuOpen ? " price-chart-toolbar--menu-open" : ""
+        }`}
+      >
+        <div className="price-chart-toolbar__leading">
+          <div className="price-chart-toolbar__intervals">
+            <div className="price-chart-toolbar__interval-row">
+              <div className="segment-control">
+                {CANDLE_INTERVALS.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => selectInterval(item.id)}
+                    className={`price-chart-toolbar__btn shrink-0 transition ${
+                      timeInterval === item.id
+                        ? "chip-button-active"
+                        : "chip-button chip-button-ghost"
+                    }`}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
+
+          <div className="price-chart-style-menu shrink-0">
+            <button
+              type="button"
+              aria-label="Chart type"
+              aria-haspopup="listbox"
+              aria-expanded={styleMenuOpen}
+              onClick={() => setStyleMenuOpen((open) => !open)}
+              className={`price-chart-style-trigger transition ${
+                styleMenuOpen ? "chip-button-active" : "chip-button chip-button-ghost"
+              }`}
+              title="Chart type"
+            >
+              <PumpIcon
+                icon={chartDisplayStyleIcon(chartStyle)}
+                className="price-chart-style-trigger__icon"
+              />
+              <PumpIcon
+                icon={faChevronDown}
+                className={`price-chart-style-trigger__caret${
+                  styleMenuOpen ? " price-chart-style-trigger__caret--open" : ""
+                }`}
+              />
+            </button>
+            {styleMenuOpen ? (
+              <div role="listbox" className="price-chart-style-menu__panel">
+                {CHART_DISPLAY_STYLE_OPTIONS.map((option) => (
+                  <button
+                    key={option.id}
+                    type="button"
+                    role="option"
+                    aria-selected={chartStyle === option.id}
+                    onClick={() => selectChartStyle(option.id)}
+                    className={`price-chart-style-menu__item ${
+                      chartStyle === option.id ? "price-chart-style-menu__item--active" : ""
+                    }`}
+                  >
+                    <PumpIcon icon={option.icon} className="price-chart-style-menu__item-icon" />
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </div>
         </div>
+
         <div className="price-chart-toolbar__actions">
           <div className="segment-control shrink-0">
             <button

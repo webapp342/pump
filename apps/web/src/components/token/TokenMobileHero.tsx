@@ -158,7 +158,7 @@ export function TokenMobileHero({
               address={token.address}
               symbol={token.symbol}
               logoUrl={token.logoUrl}
-              size={40}
+              size={36}
               shape="rounded"
               className="token-mobile-hero__logo shrink-0"
             />

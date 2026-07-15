@@ -131,10 +131,8 @@ export function deriveChartSeries(input: DeriveChartSeriesInput): {
   }
 
   let candles = scaleCandleBars(state.candles, priceScale);
-  let volumes =
-    priceScale === 1
-      ? state.volumes
-      : state.volumes.map((v) => ({ ...v, value: v.value * priceScale }));
+  /** Volume stays native — MCAP axis scale must not inflate histogram. */
+  let volumes = state.volumes;
 
   if (!state.gapFilledByApi && state.source === "trades") {
     const filled = fillGapsForStoredCandles(candles, volumes, displayInterval, {

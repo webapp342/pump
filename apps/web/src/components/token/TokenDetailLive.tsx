@@ -80,6 +80,7 @@ import { tokenDocumentTitle } from "@/lib/token-tab-title";
 import { writeLastTradeTokenAddress } from "@/lib/last-trade-token";
 import { useLiveChannel, resolveLivePollDelay } from "@/hooks/useLiveChannel";
 import { useRafMessageQueue } from "@/hooks/useRafMessageQueue";
+import { useTokenChartTapeSplit } from "@/hooks/useTokenChartTapeSplit";
 import { useBondingCurveMachine } from "@/hooks/useBondingCurveMachine";
 import {
   isUninitializedCurveTuple,
@@ -232,6 +233,7 @@ export function TokenDetailLive({
     TokenTradeWsPayload["bonding"] | null
   >(null);
   const [chartCurrency, setChartCurrency] = useState<"usd" | "mcap">("mcap");
+  const chartTapeSplit = useTokenChartTapeSplit();
 
   const streamAddress = contentSynced ? tokenAddress : token.address;
 
@@ -1065,8 +1067,18 @@ export function TokenDetailLive({
             />
           </div>
 
-          <div className="token-page-content-slot">
-            <div className="token-page-chart-slot">
+          <div
+            ref={chartTapeSplit.contentRef}
+            className="token-page-content-slot"
+            style={chartTapeSplit.contentStyle}
+          >
+            <div
+              className={
+                chartTapeSplit.chartCollapsed
+                  ? "token-page-chart-slot token-page-chart-slot--collapsed"
+                  : "token-page-chart-slot"
+              }
+            >
               <PriceChart
                 fillContainer
                 tokenAddress={streamAddress}
@@ -1083,6 +1095,13 @@ export function TokenDetailLive({
                 currency={chartCurrency}
                 onCurrencyChange={setChartCurrency}
               />
+            </div>
+
+            <div
+              className="token-page-split-handle"
+              {...chartTapeSplit.handleProps}
+            >
+              <span className="token-page-split-handle__grip" aria-hidden />
             </div>
 
             <div className="token-page-mobile-activity lg:hidden">
