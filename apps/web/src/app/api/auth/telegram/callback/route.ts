@@ -1,6 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getOrCreateTelegramWallet } from "@/lib/aa/telegram-wallet-server";
 import {
+  clearAuthReturnCookie,
+  readAuthReturnCookie,
+} from "@/lib/auth/auth-return-cookie";
+import {
   exchangeTelegramAuthCode,
   TELEGRAM_OIDC_COOKIE,
   type TelegramOidcCookiePayload,
@@ -77,11 +81,15 @@ export async function GET(request: NextRequest) {
 
     const completeUrl = new URL("/auth/telegram/complete", resolveAuthRedirectOrigin(request));
     completeUrl.searchParams.set("status", "ok");
+    const returnPath = readAuthReturnCookie(request);
+    if (returnPath) completeUrl.searchParams.set("next", returnPath);
+
     const redirect = NextResponse.redirect(completeUrl);
     for (const cookie of sessionResponse.cookies.getAll()) {
       redirect.cookies.set(cookie);
     }
     clearOidcCookie(redirect, request);
+    clearAuthReturnCookie(redirect, request);
     return redirect;
   } catch (error) {
     const message = error instanceof Error ? error.message : "Telegram login failed.";

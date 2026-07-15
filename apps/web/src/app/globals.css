@@ -7105,112 +7105,21 @@ code,
 
   @media (max-width: 767px) {
     :root {
-      --app-header-height: 3rem;
+      --app-header-height: 0px;
       --app-header-control-height: 1.75rem;
       --cyclops-logo-logogram-height: 1.125rem;
       --cyclops-logo-wordmark-height: 1.0625rem;
     }
 
+    /* Mobile: bottom tab bar is primary chrome — hide top header (incl. loading shell) */
+    .app-header,
+    .hub-terminal-header-band {
+      display: none !important;
+    }
+
     .cyclops-logo--lockup {
       gap: 0.3125rem;
       min-width: 0;
-    }
-
-    .app-header {
-      border-bottom-color: rgb(var(--pump-border) / 0.2);
-    }
-
-    .app-header-inner {
-      min-height: var(--app-header-height);
-      gap: 0.625rem;
-      padding-block: 0.375rem;
-    }
-
-    .app-header-start {
-      gap: 0.25rem;
-      min-width: 0;
-    }
-
-    .app-header-brand {
-      padding-right: 0;
-      min-width: 0;
-    }
-
-    .app-header-actions {
-      gap: 0.125rem;
-      align-items: center;
-    }
-
-    .app-header-utility-btn {
-      width: 2rem;
-      height: 2rem;
-      padding: 0;
-    }
-
-    .app-header-utility-btn__glyph {
-      width: 1rem;
-      height: 1rem;
-    }
-
-    /* Header actions — text links + ghost icon (Coinbase / Robinhood mobile) */
-    .app-header-icon-btn {
-      width: 2rem;
-      height: 2rem;
-      min-width: 2rem;
-      border: none;
-      border-radius: var(--radius-sm);
-      background: transparent;
-      color: rgb(var(--pump-muted));
-    }
-
-    .app-header-icon-btn:hover {
-      background: rgb(var(--pump-border) / 0.1);
-      color: rgb(var(--pump-text));
-    }
-
-    .app-header-icon-btn__glyph {
-      width: 1rem;
-      height: 1rem;
-    }
-
-    .app-header-create-btn {
-      padding: 0.3125rem 0.375rem;
-      font-size: 0.8125rem;
-      letter-spacing: -0.01em;
-    }
-
-    .app-header-create-btn:hover,
-    .app-header-create-btn--active {
-      background: transparent;
-      box-shadow: none;
-      color: rgb(var(--pump-accent));
-    }
-
-    .app-header-account-chip {
-      max-width: min(11rem, 40vw);
-      gap: 0.375rem;
-      padding: 0.25rem 0.375rem 0.25rem 0.25rem;
-    }
-
-    .app-header-account-chip__avatar,
-    .app-header-account-chip__avatar-fallback {
-      width: 1.375rem;
-      height: 1.375rem;
-    }
-
-    .app-header-balance-btn {
-      padding: 0.3125rem 0.375rem;
-    }
-
-    .app-header-sign-in-btn {
-      padding: 0.3125rem 0.375rem;
-      font-size: 0.8125rem;
-      letter-spacing: -0.01em;
-    }
-
-    .app-header-sign-in-btn:hover {
-      background: transparent;
-      color: rgb(var(--pump-accent));
     }
 
     .app-header-account-btn {
@@ -18111,4 +18020,191 @@ code,
   font-size: var(--mobile-bottom-nav-icon-size);
   width: var(--mobile-bottom-nav-icon-size);
   height: var(--mobile-bottom-nav-icon-size);
+}
+
+/* ==========================================================================
+   SIGN-IN MODAL (Glow Labs–style)
+   ========================================================================== */
+
+.sign-in-modal {
+  background: rgb(var(--pump-card)) !important;
+  width: min(100%, 20.5rem) !important;
+  max-width: 20.5rem !important;
+}
+
+.sign-in-modal__layout {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: min(28rem, 70dvh);
+  width: 100%;
+  padding: 2.5rem 1.25rem 1.5rem;
+}
+
+.sign-in-modal__close-text {
+  position: absolute;
+  left: 1rem;
+  top: 0.75rem;
+  z-index: 2;
+  min-height: 2.5rem;
+  padding: 0.375rem 0.25rem;
+  border: none;
+  background: transparent;
+  color: rgb(var(--pump-muted));
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.sign-in-modal__close-text:hover {
+  color: rgb(var(--pump-text));
+}
+
+.sign-in-modal__stack {
+  display: flex;
+  width: 100%;
+  max-width: 18.5rem;
+  flex-direction: column;
+  align-items: center;
+}
+
+.sign-in-modal__brand {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 1.25rem;
+  transform: scale(1.08);
+}
+
+.sign-in-modal__title {
+  font-size: 1.05rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: rgb(var(--pump-text));
+  margin: 0 0 1.75rem;
+  text-align: center;
+}
+
+.sign-in-modal__providers {
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+  width: 100%;
+}
+
+.sign-in-modal__btn {
+  display: flex;
+  width: 100%;
+  min-height: 3rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  border-radius: 0.625rem;
+  border: 1px solid rgb(var(--pump-border) / 0.45);
+  background: rgb(var(--pump-card-soft));
+  color: rgb(var(--pump-text));
+  font-size: 0.875rem;
+  font-weight: 550;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+}
+
+.sign-in-modal__btn:hover:not(:disabled) {
+  background: rgb(var(--pump-border) / 0.18);
+  border-color: rgb(var(--pump-border) / 0.7);
+}
+
+.sign-in-modal__btn:active:not(:disabled) {
+  transform: scale(0.99);
+}
+
+.sign-in-modal__btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.sign-in-modal__btn-icon {
+  display: inline-flex;
+  height: 1rem;
+  width: 1rem;
+  align-items: center;
+  justify-content: center;
+}
+
+.sign-in-modal__error {
+  margin-top: 0.25rem;
+  text-align: center;
+  font-size: 0.8rem;
+  color: rgb(var(--pump-danger));
+}
+
+.sign-in-modal__trust {
+  margin: 0;
+  text-align: center;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: rgb(var(--pump-muted));
+  max-width: 18rem;
+  margin-inline: auto;
+}
+
+.sign-in-modal__trust strong {
+  color: rgb(var(--pump-text));
+  font-weight: 560;
+}
+
+.sign-in-modal .app-bottom-sheet__footer {
+  border-top: none;
+  padding: 1rem 1.25rem 1.5rem;
+}
+
+/* Mobile: full-screen sign-in with swipe-to-dismiss grip */
+@media (max-width: 639px) {
+  .modal-sheet-host:has(.sign-in-modal) {
+    align-items: stretch;
+    padding: 0;
+  }
+
+  .sign-in-modal.app-bottom-sheet,
+  .sign-in-modal.modal-sheet-panel {
+    width: 100% !important;
+    max-width: none !important;
+    height: 100% !important;
+    max-height: none !important;
+    border-radius: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+
+  .sign-in-modal .app-bottom-sheet__grip-bar {
+    display: flex;
+  }
+
+  .sign-in-modal .app-bottom-sheet__body {
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .sign-in-modal__layout {
+    flex: 1 1 auto;
+    min-height: 0;
+    padding: 0.5rem 1.5rem 1rem;
+  }
+
+  .sign-in-modal__close-text {
+    top: 0.25rem;
+    left: 1.25rem;
+  }
+
+  .sign-in-modal__stack {
+    max-width: 20.5rem;
+  }
+
+  .sign-in-modal .app-bottom-sheet__footer {
+    padding: 1rem 1.5rem max(1.75rem, calc(env(safe-area-inset-bottom) + 1rem));
+  }
 }

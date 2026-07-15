@@ -9,6 +9,10 @@ import {
   verifyAppleIdToken,
 } from "@/lib/oauth/apple-oidc";
 import { clearOidcFlowCookie, readOidcFlowCookie } from "@/lib/oauth/oidc-flow";
+import {
+  clearAuthReturnCookie,
+  readAuthReturnCookie,
+} from "@/lib/auth/auth-return-cookie";
 import { resolvePublicAppOrigin } from "@/lib/telegram/public-app-origin";
 
 export async function GET(request: NextRequest) {
@@ -65,11 +69,15 @@ export async function GET(request: NextRequest) {
     const completeUrl = new URL("/auth/oauth/complete", resolvePublicAppOrigin(request));
     completeUrl.searchParams.set("provider", "apple");
     completeUrl.searchParams.set("status", "ok");
+    const returnPath = readAuthReturnCookie(request);
+    if (returnPath) completeUrl.searchParams.set("next", returnPath);
+
     const redirect = NextResponse.redirect(completeUrl);
     for (const cookie of sessionResponse.cookies.getAll()) {
       redirect.cookies.set(cookie);
     }
     clearOidcFlowCookie(redirect, request, APPLE_OIDC_COOKIE);
+    clearAuthReturnCookie(redirect, request);
     return redirect;
   } catch (err) {
     const message = err instanceof Error ? err.message : "Apple login failed.";

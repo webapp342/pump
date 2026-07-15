@@ -3,7 +3,7 @@
 import { PumpIcon, faCheck } from "@/lib/icons";
 import { TokenAvatar } from "@/components/token/TokenAvatar";
 import { shortAddress } from "@/config/chain";
-import { ModalPortal } from "@/components/ui/ModalPortal";
+import { AppBottomSheet } from "@/components/ui/AppBottomSheet";
 
 type TokenLaunchSuccessModalProps = {
   open: boolean;
@@ -27,48 +27,34 @@ export function TokenLaunchSuccessModal({
   onDismiss,
 }: TokenLaunchSuccessModalProps) {
   return (
-    <ModalPortal open={open}>
-      <div
-        className="modal-backdrop modal-backdrop-shell z-50"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="token-launch-success-title"
-      >
-        <button
-          type="button"
-          className="absolute inset-0 cursor-default"
-          aria-label="Close"
-          onClick={onDismiss}
-        />
-        <div className="modal-panel relative w-full max-w-md p-4 sm:p-5">
-          <div className="flex items-start justify-between gap-3 border-b border-pump-border/45 pb-3">
-            <div className="flex min-w-0 items-start gap-3">
-              <span
-                className="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-pump-accent/15 text-pump-accent"
-                aria-hidden
-              >
-                <PumpIcon icon={faCheck} className="h-[18px] w-[18px]" />
-              </span>
-              <div className="min-w-0">
-                <h2 id="token-launch-success-title" className="text-h3 font-semibold text-pump-text">
-                  Token launched
-                </h2>
-                <p className="mt-0.5 text-caption text-pump-muted">
-                  Your coin is live on the bonding curve.
-                </p>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={onDismiss}
-              className="inline-flex h-8 w-8 shrink-0 items-center justify-center text-pump-muted transition hover:bg-pump-border/10 hover:text-pump-text"
-              aria-label="Close"
-            >
-              ×
-            </button>
-          </div>
-
-          <div className="mt-4 flex items-center gap-3 rounded-lg border border-pump-border/30 bg-pump-card-soft/40 px-3 py-3">
+    <AppBottomSheet
+      open={open}
+      onClose={onDismiss}
+      ariaLabel="Token launched"
+      title="Token launched"
+      subtitle="Your coin is live on the bonding curve."
+      zIndex={50}
+      panelClassName="max-w-md"
+      headerLeading={
+        <span
+          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-pump-accent/15 text-pump-accent"
+          aria-hidden
+        >
+          <PumpIcon icon={faCheck} className="h-[18px] w-[18px]" />
+        </span>
+      }
+      footer={
+        <div className="space-y-2">
+          <button type="button" onClick={onCreateAirdrop} className="primary-button w-full py-2.5">
+            Create airdrop
+          </button>
+          <button type="button" onClick={onViewToken} className="secondary-button w-full py-2.5">
+            View token page
+          </button>
+        </div>
+      }
+    >
+          <div className="flex items-center gap-3 rounded-lg border border-pump-border/30 bg-pump-card-soft/40 px-3 py-3">
             <TokenAvatar
               address={tokenAddress}
               symbol={tokenSymbol}
@@ -78,7 +64,7 @@ export function TokenLaunchSuccessModal({
             <div className="min-w-0">
               <p className="truncate text-body font-semibold text-pump-text">{tokenName}</p>
               <p className="font-mono text-caption text-pump-muted">
-                ${tokenSymbol}
+                {tokenSymbol}
                 <span className="mx-1.5 text-pump-border">·</span>
                 {shortAddress(tokenAddress, true)}
               </p>
@@ -94,16 +80,6 @@ export function TokenLaunchSuccessModal({
             </p>
           </div>
 
-          <div className="mt-4 space-y-2">
-            <button type="button" onClick={onCreateAirdrop} className="primary-button w-full py-2.5">
-              Create airdrop
-            </button>
-            <button type="button" onClick={onViewToken} className="secondary-button w-full py-2.5">
-              View token page
-            </button>
-          </div>
-        </div>
-      </div>
-    </ModalPortal>
+    </AppBottomSheet>
   );
 }

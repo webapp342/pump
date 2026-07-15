@@ -641,7 +641,7 @@ export function PortfolioPanel({
   const activeTab = parsePortfolioTab(searchParams.get("tab") ?? initialTab);
   const hasSsrPortfolio = portfolioMatchesWallet(initialPortfolio, ssrWalletAddress);
   const { address, isConnected, isConnecting, isReconnecting } = useAccount();
-  const { authenticated, scwAddress: sessionAddress, ready: pumpReady } = usePumpWallet();
+  const { authenticated, scwAddress: sessionAddress, ready: pumpReady, login } = usePumpWallet();
   const walletSessionActive = pumpReady && authenticated && Boolean(sessionAddress);
   const { openConnectModal } = useOpenConnectModal();
   const { bnbUsd } = useBnbUsdPrice();
@@ -1258,7 +1258,9 @@ export function PortfolioPanel({
     return (
       <PortfolioGuestPanel
         activeTab={activeTab}
-        onSignIn={() => openConnectModal?.()}
+        onSignIn={() => {
+          login();
+        }}
       />
     );
   }

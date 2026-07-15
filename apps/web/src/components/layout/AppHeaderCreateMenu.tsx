@@ -2,12 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { CREATE_DESTINATIONS } from "@/lib/create-destinations";
 import { PumpIcon, faPlus } from "@/lib/icons";
-
-const CREATE_OPTIONS = [
-  { href: "/create", label: "Token", description: "Launch a meme on the bonding curve" },
-  { href: "/airdrops/create", label: "Airdrop", description: "Fund and run a reward campaign" },
-] as const;
 
 type AppHeaderCreateMenuProps = {
   pathname: string;
@@ -57,7 +53,7 @@ export function AppHeaderCreateMenu({ pathname }: AppHeaderCreateMenuProps) {
 
       {open ? (
         <div className="app-header-create-menu__panel" role="menu">
-          {CREATE_OPTIONS.map(({ href, label, description }) => {
+          {CREATE_DESTINATIONS.map(({ href, label, description }) => {
             const active = pathname === href || pathname.startsWith(`${href}/`);
             return (
               <Link

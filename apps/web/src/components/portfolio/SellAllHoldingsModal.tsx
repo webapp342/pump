@@ -33,7 +33,7 @@ import {
 } from "@/lib/batch-sell-permit-cache";
 import { formatTradeError } from "@/lib/trade-errors";
 import { formatUsdReadable } from "@/lib/format-usd";
-import { ModalPortal } from "@/components/ui/ModalPortal";
+import { AppBottomSheet } from "@/components/ui/AppBottomSheet";
 import { TokenAvatar } from "@/components/token/TokenAvatar";
 
 export type SellAllHoldingInput = {
@@ -372,42 +372,21 @@ export function SellAllHoldingsModal({
   const canSellNow = targets.length > 0 && !isBusy && !sellDone;
 
   return (
-    <ModalPortal open={open}>
-      <div
-        className="modal-backdrop modal-backdrop-shell z-50"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="sell-all-holdings-title"
-      >
-        <button
-          type="button"
-          className="absolute inset-0 cursor-default"
-          aria-label="Close"
-          onClick={onClose}
-        />
-        <div className="modal-panel relative w-full max-w-lg p-4 sm:p-5">
-          <div className="flex items-start justify-between gap-3 border-b border-pump-border/45 pb-3">
-            <div className="min-w-0">
-              <h2 id="sell-all-holdings-title" className="text-h3 font-semibold text-pump-text">
-                {isSingleSell ? "Sell max" : "Sell all holdings"}
-              </h2>
-              <p className="mt-0.5 text-caption text-pump-muted">
-                {isSingleSell
-                  ? "Exit your full balance on the bonding curve."
-                  : "Exit every bonding-curve position in on-chain batches."}
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={onClose}
-              className="inline-flex h-8 w-8 shrink-0 items-center justify-center text-pump-muted transition hover:bg-pump-border/10 hover:text-pump-text"
-              aria-label="Close"
-            >
-              ×
-            </button>
-          </div>
-
-          <div className="mt-4 rounded-md border border-pump-danger/25 bg-pump-danger/5 p-3.5">
+    <AppBottomSheet
+      open={open}
+      onClose={onClose}
+      ariaLabel={isSingleSell ? "Sell max" : "Sell all holdings"}
+      title={isSingleSell ? "Sell max" : "Sell all holdings"}
+      subtitle={
+        isSingleSell
+          ? "Exit your full balance on the bonding curve."
+          : "Exit every bonding-curve position in on-chain batches."
+      }
+      zIndex={50}
+      panelClassName="max-w-lg"
+      dragEntirePanel={false}
+    >
+          <div className="rounded-md border border-pump-danger/25 bg-pump-danger/5 p-3.5">
             <p className="section-label text-pump-danger">Estimated proceeds</p>
             <p className="mt-1 financial-value text-2xl font-semibold text-pump-text">
               {formatUsdReadable(estimatedUsdTotal, { compact: false }) ?? "—"}
@@ -516,8 +495,6 @@ export function SellAllHoldingsModal({
               Cancel
             </button>
           </div>
-        </div>
-      </div>
-    </ModalPortal>
+    </AppBottomSheet>
   );
 }

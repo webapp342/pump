@@ -16,7 +16,7 @@ function navLinkClass(active: boolean): string {
 }
 
 export function AppHeaderView({ pathname }: { pathname: string }) {
-  const { ready, authenticated, scwAddress } = usePumpWallet();
+  const { ready, authenticated, scwAddress, login } = usePumpWallet();
   const { isConnected } = useAccount();
   const walletReady =
     ready && authenticated && Boolean(scwAddress) && isConnected;
@@ -35,6 +35,7 @@ export function AppHeaderView({ pathname }: { pathname: string }) {
                 item.href === "/"
                   ? isTradeHomeRoute(pathname)
                   : pathname === item.href || pathname.startsWith(`${item.href}/`);
+              const requiresAuth = item.href === "/portfolio";
 
               return (
                 <Link
@@ -43,6 +44,15 @@ export function AppHeaderView({ pathname }: { pathname: string }) {
                   prefetch={true}
                   aria-current={active ? "page" : undefined}
                   className={navLinkClass(active)}
+                  onClick={
+                    requiresAuth
+                      ? (event) => {
+                          if (!ready || authenticated) return;
+                          event.preventDefault();
+                          login();
+                        }
+                      : undefined
+                  }
                 >
                   {item.label}
                 </Link>

@@ -14,6 +14,7 @@ import {
   faCopy,
   faLogout,
   faSun,
+  faUserPen,
 } from "@/lib/icons";
 
 function formatHeaderBalanceUsd(usd: number | null): string {
@@ -174,14 +175,29 @@ function AccountSummaryCard({
 function AccountSettingsNav({
   onLogout,
   onClose,
+  onEditProfile,
   showPushNotifications,
 }: {
   onLogout: () => void;
   onClose: () => void;
+  onEditProfile?: () => void;
   showPushNotifications: boolean;
 }) {
   return (
     <nav className="wallet-account-panel__nav" aria-label="Account settings">
+      {onEditProfile ? (
+        <button
+          type="button"
+          onClick={() => {
+            onClose();
+            onEditProfile();
+          }}
+          className="wallet-account-panel__nav-row"
+        >
+          <PumpIcon icon={faUserPen} className="wallet-account-panel__nav-icon" aria-hidden />
+          Edit profile
+        </button>
+      ) : null}
       {showPushNotifications ? <PushNotificationsPanel /> : null}
       <div className="wallet-account-panel__nav-row wallet-account-panel__nav-row--static">
         <span className="wallet-account-panel__nav-label">
@@ -213,6 +229,8 @@ export type WalletAccountPanelProps = {
   onToggleBalanceUnit: () => void;
   onClose: () => void;
   onLogout: () => void;
+  /** Opens profile editor after the sheet/dropdown closes. */
+  onEditProfile?: () => void;
   variant?: "dropdown" | "sheet";
 };
 
@@ -224,6 +242,7 @@ export function WalletAccountPanel({
   onToggleBalanceUnit,
   onClose,
   onLogout,
+  onEditProfile,
   variant = "dropdown",
 }: WalletAccountPanelProps) {
   const rootClass =
@@ -252,6 +271,7 @@ export function WalletAccountPanel({
       <AccountSettingsNav
         onLogout={onLogout}
         onClose={onClose}
+        onEditProfile={onEditProfile}
         showPushNotifications={variant === "sheet"}
       />
     </div>

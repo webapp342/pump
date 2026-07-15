@@ -14,7 +14,7 @@ import { useBnbUsdPrice } from "@/hooks/useBnbUsdPrice";
 import { bondingCurveManagerAbi } from "@/lib/bonding-curve";
 import { buildReferralInviteUrl, truncateReferralInviteUrl } from "@/lib/referral-link";
 import { ShareSheetModal } from "@/components/ui/ShareSheetModal";
-import { ModalPortal } from "@/components/ui/ModalPortal";
+import { AppBottomSheet } from "@/components/ui/AppBottomSheet";
 import { PumpIcon, faInviteLink } from "@/lib/icons";
 import { referralSharePayload } from "@/lib/share-links";
 import { formatPortfolioFeesUsd } from "@/lib/format-usd";
@@ -121,40 +121,31 @@ export function ClaimReferrerFeesModal({
 
   return (
     <>
-    <ModalPortal open={open}>
-      <div
-        className="modal-backdrop modal-backdrop-shell z-50"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="claim-referrer-fees-title"
-    >
-      <button
-        type="button"
-        className="absolute inset-0 cursor-default"
-        aria-label="Close"
-        onClick={onClose}
-      />
-      <div className="modal-panel relative w-full max-w-md p-4 sm:p-5">
-        <div className="flex items-start justify-between gap-3 border-b border-pump-border/45 pb-3">
-          <div>
-            <h2 id="claim-referrer-fees-title" className="text-h3 font-semibold text-pump-text">
-              Referral earnings
-            </h2>
-            <p className="mt-0.5 text-caption text-pump-muted">
-              Earnings from friends you invited
-            </p>
+      <AppBottomSheet
+        open={open}
+        onClose={onClose}
+        ariaLabel="Referral earnings"
+        title="Referral earnings"
+        subtitle="Earnings from friends you invited"
+        zIndex={50}
+        panelClassName="max-w-md"
+        footer={
+          <div className="flex gap-2">
+            <button type="button" onClick={onClose} className="secondary-button flex-1">
+              Close
+            </button>
+            <button
+              type="button"
+              disabled={!canClaim}
+              onClick={() => void handleClaim()}
+              className="primary-button flex-1 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {isPending || isConfirming ? "Claiming…" : "Claim"}
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="inline-flex h-8 w-8 items-center justify-center text-pump-muted transition hover:bg-pump-border/10 hover:text-pump-text"
-            aria-label="Close"
-          >
-            ×
-          </button>
-        </div>
-
-        <table className="sheet-grid mt-3 w-full">
+        }
+      >
+        <table className="sheet-grid w-full">
           <tbody>
             <tr>
               <th scope="row">Total earned</th>
@@ -233,22 +224,7 @@ export function ClaimReferrerFeesModal({
           </p>
         ) : null}
 
-        <div className="mt-4 flex gap-2">
-          <button type="button" onClick={onClose} className="secondary-button flex-1">
-            Close
-          </button>
-          <button
-            type="button"
-            disabled={!canClaim}
-            onClick={() => void handleClaim()}
-            className="primary-button flex-1 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {isPending || isConfirming ? "Claiming…" : "Claim"}
-          </button>
-        </div>
-      </div>
-    </div>
-    </ModalPortal>
+      </AppBottomSheet>
 
       {sharePayload ? (
         <ShareSheetModal

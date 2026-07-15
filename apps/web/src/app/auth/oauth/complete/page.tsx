@@ -6,7 +6,7 @@ export const metadata: Metadata = {
 };
 
 type OAuthAuthCompletePageProps = {
-  searchParams: Promise<{ status?: string; message?: string; provider?: string }>;
+  searchParams: Promise<{ status?: string; message?: string; provider?: string; next?: string }>;
 };
 
 export default async function OAuthAuthCompletePage({
@@ -19,6 +19,7 @@ export default async function OAuthAuthCompletePage({
       status={params.status ?? null}
       message={params.message ?? null}
       provider={params.provider ?? null}
+      next={params.next ?? null}
     />
   );
 }

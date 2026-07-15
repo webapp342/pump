@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState } from "react";
 import QRCode from "qrcode";
 import { pumpChain, shortAddress } from "@/config/chain";
 import { FUNDING_CHAIN_LABEL } from "@/lib/wallet-funding";
 import { copyToClipboard } from "@/lib/copy-to-clipboard";
-import { ModalPortal } from "@/components/ui/ModalPortal";
+import { AppBottomSheet } from "@/components/ui/AppBottomSheet";
 import { usePumpWallet } from "@/components/wallet/PumpWalletProvider";
 import { WithdrawForm } from "@/components/wallet/WithdrawForm";
 import type { WalletFundingOptions, WalletFundingView } from "@/components/wallet/WalletFundingProvider";
@@ -21,42 +21,36 @@ type WalletFundingModalProps = {
   onViewChange: (view: WalletFundingView) => void;
 };
 
-function FundingSheetFrame({
+function FundingSheetFrameHeader({
   title,
   subtitle,
   canReturnToChoice,
   onBack,
   onClose,
-  children,
 }: {
   title: string;
   subtitle?: string;
   canReturnToChoice?: boolean;
   onBack?: () => void;
   onClose: () => void;
-  children: ReactNode;
 }) {
   return (
-    <div className="app-sheet app-sheet--funding">
-      <div className="app-sheet__grab" aria-hidden />
-      <div className="app-sheet__header">
-        <div className="app-sheet__header-main">
-          {canReturnToChoice && onBack ? (
-            <button type="button" onClick={onBack} className="app-sheet__back" aria-label="Back">
-              <PumpIcon icon={faArrowLeft} className="h-4 w-4" />
-            </button>
-          ) : null}
-          <div className="min-w-0">
-            <h2 className="app-sheet__title">{title}</h2>
-            {subtitle ? <p className="app-sheet__subtitle">{subtitle}</p> : null}
-          </div>
+    <>
+      <div className="app-sheet__header-main">
+        {canReturnToChoice && onBack ? (
+          <button type="button" onClick={onBack} className="app-sheet__back" aria-label="Back">
+            <PumpIcon icon={faArrowLeft} className="h-4 w-4" />
+          </button>
+        ) : null}
+        <div className="min-w-0">
+          <h2 className="app-sheet__title">{title}</h2>
+          {subtitle ? <p className="app-sheet__subtitle">{subtitle}</p> : null}
         </div>
-        <button type="button" onClick={onClose} className="app-sheet__close" aria-label="Close">
-          <PumpIcon icon={faX} className="h-4 w-4" />
-        </button>
       </div>
-      <div className="app-sheet__body">{children}</div>
-    </div>
+      <button type="button" onClick={onClose} className="app-sheet__close" aria-label="Close">
+        <PumpIcon icon={faX} className="h-4 w-4" />
+      </button>
+    </>
   );
 }
 
@@ -150,64 +144,71 @@ export function WalletFundingModal({
         : (options.message ?? `Fund your wallet on ${FUNDING_CHAIN_LABEL}.`);
 
   return (
-    <ModalPortal open={open}>
-      <>
-        <button
-          type="button"
-          className="modal-backdrop modal-backdrop-dismiss z-[110] cursor-default transition-opacity"
-          aria-label="Close"
-          onClick={onClose}
+    <AppBottomSheet
+      open={open}
+      onClose={onClose}
+      ariaLabel={title}
+      title={title}
+      zIndex={110}
+      panelClassName="max-w-md"
+      bodyClassName="!p-0"
+      header={
+        <FundingSheetFrameHeader
+          title={title}
+          subtitle={subtitle}
+          canReturnToChoice={(view === "withdraw" || view === "deposit") && canReturnToChoice}
+          onBack={() => onViewChange("choice")}
+          onClose={onClose}
         />
-        <div className="modal-sheet-host z-[111]" role="dialog" aria-modal="true" aria-labelledby="wallet-funding-title">
-          <div className="modal-panel modal-sheet-panel app-sheet-host-panel pointer-events-auto max-w-md rounded-t-2xl border-x-0 border-b-0 sm:rounded-xl sm:border-x sm:border-b">
-            <FundingSheetFrame
-              title={title}
-              subtitle={subtitle}
-              canReturnToChoice={(view === "withdraw" || view === "deposit") && canReturnToChoice}
-              onBack={() => onViewChange("choice")}
-              onClose={onClose}
+      }
+    >
+      <div className="app-sheet__body">
+        {view === "choice" ? (
+          <div className="wallet-funding-choice">
+            <button
+              type="button"
+              onClick={() => onViewChange("deposit")}
+              className="wallet-funding-choice__item panel-surface"
             >
-              {view === "choice" ? (
-                <div className="wallet-funding-choice">
-                  <button type="button" onClick={() => onViewChange("deposit")} className="wallet-funding-choice__item panel-surface">
-                    <span className="wallet-funding-choice__icon">
-                      <PumpIcon icon={faWallet} className="h-5 w-5" />
-                    </span>
-                    <span className="min-w-0">
-                      <span className="block text-body-sm font-semibold text-pump-text">Deposit</span>
-                      <span className="mt-0.5 block text-caption leading-snug text-pump-muted">
-                        Receive {pumpChain.nativeCurrency.symbol} to your smart wallet.
-                      </span>
-                    </span>
-                  </button>
+              <span className="wallet-funding-choice__icon">
+                <PumpIcon icon={faWallet} className="h-5 w-5" />
+              </span>
+              <span className="min-w-0">
+                <span className="block text-body-sm font-semibold text-pump-text">Deposit</span>
+                <span className="mt-0.5 block text-caption leading-snug text-pump-muted">
+                  Receive {pumpChain.nativeCurrency.symbol} to your smart wallet.
+                </span>
+              </span>
+            </button>
 
-                  <button type="button" onClick={() => onViewChange("withdraw")} className="wallet-funding-choice__item panel-surface">
-                    <span className="wallet-funding-choice__icon">
-                      <PumpIcon icon={faArrowUpRight} className="h-5 w-5" />
-                    </span>
-                    <span className="min-w-0">
-                      <span className="block text-body-sm font-semibold text-pump-text">Withdraw</span>
-                      <span className="mt-0.5 block text-caption leading-snug text-pump-muted">
-                        Send {pumpChain.nativeCurrency.symbol} or tokens to an external address.
-                      </span>
-                    </span>
-                  </button>
-                </div>
-              ) : view === "deposit" ? (
-                authenticated && scwAddress ? (
-                  <DepositView address={scwAddress} onClose={onClose} />
-                ) : (
-                  <p className="notice-warning">Sign in to view your deposit address.</p>
-                )
-              ) : authenticated ? (
-                <WithdrawForm onClose={onClose} />
-              ) : (
-                <p className="notice-warning">Sign in to withdraw.</p>
-              )}
-            </FundingSheetFrame>
+            <button
+              type="button"
+              onClick={() => onViewChange("withdraw")}
+              className="wallet-funding-choice__item panel-surface"
+            >
+              <span className="wallet-funding-choice__icon">
+                <PumpIcon icon={faArrowUpRight} className="h-5 w-5" />
+              </span>
+              <span className="min-w-0">
+                <span className="block text-body-sm font-semibold text-pump-text">Withdraw</span>
+                <span className="mt-0.5 block text-caption leading-snug text-pump-muted">
+                  Send {pumpChain.nativeCurrency.symbol} or tokens to an external address.
+                </span>
+              </span>
+            </button>
           </div>
-        </div>
-      </>
-    </ModalPortal>
+        ) : view === "deposit" ? (
+          authenticated && scwAddress ? (
+            <DepositView address={scwAddress} onClose={onClose} />
+          ) : (
+            <p className="notice-warning">Sign in to view your deposit address.</p>
+          )
+        ) : authenticated ? (
+          <WithdrawForm onClose={onClose} />
+        ) : (
+          <p className="notice-warning">Sign in to withdraw.</p>
+        )}
+      </div>
+    </AppBottomSheet>
   );
 }

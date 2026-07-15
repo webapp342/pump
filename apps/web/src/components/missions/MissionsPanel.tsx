@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useOpenConnectModal } from "@/hooks/useOpenConnectModal";
 import { useAccount } from "wagmi";
 import {
   listPendingMissionKeys,
@@ -14,13 +13,14 @@ import { MissionsList } from "@/components/missions/MissionList";
 import { MissionsPanelSkeleton } from "@/components/missions/MissionsPanelSkeleton";
 import { HubDiscoveryScrollLock } from "@/components/layout/HubDiscoveryScrollLock";
 import type { Mission, MissionFilter, MissionsData } from "@/lib/missions-types";
+import { usePumpWallet } from "@/components/wallet/PumpWalletProvider";
 
 const BURST_POLL_MS = 1_500;
 const BURST_DURATION_MS = 60_000;
 
 export function MissionsPanel() {
   const { address, isConnected } = useAccount();
-  const { openConnectModal } = useOpenConnectModal();
+  const { login } = usePumpWallet();
   const [data, setData] = useState<MissionsData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -161,7 +161,13 @@ export function MissionsPanel() {
   }, [data, activeFilter]);
 
   if (!isConnected || !address) {
-    return <MissionsGuestPanel onSignIn={() => openConnectModal?.()} />;
+    return (
+      <MissionsGuestPanel
+        onSignIn={() => {
+          login();
+        }}
+      />
+    );
   }
 
   if (loading && !data) {

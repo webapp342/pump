@@ -16,7 +16,7 @@ Overrides `MASTER.md` for `/portfolio` only.
 
 **Typography note:** `--text-label` uppercase is for **section headers / metric captions**, not wallet CTA buttons (Coinbase/Robinhood use sentence case on actions).
 
-**Deposit** → `openDeposit()` · **Withdraw** → `openWithdraw()` · **Create** → `/create`.
+**Deposit** → `openDeposit()` · **Withdraw** → `openWithdraw()` · **Create** → mobile bottom sheet (`CreateChoiceSheet`: Token `/create` · Airdrop `/airdrops/create`).
 
 Icon semantics (Material Symbols, matches WalletAccountPanel copy):
 - **Deposit** = funds in (`south_west`) — same modal as legacy “Receive”

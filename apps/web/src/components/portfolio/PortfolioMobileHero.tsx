@@ -1,9 +1,10 @@
 "use client";
 
-import Link from "next/link";
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { ShareSheetModal } from "@/components/ui/ShareSheetModal";
 import { AccountSheet } from "@/components/wallet/AccountSheet";
+import { CreateChoiceSheet } from "@/components/create/CreateChoiceSheet";
 import { useWalletFunding } from "@/components/wallet/WalletFundingProvider";
 import { usePumpWallet } from "@/components/wallet/PumpWalletProvider";
 import { UserAvatarForAddress } from "@/components/user/UserAvatarForAddress";
@@ -19,7 +20,6 @@ import {
   faCheck,
   faCopy,
   faMenu,
-  faPen,
   faPlus,
   faShare,
 } from "@/lib/icons";
@@ -93,7 +93,11 @@ function MobileHeroPnl({
   pct: number | null;
 }) {
   const tone =
-    usd > 0 ? "portfolio-mobile-hero__pnl--up" : usd < 0 ? "portfolio-mobile-hero__pnl--down" : "portfolio-mobile-hero__pnl--flat";
+    usd > 0
+      ? "portfolio-mobile-hero__pnl--up"
+      : usd < 0
+        ? "portfolio-mobile-hero__pnl--down"
+        : "portfolio-mobile-hero__pnl--flat";
 
   return (
     <p className={`portfolio-mobile-hero__pnl ${tone}`}>
@@ -123,6 +127,7 @@ export function PortfolioMobileHero({
 }: PortfolioMobileHeroProps) {
   const [shareOpen, setShareOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
   const [showBnb, setShowBnb] = useState(false);
   const { openDeposit, openWithdraw } = useWalletFunding();
   const { scwAddress, logout } = usePumpWallet();
@@ -131,9 +136,7 @@ export function PortfolioMobileHero({
 
   const sharePayload = useMemo(
     () =>
-      guestMode
-        ? null
-        : portfolioSharePayload(walletAddress, displayUsername),
+      guestMode ? null : portfolioSharePayload(walletAddress, displayUsername),
     [displayUsername, guestMode, walletAddress]
   );
 
@@ -159,8 +162,15 @@ export function PortfolioMobileHero({
     }
     if (action === "withdraw") {
       openWithdraw();
+      return;
+    }
+    if (action === "create") {
+      setCreateOpen(true);
     }
   }
+
+  const openAccount = () => setAccountOpen(true);
+  const canOpenAccount = !guestMode && showWalletActions;
 
   const accountPanelProps = {
     address: accountAddress,
@@ -170,7 +180,10 @@ export function PortfolioMobileHero({
     onToggleBalanceUnit: () => setShowBnb((value) => !value),
     onClose: () => setAccountOpen(false),
     onLogout: () => void logout(),
+    onEditProfile: canEditProfile ? onOpenProfileEditor : undefined,
   };
+
+  const avatarSize = 22;
 
   return (
     <>
@@ -180,35 +193,43 @@ export function PortfolioMobileHero({
             <div className="portfolio-mobile-hero__avatar-wrap">
               {guestMode ? (
                 <div className="portfolio-mobile-hero__guest-avatar" aria-hidden />
-              ) : canEditProfile ? (
+              ) : canOpenAccount ? (
                 <button
                   type="button"
-                  onClick={onOpenProfileEditor}
+                  onClick={openAccount}
                   className="portfolio-mobile-hero__avatar-btn"
-                  aria-label="Edit profile photo and username"
+                  aria-label="Open account"
                 >
                   <UserAvatarForAddress
                     address={walletAddress}
-                    size={44}
+                    size={avatarSize}
                     className="portfolio-mobile-hero__avatar"
                   />
-                  <span className="portfolio-mobile-hero__avatar-edit" aria-hidden>
-                    <PumpIcon icon={faPen} className="portfolio-mobile-hero__avatar-edit-glyph" />
-                  </span>
                 </button>
               ) : (
                 <UserAvatarForAddress
                   address={walletAddress}
-                  size={44}
+                  size={avatarSize}
                   className="portfolio-mobile-hero__avatar"
                 />
               )}
             </div>
 
             <div className="portfolio-mobile-hero__identity">
-              <p className="portfolio-mobile-hero__username">
-                {formatHeroUsername(displayUsername, guestMode)}
-              </p>
+              {canOpenAccount ? (
+                <button
+                  type="button"
+                  onClick={openAccount}
+                  className="portfolio-mobile-hero__username portfolio-mobile-hero__username--btn"
+                  aria-label="Open account"
+                >
+                  {formatHeroUsername(displayUsername, guestMode)}
+                </button>
+              ) : (
+                <p className="portfolio-mobile-hero__username">
+                  {formatHeroUsername(displayUsername, guestMode)}
+                </p>
+              )}
               <MobileWalletAddress address={walletAddress} guestMode={guestMode} />
             </div>
           </div>
@@ -281,25 +302,16 @@ export function PortfolioMobileHero({
               </span>
               <span className="portfolio-mobile-hero__action-label">Withdraw</span>
             </button>
-            {guestMode ? (
-              <button
-                type="button"
-                onClick={() => onSignIn?.()}
-                className="portfolio-mobile-hero__action"
-              >
-                <span className="portfolio-mobile-hero__action-icon" aria-hidden>
-                  <PumpIcon icon={faPlus} className="portfolio-mobile-hero__action-glyph" fixedWidth />
-                </span>
-                <span className="portfolio-mobile-hero__action-label">Create</span>
-              </button>
-            ) : (
-              <Link href="/create" className="portfolio-mobile-hero__action">
-                <span className="portfolio-mobile-hero__action-icon" aria-hidden>
-                  <PumpIcon icon={faPlus} className="portfolio-mobile-hero__action-glyph" fixedWidth />
-                </span>
-                <span className="portfolio-mobile-hero__action-label">Create</span>
-              </Link>
-            )}
+            <button
+              type="button"
+              onClick={() => onAction("create")}
+              className="portfolio-mobile-hero__action"
+            >
+              <span className="portfolio-mobile-hero__action-icon" aria-hidden>
+                <PumpIcon icon={faPlus} className="portfolio-mobile-hero__action-glyph" fixedWidth />
+              </span>
+              <span className="portfolio-mobile-hero__action-label">Create</span>
+            </button>
           </div>
         ) : null}
       </section>
@@ -315,6 +327,10 @@ export function PortfolioMobileHero({
 
       {showWalletActions ? (
         <AccountSheet open={accountOpen} {...accountPanelProps} />
+      ) : null}
+
+      {!guestMode ? (
+        <CreateChoiceSheet open={createOpen} onClose={() => setCreateOpen(false)} />
       ) : null}
     </>
   );

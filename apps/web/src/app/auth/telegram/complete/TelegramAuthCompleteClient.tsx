@@ -2,20 +2,25 @@
 
 import { useEffect, useRef, useState } from "react";
 import { completePumpSignIn } from "@/lib/aa/pump-account";
+import { safeReturnPath } from "@/lib/safe-return-path";
 import { PumpIcon, faShieldCheck } from "@/lib/icons";
 
 type TelegramAuthCompleteClientProps = {
   status: string | null;
   message: string | null;
+  next: string | null;
 };
 
 export function TelegramAuthCompleteClient({
   status,
   message: errorMessage,
+  next,
 }: TelegramAuthCompleteClientProps) {
   const handledRef = useRef(false);
   const [message, setMessage] = useState("Completing sign-in…");
   const [failed, setFailed] = useState(false);
+  const destination = safeReturnPath(next) ?? "/";
+  const failHref = destination;
 
   useEffect(() => {
     if (handledRef.current) return;
@@ -30,13 +35,13 @@ export function TelegramAuthCompleteClient({
     void (async () => {
       try {
         await completePumpSignIn();
-        window.location.replace("/");
+        window.location.replace(destination);
       } catch (error) {
         setFailed(true);
         setMessage(error instanceof Error ? error.message : "Could not restore your session.");
       }
     })();
-  }, [status, errorMessage]);
+  }, [status, errorMessage, destination]);
 
   return (
     <main className="flex min-h-[60vh] items-center justify-center px-4">
@@ -61,10 +66,10 @@ export function TelegramAuthCompleteClient({
         </p>
         {failed ? (
           <a
-            href="/"
+            href={failHref}
             className="primary-button mt-6 inline-flex min-h-[2.75rem] items-center justify-center px-5 text-body-sm"
           >
-            Return to Pump
+            Try again
           </a>
         ) : null}
       </div>

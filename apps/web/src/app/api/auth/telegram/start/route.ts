@@ -17,6 +17,8 @@ import {
 import { isTelegramServerConfigured } from "@/lib/telegram-config";
 import { resolvePublicAppOrigin } from "@/lib/telegram/public-app-origin";
 import { authCookieOptions } from "@/lib/auth/session-cookie";
+import { setAuthReturnCookie } from "@/lib/auth/auth-return-cookie";
+import { safeReturnPath } from "@/lib/safe-return-path";
 
 export async function GET(request: NextRequest) {
   if (!isTelegramServerConfigured()) {
@@ -56,6 +58,8 @@ export async function GET(request: NextRequest) {
     ...authCookieOptions(request),
     maxAge: TELEGRAM_OIDC_COOKIE_MAX_AGE_SECONDS,
   });
+
+  setAuthReturnCookie(response, request, safeReturnPath(request.nextUrl.searchParams.get("next")));
 
   return response;
 }

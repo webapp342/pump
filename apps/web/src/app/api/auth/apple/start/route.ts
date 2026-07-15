@@ -16,6 +16,8 @@ import {
   setOidcFlowCookie,
 } from "@/lib/oauth/oidc-flow";
 import { resolvePublicAppOrigin } from "@/lib/telegram/public-app-origin";
+import { setAuthReturnCookie } from "@/lib/auth/auth-return-cookie";
+import { safeReturnPath } from "@/lib/safe-return-path";
 
 export async function GET(request: NextRequest) {
   if (!isAppleServerConfigured()) {
@@ -57,6 +59,8 @@ export async function GET(request: NextRequest) {
     { state, nonce, codeVerifier, redirectUri },
     APPLE_OIDC_COOKIE_MAX_AGE_SECONDS
   );
+
+  setAuthReturnCookie(response, request, safeReturnPath(request.nextUrl.searchParams.get("next")));
 
   return response;
 }

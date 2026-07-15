@@ -2,6 +2,7 @@
 
 import {
   createContext,
+  Suspense,
   useCallback,
   useContext,
   useEffect,
@@ -124,6 +125,18 @@ export function PumpWalletProvider({ children }: { children: ReactNode }) {
     };
   }, [applySession]);
 
+  useEffect(() => {
+    if (!ready) return;
+    if (authenticated) {
+      setLoginModalOpen(false);
+      return;
+    }
+    if (typeof window !== "undefined" && window.location.pathname.startsWith("/auth/")) {
+      return;
+    }
+    setLoginModalOpen(true);
+  }, [ready, authenticated]);
+
   const login = useCallback(() => {
     setLoginModalOpen(true);
   }, []);
@@ -202,11 +215,13 @@ export function PumpWalletProvider({ children }: { children: ReactNode }) {
   return (
     <PumpWalletContext.Provider value={value}>
       {children}
-      <SignInModal
-        open={loginModalOpen}
-        onClose={() => setLoginModalOpen(false)}
-        onSuccess={() => setLoginModalOpen(false)}
-      />
+      <Suspense fallback={null}>
+        <SignInModal
+          open={loginModalOpen}
+          onClose={() => setLoginModalOpen(false)}
+          onSuccess={() => setLoginModalOpen(false)}
+        />
+      </Suspense>
     </PumpWalletContext.Provider>
   );
 }

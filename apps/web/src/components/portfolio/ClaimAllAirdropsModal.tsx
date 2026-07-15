@@ -15,7 +15,7 @@ import { useOpenConnectModal } from "@/hooks/useOpenConnectModal";
 import { useBnbUsdPrice } from "@/hooks/useBnbUsdPrice";
 import { contracts, pumpChain } from "@/config/chain";
 import { pumpAirdropManagerAbi } from "@/lib/abis/pump-airdrop-manager";
-import { ModalPortal } from "@/components/ui/ModalPortal";
+import { AppBottomSheet } from "@/components/ui/AppBottomSheet";
 import { TokenAvatar } from "@/components/token/TokenAvatar";
 import { BnbLogo } from "@/components/token/BnbLogo";
 import { formatUsdReadable } from "@/lib/format-usd";
@@ -287,40 +287,17 @@ export function ClaimAllAirdropsModal({
   const canClaimNow = targets.length > 0 && !isClaiming && !claimDone;
 
   return (
-    <ModalPortal open={open}>
-      <div
-        className="modal-backdrop modal-backdrop-shell z-50"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="claim-all-airdrops-title"
-      >
-        <button
-          type="button"
-          className="absolute inset-0 cursor-default"
-          aria-label="Close"
-          onClick={onClose}
-        />
-        <div className="modal-panel relative w-full max-w-lg p-4 sm:p-5">
-          <div className="flex items-start justify-between gap-3 border-b border-pump-border/45 pb-3">
-            <div className="min-w-0">
-              <h2 id="claim-all-airdrops-title" className="text-h3 font-semibold text-pump-text">
-                Claim airdrop rewards
-              </h2>
-              <p className="mt-0.5 text-caption text-pump-muted">
-                Review ready payouts and projected earnings from active campaigns.
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={onClose}
-              className="inline-flex h-8 w-8 shrink-0 items-center justify-center text-pump-muted transition hover:bg-pump-border/10 hover:text-pump-text"
-              aria-label="Close"
-            >
-              ×
-            </button>
-          </div>
-
-          <div className="mt-4 rounded-md border border-pump-accent/25 bg-pump-accent/5 p-3.5">
+    <AppBottomSheet
+      open={open}
+      onClose={onClose}
+      ariaLabel="Claim airdrop rewards"
+      title="Claim airdrop rewards"
+      subtitle="Review ready payouts and projected earnings from active campaigns."
+      zIndex={50}
+      panelClassName="max-w-lg"
+      dragEntirePanel={false}
+    >
+          <div className="rounded-md border border-pump-accent/25 bg-pump-accent/5 p-3.5">
             <p className="section-label text-pump-accent">Ready to claim</p>
             <p className="mt-1 financial-value text-2xl font-semibold text-pump-text">
               {formatUsdReadable(claimableUsdTotal, { compact: false }) ?? "$0.00"}
@@ -508,8 +485,6 @@ export function ClaimAllAirdropsModal({
               Switch to BSC Testnet to claim.
             </p>
           ) : null}
-        </div>
-      </div>
-    </ModalPortal>
+    </AppBottomSheet>
   );
 }

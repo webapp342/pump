@@ -1,5 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
 import {
+  clearAuthReturnCookie,
+  readAuthReturnCookie,
+} from "@/lib/auth/auth-return-cookie";
+import {
   authCookieOptions,
   AUTH_COOKIE_NAME,
 } from "@/lib/auth/session-cookie";
@@ -56,5 +60,9 @@ export function redirectAfterOAuthLogin(
   url.searchParams.set("provider", provider);
   url.searchParams.set("status", status);
   if (message) url.searchParams.set("message", message);
-  return NextResponse.redirect(url);
+  const returnPath = readAuthReturnCookie(request);
+  if (returnPath) url.searchParams.set("next", returnPath);
+  const redirect = NextResponse.redirect(url);
+  clearAuthReturnCookie(redirect, request);
+  return redirect;
 }

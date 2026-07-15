@@ -2,23 +2,28 @@
 
 import { useEffect, useRef, useState } from "react";
 import { completePumpSignIn } from "@/lib/aa/pump-account";
+import { safeReturnPath } from "@/lib/safe-return-path";
 import { PumpIcon, faShieldCheck } from "@/lib/icons";
 
 type OAuthAuthCompleteClientProps = {
   status: string | null;
   message: string | null;
   provider: string | null;
+  next: string | null;
 };
 
 export function OAuthAuthCompleteClient({
   status,
   message: errorMessage,
   provider,
+  next,
 }: OAuthAuthCompleteClientProps) {
   const handledRef = useRef(false);
   const [message, setMessage] = useState("Completing sign-in…");
   const [failed, setFailed] = useState(false);
   const providerLabel = provider ?? "account";
+  const destination = safeReturnPath(next) ?? "/";
+  const failHref = destination;
 
   useEffect(() => {
     if (handledRef.current) return;
@@ -33,7 +38,7 @@ export function OAuthAuthCompleteClient({
     void (async () => {
       try {
         await completePumpSignIn();
-        window.location.replace("/");
+        window.location.replace(destination);
       } catch (error) {
         setFailed(true);
         setMessage(
@@ -43,7 +48,7 @@ export function OAuthAuthCompleteClient({
         );
       }
     })();
-  }, [status, errorMessage, providerLabel]);
+  }, [status, errorMessage, providerLabel, destination]);
 
   return (
     <main className="flex min-h-[60vh] items-center justify-center px-4">
@@ -68,10 +73,10 @@ export function OAuthAuthCompleteClient({
         </p>
         {failed ? (
           <a
-            href="/"
+            href={failHref}
             className="primary-button mt-6 inline-flex min-h-[2.75rem] items-center justify-center px-5 text-body-sm"
           >
-            Return to Pump
+            Try again
           </a>
         ) : null}
       </div>

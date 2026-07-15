@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { createPortal } from "react-dom";
 import type {
   CreatorProfile,
   CreatorProfileHolding,
@@ -13,6 +12,7 @@ import { UserDisplayName } from "@/components/user/UserDisplayName";
 import { TokenAvatar } from "@/components/token/TokenAvatar";
 import { UserAvatarForAddress } from "@/components/user/UserAvatarForAddress";
 import { useCreatorFollows } from "@/components/creators/CreatorFollowsProvider";
+import { AppBottomSheet } from "@/components/ui/AppBottomSheet";
 import { useBnbUsdPrice } from "@/hooks/useBnbUsdPrice";
 import { useAccount } from "wagmi";
 import {
@@ -166,29 +166,6 @@ export function CreatorProfileModal({ open, onClose, creatorAddress }: CreatorPr
   const [profile, setProfile] = useState<CreatorProfileData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  useEffect(() => {
-    if (!open) return;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = previousOverflow;
-    };
-  }, [open]);
-
-  useEffect(() => {
-    if (!open) return;
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [open, onClose]);
 
   useEffect(() => {
     if (!open || !creatorAddress) return;
@@ -229,57 +206,51 @@ export function CreatorProfileModal({ open, onClose, creatorAddress }: CreatorPr
     [profile]
   );
 
-  if (!open || !mounted) return null;
+  if (!open) return null;
 
   const isSelf = address?.toLowerCase() === creatorAddress.toLowerCase();
   const following = isFollowing(creatorAddress);
 
-  return createPortal(
-    <>
-      <button
-        type="button"
-        className="modal-backdrop modal-backdrop-dismiss z-[100] cursor-default transition-opacity"
-        aria-label="Close"
-        onClick={onClose}
-      />
-      <div
-        className="modal-sheet-host z-[101] sm:items-center sm:p-4"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="creator-profile-title"
-      >
-        <div className="panel-surface pointer-events-auto relative flex w-full max-w-2xl max-h-[min(90dvh,680px)] flex-col overflow-hidden rounded-t-2xl shadow-panel sm:max-h-[min(72vh,640px)] sm:rounded-xl">
-          <div className="shrink-0 border-b border-pump-border/10 px-4 pb-3 pt-3 sm:px-5 sm:pb-4 sm:pt-4">
-            <div className="mb-2 flex justify-center sm:hidden">
-              <div className="h-1 w-10 rounded-full bg-pump-border/50" aria-hidden />
-            </div>
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="flex min-w-0 items-start gap-3">
-                <UserAvatarForAddress address={creatorAddress} size={44} />
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h2
-                      id="creator-profile-title"
-                      className="financial-value text-h2 font-semibold text-pump-text"
-                    >
-                      {profile?.displayUsername ?? (
-                        <UserDisplayName address={creatorAddress} />
-                      )}
-                    </h2>
-                    <span className="rounded-full bg-pump-accent/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-pump-accent">
-                      Creator
-                    </span>
-                  </div>
-                  <a
-                    href={explorerAddressUrl(creatorAddress)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="mt-1 text-caption text-pump-muted hover:text-pump-accent hover:underline"
+  return (
+    <AppBottomSheet
+      open={open}
+      onClose={onClose}
+      ariaLabel="Creator profile"
+      title="Creator profile"
+      zIndex={100}
+      panelClassName="max-w-2xl max-h-[min(90dvh,680px)] sm:max-h-[min(72vh,640px)]"
+      bodyClassName="px-4 py-3 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-5 sm:py-4"
+      dragEntirePanel={false}
+      header={
+        <div className="w-full">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="flex min-w-0 items-start gap-3">
+              <UserAvatarForAddress address={creatorAddress} size={44} />
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h2
+                    id="creator-profile-title"
+                    className="financial-value text-h2 font-semibold text-pump-text"
                   >
-                    View on BscScan
-                  </a>
+                    {profile?.displayUsername ?? (
+                      <UserDisplayName address={creatorAddress} />
+                    )}
+                  </h2>
+                  <span className="rounded-full bg-pump-accent/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-pump-accent">
+                    Creator
+                  </span>
                 </div>
+                <a
+                  href={explorerAddressUrl(creatorAddress)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-1 text-caption text-pump-muted hover:text-pump-accent hover:underline"
+                >
+                  View on BscScan
+                </a>
               </div>
+            </div>
+            <div className="flex shrink-0 items-center gap-2">
               {!isSelf ? (
                 <button
                   type="button"
@@ -293,11 +264,22 @@ export function CreatorProfileModal({ open, onClose, creatorAddress }: CreatorPr
                   {following ? "Following" : "Follow"}
                 </button>
               ) : null}
+              <button
+                type="button"
+                onClick={onClose}
+                className="app-bottom-sheet__close"
+                aria-label="Close"
+              >
+                <span className="text-xl leading-none" aria-hidden>
+                  ×
+                </span>
+              </button>
             </div>
           </div>
-
-          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-3 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-5 sm:py-4 [touch-action:pan-y]">
-          {loading ? (
+        </div>
+      }
+    >
+      {loading ? (
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 {Array.from({ length: 2 }).map((_, i) => (
@@ -406,11 +388,7 @@ export function CreatorProfileModal({ open, onClose, creatorAddress }: CreatorPr
                 )}
               </section>
             </div>
-          ) : null}
-          </div>
-        </div>
-      </div>
-    </>,
-    document.body
+      ) : null}
+    </AppBottomSheet>
   );
 }

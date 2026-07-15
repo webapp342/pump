@@ -1,5 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
 import type { getOrCreateTelegramWallet } from "@/lib/aa/telegram-wallet-server";
+import {
+  clearAuthReturnCookie,
+  readAuthReturnCookie,
+} from "@/lib/auth/auth-return-cookie";
 import { resolveAuthRedirectOrigin } from "@/lib/telegram/public-app-origin";
 import {
   authCookieOptions,
@@ -42,5 +46,9 @@ export function redirectAfterTelegramLogin(request: NextRequest, status: "ok" | 
   const url = new URL("/auth/telegram/complete", origin);
   url.searchParams.set("status", status);
   if (message) url.searchParams.set("message", message);
-  return NextResponse.redirect(url);
+  const returnPath = readAuthReturnCookie(request);
+  if (returnPath) url.searchParams.set("next", returnPath);
+  const redirect = NextResponse.redirect(url);
+  clearAuthReturnCookie(redirect, request);
+  return redirect;
 }

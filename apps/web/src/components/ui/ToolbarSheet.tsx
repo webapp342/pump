@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { ModalPortal } from "@/components/ui/ModalPortal";
+import { AppBottomSheet } from "@/components/ui/AppBottomSheet";
 import { PumpIcon, faX } from "@/lib/icons";
 
 type ToolbarSheetProps = {
@@ -24,21 +24,17 @@ export function ToolbarSheet({
   children,
 }: ToolbarSheetProps) {
   return (
-    <ModalPortal open={open}>
-      <div
-        className="modal-backdrop modal-backdrop-shell z-50"
-        role="dialog"
-        aria-modal="true"
-        aria-label={ariaLabel}
-      >
-        <button
-          type="button"
-          className="absolute inset-0 cursor-default"
-          aria-label={`Close ${title.toLowerCase()}`}
-          onClick={onClose}
-        />
-        <div className="toolbar-sheet modal-panel pointer-events-auto relative flex max-h-[min(80vh,32rem)] w-full max-w-lg flex-col overflow-hidden">
-          <div className="toolbar-sheet-header">
+    <AppBottomSheet
+      open={open}
+      onClose={onClose}
+      ariaLabel={ariaLabel}
+      title={title}
+      zIndex={50}
+      panelClassName="toolbar-sheet max-h-[min(80vh,32rem)] max-w-lg"
+      bodyClassName="toolbar-sheet-body !p-0"
+      dragEntirePanel={false}
+      header={
+        <>
             <div className="toolbar-sheet-header__title">
               <span className="toolbar-sheet-header__icon" aria-hidden>
                 {icon}
@@ -56,10 +52,10 @@ export function ToolbarSheet({
             >
               <PumpIcon icon={faX} className="h-4 w-4" />
             </button>
-          </div>
-          <div className="toolbar-sheet-body min-h-0 flex-1 overflow-y-auto">{children}</div>
-        </div>
-      </div>
-    </ModalPortal>
+        </>
+      }
+    >
+      {children}
+    </AppBottomSheet>
   );
 }

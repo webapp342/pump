@@ -1,6 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
 import {
-  buildLastTradeTokenHref,
   LAST_TRADE_TOKEN_COOKIE_NAME,
   parseLastTradeTokenCookie,
 } from "@/lib/last-trade-token-cookie";

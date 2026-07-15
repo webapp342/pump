@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import type { CreatorFollowNetwork } from "@/lib/db/launchpad";
 import { CreatorProfileModal } from "@/components/creators/CreatorProfileModal";
-import { ModalPortal } from "@/components/ui/ModalPortal";
+import { AppBottomSheet } from "@/components/ui/AppBottomSheet";
 import { UserAvatarForAddress } from "@/components/user/UserAvatarForAddress";
 import { UserDisplayName } from "@/components/user/UserDisplayName";
 
@@ -141,28 +141,17 @@ export function FollowNetworkModal({
       />
 
       {!profileOpen ? (
-      <ModalPortal open={open}>
-      <div
-        className="modal-backdrop modal-backdrop-shell z-50"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="follow-network-title"
-      >
-        <button
-          type="button"
-          className="absolute inset-0 cursor-default"
-          aria-label="Close"
-          onClick={onClose}
-        />
-        <div className="panel-surface relative w-full max-w-md p-5 shadow-panel">
-          <h2 id="follow-network-title" className="text-h2 font-semibold text-pump-text">
-            Creator network
-          </h2>
-          <p className="mt-1 text-sm text-pump-muted">
-            {followingCount} following · {followerCount} followers
-          </p>
-
-          <div className="mt-4 flex gap-2">
+        <AppBottomSheet
+          open={open}
+          onClose={onClose}
+          ariaLabel="Creator network"
+          title="Creator network"
+          subtitle={`${followingCount} following · ${followerCount} followers`}
+          zIndex={50}
+          panelClassName="max-w-md"
+          dragEntirePanel={false}
+        >
+          <div className="flex gap-2">
             <button
               type="button"
               onClick={() => setTab("following")}
@@ -204,9 +193,7 @@ export function FollowNetworkModal({
           <button type="button" onClick={onClose} className="secondary-button mt-5 w-full py-2.5">
             Close
           </button>
-        </div>
-      </div>
-      </ModalPortal>
+        </AppBottomSheet>
       ) : null}
     </>
   );

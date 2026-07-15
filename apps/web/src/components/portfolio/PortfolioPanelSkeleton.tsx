@@ -9,7 +9,7 @@ export function PortfolioPanelSkeleton() {
         <section className="portfolio-mobile-hero md:hidden" aria-hidden>
           <div className="portfolio-mobile-hero__top">
             <div className="portfolio-mobile-hero__profile">
-              <Skeleton variant="circle" className="h-11 w-11 shrink-0" />
+              <Skeleton variant="circle" className="h-7 w-7 shrink-0" />
               <div className="flex min-w-0 flex-col gap-1.5">
                 <Skeleton variant="line" className="h-4 w-28" />
                 <Skeleton variant="line" className="h-3 w-20" />

@@ -4,7 +4,7 @@ import { useEffect, useId, useMemo, useState, type ReactNode } from "react";
 import type { TokenListItem } from "@/lib/db/launchpad";
 import { TokenAvatar } from "@/components/token/TokenAvatar";
 import { FieldErrorIcon, FieldErrorMessage } from "@/components/ui/FieldError";
-import { ModalPortal } from "@/components/ui/ModalPortal";
+import { AppBottomSheet } from "@/components/ui/AppBottomSheet";
 
 function formatTokenBalance(value: string | number): string {
   const n = typeof value === "string" ? Number(value) : value;
@@ -115,7 +115,6 @@ export function LaunchpadTokenPicker({
 }: LaunchpadTokenPickerProps) {
   const hasError = Boolean(error);
   const listboxId = useId();
-  const titleId = useId();
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
 
@@ -160,23 +159,6 @@ export function LaunchpadTokenPicker({
       otherListCapped: recentPool.length >= ALL_TOKENS_LIMIT,
     };
   }, [priorityTokens, tokens, priorityAddressSet, search, balances]);
-
-  useEffect(() => {
-    if (!open) return;
-
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") setOpen(false);
-    }
-
-    document.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      document.removeEventListener("keydown", onKeyDown);
-    };
-  }, [open]);
 
   useEffect(() => {
     if (!open) setSearch("");
@@ -301,44 +283,18 @@ export function LaunchpadTokenPicker({
       {hint ? <div className="mt-1.5">{hint}</div> : null}
 
       {open ? (
-        <ModalPortal open={open}>
-        <div
-          className="modal-backdrop modal-backdrop-shell z-[70]"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby={titleId}
+        <AppBottomSheet
+          open={open}
+          onClose={closeModal}
+          ariaLabel={modalTitle}
+          title={modalTitle}
+          subtitle="Search by name, symbol, or contract address."
+          zIndex={70}
+          panelClassName="max-w-lg max-h-[92dvh] sm:max-h-[min(85vh,720px)]"
+          bodyClassName="!p-0"
+          dragEntirePanel={false}
         >
-          <button
-            type="button"
-            className="absolute inset-0 cursor-default"
-            aria-label="Close"
-            onClick={closeModal}
-          />
-
-          <div className="panel-surface relative flex w-full max-w-lg max-h-[92dvh] flex-col overflow-hidden rounded-t-2xl shadow-panel sm:max-h-[min(85vh,720px)] sm:rounded-xl">
-            <div className="shrink-0 border-b border-pump-border/10 px-4 pb-4 pt-3 sm:px-5 sm:pt-5">
-              <div className="mb-3 flex justify-center sm:hidden">
-                <div className="h-1 w-10 rounded-full bg-pump-border/50" aria-hidden />
-              </div>
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <h2 id={titleId} className="section-heading text-h3">
-                    {modalTitle}
-                  </h2>
-                  <p className="mt-1 text-caption text-pump-muted">
-                    Search by name, symbol, or contract address.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={closeModal}
-                  className="chip-button-ghost shrink-0 px-2.5 py-1.5 text-caption"
-                  aria-label="Close"
-                >
-                  Close
-                </button>
-              </div>
-
+          <div className="shrink-0 border-b border-pump-border/10 px-4 pb-4 sm:px-5">
               <input
                 type="search"
                 value={search}
@@ -347,13 +303,9 @@ export function LaunchpadTokenPicker({
                 className="field-input mt-4 h-10 bg-pump-surface/75"
                 autoFocus
               />
-            </div>
+          </div>
 
-            <div
-              id={listboxId}
-              role="listbox"
-              className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 py-2 sm:px-3"
-            >
+          <div id={listboxId} role="listbox" className="px-2 py-2 sm:px-3">
               {loading ? (
                 <p className="px-3 py-8 text-center text-body-sm text-pump-muted">Loading tokens…</p>
               ) : empty ? (
@@ -404,10 +356,8 @@ export function LaunchpadTokenPicker({
                   ) : null}
                 </div>
               )}
-            </div>
           </div>
-        </div>
-        </ModalPortal>
+        </AppBottomSheet>
       ) : null}
     </div>
   );

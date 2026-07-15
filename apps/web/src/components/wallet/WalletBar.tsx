@@ -146,9 +146,7 @@ export function WalletBar() {
           userSelect: "none",
         }}
       >
-        <button type="button" tabIndex={-1} className="app-header-sign-in-btn">
-          Sign in
-        </button>
+        <span className="app-header-sign-in-btn">Sign in</span>
       </div>
     );
   }

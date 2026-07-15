@@ -1,6 +1,6 @@
 "use client";
 
-import { ModalPortal } from "@/components/ui/ModalPortal";
+import { AppBottomSheet } from "@/components/ui/AppBottomSheet";
 
 type ArenaShortcutsModalProps = {
   open: boolean;
@@ -15,25 +15,21 @@ const SHORTCUTS = [
 
 export function ArenaShortcutsModal({ open, onClose }: ArenaShortcutsModalProps) {
   return (
-    <ModalPortal open={open}>
-      <div
-        className="modal-backdrop modal-backdrop-shell z-50"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="arena-shortcuts-title"
-      >
-        <button
-          type="button"
-          className="absolute inset-0 cursor-default"
-          aria-label="Close"
-          onClick={onClose}
-        />
-        <div className="modal-panel relative w-full max-w-sm p-4 sm:p-5">
-          <h2 id="arena-shortcuts-title" className="section-heading">
-            Keyboard shortcuts
-          </h2>
-          <p className="mt-1 text-caption text-pump-muted">Desktop Arena only</p>
-          <ul className="mt-4 space-y-2">
+    <AppBottomSheet
+      open={open}
+      onClose={onClose}
+      ariaLabel="Keyboard shortcuts"
+      title="Keyboard shortcuts"
+      subtitle="Desktop Arena only"
+      zIndex={50}
+      panelClassName="max-w-sm"
+      footer={
+        <button type="button" onClick={onClose} className="secondary-button w-full">
+          Close
+        </button>
+      }
+    >
+          <ul className="space-y-2">
             {SHORTCUTS.map((shortcut) => (
               <li
                 key={shortcut.keys}
@@ -46,11 +42,6 @@ export function ArenaShortcutsModal({ open, onClose }: ArenaShortcutsModalProps)
               </li>
             ))}
           </ul>
-          <button type="button" onClick={onClose} className="secondary-button mt-4 w-full">
-            Close
-          </button>
-        </div>
-      </div>
-    </ModalPortal>
+    </AppBottomSheet>
   );
 }

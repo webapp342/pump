@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { AirdropListItem } from "@/lib/db/airdrops";
 import type { AirdropsHomePayload } from "@/lib/airdrops-server";
-import { useOpenConnectModal } from "@/hooks/useOpenConnectModal";
 import { useAccount } from "wagmi";
 import { AirdropsSkeleton } from "@/components/airdrops/AirdropsSkeleton";
 import { useBnbUsdPrice } from "@/hooks/useBnbUsdPrice";
@@ -20,6 +19,7 @@ import {
   type AirdropSortKey,
 } from "@/lib/airdrops-list-ui";
 import { useAirdropSaves } from "@/components/airdrops/AirdropSavesProvider";
+import { usePumpWallet } from "@/components/wallet/PumpWalletProvider";
 
 export function AirdropsListClient({
   initialPayload = null,
@@ -27,7 +27,7 @@ export function AirdropsListClient({
   initialPayload?: AirdropsHomePayload | null;
 }) {
   const { address, isConnected } = useAccount();
-  const { openConnectModal } = useOpenConnectModal();
+  const { login } = usePumpWallet();
   const { saves } = useAirdropSaves();
   const [items, setItems] = useState<AirdropListItem[] | null>(initialPayload?.data ?? null);
   const [error, setError] = useState<string | null>(null);
@@ -230,10 +230,10 @@ export function AirdropsListClient({
               </div>
               <button
                 type="button"
+                onClick={login}
                 className="primary-button airdrops-sign-in-banner__cta"
-                onClick={() => openConnectModal?.()}
               >
-                Connect
+                Sign in
               </button>
             </div>
           ) : boardItems.length === 0 ? (

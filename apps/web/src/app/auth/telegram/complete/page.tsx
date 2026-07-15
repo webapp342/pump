@@ -6,7 +6,7 @@ export const metadata: Metadata = {
 };
 
 type TelegramAuthCompletePageProps = {
-  searchParams: Promise<{ status?: string; message?: string }>;
+  searchParams: Promise<{ status?: string; message?: string; next?: string }>;
 };
 
 export default async function TelegramAuthCompletePage({
@@ -18,6 +18,7 @@ export default async function TelegramAuthCompletePage({
     <TelegramAuthCompleteClient
       status={params.status ?? null}
       message={params.message ?? null}
+      next={params.next ?? null}
     />
   );
 }
