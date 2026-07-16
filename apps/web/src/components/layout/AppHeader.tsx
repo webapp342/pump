@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAccount } from "wagmi";
 import { CyclopsLogo } from "@/components/brand/CyclopsLogo";
+import { TradeNavLink } from "@/components/layout/TradeNavLink";
 import { WalletBar } from "@/components/wallet/WalletBar";
 import { ThemePicker } from "@/components/theme/ThemePicker";
 import { usePumpWallet } from "@/components/wallet/PumpWalletProvider";
@@ -25,9 +26,9 @@ export function AppHeaderView({ pathname }: { pathname: string }) {
     <header className="app-header">
       <div className={`app-header-inner ${shellHeaderInnerClassForPath(pathname)}`}>
         <div className="app-header-start">
-          <Link href="/" className="app-header-brand" aria-label="Cyclops home">
+          <TradeNavLink className="app-header-brand" aria-label="Cyclops home">
             <CyclopsLogo variant="auto" />
-          </Link>
+          </TradeNavLink>
 
           <nav className="app-header-nav hidden md:flex" aria-label="Primary">
             {APP_NAV_ITEMS.map((item) => {
@@ -37,10 +38,16 @@ export function AppHeaderView({ pathname }: { pathname: string }) {
                   : pathname === item.href || pathname.startsWith(`${item.href}/`);
               const requiresAuth = item.href === "/portfolio";
 
+              const NavLink = item.href === "/" ? TradeNavLink : Link;
+              const linkProps =
+                item.href === "/"
+                  ? { fallbackHref: item.href as "/" }
+                  : { href: item.href };
+
               return (
-                <Link
+                <NavLink
                   key={item.href}
-                  href={item.href}
+                  {...linkProps}
                   prefetch={true}
                   aria-current={active ? "page" : undefined}
                   className={navLinkClass(active)}
@@ -55,7 +62,7 @@ export function AppHeaderView({ pathname }: { pathname: string }) {
                   }
                 >
                   {item.label}
-                </Link>
+                </NavLink>
               );
             })}
           </nav>

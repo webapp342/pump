@@ -21,6 +21,8 @@ const ThemeContext = createContext<ThemeContextValue | null>(null);
 
 function applyTheme(theme: ThemeId) {
   document.documentElement.dataset.theme = theme;
+  document.documentElement.dataset.typeTheme = "coinbase-cds";
+  document.documentElement.dataset.sizeTheme = "pump-cds";
   document.documentElement.style.colorScheme = getColorScheme(theme);
 }
 

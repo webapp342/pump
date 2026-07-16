@@ -38,13 +38,13 @@ function TierRewardCell({
     <span className="inline-flex items-center justify-end gap-1.5">
       <span className="financial-value tabular-nums text-pump-text">{amount}</span>
       {isBnb ? (
-        <BnbAssetChip size={14} />
+        <BnbAssetChip size="xs" />
       ) : rewardToken ? (
         <TokenAssetChip
           address={rewardToken.address}
           symbol={rewardToken.symbol}
           logoUrl={rewardToken.logoUrl}
-          size={14}
+          size={12}
         />
       ) : (
         <span className="text-caption text-pump-muted">{assetLabel}</span>

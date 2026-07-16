@@ -56,7 +56,7 @@ export function ArenaExploreCoinRow({
         address={token.address}
         symbol={token.symbol}
         logoUrl={token.logoUrl}
-        size={40}
+        size="3xl"
         className="ring-1 ring-pump-border/25"
       />
       <div className="min-w-0">

@@ -77,7 +77,7 @@ export function PortfolioCalloutsSection({ address }: { address: string }) {
                 address={item.tokenAddress}
                 symbol={item.tokenSymbol}
                 logoUrl={item.tokenLogoUrl}
-                size={36}
+                size="2xl"
               />
               <div className="portfolio-callouts__token">
                 <span className="portfolio-callouts__symbol">{item.tokenSymbol}</span>

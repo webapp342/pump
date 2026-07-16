@@ -1,11 +1,14 @@
 import { normalizeAddressParam } from "@/lib/address";
-import { LAST_TRADE_TOKEN_COOKIE_NAME } from "@/lib/last-trade-token-cookie";
+import {
+  LAST_TRADE_TOKEN_COOKIE_NAME,
+  parseLastTradeTokenCookie,
+} from "@/lib/last-trade-token-cookie";
 
 export const LAST_TRADE_TOKEN_STORAGE_KEY = "pump-last-trade-token";
 
 const COOKIE_MAX_AGE_SEC = 60 * 60 * 24 * 90;
 
-export function readLastTradeTokenAddress(): string | null {
+function readLastTradeTokenFromStorage(): string | null {
   if (typeof window === "undefined") return null;
   try {
     const stored = localStorage.getItem(LAST_TRADE_TOKEN_STORAGE_KEY);
@@ -14,6 +17,19 @@ export function readLastTradeTokenAddress(): string | null {
   } catch {
     return null;
   }
+}
+
+/** Client-only — localStorage wins over cookie when both exist. */
+export function readLastTradeTokenFromCookie(): string | null {
+  if (typeof document === "undefined") return null;
+  const match = document.cookie.match(
+    new RegExp(`(?:^|; )${LAST_TRADE_TOKEN_COOKIE_NAME}=([^;]*)`)
+  );
+  return parseLastTradeTokenCookie(match?.[1]);
+}
+
+export function readLastTradeTokenAddress(): string | null {
+  return readLastTradeTokenFromStorage() ?? readLastTradeTokenFromCookie();
 }
 
 export function writeLastTradeTokenCookie(address: string): void {
@@ -34,8 +50,23 @@ export function writeLastTradeTokenAddress(address: string): void {
   writeLastTradeTokenCookie(normalized);
 }
 
-/** One-time migration for sessions that have localStorage but no cookie yet. */
+/** Keep localStorage + cookie aligned — localStorage is source of truth when both exist. */
+export function syncLastTradeTokenPersistence(): void {
+  const fromStorage = readLastTradeTokenFromStorage();
+  if (fromStorage) {
+    writeLastTradeTokenCookie(fromStorage);
+    return;
+  }
+  const fromCookie = readLastTradeTokenFromCookie();
+  if (!fromCookie) return;
+  try {
+    localStorage.setItem(LAST_TRADE_TOKEN_STORAGE_KEY, fromCookie);
+  } catch {
+    /* quota / private mode */
+  }
+}
+
+/** @deprecated Use syncLastTradeTokenPersistence */
 export function syncLastTradeTokenCookieFromStorage(): void {
-  const last = readLastTradeTokenAddress();
-  if (last) writeLastTradeTokenCookie(last);
+  syncLastTradeTokenPersistence();
 }

@@ -43,7 +43,7 @@ export function TradeQuickOrderHeader({
             address={tokenAddress}
             symbol={symbol}
             logoUrl={logoUrl}
-            size={26}
+            size="md"
             className="trade-quick-order-header__logo !ring-0"
           />
           <div className="trade-quick-order-header__token-meta min-w-0">

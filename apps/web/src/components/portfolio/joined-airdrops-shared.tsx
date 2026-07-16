@@ -15,7 +15,6 @@ import {
   airdropCountdownMeta,
   formatParticipantRankLabel,
   nextActionLabel,
-  type AirdropNextAction,
 } from "@/lib/airdrop-participant-snapshot";
 import { TokenAvatar } from "@/components/token/TokenAvatar";
 import { BnbLogo } from "@/components/token/BnbLogo";
@@ -43,8 +42,7 @@ function poolSymbol(item: MyAirdropParticipation): string {
 }
 
 function tickerLabel(item: MyAirdropParticipation): string {
-  const symbol = poolSymbol(item);
-  return symbol.startsWith("$") ? symbol : `$${symbol}`;
+  return poolSymbol(item);
 }
 
 function trimTrailingZeros(formatted: string): string {
@@ -140,7 +138,7 @@ function ParticipantRewardMetric({
   );
 }
 
-function MobileRewardInline({
+function MobileRewardCell({
   item,
   bnbUsd,
 }: {
@@ -157,14 +155,13 @@ function MobileRewardInline({
 
   return (
     <span className="flex min-w-0 items-center gap-1 overflow-hidden">
-      <span className="shrink-0 text-pump-muted">Your reward</span>
       {isBnb ? (
-        <BnbLogo size={14} className="shrink-0" />
+        <BnbLogo size="xs" className="shrink-0" />
       ) : (
         <TokenAvatar
           address={item.rewardToken!}
           symbol={item.rewardSymbol ?? "?"}
-          size={14}
+          size="xs"
           className="shrink-0"
         />
       )}
@@ -221,35 +218,86 @@ function showRank(item: MyAirdropParticipation): boolean {
   );
 }
 
-function mobileActionButtonClass(action: AirdropNextAction): string {
-  const base = "relative z-10 shrink-0 rounded-md px-2.5 py-1 text-caption font-semibold";
-  if (action === "claim") {
-    return `${base} primary-button h-7 min-h-0`;
-  }
-  return `${base} border border-pump-accent/35 bg-pump-accent/10 text-pump-accent`;
-}
-
-function MobileAirdropTrailing({ item, href }: { item: MyAirdropParticipation; href: string }) {
+function AirdropMobileRow({
+  item,
+  bnbUsd,
+}: {
+  item: MyAirdropParticipation;
+  bnbUsd: number | null | undefined;
+}) {
+  const symbol = poolSymbol(item);
+  const rank = formatParticipantRankLabel(item.viewerRank, {
+    displayStatus: item.displayStatus,
+    onchainQualified: item.onchainQualified,
+  });
+  const href = `/airdrops/${item.id}`;
+  const countdown = countdownDisplay(item);
   const action = item.nextAction;
 
-  if (action === "claim" || action === "continue") {
-    return (
+  return (
+    <article className="portfolio-holding-mobile relative">
       <Link
         href={href}
-        className={mobileActionButtonClass(action)}
-        onClick={(e) => e.stopPropagation()}
-      >
-        {nextActionLabel(action)}
-      </Link>
-    );
-  }
+        className="absolute inset-0 z-0"
+        aria-label={`${tickerLabel(item)} airdrop`}
+      />
+      <div className="relative z-10 portfolio-holding-mobile__coin">
+        <TokenAvatar
+          address={item.linkedToken}
+          symbol={symbol}
+          className="portfolio-holdings-grid__coin-mark !ring-0"
+        />
+        <div className="min-w-0">
+          <p className="portfolio-holding-mobile__title truncate">{tickerLabel(item)}</p>
+          {showRank(item) ? (
+            <p className="truncate text-caption text-pump-muted">
+              Rank <span className="financial-value text-pump-text">{rank}</span>
+            </p>
+          ) : null}
+        </div>
+      </div>
+      <div className="relative z-10 portfolio-holding-mobile__amount">
+        <MobileRewardCell item={item} bnbUsd={bnbUsd} />
+      </div>
+      <div className="relative z-10 portfolio-holding-mobile__value">
+        {action === "claim" || action === "continue" ? (
+          <Link
+            href={href}
+            className="portfolio-holding-mobile__value-main text-pump-accent hover:underline"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {nextActionLabel(action)}
+          </Link>
+        ) : (
+          <>
+            <span
+              className={`portfolio-holding-mobile__value-main ${portfolioStatusTone(item.displayStatus)}`}
+            >
+              {formatAirdropDisplayStatus(item.displayStatus)}
+            </span>
+            {countdown.show ? (
+              <span
+                className="portfolio-holding-mobile__value-pnl inline-flex items-center justify-end gap-0.5 tabular-nums"
+                title={countdown.hint}
+              >
+                <HourglassIcon size={10} className="shrink-0 opacity-80" />
+                {countdown.text}
+              </span>
+            ) : null}
+          </>
+        )}
+      </div>
+    </article>
+  );
+}
 
+function AirdropsMobileHeader() {
   return (
-    <span
-      className={`relative z-10 shrink-0 self-center text-caption font-medium ${portfolioStatusTone(item.displayStatus)}`}
-    >
-      {formatAirdropDisplayStatus(item.displayStatus)}
-    </span>
+    <div className="portfolio-holdings-mobile__header">
+      <span className="portfolio-holdings-mobile__coin-col">Coin</span>
+      <span className="portfolio-holdings-mobile__amount-col">Your reward</span>
+      <span className="portfolio-holdings-mobile__value-col">Status</span>
+    </div>
   );
 }
 
@@ -268,7 +316,7 @@ function TimeLeftCell({ item }: { item: MyAirdropParticipation }) {
   );
 }
 
-function AirdropMobileRow({
+function AirdropDesktopRow({
   item,
   bnbUsd,
 }: {
@@ -280,40 +328,53 @@ function AirdropMobileRow({
     displayStatus: item.displayStatus,
     onchainQualified: item.onchainQualified,
   });
-  const href = `/airdrops/${item.id}`;
-  const countdown = countdownDisplay(item);
 
   return (
-    <article className="relative grid grid-cols-[var(--token-logo-size-inline)_1fr_auto] gap-x-2 gap-y-1.5 p-2.5 transition active:bg-pump-border/8">
-      <Link href={href} className="absolute inset-0 z-0 rounded-[inherit]" aria-label={`${tickerLabel(item)} airdrop`} />
-      <TokenAvatar
-        address={item.linkedToken}
-        symbol={symbol}
-        className="relative z-10 row-span-2 self-center portfolio-holdings-grid__coin-mark !ring-0"
-      />
-      <div className="relative z-10 flex min-w-0 items-center gap-1.5 overflow-hidden">
-        <p className="truncate text-body-sm font-medium text-pump-text">{tickerLabel(item)}</p>
-        {countdown.show ? (
-          <span
-            className="financial-value inline-flex shrink-0 items-center gap-0.5 tabular-nums text-caption text-pump-muted"
-            title={countdown.hint}
+    <tr>
+      <td className="px-4 py-3">
+        <Link
+          href={`/airdrops/${item.id}`}
+          className="portfolio-holdings-grid__coin-row flex min-w-0 items-center gap-2"
+        >
+          <TokenAvatar
+            address={item.linkedToken}
+            symbol={symbol}
+            className="portfolio-holdings-grid__coin-mark !ring-0"
+          />
+          <p className="portfolio-holdings-grid__coin-symbol truncate">{tickerLabel(item)}</p>
+        </Link>
+      </td>
+      <td className="portfolio-holdings-grid__num px-4 py-3 financial-value text-pump-text">
+        {showRank(item) ? rank : "—"}
+      </td>
+      <td className="portfolio-holdings-grid__num px-4 py-3">
+        <ParticipantRewardMetric item={item} bnbUsd={bnbUsd} iconSize={16} />
+      </td>
+      <td className="portfolio-holdings-grid__num px-4 py-3 financial-value text-pump-text">
+        <TimeLeftCell item={item} />
+      </td>
+      <td
+        className={`portfolio-holdings-grid__num px-4 py-3 text-body-sm font-medium ${portfolioStatusTone(item.displayStatus)}`}
+      >
+        {formatAirdropDisplayStatus(item.displayStatus)}
+      </td>
+      <td className="portfolio-holdings-grid__num w-[1%] whitespace-nowrap px-4 py-3 text-right">
+        {item.nextAction === "claim" || item.nextAction === "continue" ? (
+          <Link
+            href={`/airdrops/${item.id}`}
+            className={
+              item.nextAction === "claim"
+                ? "text-caption font-medium text-pump-accent hover:underline"
+                : "text-caption font-medium text-pump-muted transition hover:text-pump-accent"
+            }
           >
-            <HourglassIcon size={11} className="opacity-80" />
-            {countdown.text}
-          </span>
-        ) : null}
-      </div>
-      <MobileAirdropTrailing item={item} href={href} />
-      <div className="relative z-10 col-span-2 col-start-2 flex min-w-0 items-center gap-2 overflow-hidden text-[11px] leading-tight">
-        {showRank(item) ? (
-          <span className="financial-value shrink-0 text-pump-text">
-            <span className="text-pump-muted">Rank </span>
-            {rank}
-          </span>
-        ) : null}
-        <MobileRewardInline item={item} bnbUsd={bnbUsd} />
-      </div>
-    </article>
+            {nextActionLabel(item.nextAction)}
+          </Link>
+        ) : (
+          <span className="text-caption text-pump-muted">—</span>
+        )}
+      </td>
+    </tr>
   );
 }
 
@@ -325,86 +386,37 @@ export function JoinedAirdropsList({
   bnbUsd: number | null | undefined;
 }) {
   return (
-    <section className="rounded-lg border border-pump-border/15 bg-transparent">
-      <div className="divide-y divide-pump-border/10 lg:hidden">
-        {items.map((item) => (
-          <AirdropMobileRow key={item.id} item={item} bnbUsd={bnbUsd} />
-        ))}
+    <>
+      <div className="lg:hidden portfolio-holdings-mobile">
+        <AirdropsMobileHeader />
+        <div className="portfolio-holdings-mobile__body">
+          {items.map((item) => (
+            <AirdropMobileRow key={item.id} item={item} bnbUsd={bnbUsd} />
+          ))}
+        </div>
       </div>
 
-      <div className="hidden overflow-x-auto lg:block">
-        <table className="sheet-grid min-w-[780px]">
+      <div className="hidden lg:block overflow-x-auto">
+        <table className="sheet-grid portfolio-holdings-grid portfolio-airdrops-grid min-w-[780px]">
           <thead>
             <tr>
               <th>Coin</th>
-              <th>Rank</th>
-              <th>Your reward</th>
-              <th>Time left</th>
-              <th>Status</th>
-              <th className="w-[1%] whitespace-nowrap text-right">Action</th>
+              <th className="portfolio-holdings-grid__num">Rank</th>
+              <th className="portfolio-holdings-grid__num">Your reward</th>
+              <th className="portfolio-holdings-grid__num">Time left</th>
+              <th className="portfolio-holdings-grid__num">Status</th>
+              <th className="portfolio-holdings-grid__num w-[1%] whitespace-nowrap text-right">
+                Action
+              </th>
             </tr>
           </thead>
           <tbody>
-            {items.map((item) => {
-              const symbol = poolSymbol(item);
-              const rank = formatParticipantRankLabel(item.viewerRank, {
-                displayStatus: item.displayStatus,
-                onchainQualified: item.onchainQualified,
-              });
-
-              return (
-                <tr key={item.id} className="group">
-                  <td>
-                    <Link
-                      href={`/airdrops/${item.id}`}
-                      className="flex min-w-0 items-center gap-3"
-                    >
-                      <TokenAvatar
-                        address={item.linkedToken}
-                        symbol={symbol}
-                        className="portfolio-holdings-grid__coin-mark !ring-0"
-                      />
-                      <p className="truncate text-body-sm font-medium text-pump-text">
-                        {tickerLabel(item)}
-                      </p>
-                    </Link>
-                  </td>
-                  <td className="px-4 py-3 financial-value tabular-nums text-pump-text">
-                    {showRank(item) ? rank : "—"}
-                  </td>
-                  <td className="px-4 py-3">
-                    <ParticipantRewardMetric item={item} bnbUsd={bnbUsd} />
-                  </td>
-                  <td className="px-4 py-3 financial-value text-pump-text">
-                    <TimeLeftCell item={item} />
-                  </td>
-                  <td
-                    className={`px-4 py-3 text-body-sm font-medium ${portfolioStatusTone(item.displayStatus)}`}
-                  >
-                    {formatAirdropDisplayStatus(item.displayStatus)}
-                  </td>
-                  <td className="w-[1%] whitespace-nowrap px-4 py-3 text-right">
-                    {item.nextAction === "claim" || item.nextAction === "continue" ? (
-                      <Link
-                        href={`/airdrops/${item.id}`}
-                        className={
-                          item.nextAction === "claim"
-                            ? "text-caption font-medium text-pump-accent hover:underline"
-                            : "text-caption font-medium text-pump-muted transition hover:text-pump-accent"
-                        }
-                      >
-                        {nextActionLabel(item.nextAction)}
-                      </Link>
-                    ) : (
-                      <span className="text-caption text-pump-muted">—</span>
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
+            {items.map((item) => (
+              <AirdropDesktopRow key={item.id} item={item} bnbUsd={bnbUsd} />
+            ))}
           </tbody>
         </table>
       </div>
-    </section>
+    </>
   );
 }

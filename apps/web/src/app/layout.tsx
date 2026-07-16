@@ -5,6 +5,8 @@ import { TelegramMiniAppBootstrap } from "@/components/telegram/TelegramMiniAppB
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import { geistMono, geistSans, brandWordmark } from "@/lib/fonts";
 import "@/lib/fontawesome-config";
+import "./typography-theme.css";
+import "./size-theme.css";
 import "./globals.css";
 
 const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3012";
@@ -73,6 +75,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html
       lang="en"
       data-theme="dark"
+      data-type-theme="coinbase-cds"
+      data-size-theme="pump-cds"
       suppressHydrationWarning
       className={`${geistSans.variable} ${geistMono.variable} ${brandWordmark.variable}`}
     >
@@ -95,6 +99,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   theme = "dark";
                 }
                 document.documentElement.dataset.theme = theme;
+                document.documentElement.dataset.typeTheme = "coinbase-cds";
+                document.documentElement.dataset.sizeTheme = "pump-cds";
                 document.documentElement.style.colorScheme = theme;
 
                 var standalone =
@@ -105,6 +111,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 }
               } catch (error) {
                 document.documentElement.dataset.theme = "dark";
+                document.documentElement.dataset.typeTheme = "coinbase-cds";
+                document.documentElement.dataset.sizeTheme = "pump-cds";
                 document.documentElement.style.colorScheme = "dark";
               }
             `,

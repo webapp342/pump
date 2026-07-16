@@ -301,7 +301,7 @@ export function AdminPortfolioTab({ address }: { address: string }) {
                           address={row.tokenAddress}
                           symbol={row.symbol}
                           logoUrl={row.logoUrl}
-                          size={28}
+                          size="lg"
                         />
                         <div className="min-w-0">
                           <p className="truncate font-medium">${row.symbol}</p>

@@ -13,7 +13,7 @@ const TOP_MCAP_CACHE_LIMIT = 20;
  * last-visited token in localStorage/cookie.
  *
  * Personal last token is client-only (`pump-last-trade-token`) — never stored
- * in Redis. Middleware + TradeHomeBootstrap prefer local first.
+ * in Redis. TradeHomeBootstrap + TradeNavLink prefer local storage first.
  */
 export async function resolveDefaultTradeTokenAddress(): Promise<string | null> {
   if (useRedisArenaCache()) {

@@ -59,7 +59,7 @@ export function TokenLaunchSuccessModal({
               address={tokenAddress}
               symbol={tokenSymbol}
               previewUrl={logoPreviewUrl}
-              size={44}
+              size="3xl"
             />
             <div className="min-w-0">
               <p className="truncate text-body font-semibold text-pump-text">{tokenName}</p>

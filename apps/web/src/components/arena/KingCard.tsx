@@ -46,7 +46,7 @@ export function KingCard({ token }: { token: TokenListItem }) {
               address={token.address}
               symbol={token.symbol}
               logoUrl={token.logoUrl}
-              size={52}
+              size="row"
             />
             <div className="min-w-0">
               <p className="truncate text-h1 font-semibold text-pump-text">

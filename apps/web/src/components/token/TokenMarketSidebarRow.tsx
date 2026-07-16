@@ -13,6 +13,7 @@ import {
   seedTokenDetailFromListItem,
   tokenDetailQueryKey,
 } from "@/lib/token-detail-client";
+import { writeLastTradeTokenAddress } from "@/lib/last-trade-token";
 import { tokenDetailPath } from "@/lib/token-routes";
 import { PctChange } from "@/components/ui/PctChange";
 import { UsdReadablePrice } from "@/components/ui/UsdReadablePrice";
@@ -113,6 +114,7 @@ export function TokenMarketSidebarRow({
   const navigateToDetail = useCallback(() => {
     if (Date.now() < suppressNavUntilRef.current) return;
     seedTokenDetailFromListItem(token);
+    writeLastTradeTokenAddress(token.address);
     onTokenSelect?.();
     router.push(tokenHref, { scroll: false });
   }, [onTokenSelect, router, token, tokenHref]);
@@ -179,7 +181,7 @@ export function TokenMarketSidebarRow({
           symbol={token.symbol}
           logoUrl={token.logoUrl}
           shape="rounded"
-          size={40}
+          size="3xl"
           className="token-market-sidebar__avatar shrink-0"
         />
         <div className="token-market-sidebar__name-copy min-w-0">

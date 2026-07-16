@@ -64,12 +64,12 @@ export function AirdropRewardPoolMetric({
         <div className="flex min-w-0 items-center gap-1.5">
           {showIcon && !usdPrimary ? (
             isBnb ? (
-              <BnbLogo size={16} className="shrink-0" />
+              <BnbLogo size="xs" className="shrink-0" />
             ) : (
               <TokenAvatar
                 address={rewardToken}
                 symbol={rewardSymbol ?? "?"}
-                size={16}
+                size="xs"
                 className="shrink-0"
               />
             )
@@ -105,7 +105,7 @@ export function AirdropPoolTokenMetric({
     <MetricValueStack
       primary={
         <div className="flex min-w-0 items-center gap-1.5">
-          <TokenAvatar address={tokenAddress} symbol={symbol} size={16} className="shrink-0" />
+          <TokenAvatar address={tokenAddress} symbol={symbol} size="xs" className="shrink-0" />
           <span className="financial-value truncate text-caption font-semibold text-pump-text">
             {symbol}
           </span>

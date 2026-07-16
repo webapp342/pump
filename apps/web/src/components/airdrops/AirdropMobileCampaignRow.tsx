@@ -55,7 +55,7 @@ export function AirdropMobileCampaignRow({ item, bnbUsd }: AirdropMobileCampaign
         <TokenAvatar
           address={item.linkedToken}
           symbol={symbol}
-          size={52}
+          size="row"
           shape="rounded"
           className="airdrop-mobile-campaign-row__avatar !ring-0"
         />

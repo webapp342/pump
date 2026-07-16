@@ -3,15 +3,18 @@
 import { BnbLogo } from "@/components/token/BnbLogo";
 import { NATIVE_SYMBOL } from "@/config/chain";
 import { TokenAvatar } from "@/components/token/TokenAvatar";
+import type { TokenLogoSizeRole } from "@/lib/ui-sizes";
+
+type LogoSize = number | TokenLogoSizeRole;
 
 export function BnbAmountDisplay({
   amount,
-  logoSize = 18,
+  logoSize = "xs",
   amountClassName = "financial-value font-medium tabular-nums text-pump-text",
   symbolClassName = "text-caption font-medium text-pump-muted",
 }: {
   amount: string;
-  logoSize?: number;
+  logoSize?: LogoSize;
   amountClassName?: string;
   symbolClassName?: string;
 }) {
@@ -29,7 +32,7 @@ export function TokenAmountDisplay({
   address,
   logoUrl,
   previewUrl,
-  logoSize = 18,
+  logoSize = "xs",
   amountClassName = "financial-value font-medium tabular-nums text-pump-text",
   symbolClassName = "text-caption font-medium text-pump-muted",
 }: {
@@ -38,7 +41,7 @@ export function TokenAmountDisplay({
   address?: string;
   logoUrl?: string | null;
   previewUrl?: string | null;
-  logoSize?: number;
+  logoSize?: LogoSize;
   amountClassName?: string;
   symbolClassName?: string;
 }) {
@@ -58,11 +61,11 @@ export function TokenAmountDisplay({
 }
 
 export function BnbAssetChip({
-  size = 18,
+  size = "xs",
   symbolClassName = "text-caption font-medium text-pump-muted",
   className = "",
 }: {
-  size?: number;
+  size?: LogoSize;
   symbolClassName?: string;
   className?: string;
 }) {
@@ -79,7 +82,7 @@ export function TokenAssetChip({
   symbol,
   logoUrl,
   previewUrl,
-  size = 18,
+  size = "xs",
   symbolClassName = "text-caption font-medium text-pump-muted",
   className = "",
 }: {
@@ -87,7 +90,7 @@ export function TokenAssetChip({
   symbol: string;
   logoUrl?: string | null;
   previewUrl?: string | null;
-  size?: number;
+  size?: LogoSize;
   symbolClassName?: string;
   className?: string;
 }) {
@@ -99,18 +102,19 @@ export function TokenAssetChip({
         logoUrl={logoUrl}
         previewUrl={previewUrl}
         size={size}
+        className="shrink-0"
       />
-      <span className={symbolClassName}>${symbol}</span>
+      <span className={`truncate ${symbolClassName}`}>{symbol}</span>
     </span>
   );
 }
 
 export function BnbAmountLabel({
   amount,
-  logoSize = 12,
+  logoSize = "xs",
 }: {
   amount: string;
-  logoSize?: number;
+  logoSize?: LogoSize;
 }) {
   return (
     <span className="inline-flex items-center gap-1 tabular-nums">
@@ -131,7 +135,7 @@ export function RewardAmountDisplay({
   isBnb: boolean;
   token?: { address: string; symbol: string; logoUrl?: string | null } | null;
   amountClassName?: string;
-  logoSize?: number;
+  logoSize?: LogoSize;
 }) {
   if (amount === "—" || amount === "…") {
     return <span className="financial-value text-pump-text">{amount}</span>;

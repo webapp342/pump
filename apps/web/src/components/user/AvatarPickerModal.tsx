@@ -76,7 +76,7 @@ export function AvatarPickerModal({ open, onClose }: AvatarPickerModalProps) {
             onClick={focusAvatarPicker}
             aria-label="Choose avatar"
           >
-            <UserAvatar address={address} avatarId={selectedId} size={64} selected />
+            <UserAvatar address={address} avatarId={selectedId} size="preview" selected />
             <span className="profile-editor-modal__avatar-badge" aria-hidden>
               <PumpIcon icon={faPen} className="h-3 w-3" />
             </span>
@@ -156,7 +156,7 @@ export function AvatarPickerModal({ open, onClose }: AvatarPickerModalProps) {
                   aria-label={`${USER_AVATAR_LABELS[id]} avatar`}
                   aria-pressed={isSelected}
                 >
-                  <UserAvatar address={address} avatarId={id} size={52} selected={isSelected} />
+                  <UserAvatar address={address} avatarId={id} size="picker" selected={isSelected} />
                 </button>
               );
             })}

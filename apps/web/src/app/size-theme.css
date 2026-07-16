@@ -1,0 +1,90 @@
+/**
+ * Pump media size theme — avatars, token/chain logos, icons (4px grid).
+ * Swap later via [data-size-theme] the same way as typography-theme.css.
+ * JS mirrors: `@/lib/ui-sizes`.
+ */
+
+:root,
+html[data-theme="light"],
+html[data-theme="dark"],
+html[data-size-theme="pump-cds"] {
+  --size-theme-id: pump-cds;
+
+  /* ── Icon glyphs (Material Symbols / PumpIcon) ── */
+  --icon-size-xs: 0.75rem; /* 12 */
+  --icon-size-sm: 1rem; /* 16 */
+  --icon-size-md: 1.25rem; /* 20 — default UI icon */
+  --icon-size-lg: 1.5rem; /* 24 */
+  --icon-size-xl: 1.75rem; /* 28 */
+
+  /* ── User avatars (circle only) ── */
+  --avatar-size-xs: 1rem; /* 16 — dense meta */
+  --avatar-size-sm: 1.25rem; /* 20 */
+  --avatar-size-md: 1.5rem; /* 24 — header chip */
+  --avatar-size-lg: 2rem; /* 32 — feed / announcements */
+  --avatar-size-xl: 2.25rem; /* 36 — portfolio identity */
+  --avatar-size-2xl: 2.5rem; /* 40 — sheet profile */
+  --avatar-size-3xl: 3rem; /* 48 — portfolio hero */
+  --avatar-size-picker: 3.25rem; /* 52 */
+  --avatar-size-preview: 4rem; /* 64 */
+
+  /* ── Token / chain logos (square tile) ── */
+  --logo-size-xs: 1rem; /* 16 — metrics, order value */
+  --logo-size-sm: 1.25rem; /* 20 — tables / inline */
+  --logo-size-md: 1.5rem; /* 24 — list rows */
+  --logo-size-lg: 1.75rem; /* 28 — toolbar / detail */
+  --logo-size-xl: 2rem; /* 32 */
+  --logo-size-2xl: 2.25rem; /* 36 — token hero */
+  --logo-size-3xl: 2.5rem; /* 40 — sidebar / large list */
+  --logo-size-row: 3.25rem; /* 52 — arena mobile card */
+  --logo-size-hero: 3.25rem; /* 52 — campaign row */
+
+  /* Legacy aliases (globals / existing CSS) */
+  --token-logo-size-inline: var(--logo-size-sm);
+  --token-logo-size-row: var(--logo-size-row);
+  --toolbar-logo-size: var(--logo-size-lg);
+  --icon-size-default: var(--icon-size-md);
+  --mobile-bottom-nav-icon-size: var(--icon-size-lg);
+}
+
+/* Icon size utilities — prefer over ad-hoc h-3 w-3 / text-xs */
+.icon-xs {
+  font-size: var(--icon-size-xs) !important;
+  width: 1em;
+  height: 1em;
+  line-height: 1;
+}
+.icon-sm {
+  font-size: var(--icon-size-sm) !important;
+  width: 1em;
+  height: 1em;
+  line-height: 1;
+}
+.icon-md {
+  font-size: var(--icon-size-md) !important;
+  width: 1em;
+  height: 1em;
+  line-height: 1;
+}
+.icon-lg {
+  font-size: var(--icon-size-lg) !important;
+  width: 1em;
+  height: 1em;
+  line-height: 1;
+}
+.icon-xl {
+  font-size: var(--icon-size-xl) !important;
+  width: 1em;
+  height: 1em;
+  line-height: 1;
+}
+
+.material-symbols-rounded.icon-xs,
+.material-symbols-rounded.icon-sm,
+.material-symbols-rounded.icon-md,
+.material-symbols-rounded.icon-lg,
+.material-symbols-rounded.icon-xl {
+  font-size: inherit;
+  width: 1em;
+  height: 1em;
+}

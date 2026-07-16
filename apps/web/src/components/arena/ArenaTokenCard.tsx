@@ -261,7 +261,7 @@ export function ArenaTokenCard({
           {mcapLabel === "—" ? "—" : `${mcapLabel} MC`}
         </p>
         <div className="arena-token-card__meta">
-          <UserAvatarForAddress address={token.creatorAddress} size={18} />
+          <UserAvatarForAddress address={token.creatorAddress} size="xs" />
           <span className="arena-token-card__creator truncate">{creatorLabel}</span>
           <PumpIcon icon={faBolt} className="arena-token-card__age-icon shrink-0" aria-hidden />
           <span className="arena-token-card__age financial-value shrink-0">

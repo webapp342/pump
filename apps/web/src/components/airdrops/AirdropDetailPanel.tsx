@@ -111,7 +111,7 @@ function UpcomingTasksLockedNotice({
       />
       <div className="airdrop-detail-section__body">
         <p className="airdrop-detail-countdown" role="status" aria-live="polite">
-          <HourglassIcon size={14} className="shrink-0 text-pump-accent" aria-hidden />
+          <HourglassIcon size={12} className="shrink-0 text-pump-accent" aria-hidden />
           <span>
             Opens in{" "}
             <span className="financial-value font-semibold tabular-nums text-pump-text">
@@ -201,12 +201,12 @@ function LeaderboardEmptyState({ ended }: { ended: boolean }) {
 function TokenSymbolInline({
   address,
   symbol,
-  size = 16,
+  size = "xs",
   className = "",
 }: {
   address: string;
   symbol: string;
-  size?: number;
+  size?: number | import("@/lib/ui-sizes").TokenLogoSizeRole;
   className?: string;
 }) {
   return (
@@ -217,7 +217,11 @@ function TokenSymbolInline({
   );
 }
 
-function BnbRewardIcon({ size = 18 }: { size?: number }) {
+function BnbRewardIcon({
+  size = "xs",
+}: {
+  size?: number | import("@/lib/ui-sizes").TokenLogoSizeRole;
+}) {
   return <BnbLogo size={size} />;
 }
 
@@ -522,14 +526,14 @@ function ViewerRankBanner({
           <span className="financial-value">{rewardCompact}</span>
           {!detail.rewardToken ? (
             <>
-              <BnbRewardIcon size={14} />
+              <BnbRewardIcon size="xs" />
               <span>{NATIVE_SYMBOL}</span>
             </>
           ) : (
             <TokenSymbolInline
               address={detail.rewardToken}
               symbol={detail.rewardSymbol ?? "?"}
-              size={14}
+              size="xs"
             />
           )}
         </span>
@@ -927,7 +931,7 @@ function OnchainRequirementsContent({
     <>
       {!qualifyStarted ? (
         <p className="airdrop-detail-section__body flex flex-wrap items-center gap-x-1.5 text-body-sm text-pump-muted">
-          <HourglassIcon size={14} />
+          <HourglassIcon size={12} />
           <span>
             On-chain tracking opens in{" "}
             <span className="font-medium tabular-nums text-pump-text">
@@ -984,7 +988,7 @@ function OnchainRequirementsContent({
         <p className="airdrop-detail-onchain-qualified">
           <span className="inline-flex flex-wrap items-center gap-x-1 gap-y-0.5">
             All requirements met — rank uses your{" "}
-            <TokenSymbolInline address={linkedToken} symbol={symbol} size={14} />
+            <TokenSymbolInline address={linkedToken} symbol={symbol} size="xs" />
             balance at qualify end.
           </span>
         </p>
@@ -1327,7 +1331,7 @@ export function AirdropDetailPanel({ airdropId }: { airdropId: string }) {
                 <TokenAvatar
                   address={detail.linkedToken}
                   symbol={symbol}
-                  size={28}
+                  size="lg"
                   shape="rounded"
                   className="token-detail-toolbar__logo shrink-0 !ring-0"
                 />
@@ -1361,7 +1365,7 @@ export function AirdropDetailPanel({ airdropId }: { airdropId: string }) {
 
         {displayStatus === "UPCOMING" && !showUpcomingLockedPanel ? (
           <AirdropDetailStatusStrip>
-            <HourglassIcon size={14} className="shrink-0 text-pump-accent" aria-hidden />
+            <HourglassIcon size={12} className="shrink-0 text-pump-accent" aria-hidden />
             <span className="text-body-sm text-pump-muted">
               Qualification opens in{" "}
               <span className="financial-value font-semibold tabular-nums text-pump-text" aria-live="polite">
@@ -1462,7 +1466,7 @@ export function AirdropDetailPanel({ airdropId }: { airdropId: string }) {
                         <TokenSymbolInline
                           address={detail.linkedToken}
                           symbol={symbol}
-                          size={14}
+                          size="xs"
                           className="inline-flex text-pump-text"
                         />{" "}
                         balance at qualify end. Review the final winners list.

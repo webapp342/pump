@@ -78,12 +78,12 @@ function RewardBadge({
   return (
     <span className="inline-flex min-w-0 items-center gap-1.5">
       {isBnb ? (
-        <BnbLogo size={14} className="shrink-0" />
+        <BnbLogo size="xs" className="shrink-0" />
       ) : (
         <TokenAvatar
           address={item.rewardToken!}
           symbol={item.rewardSymbol ?? "?"}
-          size={14}
+          size="xs"
           className="shrink-0"
         />
       )}

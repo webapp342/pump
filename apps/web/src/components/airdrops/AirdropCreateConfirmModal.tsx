@@ -114,7 +114,7 @@ export function AirdropCreateConfirmModal({
                   address={linkedToken.address}
                   symbol={linkedToken.symbol}
                   logoUrl={linkedToken.logoUrl}
-                  size={28}
+                  size="lg"
                   shape="rounded"
                   className="!ring-0"
                 />

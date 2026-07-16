@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect } from "react";
-import { syncLastTradeTokenCookieFromStorage } from "@/lib/last-trade-token";
+import { useLayoutEffect } from "react";
+import { syncLastTradeTokenPersistence } from "@/lib/last-trade-token";
 
-/** Keep middleware cookie in sync when user already has a last token in localStorage. */
+/** Align last-trade localStorage + cookie on every app load (localStorage wins). */
 export function LastTradeTokenCookieSync() {
-  useEffect(() => {
-    syncLastTradeTokenCookieFromStorage();
+  useLayoutEffect(() => {
+    syncLastTradeTokenPersistence();
   }, []);
 
   return null;

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { resolveLaunchpadLogoUri } from "@/lib/assets";
-import { TOKEN_LOGO_SIZE_INLINE } from "@/lib/token-logo-sizes";
+import { TOKEN_LOGO_SIZE, type TokenLogoSizeRole } from "@/lib/ui-sizes";
 
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 
@@ -12,18 +12,25 @@ type TokenAvatarProps = {
   logoUrl?: string | null;
   /** Local blob/data URL shown before upload completes. */
   previewUrl?: string | null;
-  size?: number;
+  /** Named role or px. Prefer roles from `TOKEN_LOGO_SIZE`. Default: `sm` (20). */
+  size?: number | TokenLogoSizeRole;
   /** circle = user avatars only; rounded = token / chain logos (default). */
   shape?: "circle" | "rounded";
   className?: string;
 };
+
+function resolveLogoPx(size: number | TokenLogoSizeRole | undefined): number {
+  if (size == null) return TOKEN_LOGO_SIZE.sm;
+  if (typeof size === "number") return size;
+  return TOKEN_LOGO_SIZE[size];
+}
 
 export function TokenAvatar({
   address,
   symbol,
   logoUrl,
   previewUrl,
-  size = 40,
+  size = "sm",
   shape = "rounded",
   className = "",
 }: TokenAvatarProps) {
@@ -31,15 +38,15 @@ export function TokenAvatar({
   const letter = symbol.charAt(0).toUpperCase() || "?";
   const isPlaceholder = address.toLowerCase() === ZERO_ADDRESS;
   const isCircle = shape === "circle";
-  const useInlineTile = !isCircle && size === 40;
-  const resolvedSize = useInlineTile ? TOKEN_LOGO_SIZE_INLINE : size;
+  const resolvedSize = resolveLogoPx(size);
+  const useCssInline = !isCircle && resolvedSize === TOKEN_LOGO_SIZE.sm;
   const shapeClass = isCircle
     ? "token-avatar-circle"
-    : useInlineTile
+    : useCssInline
       ? "token-logo-mark token-logo-mark--inline"
       : "token-logo-mark";
   const ringClass = isCircle ? "ring-2 ring-pump-border/15" : "";
-  const tileStyle = useInlineTile
+  const tileStyle = useCssInline
     ? undefined
     : {
         width: resolvedSize,
@@ -60,7 +67,7 @@ export function TokenAvatar({
 
   const fallback = (
     <span
-      className={`flex shrink-0 items-center justify-center overflow-hidden text-sm font-semibold text-pump-text ${shapeClass} ${ringClass} ${className}`}
+      className={`flex shrink-0 items-center justify-center overflow-hidden type-label1 text-pump-text ${shapeClass} ${ringClass} ${className}`}
       style={tileStyle}
     >
       {letter}

@@ -64,7 +64,7 @@ function StripTokenChip({
         address={token.address}
         symbol={token.symbol}
         logoUrl={token.logoUrl}
-        size={18}
+        size="xs"
         shape="rounded"
         className="token-favorites-strip__logo shrink-0 !ring-0"
       />

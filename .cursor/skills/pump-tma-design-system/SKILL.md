@@ -59,21 +59,37 @@ Two Coinbase CDS themes: `light`, `dark`. Default resolved theme: system prefere
 
 ## Typography
 
-| Token | Mobile | Desktop (≥1024px) | Use |
-|-------|--------|-------------------|-----|
-| `--text-display` | clamp 28–32px | same | Marketing hero only |
-| `--text-h1` | clamp 24–28px | same | Page titles |
-| `--text-h2` | clamp 20–24px | same | Section titles |
-| `--text-h3` | clamp 18–20px | same | Card headings |
-| `--text-body` | 16px | 16px | Shell body, long copy |
-| `--text-body-sm` | 14px | **15px** | Tables, sidebar rows, default UI |
-| `--text-caption` | 13px | 13px | Meta, timestamps, secondary stats |
-| `--text-label` | 12px | 12px | Uppercase labels, nav captions |
+**Source of truth:** `apps/web/src/app/typography-theme.css` (Coinbase CDS product scale).  
+**Docs:** `.cursor/design-system/designs.md` → Central typography system.
 
-- **UI:** Inter (`--font-inter`)
-- **Numbers:** IBM Plex Mono (`.financial-value`, `.metric-value`) with `tabular-nums`
-- **Headings:** `letter-spacing: -0.02em`
-- **Labels:** uppercase, `letter-spacing: 0.06em`, `text-pump-muted`
+| CDS role | Size | Weight | Use |
+|----------|------|--------|-----|
+| `display1–3` | 64 / 48 / 40 | 400 | Marketing only |
+| `title1` / `title2` | 28 | 600 / 400 | Page title |
+| `title3` / `title4` | 20 | 600 / 400 | Sheet/modal title, section |
+| `headline` | 16 | 600 | CTA, identity, emphasis |
+| `body` | 16 | 400 | Default copy, inputs |
+| `label1` / `label2` | 14 | 600 / 400 | Tables, nav, dense UI |
+| `caption` | 13 | 600 | Uppercase headers |
+| `legal` | 13 | 400 | Helpers, meta, USD |
+
+Semantic aliases (`--text-body`, `--text-nav`, …) map to these roles. Tailwind `text-sm` / `text-xs` / `text-base` also map to CDS. Prefer `.type-label1` / `--type-*` for new code. Swap themes via `[data-type-theme]`.
+
+- **UI:** Geist Sans (`--font-geist-sans`)
+- **Numbers:** `.financial-value` + `tabular-nums` (mono stack)
+- **Dense product UI:** prefer label/legal/caption over body (CDS Text guidance)
+
+## Media sizes (avatars / logos / icons)
+
+**Source:** `apps/web/src/app/size-theme.css` + `@/lib/ui-sizes` · `data-size-theme="pump-cds"`
+
+| Kind | Roles | Default |
+|------|-------|---------|
+| User avatar | xs16 → preview64 | `2xl` (40) |
+| Token/chain logo | xs16 → row52 | `sm` (20) |
+| Icon | xs12 → xl28 | `md` (20) |
+
+Use `size="xl"` / `PumpIcon size="sm"` — never invent 14/18px. Portfolio identity = `xl` (36).
 
 ## Spacing (4px grid)
 

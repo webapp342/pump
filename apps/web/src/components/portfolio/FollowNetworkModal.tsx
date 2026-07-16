@@ -43,7 +43,7 @@ function FollowList({
           className="flex items-center justify-between gap-3 py-3"
         >
           <div className="flex min-w-0 items-center gap-3">
-            <UserAvatarForAddress address={entry.address} size={36} />
+            <UserAvatarForAddress address={entry.address} size="xl" />
             <div className="min-w-0">
               <span className="financial-value text-body-sm font-medium text-pump-text">
                 {entry.displayUsername ? (

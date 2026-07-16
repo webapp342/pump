@@ -240,7 +240,7 @@ export function AirdropCreateDetailPreview({
                     address={linkedToken.address}
                     symbol={linkedToken.symbol}
                     logoUrl={linkedToken.logoUrl}
-                    size={28}
+                    size="lg"
                     shape="rounded"
                     className="token-detail-toolbar__logo shrink-0 !ring-0"
                   />

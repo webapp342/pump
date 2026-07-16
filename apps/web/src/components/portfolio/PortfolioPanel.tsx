@@ -1761,9 +1761,7 @@ export function PortfolioPanel({
         ) : null}
 
         {activeTab === "airdrops" ? (
-          <div className="portfolio-tab-panel">
-          <PortfolioAirdropsSection address={walletAddress} embedded />
-          </div>
+          <PortfolioAirdropsSection address={walletAddress} />
         ) : null}
         </div>
         </div>

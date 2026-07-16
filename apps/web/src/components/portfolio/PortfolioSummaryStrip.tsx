@@ -82,13 +82,13 @@ function HoldingChip({ holding }: { holding: TopHoldingSummary }) {
   return (
     <span className="portfolio-summary-strip__holding-chip">
       {holding.isNative ? (
-        <NativeLogo size={14} className="portfolio-summary-strip__holding-chip-logo" />
+        <NativeLogo size="xs" className="portfolio-summary-strip__holding-chip-logo" />
       ) : holding.tokenAddress ? (
         <TokenAvatar
           address={holding.tokenAddress}
           symbol={holding.symbol}
           logoUrl={holding.logoUrl}
-          size={14}
+          size="xs"
           className="portfolio-summary-strip__holding-chip-logo !ring-0"
         />
       ) : null}

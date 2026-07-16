@@ -5,6 +5,7 @@ import { NativeLogo } from "@/components/token/NativeLogo";
 import { TokenAvatar } from "@/components/token/TokenAvatar";
 import { PumpIcon, faChevronDown } from "@/lib/icons";
 import type { WithdrawAsset } from "@/lib/withdraw-assets";
+import type { TokenLogoSizeRole } from "@/lib/ui-sizes";
 
 type WithdrawAssetPickerProps = {
   assets: WithdrawAsset[];
@@ -13,7 +14,13 @@ type WithdrawAssetPickerProps = {
   disabled?: boolean;
 };
 
-function AssetIcon({ asset, size = 22 }: { asset: WithdrawAsset; size?: number }) {
+function AssetIcon({
+  asset,
+  size = "md",
+}: {
+  asset: WithdrawAsset;
+  size?: number | TokenLogoSizeRole;
+}) {
   if (asset.kind === "native") {
     return (
       <span className="wallet-withdraw-asset-select__icon">

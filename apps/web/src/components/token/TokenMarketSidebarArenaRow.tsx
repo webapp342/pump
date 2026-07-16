@@ -11,6 +11,7 @@ import {
   seedTokenDetailFromListItem,
   tokenDetailQueryKey,
 } from "@/lib/token-detail-client";
+import { writeLastTradeTokenAddress } from "@/lib/last-trade-token";
 import { tokenDetailPath } from "@/lib/token-routes";
 import { formatArenaQuoteUsd } from "@/lib/arena-board-format";
 import { flashText, type FlashTone } from "@/lib/arena-explore-board-core";
@@ -67,6 +68,7 @@ export function TokenMarketSidebarArenaRow({
   const navigateToDetail = useCallback(() => {
     if (Date.now() < suppressNavUntilRef.current) return;
     seedTokenDetailFromListItem(token);
+    writeLastTradeTokenAddress(token.address);
     onTokenSelect?.();
     if (document.activeElement instanceof HTMLElement) {
       document.activeElement.blur();

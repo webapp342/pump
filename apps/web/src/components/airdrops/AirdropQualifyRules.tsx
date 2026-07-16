@@ -6,21 +6,29 @@ import type { TokenListItem } from "@/lib/db/launchpad";
 import { NATIVE_SYMBOL } from "@/config/chain";
 import { BnbLogo } from "@/components/token/BnbLogo";
 import { TokenAvatar } from "@/components/token/TokenAvatar";
+import { TOKEN_LOGO_SIZE, type TokenLogoSizeRole } from "@/lib/ui-sizes";
+
+function resolveLogoPx(size: number | TokenLogoSizeRole | undefined): number {
+  if (size == null) return TOKEN_LOGO_SIZE["2xl"];
+  if (typeof size === "number") return size;
+  return TOKEN_LOGO_SIZE[size];
+}
 
 function PoolTokenAvatar({
   token,
-  size = 36,
+  size = "2xl",
   className = "",
 }: {
   token: TokenListItem | null;
-  size?: number;
+  size?: number | TokenLogoSizeRole;
   className?: string;
 }) {
+  const px = resolveLogoPx(size);
   if (!token) {
     return (
       <div
-        className={`flex shrink-0 items-center justify-center rounded-full border border-dashed border-pump-border/30 bg-pump-surface/40 text-[10px] text-pump-muted ${className}`}
-        style={{ width: size, height: size }}
+        className={`flex shrink-0 items-center justify-center rounded-full border border-dashed border-pump-border/30 bg-pump-surface/40 type-caption text-pump-muted ${className}`}
+        style={{ width: px, height: px }}
       >
         ?
       </div>
@@ -130,7 +138,7 @@ export function AirdropQualifyRulesEditor({
           >
             {!buyInUsd ? (
               <div className="pointer-events-none absolute inset-y-0 left-3 z-[1] flex items-center">
-                <BnbLogo size={18} />
+                <BnbLogo size="xs" />
               </div>
             ) : (
               <span className="pointer-events-none absolute inset-y-0 left-3 z-[1] flex items-center text-caption font-medium text-pump-muted">
@@ -217,7 +225,7 @@ export function AirdropQualifyRulesPreview({
           </>
         ) : null}
       </p>
-      <PoolTokenAvatar token={linkedToken} size={22} className="mt-0.5 shrink-0" />
+      <PoolTokenAvatar token={linkedToken} size="sm" className="mt-0.5 shrink-0" />
     </div>
   );
 }

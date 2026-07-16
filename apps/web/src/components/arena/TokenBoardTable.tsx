@@ -114,7 +114,7 @@ export function TokenBoardTable({
                       address={token.address}
                       symbol={token.symbol}
                       logoUrl={token.logoUrl}
-                      size={30}
+                      size="lg"
                     />
                     <div className="min-w-0">
                       <p className="truncate text-body-sm font-medium text-pump-text">

@@ -43,7 +43,7 @@ export function TokenCard({ token }: { token: TokenListItem }) {
           address={token.address}
           symbol={token.symbol}
           logoUrl={token.logoUrl}
-          size={46}
+          size="row"
         />
         <div className="min-w-0 flex-1">
           <h2 className="truncate text-base font-semibold text-pump-text">{token.symbol}</h2>

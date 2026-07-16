@@ -67,7 +67,7 @@ function SavedAirdropRow({
           <TokenAvatar
             address={item.linkedToken}
             symbol={symbol}
-            size={28}
+            size="lg"
             className="toolbar-sheet-row__avatar"
           />
           <span className="toolbar-sheet-row__symbol">{symbol}</span>

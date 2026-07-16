@@ -751,7 +751,7 @@ export function CreateMemeForm() {
                               className={`relative field-control${fieldErrors.initialBuy ? " field-control--error" : ""}`}
                             >
                               <div className="pointer-events-none absolute inset-y-0 left-3 z-[1] flex items-center">
-                                <BnbLogo size={20} />
+                                <BnbLogo size="sm" />
                               </div>
                               <input
                                 id="initialBuy"

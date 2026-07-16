@@ -1515,7 +1515,7 @@ export function CreateAirdropForm({
                     >
                       {isBnbReward ? (
                         <div className="pointer-events-none absolute inset-y-0 left-3 z-[1] flex items-center">
-                          <BnbLogo size={20} />
+                          <BnbLogo size="sm" />
                         </div>
                       ) : selectedRewardToken ? (
                         <div className="pointer-events-none absolute inset-y-0 left-3 z-[1] flex items-center">

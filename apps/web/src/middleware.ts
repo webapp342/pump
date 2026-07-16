@@ -1,25 +1,12 @@
 import { NextResponse, type NextRequest } from "next/server";
-import {
-  LAST_TRADE_TOKEN_COOKIE_NAME,
-  parseLastTradeTokenCookie,
-} from "@/lib/last-trade-token-cookie";
 
-const TRADE_ENTRY_PATHS = new Set(["/", "/trade"]);
-
-export function middleware(request: NextRequest) {
-  if (!TRADE_ENTRY_PATHS.has(request.nextUrl.pathname)) {
-    return NextResponse.next();
-  }
-
-  const last = parseLastTradeTokenCookie(request.cookies.get(LAST_TRADE_TOKEN_COOKIE_NAME)?.value);
-  if (!last) {
-    return NextResponse.next();
-  }
-
-  const url = request.nextUrl.clone();
-  url.pathname = `/token/${last}`;
-  url.search = "trade=buy";
-  return NextResponse.redirect(url);
+/**
+ * Trade last-token redirect is client-only (localStorage + cookie via inline script /
+ * TradeHomeBootstrap). Edge middleware must not redirect on cookie alone — a stale cookie
+ * can beat fresher localStorage and force the top-MCAP default token.
+ */
+export function middleware(_request: NextRequest) {
+  return NextResponse.next();
 }
 
 export const config = {

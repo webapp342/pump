@@ -81,7 +81,7 @@ function TokenPickerRow({
         address={token.address}
         symbol={token.symbol}
         logoUrl={token.logoUrl}
-        size={36}
+        size="2xl"
         className="shrink-0"
       />
       <div className="min-w-0 flex-1">
@@ -124,7 +124,7 @@ function BnbPickerRow({
           : "text-pump-text hover:bg-pump-surface/50"
       }`}
     >
-      <BnbLogo size={36} />
+      <BnbLogo size="2xl" />
       <div className="min-w-0 flex-1">
         <p className="truncate text-body-sm font-medium text-pump-text">{NATIVE_SYMBOL}</p>
         <p className="truncate text-caption text-pump-muted">Native {NATIVE_SYMBOL}</p>
@@ -270,7 +270,7 @@ export function RewardAssetPicker({
             <span className="text-body-sm text-pump-muted">Loading assets…</span>
           ) : isBnbSelected ? (
             <>
-              <BnbLogo size={24} />
+              <BnbLogo size="md" />
               <span className="min-w-0 flex-1 truncate text-body-sm font-medium text-pump-text">
                 {NATIVE_SYMBOL}
               </span>
@@ -286,7 +286,7 @@ export function RewardAssetPicker({
                 address={selectedToken.address}
                 symbol={selectedToken.symbol}
                 logoUrl={selectedToken.logoUrl}
-                size={24}
+                size="md"
                 className="shrink-0"
               />
               <span className="min-w-0 flex-1 truncate text-body-sm font-medium text-pump-text">
@@ -321,7 +321,7 @@ export function RewardAssetPicker({
                   : "border-pump-border/20 bg-pump-surface/30 text-pump-muted hover:border-pump-border/40 hover:text-pump-text"
               }`}
             >
-              <BnbLogo size={14} />
+              <BnbLogo size="xs" />
               <span className="text-caption font-medium">{NATIVE_SYMBOL}</span>
               <span className="financial-value shrink-0 text-[10px] tabular-nums opacity-80">
                 {displayBnbBalance}
@@ -347,7 +347,7 @@ export function RewardAssetPicker({
                   address={token.address}
                   symbol={token.symbol}
                   logoUrl={token.logoUrl}
-                  size={14}
+                  size="xs"
                   className="shrink-0"
                 />
                 <span className="max-w-[4.5rem] truncate text-caption font-medium">

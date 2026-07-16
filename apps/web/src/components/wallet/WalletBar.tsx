@@ -76,7 +76,7 @@ function ConnectedWalletButton({ address }: { address: string }) {
           aria-label="Open account"
         >
           {avatarId ? (
-            <UserAvatar address={address} avatarId={avatarId} size={24} />
+            <UserAvatar address={address} avatarId={avatarId} size="md" />
           ) : (
             <span className="app-header-account-btn__fallback" aria-hidden>
               {address.slice(2, 4).toUpperCase()}
@@ -99,7 +99,7 @@ function ConnectedWalletButton({ address }: { address: string }) {
         aria-label="Open account menu"
       >
         {avatarId ? (
-          <UserAvatar address={address} avatarId={avatarId} size={24} className="app-header-account-chip__avatar" />
+          <UserAvatar address={address} avatarId={avatarId} size="md" className="app-header-account-chip__avatar" />
         ) : (
           <span className="app-header-account-chip__avatar-fallback" aria-hidden>
             {address.slice(2, 4).toUpperCase()}

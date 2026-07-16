@@ -178,7 +178,7 @@ export function PortfolioHero({
                   >
                     <UserAvatarForAddress
                       address={walletAddress}
-                      size={48}
+                      size="xl"
                       className="portfolio-toolbar__avatar token-detail-toolbar__logo shrink-0 !ring-0"
                     />
                     <span className="portfolio-toolbar__avatar-edit" aria-hidden>
@@ -188,7 +188,7 @@ export function PortfolioHero({
                 ) : (
                   <UserAvatarForAddress
                     address={walletAddress}
-                    size={48}
+                    size="xl"
                     className="portfolio-toolbar__avatar token-detail-toolbar__logo shrink-0 !ring-0"
                   />
                 )}

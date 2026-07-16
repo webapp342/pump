@@ -4,19 +4,28 @@ import { useEffect, useState } from "react";
 import type { UserAvatarId } from "@/lib/user-avatars";
 import { UserAvatar } from "@/components/user/UserAvatar";
 import { fetchUserAvatarId, getCachedUserAvatarId } from "@/lib/user-avatar-cache";
+import { USER_AVATAR_SIZE, type UserAvatarSizeRole } from "@/lib/ui-sizes";
 
 type UserAvatarForAddressProps = {
   address: string;
-  size?: number;
+  /** Named role or px. Prefer `USER_AVATAR_SIZE` roles. Default: `2xl` (40). */
+  size?: number | UserAvatarSizeRole;
   className?: string;
 };
 
+function resolveAvatarPx(size: number | UserAvatarSizeRole | undefined): number {
+  if (size == null) return USER_AVATAR_SIZE["2xl"];
+  if (typeof size === "number") return size;
+  return USER_AVATAR_SIZE[size];
+}
+
 export function UserAvatarForAddress({
   address,
-  size = 40,
+  size = "2xl",
   className = "",
 }: UserAvatarForAddressProps) {
   const normalized = address.toLowerCase();
+  const px = resolveAvatarPx(size);
   const [avatarId, setAvatarId] = useState<UserAvatarId | null>(
     () => getCachedUserAvatarId(normalized)
   );
@@ -42,12 +51,12 @@ export function UserAvatarForAddress({
     return (
       <span
         className={`skeleton-shimmer inline-block shrink-0 rounded-full ${className}`}
-        style={{ width: size, height: size }}
+        style={{ width: px, height: px }}
       />
     );
   }
 
   return (
-    <UserAvatar address={address} avatarId={avatarId} size={size} className={className} />
+    <UserAvatar address={address} avatarId={avatarId} size={px} className={className} />
   );
 }

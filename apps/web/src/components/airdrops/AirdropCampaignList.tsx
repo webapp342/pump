@@ -41,7 +41,7 @@ function AirdropCampaignRow({
   return (
     <Link href={href} className="airdrops-list__row">
       <div className="airdrops-list__cell airdrops-list__cell--campaign">
-        <TokenAvatar address={item.linkedToken} symbol={symbol} size={24} shape="rounded" className="shrink-0" />
+        <TokenAvatar address={item.linkedToken} symbol={symbol} size="md" shape="rounded" className="shrink-0" />
         <div className="min-w-0 flex-1">
           <p className="airdrops-list__title airdrops-list__title--desktop truncate" title={title}>
             {title}
@@ -57,7 +57,7 @@ function AirdropCampaignRow({
           rewardSymbol={item.rewardSymbol}
           linkedToken={item.linkedToken}
           linkedSymbol={symbol}
-          size={14}
+          size={12}
           className="airdrops-list__pool-token"
           amountClassName="financial-value text-body-sm font-medium tabular-nums text-pump-text"
           symbolClassName="text-caption text-pump-muted"

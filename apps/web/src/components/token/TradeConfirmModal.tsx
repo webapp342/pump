@@ -35,12 +35,12 @@ function TradeConfirmAssetValue({ line }: { line: TradeConfirmAssetLine }) {
     <div className="trade-confirm-row__value">
       <div className="trade-confirm-row__asset">
         {line.asset === "native" ? (
-          <NativeLogo size={18} className="trade-confirm-row__logo" />
+          <NativeLogo size="xs" className="trade-confirm-row__logo" />
         ) : (
           <TokenAvatar
             address={line.tokenAddress ?? "0x0000000000000000000000000000000000000000"}
             symbol={line.symbol}
-            size={18}
+            size="xs"
             className="trade-confirm-row__logo shrink-0"
           />
         )}

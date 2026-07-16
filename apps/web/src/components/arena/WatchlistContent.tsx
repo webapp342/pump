@@ -101,7 +101,7 @@ export function WatchlistContent({
                   address={token.address}
                   symbol={token.symbol}
                   logoUrl={token.logoUrl}
-                  size={28}
+                  size="lg"
                   className="toolbar-sheet-row__avatar"
                 />
                 <span className="toolbar-sheet-row__symbol">{symbolLabel}</span>

@@ -24,7 +24,7 @@ function TickerItem({ token }: { token: TokenListItem }) {
         address={token.address}
         symbol={token.symbol}
         logoUrl={token.logoUrl}
-        size={18}
+        size="xs"
       />
       <span className="mcap-ticker-symbol">{symbolLabel}</span>
       <PctChange value={token.change24hPct ?? null} className="mcap-ticker-pct" />

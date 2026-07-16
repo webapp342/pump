@@ -1,0 +1,301 @@
+/**
+ * Pump typography theme — Coinbase Design System (CDS) product scale
+ * Source: https://cds.coinbase.com/getting-started/theming/ (fontSize / fontWeight / lineHeight)
+ *
+ * Swap themes later: change [data-type-theme] block values only.
+ * Components must use --type-* roles or semantic --text-* / --weight-* aliases — never raw px.
+ */
+
+:root,
+html[data-theme="light"],
+html[data-theme="dark"],
+html[data-type-theme="coinbase-cds"] {
+  --type-theme-id: coinbase-cds;
+
+  /* ── CDS primitive roles (size / weight / line-height) ── */
+  --type-display1-size: 4rem; /* 64 */
+  --type-display1-weight: 400;
+  --type-display1-leading: 4.5rem;
+
+  --type-display2-size: 3rem; /* 48 */
+  --type-display2-weight: 400;
+  --type-display2-leading: 3.5rem;
+
+  --type-display3-size: 2.5rem; /* 40 */
+  --type-display3-weight: 400;
+  --type-display3-leading: 3rem;
+
+  --type-title1-size: 1.75rem; /* 28 */
+  --type-title1-weight: 600;
+  --type-title1-leading: 2.25rem;
+
+  --type-title2-size: 1.75rem; /* 28 */
+  --type-title2-weight: 400;
+  --type-title2-leading: 2.25rem;
+
+  --type-title3-size: 1.25rem; /* 20 */
+  --type-title3-weight: 600;
+  --type-title3-leading: 1.75rem;
+
+  --type-title4-size: 1.25rem; /* 20 */
+  --type-title4-weight: 400;
+  --type-title4-leading: 1.75rem;
+
+  --type-headline-size: 1rem; /* 16 */
+  --type-headline-weight: 600;
+  --type-headline-leading: 1.5rem;
+
+  --type-body-size: 1rem; /* 16 */
+  --type-body-weight: 400;
+  --type-body-leading: 1.5rem;
+
+  --type-label1-size: 0.875rem; /* 14 */
+  --type-label1-weight: 600;
+  --type-label1-leading: 1.25rem;
+
+  --type-label2-size: 0.875rem; /* 14 */
+  --type-label2-weight: 400;
+  --type-label2-leading: 1.25rem;
+
+  --type-caption-size: 0.8125rem; /* 13 */
+  --type-caption-weight: 600;
+  --type-caption-leading: 1rem;
+  --type-caption-transform: uppercase;
+
+  --type-legal-size: 0.8125rem; /* 13 */
+  --type-legal-weight: 400;
+  --type-legal-leading: 1rem;
+  --type-legal-transform: none;
+
+  /* Numeric / financial (CDS uses mono + tabular; Inter + tabular-nums) */
+  --type-number-size: var(--type-label1-size);
+  --type-number-weight: var(--type-label1-weight);
+  --type-number-leading: var(--type-label1-leading);
+
+  --type-number-lg-size: var(--type-title3-size);
+  --type-number-lg-weight: 500;
+  --type-number-lg-leading: var(--type-title3-leading);
+
+  /* Tracking (CDS: display only; body 0) */
+  --type-tracking-display: -0.02em;
+  --type-tracking-title: 0;
+  --type-tracking-body: 0;
+  --type-tracking-caption: 0.04em;
+
+  /* ── Legacy primitive size ladder (compat → CDS floor: legal 13px) ── */
+  --text-2xs: var(--type-legal-size);
+  --text-xs: var(--type-legal-size);
+  --text-label: var(--type-caption-size);
+  --text-caption: var(--type-legal-size);
+  --text-body-sm: var(--type-label2-size);
+  --text-body: var(--type-body-size);
+  --text-body-lg: var(--type-headline-size);
+  --text-h3: var(--type-title3-size);
+  --text-h2: var(--type-title3-size);
+  --text-h1: var(--type-title1-size);
+  --text-title: var(--type-title1-size);
+  --text-page-title: var(--type-title1-size);
+  --text-display: var(--type-display3-size);
+
+  /* Interaction aliases (CDS product UI) */
+  --text-ui-body: var(--type-body-size);
+  --text-ui-secondary: var(--type-legal-size);
+
+  /* ── App semantic sizes → CDS roles ── */
+  --text-nav: var(--type-label1-size);
+  --text-nav-bottom: var(--type-caption-size);
+  --text-button: var(--type-headline-size);
+  --text-input: var(--type-body-size);
+  --text-modal-title: var(--type-title3-size);
+  --text-modal-subtitle: var(--type-legal-size);
+  --text-modal-body: var(--type-body-size);
+  --text-metric-label: var(--type-legal-size);
+  --text-metric-hero: var(--type-title3-size);
+  --text-metric-meta: var(--type-legal-size);
+  --text-table: var(--type-label1-size);
+  --text-table-header: var(--type-caption-size);
+  --text-tab: var(--type-label2-size);
+  --text-tab-dense: var(--type-label2-size);
+  --text-tab-count: var(--type-legal-size);
+  --text-logo-wordmark: 1.25rem;
+  --text-logo-logogram: 1.375rem;
+
+  --text-token-symbol: var(--type-headline-size);
+  --text-token-price-hero: var(--type-title3-size);
+  --text-token-stat-label: var(--type-legal-size);
+  --text-token-stat-value: var(--type-label1-size);
+  --text-chart-control: var(--type-legal-size);
+  --text-chart-meta: var(--type-legal-size);
+  /* Trade sheet / panel (Coinbase Advanced–like product UI) */
+  --text-trade-field-label: var(--type-caption-size); /* TOTAL overline */
+  --text-trade-avail: var(--type-legal-size);
+  --text-trade-input: var(--type-body-size);
+  --text-trade-input-hero: var(--type-title1-size); /* mobile amount */
+  --text-trade-preset: var(--type-label2-size);
+  --text-trade-detail: var(--type-legal-size);
+  --text-trade-detail-value: var(--type-label1-size);
+  --text-trade-numpad: var(--type-title3-size);
+  --text-trade-unit: var(--type-legal-size);
+  --text-trade-cta: var(--type-headline-size);
+
+  /* Leading */
+  --leading-display: 1.125;
+  --leading-heading: 1.4;
+  --leading-body: 1.5;
+  --leading-caption: 1.23;
+  --leading-label: 1.43;
+  --leading-tight: 1.25;
+  --tracking-heading: var(--type-tracking-display);
+  --tracking-metric: -0.01em;
+  --tracking-label: var(--type-tracking-caption);
+  --tracking-overline: var(--type-tracking-caption);
+
+  /* Weight primitives */
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+
+  /* Semantic weights → CDS */
+  --weight-body: var(--type-body-weight);
+  --weight-ui: var(--type-label2-weight);
+  --weight-emphasis: var(--type-headline-weight);
+  --weight-strong: 700;
+  --weight-nav: var(--type-label1-weight);
+  --weight-nav-active: var(--type-label1-weight);
+  --weight-bottom-nav: var(--type-caption-weight);
+  --weight-bottom-nav-active: var(--type-caption-weight);
+  --weight-tab: var(--type-label2-weight);
+  --weight-tab-active: var(--type-label1-weight);
+  --weight-tab-count: var(--type-legal-weight);
+  --weight-button: var(--type-headline-weight);
+  --weight-heading: var(--type-title3-weight);
+  --weight-modal-title: var(--type-title3-weight);
+  --weight-modal-body: var(--type-body-weight);
+  --weight-overline: var(--type-caption-weight);
+  --weight-caption: var(--type-caption-weight);
+  --weight-table-header: var(--type-caption-weight);
+  --weight-table-body: var(--type-label2-weight);
+  --weight-table-value: var(--type-label1-weight);
+  --weight-table-symbol: var(--type-label1-weight);
+  --weight-metric: var(--type-title3-weight);
+  --weight-metric-secondary: var(--type-headline-weight);
+  --weight-card-title: var(--type-headline-weight);
+  --weight-trade-tab: var(--type-label2-weight);
+  --weight-trade-tab-active: var(--type-label1-weight);
+  --weight-trade-cta: var(--type-headline-weight);
+  --weight-trade-input: var(--type-title1-weight);
+  --weight-trade-preset: var(--type-label1-weight);
+  --weight-trade-numpad: var(--type-title3-weight);
+  --weight-filter-chip: var(--type-label2-weight);
+  --weight-filter-chip-active: var(--type-label1-weight);
+}
+
+/* Dense trading desktop: CDS still applies; prefer label/legal over body in data rows */
+@media (min-width: 768px) {
+  :root,
+  html[data-theme="light"],
+  html[data-theme="dark"],
+  html[data-type-theme="coinbase-cds"] {
+    --text-ui-body: var(--type-label1-size);
+    --text-ui-secondary: var(--type-legal-size);
+    --text-table: var(--type-label1-size);
+    --text-page-title: var(--type-title1-size);
+    --text-logo-wordmark: 1.3125rem;
+    --text-logo-logogram: 1.4375rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  :root,
+  html[data-theme="light"],
+  html[data-theme="dark"],
+  html[data-type-theme="coinbase-cds"] {
+    --text-logo-wordmark: 1.375rem;
+    --text-logo-logogram: 1.5rem;
+  }
+}
+
+/* ── Utility classes (use in JSX when Tailwind text-* would fight tokens) ── */
+.type-display1 {
+  font-size: var(--type-display1-size);
+  font-weight: var(--type-display1-weight);
+  line-height: var(--type-display1-leading);
+  letter-spacing: var(--type-tracking-display);
+}
+.type-display2 {
+  font-size: var(--type-display2-size);
+  font-weight: var(--type-display2-weight);
+  line-height: var(--type-display2-leading);
+  letter-spacing: var(--type-tracking-display);
+}
+.type-display3 {
+  font-size: var(--type-display3-size);
+  font-weight: var(--type-display3-weight);
+  line-height: var(--type-display3-leading);
+  letter-spacing: var(--type-tracking-display);
+}
+.type-title1 {
+  font-size: var(--type-title1-size);
+  font-weight: var(--type-title1-weight);
+  line-height: var(--type-title1-leading);
+}
+.type-title2 {
+  font-size: var(--type-title2-size);
+  font-weight: var(--type-title2-weight);
+  line-height: var(--type-title2-leading);
+}
+.type-title3 {
+  font-size: var(--type-title3-size);
+  font-weight: var(--type-title3-weight);
+  line-height: var(--type-title3-leading);
+}
+.type-title4 {
+  font-size: var(--type-title4-size);
+  font-weight: var(--type-title4-weight);
+  line-height: var(--type-title4-leading);
+}
+.type-headline {
+  font-size: var(--type-headline-size);
+  font-weight: var(--type-headline-weight);
+  line-height: var(--type-headline-leading);
+}
+.type-body {
+  font-size: var(--type-body-size);
+  font-weight: var(--type-body-weight);
+  line-height: var(--type-body-leading);
+}
+.type-label1 {
+  font-size: var(--type-label1-size);
+  font-weight: var(--type-label1-weight);
+  line-height: var(--type-label1-leading);
+}
+.type-label2 {
+  font-size: var(--type-label2-size);
+  font-weight: var(--type-label2-weight);
+  line-height: var(--type-label2-leading);
+}
+.type-caption {
+  font-size: var(--type-caption-size);
+  font-weight: var(--type-caption-weight);
+  line-height: var(--type-caption-leading);
+  letter-spacing: var(--type-tracking-caption);
+  text-transform: var(--type-caption-transform);
+}
+.type-legal {
+  font-size: var(--type-legal-size);
+  font-weight: var(--type-legal-weight);
+  line-height: var(--type-legal-leading);
+}
+.type-number {
+  font-size: var(--type-number-size);
+  font-weight: var(--type-number-weight);
+  line-height: var(--type-number-leading);
+  font-variant-numeric: tabular-nums;
+}
+.type-number-lg {
+  font-size: var(--type-number-lg-size);
+  font-weight: var(--type-number-lg-weight);
+  line-height: var(--type-number-lg-leading);
+  font-variant-numeric: tabular-nums;
+}

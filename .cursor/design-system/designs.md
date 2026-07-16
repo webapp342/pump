@@ -101,18 +101,122 @@ No balance, address, Deposit, or Withdraw. Diagnostics **dev only**.
 
 ---
 
-## Typography scale (wallet / sheet interiors)
+## Central typography system (Coinbase CDS)
 
-| Role | Token |
-|------|--------|
-| Sheet title | `--text-h3` |
-| Sheet subtitle | `--text-caption` muted |
-| Balance amount | ≤ `--text-h2` (sheet); portfolio page hero may be larger |
-| Settings label | `--text-body-sm` medium |
-| Helper / address | `--text-caption` muted |
-| Field labels | `--text-label` uppercase **or** sentence body-sm — pick one per surface |
+**Source of truth:** `apps/web/src/app/typography-theme.css`  
+**Official CDS refs:** [CDS Text](https://cds.coinbase.com/components/typography/Text/) · [CDS Theming](https://cds.coinbase.com/getting-started/theming/)
 
-Never use `--text-display` / page H1 inside sheets or account panels.
+Pump uses **CDS product roles** (size + weight + line-height). Swap themes later by editing only `typography-theme.css` / `[data-type-theme]` — do **not** hard-code `px` in components.
+
+### CDS roles Pump uses (13 roles)
+
+| Role | Size | Weight | Line-height | When to use |
+|------|------|--------|-------------|-------------|
+| `display1` | 64px | 400 | 72px | Marketing hero only |
+| `display2` | 48px | 400 | 56px | Marketing |
+| `display3` | 40px | 400 | 48px | Marketing / rare page hero |
+| `title1` | 28px | **600** | 36px | Page title (one per page) |
+| `title2` | 28px | 400 | 36px | Soft page title |
+| `title3` | 20px | **600** | 28px | Sheet/modal title, section |
+| `title4` | 20px | 400 | 28px | Soft section |
+| `headline` | 16px | **600** | 24px | Emphasized row, CTA label, identity |
+| `body` | 16px | 400 | 24px | Default copy, form input |
+| `label1` | 14px | **600** | 20px | Dense table primary, nav |
+| `label2` | 14px | 400 | 20px | Dense secondary, tabs |
+| `caption` | 13px | **600** | 16px | Uppercase table headers / overlines |
+| `legal` | 13px | 400 | 16px | Helpers, meta, USD under balance |
+
+CSS: `--type-{role}-size|weight|leading` · utilities: `.type-body`, `.type-label1`, `.type-headline`, …
+
+### App surface → CDS role map
+
+| Surface | Role |
+|---------|------|
+| `body` / paragraphs | `body` |
+| Page H1 | `title1` |
+| Sheet / modal title (`h2`) | `title3` |
+| Modal subtitle / hint | `legal` |
+| Primary / secondary button | `headline` (16/600) |
+| Top nav link | `label1` |
+| Bottom nav label | `caption` |
+| Tab (idle / active) | `label2` / `label1` |
+| Table header | `caption` |
+| Table cell primary (coin, amount) | `label1` |
+| Table cell secondary (symbol, $) | `legal` |
+| Metric hero $ | `title3` or `headline` |
+| Metric label | `legal` |
+| Financial numbers | `.financial-value` + parent role size; mono + tabular-nums |
+
+### Dense product UI (CDS guidance)
+
+For trading / portfolio / sheets with many rows, prefer **`label1` / `label2` / `legal` / `caption`** over `body` — CDS Text docs: labels may replace body in extraordinarily dense interfaces.
+
+Mobile and desktop use the **same CDS sizes** (product CDS is fixed). Dense desktop only switches data rows to label/legal via `--text-ui-body` → `label1` at `≥768px`.
+
+### Agent rules
+
+1. Never set `font-size: 0.75rem` etc. in new CSS — use `--type-*` or `--text-*` aliases.
+2. Prefer `.type-label1` / semantic tokens over Tailwind `text-sm` / `text-xs`.
+3. To try another foundry scale: duplicate the theme block as `[data-type-theme="…"]` and flip `dataset.typeTheme`.
+4. Sheets: never `title1` / `display*` for in-sheet identity rows.
+
+### Creator profile sheet (CDS mapping)
+
+| Element | CDS role |
+|---------|----------|
+| Address / username | `headline` |
+| Followers / Following | `legal` (+ strong `caption` weight on count) |
+| Earnings label | `legal` |
+| Earnings value | `headline` |
+| Tab | `label2` |
+| Table header | `caption` |
+| Coin / balance | `label1` |
+| Symbol / USD | `legal` |
+
+Header grid unchanged: avatar · identity+explorer · Follow. Empty earnings → `$0`.
+
+### Trade Buy/Sell sheet (CDS mapping)
+
+| Element | CDS role |
+|---------|----------|
+| Symbol (ZNS) | `headline` |
+| Change % | `legal` (+ caption weight) |
+| Buy / Sell toggle | `label1` / `label2` idle |
+| TOTAL / field label | `caption` (uppercase) |
+| Avail. | `legal` (amount `caption` weight) |
+| Amount input (mobile) | `title1` |
+| Amount input (desktop) | `body` + headline weight |
+| USD \| TOKEN chip | `legal` |
+| 25% / 50% / Max | `label2` (+ label1 weight) |
+| Order value label / USD | `legal` |
+| Order value tokens | `label1` |
+| Numpad keys | `title3` |
+| Buy / Sell CTA | `headline` |
+
+Tokens: `--text-trade-*` in `typography-theme.css`.
+
+---
+
+## Central media sizes (avatars / logos / icons)
+
+**Source of truth:** `apps/web/src/app/size-theme.css` + `apps/web/src/lib/ui-sizes.ts`  
+**Theme id:** `data-size-theme="pump-cds"`
+
+4px-grid steps only: **12 · 16 · 20 · 24 · 28 · 32 · 36 · 40 · 48 · 52 · 64**. No 14/18/22/26/44.
+
+| Kind | Roles (px) | Default |
+|------|------------|---------|
+| User avatar (circle) | xs16 · sm20 · md24 · lg32 · xl36 · 2xl40 · 3xl48 · picker52 · preview64 | `2xl` |
+| Token / chain logo (square) | xs16 · sm20 · md24 · lg28 · xl32 · 2xl36 · 3xl40 · row52 · hero52 | `sm` |
+| Icon (PumpIcon) | xs12 · sm16 · md20 · lg24 · xl28 | `md` |
+
+**Rules**
+
+1. Prefer `size="xl"` / `USER_AVATAR_SIZE.xl` / `TOKEN_LOGO_SIZE.sm` — never invent raw px in new UI.
+2. Portfolio identity avatar: `xl` (36). Sheet profile: `2xl` (40). Header chip: `md` (24).
+3. Table / holdings logos: `sm` (20) via `--token-logo-size-inline`.
+4. Icons: `PumpIcon size="sm"` or `.icon-sm` — not `h-3 w-3` / `text-xs`.
+5. To retune the whole app, edit `size-theme.css` only.
 
 ---
 
@@ -136,3 +240,6 @@ Never use `--text-display` / page H1 inside sheets or account panels.
 - [ ] Settings rows share height / padding / icon column
 - [ ] CTAs sentence case, ≥44px
 - [ ] Visual check at 375px width
+- [ ] Typography uses `--type-*` / `.type-*` (CDS) — no raw px font-size
+- [ ] Creator profile: explorer icon immediately after address
+- [ ] `data-type-theme="coinbase-cds"` on `<html>` (ThemeProvider)

@@ -1,8 +1,10 @@
-/** Inline list/table token logo — matches `--token-logo-size-inline` (1.25rem). */
-export const TOKEN_LOGO_SIZE_INLINE = 20;
-
-/** Arena mobile card row logo — matches `--token-logo-size-row` (3.25rem). Do not change arena CSS. */
-export const TOKEN_LOGO_SIZE_ROW = 52;
-
-/** Token detail / toolbar mark — matches `--toolbar-logo-size`. */
-export const TOKEN_LOGO_SIZE_TOOLBAR = 28;
+/**
+ * @deprecated Import from `@/lib/ui-sizes` — kept so existing imports keep working.
+ */
+export {
+  TOKEN_LOGO_SIZE,
+  TOKEN_LOGO_SIZE_INLINE,
+  TOKEN_LOGO_SIZE_ROW,
+  TOKEN_LOGO_SIZE_TOOLBAR,
+  type TokenLogoSizeRole,
+} from "@/lib/ui-sizes";

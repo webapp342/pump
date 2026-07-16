@@ -1,11 +1,12 @@
 import { NativeLogo } from "@/components/token/NativeLogo";
+import type { TokenLogoSizeRole } from "@/lib/ui-sizes";
 
 /** @deprecated Use NativeLogo — kept for existing imports. */
 export function BnbLogo({
-  size = 28,
+  size = "sm",
   className = "",
 }: {
-  size?: number;
+  size?: number | TokenLogoSizeRole;
   className?: string;
 }) {
   return <NativeLogo size={size} className={className} />;

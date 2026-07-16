@@ -343,9 +343,9 @@ function TradeOrderValueStrip({
       {orderValuePrimary ? (
         <div className="trade-order-value-primary">
           {side === "buy" ? (
-            <TokenAvatar address={tokenAddress} symbol={symbol} size={16} className="!ring-0" />
+            <TokenAvatar address={tokenAddress} symbol={symbol} size="xs" className="!ring-0" />
           ) : (
-            <NativeLogo size={16} />
+            <NativeLogo size="xs" />
           )}
           <span className="financial-value text-pump-text">{orderValuePrimary}</span>
         </div>
@@ -2730,9 +2730,9 @@ export function TradePanel({
             <div className="trade-field-header">
               <span className="trade-field-label">{inputFieldLabel}</span>
               {availableLabel ? (
-                <span className="trade-field-avail text-caption leading-snug text-pump-muted">
+                <span className="trade-field-avail">
                   Avail.{" "}
-                  <span className="financial-value text-pump-text">{availableLabel}</span>
+                  <span className="financial-value">{availableLabel}</span>
                 </span>
               ) : null}
             </div>

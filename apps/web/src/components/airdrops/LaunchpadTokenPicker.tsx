@@ -78,7 +78,7 @@ function TokenPickerRow({
         address={token.address}
         symbol={token.symbol}
         logoUrl={token.logoUrl}
-        size={36}
+        size="2xl"
         className="shrink-0"
       />
       <div className="min-w-0 flex-1">
@@ -219,7 +219,7 @@ export function LaunchpadTokenPicker({
                 address={selectedToken.address}
                 symbol={selectedToken.symbol}
                 logoUrl={selectedToken.logoUrl}
-                size={24}
+                size="md"
                 className="shrink-0"
               />
               <span className="min-w-0 flex-1 truncate text-body-sm font-medium text-pump-text">
@@ -262,7 +262,7 @@ export function LaunchpadTokenPicker({
                   address={token.address}
                   symbol={token.symbol}
                   logoUrl={token.logoUrl}
-                  size={14}
+                  size="xs"
                   className="shrink-0"
                 />
                 <span className="max-w-[4.5rem] truncate text-caption font-medium">

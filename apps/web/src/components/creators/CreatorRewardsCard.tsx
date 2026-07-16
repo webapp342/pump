@@ -71,7 +71,7 @@ export function CreatorRewardsCard({
             className="creator-rewards-card__identity"
             aria-label={`View creator profile ${creatorDisplayUsername ?? creatorAddress}`}
           >
-            <UserAvatarForAddress address={creatorAddress} size={44} />
+            <UserAvatarForAddress address={creatorAddress} size="2xl" />
             <div className="creator-rewards-card__identity-copy">
               <span className="creator-rewards-card__name financial-value">
                 {creatorDisplayUsername ?? (

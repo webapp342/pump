@@ -32,6 +32,7 @@ Source of truth when **ui-ux-pro-max** search conflicts with Pump. Always read *
 | `--text-label` uppercase on wallet CTAs | Sentence case `--text-caption` on Deposit/Withdraw/Create |
 | `$` prefix on token symbols in UI | Show `symbol` only (e.g. `USDC`, not `$USDC`) |
 | Circle crop on token/chain logos | **`TokenAvatar` default `rounded` (square tile)**; **user avatars only = circle** |
+| Ad-hoc avatar/logo/icon px (14/18/22…) | **`size-theme.css` + `@/lib/ui-sizes` roles only** |
 | Skill color palette (#F59E0B, purple accent, etc.) | `pump-accent`, `pump-card-soft`, `pump-border` |
 | Phosphor / Lucide icons | `PumpIcon` + Material Symbols (`@/lib/pump-icons`) |
 | Icon sizing via `width/height` only on `.material-symbols-rounded` | Set **`font-size` + `1em`** — else glyphs clip |
@@ -40,11 +41,12 @@ Source of truth when **ui-ux-pro-max** search conflicts with Pump. Always read *
 
 On **every UI/UX task** in this repo — without the user asking again:
 
-0. Read **`.cursor/design-system/designs.md`** (corporate fintech bar — permanent).
+0. Read **`.cursor/design-system/designs.md`** (corporate fintech bar — permanent) + **typography-theme.css** (CDS roles).
 1. Read **`pump-tma-design-system`** → **`pump-tma-ui-ux`** → **`.cursor/design-system/MASTER.md`** (+ `pages/<route>.md`).
 2. Run **`ui-ux-pro-max`** `--domain ux` search when changing portfolio, wallet, nav, or earnings surfaces.
 3. Apply **logo shape rule**, **no `$` on symbols**, **sentence-case wallet CTAs**, **Launched = Holdings grid parity**.
 4. Sheets/modals: also read **`pages/sheets.md`**.
+5. Typography: use `--type-*` / `.type-*` — never invent raw `font-size` px.
 
 ## Touch & density defaults
 

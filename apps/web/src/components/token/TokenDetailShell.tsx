@@ -64,7 +64,7 @@ function resolveRouteBundle(
     return { token: optimisticToken, trades: [], holders: [] };
   }
 
-  return resolved;
+  return null;
 }
 
 export function TokenDetailShell({
@@ -131,6 +131,9 @@ export function TokenDetailShell({
   const routeBundle = resolveRouteBundle(normalized, resolved, optimisticToken);
   const contentSynced =
     routeBundle != null && routeBundle.token.address.toLowerCase() === normalized;
+
+  const showRouteSkeleton =
+    !routeBundle || routeBundle.token.address.toLowerCase() !== normalized;
 
   const load = useCallback(
     async (options: { silent?: boolean } = {}) => {
@@ -232,7 +235,7 @@ export function TokenDetailShell({
 
   const showFullSkeleton = !layoutMountedRef.current && !routeBundle;
 
-  if (showFullSkeleton) {
+  if (showFullSkeleton || showRouteSkeleton) {
     return (
       <AppShell wide>
         <TokenDetailBodySkeleton />

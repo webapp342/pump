@@ -47,6 +47,10 @@ Tailwind tokens: `text-h1`…`text-caption`, `text-pump-*`, `bg-pump-*`, `border
 
 Two Coinbase CDS themes via `data-theme` on `<html>`: `light`, `dark`. CSS vars in `globals.css`; logic in `src/lib/theme.ts`. First visit follows `prefers-color-scheme` (fallback dark); sun/moon toggle saves explicit preference.
 
+**Typography:** `apps/web/src/app/typography-theme.css` + `data-type-theme="coinbase-cds"`. Roles: display / title / headline / body / label / caption / legal. Prefer `--type-*` or `.type-*`; see `.cursor/design-system/designs.md`.
+
+**Media sizes:** `apps/web/src/app/size-theme.css` + `@/lib/ui-sizes` + `data-size-theme="pump-cds"`. Avatars / logos / icons use named roles (`USER_AVATAR_SIZE`, `TOKEN_LOGO_SIZE`, `ICON_SIZE`) — no ad-hoc 14/18px.
+
 ## Icons & loading
 
 - Icons: `PumpIcon` + `@/lib/pump-icons` (Material Symbols Rounded)
