@@ -4,37 +4,11 @@ import type { MouseEvent } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { isTokenRoute } from "@/components/layout/layout-shell";
-import { TradeNavLink } from "@/components/layout/TradeNavLink";
 import { TokenTradeDockPill } from "@/components/token/TokenTradeDock";
 import { useTokenMobileTradeDock } from "@/components/token/TokenMobileTradeDockContext";
 import { usePumpWallet } from "@/components/wallet/PumpWalletProvider";
 import { APP_BOTTOM_TAB_ITEMS, isBottomNavActive } from "@/lib/nav-config";
 import { PumpIcon } from "@/lib/icons";
-
-function BottomNavTradeTab({
-  label,
-  icon,
-  active,
-  onClick,
-}: {
-  label: string;
-  icon: (typeof APP_BOTTOM_TAB_ITEMS)[number]["icon"];
-  active: boolean;
-  onClick?: (event: MouseEvent<HTMLAnchorElement>) => void;
-}) {
-  return (
-    <TradeNavLink
-      fallbackHref="/"
-      prefetch={true}
-      aria-current={active ? "page" : undefined}
-      aria-label={label}
-      className={`bottom-nav-item${active ? " bottom-nav-item-active" : ""}`}
-      onClick={onClick}
-    >
-      <PumpIcon icon={icon} active={active} size="lg" className="bottom-nav-icon" />
-    </TradeNavLink>
-  );
-}
 
 function BottomNavRouteTab({
   href,
@@ -89,18 +63,6 @@ export function AppNavView({ pathname }: { pathname: string }) {
                 }
               : undefined;
             const active = isBottomNavActive(pathname, item.href);
-
-            if (item.href === "/") {
-              return (
-                <BottomNavTradeTab
-                  key={item.href}
-                  label={item.label}
-                  icon={item.icon}
-                  active={active}
-                  onClick={onClick}
-                />
-              );
-            }
 
             return (
               <BottomNavRouteTab

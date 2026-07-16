@@ -1,5 +1,10 @@
 import type { PumpIconDefinition } from "@/lib/icons";
-import { faAirdropParachute, faArrowLeftRight, faList, faTarget, faWallet } from "@/lib/pump-icons";
+import {
+  faAirdropParachute,
+  faBaseWallet,
+  faHurricane,
+  faTokenLaunchRocket,
+} from "@/lib/pump-icons";
 
 export type AppNavItem = {
   href: string;
@@ -7,24 +12,22 @@ export type AppNavItem = {
   icon: PumpIconDefinition;
 };
 
-/** Desktop header — Trade home first, then discovery + account tabs. */
+/** Desktop header — discovery + account (Trade is logo / home only). */
 export const APP_NAV_ITEMS: AppNavItem[] = [
-  { href: "/", label: "Trade", icon: faArrowLeftRight },
-  { href: "/arena", label: "Arena", icon: faList },
+  { href: "/arena", label: "Arena", icon: faTokenLaunchRocket },
   { href: "/airdrops", label: "Airdrops", icon: faAirdropParachute },
-  { href: "/missions", label: "Missions", icon: faTarget },
-  { href: "/portfolio", label: "Portfolio", icon: faWallet },
+  { href: "/missions", label: "Missions", icon: faHurricane },
+  { href: "/portfolio", label: "Portfolio", icon: faBaseWallet },
 ];
 
-/** Mobile bottom dock — Trade is home (`/`). Center FAB = Airdrops. */
+/** Mobile bottom dock — Trade removed; home stays via logo / deep links. */
 export const BOTTOM_NAV_CENTER_HREF = "/airdrops";
 
 export const APP_BOTTOM_TAB_ITEMS: AppNavItem[] = [
-  { href: "/", label: "Trade", icon: faArrowLeftRight },
-  { href: "/arena", label: "Arena", icon: faList },
+  { href: "/arena", label: "Arena", icon: faTokenLaunchRocket },
   { href: BOTTOM_NAV_CENTER_HREF, label: "Airdrops", icon: faAirdropParachute },
-  { href: "/missions", label: "Missions", icon: faTarget },
-  { href: "/portfolio", label: "Portfolio", icon: faWallet },
+  { href: "/missions", label: "Missions", icon: faHurricane },
+  { href: "/portfolio", label: "Portfolio", icon: faBaseWallet },
 ];
 
 export const APP_BOTTOM_TAB_SIDE_ITEMS = APP_BOTTOM_TAB_ITEMS.filter(
@@ -40,9 +43,6 @@ export function isTradeHomeRoute(pathname: string): boolean {
 }
 
 export function isBottomNavActive(pathname: string, href: string): boolean {
-  if (href === "/") {
-    return isTradeHomeRoute(pathname);
-  }
   return isNavActive(pathname, href);
 }
 

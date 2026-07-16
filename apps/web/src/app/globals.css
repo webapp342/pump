@@ -30,6 +30,8 @@ html[data-theme="light"] {
   --mobile-bottom-nav-hit-size: 2.5rem;
   /* Icon size from size-theme.css — do not hardcode rem here */
   --mobile-bottom-nav-float-radius: calc(var(--mobile-bottom-bar-content-height) / 2);
+  /* Selected tab chip — a few px tighter than the outer pill */
+  --mobile-bottom-nav-active-radius: calc(var(--mobile-bottom-nav-float-radius) - 4px);
   --mobile-bottom-bar-content-height: 3.25rem;
   --mobile-bottom-nav-height: calc(
     var(--mobile-bottom-bar-content-height) + var(--mobile-bottom-nav-offset)
@@ -11314,7 +11316,7 @@ code,
     justify-content: center;
     gap: 0;
     padding-inline: 0;
-    border-radius: 50%;
+    border-radius: var(--mobile-bottom-nav-active-radius);
     background: transparent;
     color: rgb(var(--pump-muted));
     -webkit-tap-highlight-color: transparent;
@@ -11332,13 +11334,13 @@ code,
     width: var(--mobile-bottom-nav-hit-size);
     gap: 0;
     padding-inline: 0;
-    background: rgb(var(--pump-card-soft));
-    color: rgb(var(--pump-text));
+    background: transparent;
+    color: rgb(var(--pump-accent));
     box-shadow: none;
   }
 
   html[data-theme="light"] .bottom-nav-item-active {
-    background: rgb(var(--pump-card-soft));
+    background: transparent;
     box-shadow: none;
   }
 
@@ -11353,7 +11355,7 @@ code,
 
   .bottom-nav-item-active .bottom-nav-icon {
     opacity: 1;
-    color: rgb(var(--pump-text));
+    color: rgb(var(--pump-accent));
   }
 
   .koth-section {

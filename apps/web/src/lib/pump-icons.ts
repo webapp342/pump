@@ -119,6 +119,11 @@ export const faMail = faEnvelope;
 export const faAlertTriangle = faTriangleExclamation;
 export const faInfo = faCircleInfo;
 export const faAirdropParachute = faParachuteBox;
+export const faAirdropCoins = cds("airdropCoins");
+export const faTokenLaunchRocket = cds("tokenLaunchRocket");
+export const faHurricane = cds("hurricane");
+export const faBaseWallet = cds("baseWallet");
+export const faAdvancedTradeProduct = cds("advancedTradeProduct");
 export const faDeposit = cds("deposit");
 export const faWithdraw = cds("withdraw");
 

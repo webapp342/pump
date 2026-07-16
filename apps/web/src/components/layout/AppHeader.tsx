@@ -9,7 +9,7 @@ import { TradeNavLink } from "@/components/layout/TradeNavLink";
 import { WalletBar } from "@/components/wallet/WalletBar";
 import { ThemePicker } from "@/components/theme/ThemePicker";
 import { usePumpWallet } from "@/components/wallet/PumpWalletProvider";
-import { APP_NAV_ITEMS, isTradeHomeRoute } from "@/lib/nav-config";
+import { APP_NAV_ITEMS } from "@/lib/nav-config";
 import { AppHeaderCreateMenu } from "@/components/layout/AppHeaderCreateMenu";
 import { shellHeaderInnerClassForPath } from "@/components/layout/layout-shell";
 
@@ -34,9 +34,7 @@ export function AppHeaderView({ pathname }: { pathname: string }) {
           <nav className="app-header-nav hidden md:flex" aria-label="Primary">
             {APP_NAV_ITEMS.map((item) => {
               const active =
-                item.href === "/"
-                  ? isTradeHomeRoute(pathname)
-                  : pathname === item.href || pathname.startsWith(`${item.href}/`);
+                pathname === item.href || pathname.startsWith(`${item.href}/`);
               const requiresAuth = item.href === "/portfolio";
               const onClick = requiresAuth
                 ? (event: MouseEvent<HTMLAnchorElement>) => {
@@ -45,21 +43,6 @@ export function AppHeaderView({ pathname }: { pathname: string }) {
                     login();
                   }
                 : undefined;
-
-              if (item.href === "/") {
-                return (
-                  <TradeNavLink
-                    key={item.href}
-                    fallbackHref="/"
-                    prefetch={true}
-                    aria-current={active ? "page" : undefined}
-                    className={navLinkClass(active)}
-                    onClick={onClick}
-                  >
-                    {item.label}
-                  </TradeNavLink>
-                );
-              }
 
               return (
                 <Link
