@@ -13,7 +13,7 @@ import {
   faCheck,
   faCopy,
   faLogout,
-  faSun,
+  faSliders,
   faUserPen,
 } from "@/lib/icons";
 
@@ -128,7 +128,6 @@ function AccountSummaryCard({
   showBnb,
   onSelectUsd,
   onSelectNative,
-  hero = false,
 }: {
   address: string;
   nativeBnb: number;
@@ -136,7 +135,6 @@ function AccountSummaryCard({
   showBnb: boolean;
   onSelectUsd: () => void;
   onSelectNative: () => void;
-  hero?: boolean;
 }) {
   const availablePrimary = showBnb
     ? formatHeaderBalanceNative(nativeBnb)
@@ -151,11 +149,7 @@ function AccountSummaryCard({
         <p className="wallet-account-panel__metric-label">Available to trade</p>
         <div className="wallet-account-panel__balance-row">
           <div className="wallet-account-panel__balance-main">
-            <span
-              className={`financial-value wallet-account-panel__balance-amount${
-                hero ? " wallet-account-panel__balance-amount--hero" : ""
-              }`}
-            >
+            <span className="financial-value wallet-account-panel__balance-amount">
               {availablePrimary}
             </span>
             <p className="wallet-account-panel__balance-equiv financial-value">{availableSecondary}</p>
@@ -184,7 +178,7 @@ function AccountSettingsNav({
   showPushNotifications: boolean;
 }) {
   return (
-    <nav className="wallet-account-panel__nav" aria-label="Account settings">
+    <nav className="wallet-account-panel__nav" aria-label="Settings">
       {onEditProfile ? (
         <button
           type="button"
@@ -194,17 +188,22 @@ function AccountSettingsNav({
           }}
           className="wallet-account-panel__nav-row"
         >
-          <PumpIcon icon={faUserPen} className="wallet-account-panel__nav-icon" aria-hidden />
-          Edit profile
+          <span className="wallet-account-panel__nav-label">
+            <PumpIcon icon={faUserPen} className="wallet-account-panel__nav-icon" aria-hidden />
+            Edit profile
+          </span>
         </button>
       ) : null}
-      {showPushNotifications ? <PushNotificationsPanel /> : null}
+      {showPushNotifications ? <PushNotificationsPanel variant="settings" /> : null}
       <div className="wallet-account-panel__nav-row wallet-account-panel__nav-row--static">
         <span className="wallet-account-panel__nav-label">
-          <PumpIcon icon={faSun} className="wallet-account-panel__nav-icon" aria-hidden />
+          <PumpIcon icon={faSliders} className="wallet-account-panel__nav-icon" aria-hidden />
           Appearance
         </span>
-        <ThemePicker className="wallet-account-panel__appearance-toggle" />
+        <ThemePicker
+          className="wallet-account-panel__appearance-toggle"
+          showLabel
+        />
       </div>
       <button
         type="button"
@@ -214,8 +213,10 @@ function AccountSettingsNav({
         }}
         className="wallet-account-panel__nav-row wallet-account-panel__nav-row--danger"
       >
-        <PumpIcon icon={faLogout} className="wallet-account-panel__nav-icon" aria-hidden />
-        Log out
+        <span className="wallet-account-panel__nav-label">
+          <PumpIcon icon={faLogout} className="wallet-account-panel__nav-icon" aria-hidden />
+          Log out
+        </span>
       </button>
     </nav>
   );
@@ -231,6 +232,7 @@ export type WalletAccountPanelProps = {
   onLogout: () => void;
   /** Opens profile editor after the sheet/dropdown closes. */
   onEditProfile?: () => void;
+  /** dropdown = desktop account menu; sheet = mobile Settings (no balance/funding). */
   variant?: "dropdown" | "sheet";
 };
 
@@ -245,8 +247,10 @@ export function WalletAccountPanel({
   onEditProfile,
   variant = "dropdown",
 }: WalletAccountPanelProps) {
-  const rootClass =
-    variant === "sheet" ? "wallet-account-panel wallet-account-panel--sheet" : "wallet-account-panel";
+  const isSettingsSheet = variant === "sheet";
+  const rootClass = isSettingsSheet
+    ? "wallet-account-panel wallet-account-panel--sheet wallet-account-panel--settings"
+    : "wallet-account-panel";
 
   const selectUsd = () => {
     if (showBnb) onToggleBalanceUnit();
@@ -258,21 +262,24 @@ export function WalletAccountPanel({
 
   return (
     <div className={rootClass} role="menu">
-      <AccountSummaryCard
-        address={address}
-        nativeBnb={nativeBnb}
-        nativeUsd={nativeUsd}
-        showBnb={showBnb}
-        onSelectUsd={selectUsd}
-        onSelectNative={selectNative}
-        hero={variant === "sheet"}
-      />
-      <WalletFundButtons onClose={onClose} />
+      {isSettingsSheet ? null : (
+        <>
+          <AccountSummaryCard
+            address={address}
+            nativeBnb={nativeBnb}
+            nativeUsd={nativeUsd}
+            showBnb={showBnb}
+            onSelectUsd={selectUsd}
+            onSelectNative={selectNative}
+          />
+          <WalletFundButtons onClose={onClose} />
+        </>
+      )}
       <AccountSettingsNav
         onLogout={onLogout}
         onClose={onClose}
         onEditProfile={onEditProfile}
-        showPushNotifications={variant === "sheet"}
+        showPushNotifications={isSettingsSheet}
       />
     </div>
   );

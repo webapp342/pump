@@ -2,23 +2,21 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  clearPushActivityLog,
   fetchPushStatus,
-  getPushActivityLog,
   isPushApiSupported,
   PushReloadPendingError,
-  readPushSetupDiagnostics,
-  subscribePushActivityLog,
   subscribeToPushNotifications,
   unsubscribeFromPushNotifications,
   updatePushPreferencesClient,
-  type PushActivityEntry,
   type PushSubscribeProgress,
 } from "@/lib/push/client";
 import type { PushStatus } from "@/lib/push/types";
+import { PumpIcon, faBell } from "@/lib/icons";
 
 type PushNotificationsPanelProps = {
   className?: string;
+  /** settings = single On/Off toggle row (mobile Settings sheet). */
+  variant?: "default" | "settings";
 };
 
 function PushSetupProgressBar({ label, percent }: { label: string; percent: number }) {
@@ -36,106 +34,50 @@ function PushSetupProgressBar({ label, percent }: { label: string; percent: numb
   );
 }
 
-function activityToneClass(level: PushActivityEntry["level"]): string {
-  switch (level) {
-    case "error":
-      return "text-pump-danger";
-    case "warn":
-      return "text-amber-400";
-    case "success":
-      return "text-pump-accent";
-    default:
-      return "text-pump-muted";
-  }
-}
-
-function PushActivityLog({
-  entries,
-  onClear,
-}: {
-  entries: readonly PushActivityEntry[];
-  onClear: () => void;
-}) {
-  if (entries.length === 0) return null;
-  return (
-    <div className="mt-2 rounded-lg border border-pump-border/25 bg-pump-border/5 p-2.5">
-      <div className="mb-1.5 flex items-center justify-between gap-2">
-        <p className="text-caption font-medium text-pump-text">Activity log</p>
-        <button type="button" className="text-caption text-pump-muted underline" onClick={onClear}>
-          Clear
-        </button>
-      </div>
-      <ul className="max-h-40 space-y-1 overflow-y-auto overscroll-contain">
-        {entries.map((entry) => (
-          <li key={entry.id} className={`text-caption leading-snug ${activityToneClass(entry.level)}`}>
-            <span className="tabular-nums text-pump-muted/80">{entry.time}</span> {entry.message}
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
-export function PushNotificationsPanel({ className = "" }: PushNotificationsPanelProps) {
+export function PushNotificationsPanel({
+  className = "",
+  variant = "default",
+}: PushNotificationsPanelProps) {
   const [status, setStatus] = useState<PushStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [prefsBusy, setPrefsBusy] = useState(false);
   const [busyStep, setBusyStep] = useState<PushSubscribeProgress | null>(null);
-  const [activityLog, setActivityLog] = useState<readonly PushActivityEntry[]>(getPushActivityLog);
   const [error, setError] = useState<string | null>(null);
-  const [diagnostics, setDiagnostics] = useState<string | null>(null);
   const lastProgressRef = useRef<PushSubscribeProgress | null>(null);
   const supported = isPushApiSupported();
-
-  const refreshDiagnostics = useCallback(async () => {
-    try {
-      setDiagnostics(await readPushSetupDiagnostics());
-    } catch {
-      setDiagnostics(null);
-    }
-  }, []);
 
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
       setStatus(await fetchPushStatus());
-      await refreshDiagnostics();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not load push status");
     } finally {
       setLoading(false);
     }
-  }, [refreshDiagnostics]);
+  }, []);
 
   useEffect(() => {
     if (!supported) return;
     void refresh();
   }, [refresh, supported]);
 
-  useEffect(() => subscribePushActivityLog(setActivityLog), []);
-
   async function onEnable() {
     setBusy(true);
     setError(null);
     lastProgressRef.current = { step: "permission", label: "Starting…", percent: 10 };
     setBusyStep(lastProgressRef.current);
-
     try {
-      const next = await subscribeToPushNotifications({
-        onProgress: (progress) => {
-          lastProgressRef.current = progress;
-          setBusyStep(progress);
-        },
+      await subscribeToPushNotifications((progress) => {
+        lastProgressRef.current = progress;
+        setBusyStep(progress);
       });
-      setStatus(next);
-      await refreshDiagnostics();
+      await refresh();
     } catch (err) {
       if (err instanceof PushReloadPendingError) return;
-      const message = err instanceof Error ? err.message : "Could not enable notifications";
-      setError(message);
-      await refreshDiagnostics();
-      await refresh();
+      setError(err instanceof Error ? err.message : "Could not enable notifications");
+      setBusyStep(null);
     } finally {
       setBusy(false);
       setBusyStep(null);
@@ -166,9 +108,7 @@ export function PushNotificationsPanel({ className = "" }: PushNotificationsPane
     });
     try {
       const preferences = await updatePushPreferencesClient({ followerAnnouncements: next });
-      setStatus((current) =>
-        current ? { ...current, preferences } : current
-      );
+      setStatus((current) => (current ? { ...current, preferences } : current));
     } catch (err) {
       setStatus((current) =>
         current
@@ -184,122 +124,168 @@ export function PushNotificationsPanel({ className = "" }: PushNotificationsPane
     }
   }
 
+  async function onTogglePush(next: boolean) {
+    if (next) await onEnable();
+    else await onDisable();
+  }
+
   if (!supported) {
     return null;
   }
 
   if (loading && !status) {
     return (
-      <div className={className}>
-        <p className="text-caption text-pump-muted">Loading notifications…</p>
+      <div className={`wallet-account-panel__nav-row wallet-account-panel__nav-row--static ${className}`.trim()}>
+        <span className="wallet-account-panel__nav-label">
+          <PumpIcon icon={faBell} className="wallet-account-panel__nav-icon" aria-hidden />
+          Push notifications
+        </span>
+        <span className="text-caption text-pump-muted">…</span>
       </div>
     );
   }
 
   if (!status?.supported) {
     return (
-      <div className={className}>
-        <p className="text-caption text-pump-muted">Push notifications are not supported in this browser.</p>
+      <div className={`wallet-account-panel__nav-row wallet-account-panel__nav-row--static ${className}`.trim()}>
+        <span className="wallet-account-panel__nav-label">
+          <PumpIcon icon={faBell} className="wallet-account-panel__nav-icon" aria-hidden />
+          Push notifications
+        </span>
+        <span className="text-caption text-pump-muted">Unsupported</span>
       </div>
     );
   }
 
   const enabledOnThisDevice = status.subscribedOnThisDevice && status.permission === "granted";
   const permissionBlocked = status.permission === "denied";
-  const isIos = status.platform === "ios";
+  const toggleDisabled = busy || permissionBlocked || status.needsInstall;
 
-  return (
-    <div className={className}>
-      <div className="wallet-account-panel__menu-item wallet-account-panel__menu-item--static !items-start">
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <p className="text-body-sm font-medium text-pump-text">Push notifications</p>
-            {!status.needsInstall && !permissionBlocked ? (
-              <span
-                className={`rounded-full px-2 py-0.5 text-caption ${
-                  enabledOnThisDevice
-                    ? "bg-pump-accent/15 text-pump-accent"
-                    : "bg-pump-border/20 text-pump-muted"
-                }`}
-              >
-                {enabledOnThisDevice ? "On" : "Off"}
-              </span>
-            ) : null}
+  if (variant === "settings") {
+    return (
+      <div className={`wallet-account-panel__push ${className}`.trim()}>
+        <label className="wallet-account-panel__nav-row wallet-account-panel__nav-row--static">
+          <span className="wallet-account-panel__nav-label">
+            <PumpIcon icon={faBell} className="wallet-account-panel__nav-icon" aria-hidden />
+            Push notifications
+          </span>
+          <span className="wallet-account-panel__switch">
+            <input
+              type="checkbox"
+              className="wallet-account-panel__switch-input"
+              checked={enabledOnThisDevice}
+              disabled={toggleDisabled}
+              onChange={(event) => {
+                void onTogglePush(event.target.checked);
+              }}
+              aria-label={
+                enabledOnThisDevice ? "Disable push notifications" : "Enable push notifications"
+              }
+            />
+            <span className="wallet-account-panel__switch-track" aria-hidden />
+          </span>
+        </label>
+        {status.needsInstall ? (
+          <p className="wallet-account-panel__settings-hint">Add to Home Screen, then turn on.</p>
+        ) : permissionBlocked ? (
+          <p className="wallet-account-panel__settings-hint wallet-account-panel__settings-hint--danger">
+            Blocked in system settings.
+          </p>
+        ) : null}
+        {busy && busyStep ? (
+          <div className="wallet-account-panel__settings-inset pb-2">
+            <PushSetupProgressBar label={busyStep.label} percent={busyStep.percent} />
           </div>
-
-          {status.needsInstall ? (
-            <p className="mt-1 text-caption text-pump-muted">
-              iPhone: Safari → Share → <strong>Add to Home Screen</strong>, open <strong>Pump</strong> from the icon,
-              then tap Enable once.
-            </p>
-          ) : permissionBlocked ? (
-            <p className="mt-1 text-caption text-pump-danger">
-              Notifications blocked. Allow in system settings, then tap Enable again.
-            </p>
-          ) : enabledOnThisDevice ? (
-            <p className="mt-1 text-caption text-pump-muted">Enabled on this device.</p>
-          ) : status.subscribedOnOtherDevice ? (
-            <p className="mt-1 text-caption text-pump-muted">
-              Your PC has alerts. Tap Enable once to add this {isIos ? "iPhone" : "device"} — first time
-              takes ~10 seconds on iPhone.
-            </p>
-          ) : isIos ? (
-            <p className="mt-1 text-caption text-pump-muted">
-              Tap Enable once. iPhone installs a lightweight alerts worker (one-time, ~10 sec).
-            </p>
-          ) : (
-            <p className="mt-1 text-caption text-pump-muted">
-              Tap Enable once per device. After that, alerts work without repeating setup.
-            </p>
-          )}
-
-          {enabledOnThisDevice ? (
-            <label className="mt-3 flex cursor-pointer items-center justify-between gap-3">
-              <span className="min-w-0 text-caption text-pump-muted">
-                Callouts from people you follow
-              </span>
+        ) : null}
+        {error ? (
+          <p className="wallet-account-panel__push-error wallet-account-panel__settings-inset pb-2">{error}</p>
+        ) : null}
+        {enabledOnThisDevice ? (
+          <label className="wallet-account-panel__nav-row wallet-account-panel__nav-row--static wallet-account-panel__push-pref">
+            <span className="min-w-0 flex-1 text-body-sm text-pump-text">Callouts from people you follow</span>
+            <span className="wallet-account-panel__switch">
               <input
                 type="checkbox"
-                className="h-4 w-4 accent-[rgb(var(--pump-accent))]"
+                className="wallet-account-panel__switch-input"
                 checked={status.preferences.followerAnnouncements}
                 disabled={busy || prefsBusy}
                 onChange={(event) => {
                   void onToggleFollowerAnnouncements(event.target.checked);
                 }}
               />
-            </label>
-          ) : null}
+              <span className="wallet-account-panel__switch-track" aria-hidden />
+            </span>
+          </label>
+        ) : null}
+      </div>
+    );
+  }
 
+  const isIos = status.platform === "ios";
+  const hint = status.needsInstall
+    ? "Add to Home Screen, then Enable once."
+    : permissionBlocked
+      ? "Blocked in system settings."
+      : enabledOnThisDevice
+        ? "Enabled on this device."
+        : status.subscribedOnOtherDevice
+          ? `Enable to add this ${isIos ? "iPhone" : "device"}.`
+          : "Enable once per device.";
+
+  return (
+    <div className={`wallet-account-panel__push ${className}`.trim()}>
+      <div className="wallet-account-panel__nav-row wallet-account-panel__nav-row--static wallet-account-panel__nav-row--push">
+        <div className="wallet-account-panel__push-copy min-w-0 flex-1">
+          <div className="wallet-account-panel__push-title">
+            <span className="wallet-account-panel__nav-label">
+              <PumpIcon icon={faBell} className="wallet-account-panel__nav-icon" aria-hidden />
+              Push notifications
+            </span>
+          </div>
+          <p
+            className={`wallet-account-panel__push-hint${
+              permissionBlocked ? " wallet-account-panel__push-hint--danger" : ""
+            }`}
+          >
+            {hint}
+          </p>
           {busy && busyStep ? <PushSetupProgressBar label={busyStep.label} percent={busyStep.percent} /> : null}
-
-          {error ? (
-            <div className="mt-2 rounded-lg bg-pump-danger/10 px-2.5 py-2 text-caption text-pump-danger">
-              {error}
-            </div>
-          ) : null}
-
-          {diagnostics ? (
-            <p className="mt-2 text-caption text-pump-muted/80 break-words">{diagnostics}</p>
-          ) : null}
-
-          <PushActivityLog entries={activityLog} onClear={() => clearPushActivityLog()} />
+          {error ? <p className="wallet-account-panel__push-error">{error}</p> : null}
         </div>
 
         {!status.needsInstall && !permissionBlocked ? (
-          <button
-            type="button"
-            className={
-              enabledOnThisDevice
-                ? "secondary-button px-3 py-1.5 text-caption"
-                : "primary-button px-3 py-1.5 text-caption"
-            }
-            disabled={busy}
-            onClick={() => void (enabledOnThisDevice ? onDisable() : onEnable())}
-          >
-            {busy ? "…" : enabledOnThisDevice ? "Disable" : "Enable"}
-          </button>
+          <label className="wallet-account-panel__switch">
+            <span className="sr-only">
+              {enabledOnThisDevice ? "Disable push notifications" : "Enable push notifications"}
+            </span>
+            <input
+              type="checkbox"
+              className="wallet-account-panel__switch-input"
+              checked={enabledOnThisDevice}
+              disabled={busy}
+              onChange={(event) => {
+                void onTogglePush(event.target.checked);
+              }}
+            />
+            <span className="wallet-account-panel__switch-track" aria-hidden />
+          </label>
         ) : null}
       </div>
+
+      {enabledOnThisDevice ? (
+        <label className="wallet-account-panel__nav-row wallet-account-panel__nav-row--static wallet-account-panel__push-pref">
+          <span className="min-w-0 flex-1 text-body-sm text-pump-text">Callouts from people you follow</span>
+          <input
+            type="checkbox"
+            className="wallet-account-panel__push-switch"
+            checked={status.preferences.followerAnnouncements}
+            disabled={busy || prefsBusy}
+            onChange={(event) => {
+              void onToggleFollowerAnnouncements(event.target.checked);
+            }}
+          />
+        </label>
+      ) : null}
     </div>
   );
 }

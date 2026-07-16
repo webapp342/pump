@@ -23,11 +23,20 @@ import {
 
 type WithdrawFormProps = {
   onClose: () => void;
+  /** When true, Cancel/Withdraw live in the parent sheet footer. */
+  hideActions?: boolean;
+  formId?: string;
+  onUiChange?: (ui: { pending: boolean; canSubmit: boolean }) => void;
 };
 
 type ActivePreset = number | "max" | null;
 
-export function WithdrawForm({ onClose }: WithdrawFormProps) {
+export function WithdrawForm({
+  onClose,
+  hideActions = false,
+  formId = "pump-withdraw-form",
+  onUiChange,
+}: WithdrawFormProps) {
   const { scwAddress, withdraw, withdrawToken } = usePumpWallet();
   const { bnbUsd } = useBnbUsdPrice();
   const { assets, loading, error: loadError, reload } = useWithdrawAssets(scwAddress, true);
@@ -149,6 +158,12 @@ export function WithdrawForm({ onClose }: WithdrawFormProps) {
     };
   }, [selectedAsset, spendableWei]);
 
+  const canSubmit = Boolean(selectedAsset && spendableWei > 0n && !pending);
+
+  useEffect(() => {
+    onUiChange?.({ pending, canSubmit });
+  }, [canSubmit, onUiChange, pending]);
+
   async function onSubmit(event: React.FormEvent) {
     event.preventDefault();
     setError(null);
@@ -216,22 +231,24 @@ export function WithdrawForm({ onClose }: WithdrawFormProps) {
   }
 
   return (
-    <form onSubmit={(event) => void onSubmit(event)} className="wallet-funding-withdraw">
-      {loadError ? <p className="notice-warning leading-snug">{loadError}</p> : null}
+    <form
+      id={formId}
+      onSubmit={(event) => void onSubmit(event)}
+      className="wallet-funding-withdraw"
+    >
+      {loadError ? <p className="wallet-funding-sheet__notice notice-warning leading-snug">{loadError}</p> : null}
 
-      <div>
+      <div className="wallet-funding-field">
         <span className="field-label">Asset</span>
-        <div className="mt-1.5">
-          <WithdrawAssetPicker
-            assets={assets}
-            selectedId={selectedId}
-            onSelect={onSelectAsset}
-            disabled={pending || assets.length === 0}
-          />
-        </div>
+        <WithdrawAssetPicker
+          assets={assets}
+          selectedId={selectedId}
+          onSelect={onSelectAsset}
+          disabled={pending || assets.length === 0}
+        />
       </div>
 
-      <div>
+      <div className="wallet-funding-field">
         <div className="wallet-funding-withdraw__amount-head">
           <label className="field-label" htmlFor="withdraw-amount">
             Amount
@@ -247,7 +264,7 @@ export function WithdrawForm({ onClose }: WithdrawFormProps) {
         </div>
         <input
           id="withdraw-amount"
-          className="field-input wallet-funding-withdraw__amount-input mt-1.5 w-full"
+          className="field-input wallet-funding-withdraw__amount-input w-full"
           value={amount}
           onChange={(event) => {
             setAmount(event.target.value);
@@ -259,44 +276,42 @@ export function WithdrawForm({ onClose }: WithdrawFormProps) {
           disabled={!selectedAsset || pending}
         />
         {amountUsd != null && amountWei != null ? (
-          <p className="field-hint mt-1.5 financial-value">
+          <p className="field-hint financial-value">
             ≈ {formatPortfolioHoldingValueUsd(amountUsd)}
           </p>
         ) : null}
-        <div className="mt-2.5">
-          <PumpAmountPresets
-            side="sell"
-            activePreset={activePreset}
-            disabled={!selectedAsset || pending}
-            maxDisabled={!selectedAsset || spendableWei <= 0n}
-            presetsDisabled={!selectedAsset || spendableWei <= 0n}
-            onPresetPercent={(pct) => void applyPreset(pct)}
-            onMax={() => void applyPreset("max")}
-          />
-        </div>
+        <PumpAmountPresets
+          side="sell"
+          activePreset={activePreset}
+          disabled={!selectedAsset || pending}
+          maxDisabled={!selectedAsset || spendableWei <= 0n}
+          presetsDisabled={!selectedAsset || spendableWei <= 0n}
+          onPresetPercent={(pct) => void applyPreset(pct)}
+          onMax={() => void applyPreset("max")}
+        />
       </div>
 
-      <div>
+      <div className="wallet-funding-field">
         <label className="field-label" htmlFor="withdraw-destination">
           Destination address
         </label>
         <input
           id="withdraw-destination"
-          className="field-input mt-1.5 w-full"
+          className="field-input w-full"
           value={destination}
           onChange={(event) => setDestination(event.target.value)}
           placeholder="0x…"
           autoComplete="off"
           disabled={pending}
         />
-        <p className="field-hint mt-1.5">
+        <p className="field-hint">
           Network fees are paid from your {NATIVE_SYMBOL} balance on {pumpChain.name}.
         </p>
       </div>
 
-      {error ? <p className="notice-warning leading-snug">{error}</p> : null}
+      {error ? <p className="wallet-funding-sheet__notice notice-warning leading-snug">{error}</p> : null}
       {txHash ? (
-        <p className="text-caption text-pump-success">
+        <p className="wallet-funding-sheet__notice text-caption text-pump-success">
           Withdrawal submitted.{" "}
           <a
             href={`${pumpChain.blockExplorers.default.url}/tx/${txHash}`}
@@ -309,18 +324,20 @@ export function WithdrawForm({ onClose }: WithdrawFormProps) {
         </p>
       ) : null}
 
-      <div className="wallet-funding-withdraw__actions">
-        <button type="button" onClick={onClose} className="secondary-button w-full" disabled={pending}>
-          Cancel
-        </button>
-        <button
-          type="submit"
-          className="primary-button w-full"
-          disabled={pending || !selectedAsset || spendableWei <= 0n}
-        >
-          {pending ? "Sending…" : "Withdraw"}
-        </button>
-      </div>
+      {hideActions ? null : (
+        <div className="wallet-funding-withdraw__actions">
+          <button type="button" onClick={onClose} className="secondary-button w-full" disabled={pending}>
+            Cancel
+          </button>
+          <button
+            type="submit"
+            className="primary-button w-full"
+            disabled={pending || !selectedAsset || spendableWei <= 0n}
+          >
+            {pending ? "Sending…" : "Withdraw"}
+          </button>
+        </div>
+      )}
     </form>
   );
 }

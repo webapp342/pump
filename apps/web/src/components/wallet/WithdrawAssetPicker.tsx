@@ -33,12 +33,11 @@ function AssetIcon({ asset, size = 22 }: { asset: WithdrawAsset; size?: number }
 }
 
 function assetLabel(asset: WithdrawAsset): string {
-  return asset.kind === "token" ? `$${asset.symbol}` : asset.symbol;
+  return asset.symbol;
 }
 
 function assetSubline(asset: WithdrawAsset): string | null {
-  const label = assetLabel(asset);
-  if (asset.name.trim().toUpperCase() === label.replace(/^\$/, "").trim().toUpperCase()) {
+  if (asset.name.trim().toUpperCase() === asset.symbol.trim().toUpperCase()) {
     return null;
   }
   return asset.name;

@@ -30,17 +30,20 @@ python .cursor/skills/ui-ux-pro-max/scripts/search.py "touch target icon button 
 python .cursor/skills/ui-ux-pro-max/scripts/search.py "fintech trading terminal dark" --design-system --density 8 --motion 3 -p "Pump" -f markdown
 ```
 
-Persisted page specs: `.cursor/design-system/pages/portfolio.md` (wallet actions, Launched=Holdings grid, Earnings cards).
+Persisted page specs: `.cursor/design-system/pages/portfolio.md` (wallet actions, Launched=Holdings grid, Earnings cards). Corporate bar: `.cursor/design-system/designs.md`.
 
 ### Persistent UI conventions (always)
 
 | Rule | Implementation |
 |------|----------------|
-| User avatars | Circle only (`UserAvatarForAddress`) |
+| Corporate bar | `.cursor/design-system/designs.md` — required for wallet / account / sheet UI |
+| User avatars | Circle only (`UserAvatarForAddress`); portfolio hero **32–36px** |
+| Portfolio mobile identity | One label (username or short address) + trailing copy — no second address row |
 | Token / chain logos | Square tile — `TokenAvatar` default `shape="rounded"`, `NativeLogo` |
 | Token symbols in UI | No leading `$` — display `symbol` as stored |
 | Portfolio Launched tab | Same grid as Holdings: Coin · Amount · Value/PNL (mobile); + Entry · P/L (desktop) |
 | Portfolio Earnings tab | `PortfolioEarningsCard` — title, description, Available (hero), Claimed, Claim CTA |
+| Account sheet | No push SW diagnostics in production |
 
 ## Skill routing
 

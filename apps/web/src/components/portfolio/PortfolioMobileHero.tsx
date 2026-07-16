@@ -42,11 +42,11 @@ type PortfolioMobileHeroProps = {
 
 function formatHeroUsername(name: string, guestMode: boolean): string {
   if (guestMode || !name) return "—";
-  if (name.startsWith("0x")) return name;
+  if (name.startsWith("0x")) return shortAddress(name, true);
   return name.startsWith("@") ? name : `@${name}`;
 }
 
-function MobileWalletAddress({
+function MobileIdentityCopy({
   address,
   guestMode,
 }: {
@@ -55,13 +55,7 @@ function MobileWalletAddress({
 }) {
   const [copied, setCopied] = useState(false);
 
-  if (guestMode) {
-    return (
-      <span className="portfolio-mobile-hero__address portfolio-mobile-hero__address--static">
-        <span className="financial-value">—</span>
-      </span>
-    );
-  }
+  if (guestMode) return null;
 
   async function onCopy() {
     const ok = await copyToClipboard(address);
@@ -73,13 +67,12 @@ function MobileWalletAddress({
     <button
       type="button"
       onClick={() => void onCopy()}
-      className="portfolio-mobile-hero__address"
+      className="portfolio-mobile-hero__copy"
       aria-label={copied ? "Address copied" : "Copy wallet address"}
     >
-      <span className="financial-value">{shortAddress(address, true)}</span>
       <PumpIcon
         icon={copied ? faCheck : faCopy}
-        className="portfolio-mobile-hero__address-icon"
+        className="portfolio-mobile-hero__copy-icon"
       />
     </button>
   );
@@ -183,7 +176,7 @@ export function PortfolioMobileHero({
     onEditProfile: canEditProfile ? onOpenProfileEditor : undefined,
   };
 
-  const avatarSize = 22;
+  const avatarSize = 36;
 
   return (
     <>
@@ -198,7 +191,7 @@ export function PortfolioMobileHero({
                   type="button"
                   onClick={openAccount}
                   className="portfolio-mobile-hero__avatar-btn"
-                  aria-label="Open account"
+                  aria-label="Open settings"
                 >
                   <UserAvatarForAddress
                     address={walletAddress}
@@ -221,7 +214,7 @@ export function PortfolioMobileHero({
                   type="button"
                   onClick={openAccount}
                   className="portfolio-mobile-hero__username portfolio-mobile-hero__username--btn"
-                  aria-label="Open account"
+                  aria-label="Open settings"
                 >
                   {formatHeroUsername(displayUsername, guestMode)}
                 </button>
@@ -230,7 +223,7 @@ export function PortfolioMobileHero({
                   {formatHeroUsername(displayUsername, guestMode)}
                 </p>
               )}
-              <MobileWalletAddress address={walletAddress} guestMode={guestMode} />
+              <MobileIdentityCopy address={walletAddress} guestMode={guestMode} />
             </div>
           </div>
 
@@ -254,7 +247,7 @@ export function PortfolioMobileHero({
                   type="button"
                   onClick={() => setAccountOpen(true)}
                   className="portfolio-mobile-hero__toolbar-btn"
-                  aria-label="Open account menu"
+                  aria-label="Open settings"
                 >
                   <PumpIcon icon={faMenu} className="portfolio-mobile-hero__toolbar-icon" />
                 </button>

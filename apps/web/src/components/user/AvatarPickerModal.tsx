@@ -69,14 +69,14 @@ export function AvatarPickerModal({ open, onClose }: AvatarPickerModalProps) {
       zIndex={70}
       panelClassName="profile-editor-modal !p-0"
       header={
-        <>
+        <div className="profile-editor-modal__header">
           <button
             type="button"
             className="profile-editor-modal__avatar-trigger"
             onClick={focusAvatarPicker}
             aria-label="Choose avatar"
           >
-            <UserAvatar address={address} avatarId={selectedId} size={72} selected />
+            <UserAvatar address={address} avatarId={selectedId} size={64} selected />
             <span className="profile-editor-modal__avatar-badge" aria-hidden>
               <PumpIcon icon={faPen} className="h-3 w-3" />
             </span>
@@ -99,7 +99,7 @@ export function AvatarPickerModal({ open, onClose }: AvatarPickerModalProps) {
           >
             <PumpIcon icon={faX} className="h-4 w-4" />
           </button>
-        </>
+        </div>
       }
       footer={
         <div className="profile-editor-modal__footer !p-0">

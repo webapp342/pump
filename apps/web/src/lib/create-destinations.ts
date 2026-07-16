@@ -13,7 +13,7 @@ export const CREATE_DESTINATIONS: readonly CreateDestination[] = [
   {
     href: "/create",
     label: "Token",
-    description: "Launch a meme on the bonding curve",
+    description: "Launch a token on the bonding curve",
     icon: faRocket,
   },
   {

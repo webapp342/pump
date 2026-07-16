@@ -2,6 +2,19 @@
 
 Overrides `MASTER.md` for `/portfolio` only.
 
+## Mobile hero — identity row
+
+**Corporate pattern:** Coinbase/Robinhood identity cluster — one line only.
+
+| Element | Spec |
+|---------|------|
+| Avatar | Circle **32–36px** (not ~22px) |
+| Primary label | Username (`@name`) **or** short address — never both stacked |
+| Copy | Trailing icon button ≥44×44, right of label |
+| Forbidden | Second line with address + second copy icon |
+
+See `.cursor/design-system/designs.md` (permanent corporate bar).
+
 ## Mobile hero — wallet quick actions
 
 **Pattern:** Coinbase/Robinhood-style **segmented action strip** (not separate tall cards).

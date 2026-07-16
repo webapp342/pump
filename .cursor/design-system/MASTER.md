@@ -40,9 +40,11 @@ Source of truth when **ui-ux-pro-max** search conflicts with Pump. Always read *
 
 On **every UI/UX task** in this repo — without the user asking again:
 
+0. Read **`.cursor/design-system/designs.md`** (corporate fintech bar — permanent).
 1. Read **`pump-tma-design-system`** → **`pump-tma-ui-ux`** → **`.cursor/design-system/MASTER.md`** (+ `pages/<route>.md`).
 2. Run **`ui-ux-pro-max`** `--domain ux` search when changing portfolio, wallet, nav, or earnings surfaces.
 3. Apply **logo shape rule**, **no `$` on symbols**, **sentence-case wallet CTAs**, **Launched = Holdings grid parity**.
+4. Sheets/modals: also read **`pages/sheets.md`**.
 
 ## Touch & density defaults
 
