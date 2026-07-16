@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import type { MouseEvent } from "react";
 import { useAccount } from "wagmi";
 import { CyclopsLogo } from "@/components/brand/CyclopsLogo";
 import { TradeNavLink } from "@/components/layout/TradeNavLink";
@@ -37,32 +38,40 @@ export function AppHeaderView({ pathname }: { pathname: string }) {
                   ? isTradeHomeRoute(pathname)
                   : pathname === item.href || pathname.startsWith(`${item.href}/`);
               const requiresAuth = item.href === "/portfolio";
+              const onClick = requiresAuth
+                ? (event: MouseEvent<HTMLAnchorElement>) => {
+                    if (!ready || authenticated) return;
+                    event.preventDefault();
+                    login();
+                  }
+                : undefined;
 
-              const NavLink = item.href === "/" ? TradeNavLink : Link;
-              const linkProps =
-                item.href === "/"
-                  ? { fallbackHref: item.href as "/" }
-                  : { href: item.href };
+              if (item.href === "/") {
+                return (
+                  <TradeNavLink
+                    key={item.href}
+                    fallbackHref="/"
+                    prefetch={true}
+                    aria-current={active ? "page" : undefined}
+                    className={navLinkClass(active)}
+                    onClick={onClick}
+                  >
+                    {item.label}
+                  </TradeNavLink>
+                );
+              }
 
               return (
-                <NavLink
+                <Link
                   key={item.href}
-                  {...linkProps}
+                  href={item.href}
                   prefetch={true}
                   aria-current={active ? "page" : undefined}
                   className={navLinkClass(active)}
-                  onClick={
-                    requiresAuth
-                      ? (event) => {
-                          if (!ready || authenticated) return;
-                          event.preventDefault();
-                          login();
-                        }
-                      : undefined
-                  }
+                  onClick={onClick}
                 >
                   {item.label}
-                </NavLink>
+                </Link>
               );
             })}
           </nav>

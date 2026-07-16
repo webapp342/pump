@@ -43,10 +43,19 @@ export function applyTradeToPositionCost(
     return state;
   }
 
-  const rate =
+  const explicitRate =
     nativeUsdRate != null && Number.isFinite(nativeUsdRate) && nativeUsdRate > 0
       ? nativeUsdRate
       : null;
+  // Missing oracle on this trade: reuse implied FX from the open lot so USD
+  // cost stays aligned with native cost (avoids marking full MTM as profit).
+  const impliedRate =
+    explicitRate == null &&
+    state.remainingCostBasis > 0 &&
+    state.remainingCostBasisUsd > 0
+      ? state.remainingCostBasisUsd / state.remainingCostBasis
+      : null;
+  const rate = explicitRate ?? impliedRate;
 
   if (isBuy) {
     const netUsd = rate != null ? netZug * rate : 0;

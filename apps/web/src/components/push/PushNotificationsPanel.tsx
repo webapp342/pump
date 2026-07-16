@@ -69,9 +69,11 @@ export function PushNotificationsPanel({
     lastProgressRef.current = { step: "permission", label: "Starting…", percent: 10 };
     setBusyStep(lastProgressRef.current);
     try {
-      await subscribeToPushNotifications((progress) => {
-        lastProgressRef.current = progress;
-        setBusyStep(progress);
+      await subscribeToPushNotifications({
+        onProgress: (progress) => {
+          lastProgressRef.current = progress;
+          setBusyStep(progress);
+        },
       });
       await refresh();
     } catch (err) {

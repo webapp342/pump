@@ -8,6 +8,7 @@ import { UserAvatarForAddress } from "@/components/user/UserAvatarForAddress";
 import { PctChange } from "@/components/ui/PctChange";
 import { ACTIVITY_PAGE_SIZE } from "@/lib/activity-page-size";
 import { PumpSubscriptPrice } from "@/components/ui/PumpSubscriptPrice";
+import { formatAge } from "@/lib/arena-board-format";
 import {
   DEFAULT_TOKEN_TOTAL_SUPPLY,
   formatUsdReadable,
@@ -60,15 +61,6 @@ const MOBILE_TAPE_TABS: ReadonlyArray<{ id: ActivityTab; label: string }> = [
   { id: "social", label: "Social" },
   { id: "about", label: "About" },
 ];
-
-function formatTradeClockTime(iso: string, mobile = false): string {
-  return new Date(iso).toLocaleTimeString(
-    undefined,
-    mobile
-      ? { hour: "2-digit", minute: "2-digit", hour12: false }
-      : { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }
-  );
-}
 
 function ultraShortAddress(address: string): string {
   return `${address.slice(0, 4)}…${address.slice(-2)}`;
@@ -362,6 +354,14 @@ export function TradeTape({
   const [holdersReady, setHoldersReady] = useState(
     Boolean(initialHolders && initialHolders.length > 0)
   );
+  const [ageNowMs, setAgeNowMs] = useState(() => Date.now());
+
+  useEffect(() => {
+    if (tab !== "trades") return;
+    setAgeNowMs(Date.now());
+    const id = window.setInterval(() => setAgeNowMs(Date.now()), 1_000);
+    return () => window.clearInterval(id);
+  }, [tab]);
 
   const displayedTrades = useMemo(
     () => mergeTradesByTxHash(headTrades, olderTrades),
@@ -663,7 +663,7 @@ export function TradeTape({
                           {formatSupplyShare(row.netTokens)}
                         </td>
                         <td className="token-tape-table__col-num token-tape-table__value financial-value token-tape-table__muted">
-                          {formatUsdReadable(avgEntryUsd, { compact: true })}
+                          <PumpSubscriptPrice value={avgEntryUsd} />
                         </td>
                         <td className="token-tape-table__col-end">
                           <div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
@@ -676,7 +676,7 @@ export function TradeTape({
                             <PctChange
                               value={unrealizedPnlPct}
                               className="text-caption"
-                              toneClassName={pnlTone}
+                              toneClassName="text-pump-muted"
                             />
                           </div>
                         </td>
@@ -706,7 +706,7 @@ export function TradeTape({
                   <th className="token-tape-table__head-amount">Value</th>
                   <th className="token-tape-table__head-account">Account</th>
                   <th className="token-tape-table__head-price">Price</th>
-                  <th className="token-tape-table__head-time">Time</th>
+                  <th className="token-tape-table__head-time">Age</th>
                 </tr>
               </thead>
               <tbody>
@@ -757,7 +757,7 @@ export function TradeTape({
                       <td className="token-tape-table__time-cell">
                         <div className="token-tape-time-txn">
                           <span className="token-tape-time-txn__clock financial-value">
-                            {formatTradeClockTime(trade.blockTime, true)}
+                            {formatAge(trade.blockTime, ageNowMs)}
                           </span>
                           <a
                             href={explorerTxUrl(trade.txHash)}
@@ -790,7 +790,7 @@ export function TradeTape({
                   <th className="token-tape-table__col-num">Price</th>
                   <th className="token-tape-table__col-num">Value</th>
                   <th className="token-tape-table__col-num">{symbol}</th>
-                  <th className="token-tape-table__col-end">Time</th>
+                  <th className="token-tape-table__col-end">Age</th>
                   <th className="token-tape-table__col-end">Txn</th>
                 </tr>
               </thead>
@@ -844,8 +844,8 @@ export function TradeTape({
                       >
                         {formatTokenAmount(Number(trade.tokenAmount))}
                       </td>
-                      <td className="token-tape-table__col-end token-tape-table__muted">
-                        {formatTradeClockTime(trade.blockTime)}
+                      <td className="token-tape-table__col-end token-tape-table__muted financial-value">
+                        {formatAge(trade.blockTime, ageNowMs)}
                       </td>
                       <td className="token-tape-table__col-end token-tape-table__txn-cell">
                         <a

@@ -127,7 +127,6 @@ import {
 import type { TradePrefillConfig } from "@/lib/token-trade-prefill";
 
 type Side = "buy" | "sell";
-type TradeMode = "market" | "limit";
 type TradeInputMode = "usd" | "token";
 
 function normalizeTradeInputMode(mode?: string): TradeInputMode {
@@ -406,7 +405,6 @@ export function TradePanel({
   const optimisticNativeUsdRate =
     bnbUsd != null && bnbUsd > 0 ? String(bnbUsd) : undefined;
   const [side, setSide] = useState<Side>("buy");
-  const [tradeMode, setTradeMode] = useState<TradeMode>("market");
   const [buyInputMode, setBuyInputMode] = useState<TradeInputMode>("usd");
   const [sellInputMode, setSellInputMode] = useState<TradeInputMode>("usd");
   const [amount, setAmount] = useState("");
@@ -2629,44 +2627,6 @@ export function TradePanel({
       <form onSubmit={onSubmit}>
         {!compact ? (
           <div className="trade-panel-toolbar">
-            <div
-              className="trade-panel-mode-tabs trade-panel-mode-tabs--toolbar"
-              role="tablist"
-              aria-label="Order type"
-            >
-              <button
-                type="button"
-                role="tab"
-                aria-selected={tradeMode === "market"}
-                className={
-                  tradeMode === "market"
-                    ? "trade-panel-mode-tab trade-panel-mode-tab--active"
-                    : "trade-panel-mode-tab"
-                }
-                onClick={() => {
-                  setTradeMode("market");
-                  setAssetMenuOpen(false);
-                }}
-              >
-                Market
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={tradeMode === "limit"}
-                className={
-                  tradeMode === "limit"
-                    ? "trade-panel-mode-tab trade-panel-mode-tab--active"
-                    : "trade-panel-mode-tab"
-                }
-                onClick={() => {
-                  setTradeMode("limit");
-                  setAssetMenuOpen(false);
-                }}
-              >
-                Limit
-              </button>
-            </div>
             <div className="trade-side-group trade-side-group--toolbar">
               <button
                 type="button"
@@ -2686,7 +2646,7 @@ export function TradePanel({
           </div>
         ) : null}
 
-        {tradeMode === "market" && useQuickOrderHeader ? (
+        {useQuickOrderHeader ? (
           <TradeQuickOrderHeader
             tokenAddress={tokenAddress}
             symbol={symbol}
@@ -2697,7 +2657,7 @@ export function TradePanel({
           />
         ) : null}
 
-        {tradeMode === "market" && compact && !useQuickOrderHeader ? (
+        {compact && !useQuickOrderHeader ? (
           <div className="trade-panel-tabs">
             <div className="trade-side-group">
               <button
@@ -2718,8 +2678,6 @@ export function TradePanel({
           </div>
         ) : null}
 
-        {tradeMode === "market" ? (
-          <>
         {paused ? (
           <p className="notice-warning mx-4 mt-2 text-caption">Trading is paused on this curve.</p>
         ) : null}
@@ -2907,12 +2865,6 @@ export function TradePanel({
             {submitActionLabel}
           </button>
         </div>
-        )}
-          </>
-        ) : (
-          <div className="trade-limit-placeholder">
-            <p className="text-body-sm font-medium text-pump-muted">Coming soon</p>
-          </div>
         )}
       </form>
 

@@ -358,7 +358,7 @@ function AirdropDesktopRow({
       >
         {formatAirdropDisplayStatus(item.displayStatus)}
       </td>
-      <td className="portfolio-holdings-grid__num w-[1%] whitespace-nowrap px-4 py-3 text-right">
+      <td className="portfolio-holdings-grid__num portfolio-airdrops-grid__action-cell px-4 py-3">
         {item.nextAction === "claim" || item.nextAction === "continue" ? (
           <Link
             href={`/airdrops/${item.id}`}
@@ -396,8 +396,16 @@ export function JoinedAirdropsList({
         </div>
       </div>
 
-      <div className="hidden lg:block overflow-x-auto">
-        <table className="sheet-grid portfolio-holdings-grid portfolio-airdrops-grid min-w-[780px]">
+      <div className="hidden lg:block">
+        <table className="sheet-grid portfolio-holdings-grid portfolio-airdrops-grid">
+          <colgroup>
+            <col className="portfolio-airdrops-grid__col-coin" />
+            <col className="portfolio-airdrops-grid__col-rank" />
+            <col className="portfolio-airdrops-grid__col-reward" />
+            <col className="portfolio-airdrops-grid__col-time" />
+            <col className="portfolio-airdrops-grid__col-status" />
+            <col className="portfolio-airdrops-grid__col-action" />
+          </colgroup>
           <thead>
             <tr>
               <th>Coin</th>
@@ -405,7 +413,7 @@ export function JoinedAirdropsList({
               <th className="portfolio-holdings-grid__num">Your reward</th>
               <th className="portfolio-holdings-grid__num">Time left</th>
               <th className="portfolio-holdings-grid__num">Status</th>
-              <th className="portfolio-holdings-grid__num w-[1%] whitespace-nowrap text-right">
+              <th className="portfolio-holdings-grid__num portfolio-airdrops-grid__action-head">
                 Action
               </th>
             </tr>

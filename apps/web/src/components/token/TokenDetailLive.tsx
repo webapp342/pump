@@ -1026,7 +1026,7 @@ export function TokenDetailLive({
                   className="token-detail-toolbar__contract-btn"
                   aria-label="View contract on explorer"
                 >
-                  <PumpIcon icon={faExternalLink} className="h-[14px] w-[14px]" />
+                  <PumpIcon icon={faExternalLink} size="xs" />
                 </a>
                 <button
                   type="button"
@@ -1035,9 +1035,9 @@ export function TokenDetailLive({
                   aria-label={copiedAddress ? "Address copied" : "Copy contract address"}
                 >
                   {copiedAddress ? (
-                    <PumpIcon icon={faCheck} className="h-[14px] w-[14px]" />
+                    <PumpIcon icon={faCheck} size="xs" />
                   ) : (
-                    <PumpIcon icon={faCopy} className="h-[14px] w-[14px]" />
+                    <PumpIcon icon={faCopy} size="xs" />
                   )}
                 </button>
               </div>
@@ -1065,7 +1065,7 @@ export function TokenDetailLive({
                 : "token-detail-toolbar__fav-btn"
             }
           >
-            <FavoriteIcon active={favorited} className="token-detail-toolbar__fav-icon" />
+            <FavoriteIcon active={favorited} size="md" className="token-detail-toolbar__fav-icon" />
           </button>
           <button
             type="button"
@@ -1075,7 +1075,7 @@ export function TokenDetailLive({
             title="Announce"
             className="token-detail-toolbar__announce-btn"
           >
-            <PumpIcon icon={faCampaign} className="h-4 w-4" />
+            <PumpIcon icon={faCampaign} size="md" />
           </button>
           <button
             type="button"
@@ -1084,7 +1084,7 @@ export function TokenDetailLive({
             aria-label="Share token"
             title="Share"
           >
-            <PumpIcon icon={faShare} className="h-4 w-4" />
+            <PumpIcon icon={faShare} size="md" />
           </button>
         </div>
       </div>

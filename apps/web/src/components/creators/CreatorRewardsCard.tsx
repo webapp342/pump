@@ -71,7 +71,7 @@ export function CreatorRewardsCard({
             className="creator-rewards-card__identity"
             aria-label={`View creator profile ${creatorDisplayUsername ?? creatorAddress}`}
           >
-            <UserAvatarForAddress address={creatorAddress} size="2xl" />
+            <UserAvatarForAddress address={creatorAddress} size="xl" />
             <div className="creator-rewards-card__identity-copy">
               <span className="creator-rewards-card__name financial-value">
                 {creatorDisplayUsername ?? (
@@ -80,11 +80,11 @@ export function CreatorRewardsCard({
               </span>
               <div className="creator-rewards-card__meta">
                 <span className="creator-rewards-card__meta-item">
-                  <PumpIcon icon={faWallet} className="creator-rewards-card__meta-icon" aria-hidden />
+                  <PumpIcon icon={faWallet} size="xs" className="creator-rewards-card__meta-icon" aria-hidden />
                   <span className="financial-value">{formatWalletUsdTotal(totalUsd)}</span>
                 </span>
                 <span className="creator-rewards-card__meta-item">
-                  <PumpIcon icon={faUsers} className="creator-rewards-card__meta-icon" aria-hidden />
+                  <PumpIcon icon={faUsers} size="xs" className="creator-rewards-card__meta-icon" aria-hidden />
                   <span className="financial-value">
                     {Math.max(0, followerCount).toLocaleString()}
                   </span>

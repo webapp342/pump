@@ -16,7 +16,6 @@ import type { TokenListItem } from "@/lib/db/launchpad";
 import {
   readTokenWatchlistStripMode,
   resolveTokenWatchlistStripFilter,
-  tokenWatchlistStripLabel,
   TOKEN_WATCHLIST_STRIP_SOURCE_OPTIONS,
   writeTokenWatchlistStripMode,
   type TokenWatchlistStripMode,
@@ -64,12 +63,12 @@ function StripTokenChip({
         address={token.address}
         symbol={token.symbol}
         logoUrl={token.logoUrl}
-        size="xs"
+        size="sm"
         shape="rounded"
         className="token-favorites-strip__logo shrink-0 !ring-0"
       />
       <span className="token-favorites-strip__symbol financial-value">{token.symbol}</span>
-      <span className="token-favorites-strip__mcap financial-value text-pump-muted">
+      <span className="token-favorites-strip__mcap financial-value">
         {formatArenaQuoteUsd(mcapUsd)}
       </span>
     </Link>
@@ -167,8 +166,6 @@ export function TokenWatchlistStrip({ activeTokenAddress }: TokenWatchlistStripP
   const visibleTokens = tokens.slice(0, visibleCount);
 
   const activeKey = activeTokenAddress.toLowerCase();
-  const label = tokenWatchlistStripLabel(effectiveFilter);
-  const labelActive = effectiveFilter === "favorites" && hasWatchlist;
 
   const selectMode = useCallback((mode: TokenWatchlistStripMode) => {
     setStripMode(mode);
@@ -236,16 +233,6 @@ export function TokenWatchlistStrip({ activeTokenAddress }: TokenWatchlistStripP
               document.body
             )
           : null}
-      </div>
-
-      <div
-        className={
-          labelActive
-            ? "token-favorites-strip__label token-favorites-strip__label--active"
-            : "token-favorites-strip__label"
-        }
-      >
-        <span className="token-favorites-strip__label-text">{label}</span>
       </div>
 
       <div

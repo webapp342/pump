@@ -17,11 +17,12 @@ import { TokenMarketSidebarArenaRow } from "@/components/token/TokenMarketSideba
 import { TokenMarketSidebarRow } from "@/components/token/TokenMarketSidebarRow";
 import { TokenMarketSidebarHead } from "@/components/token/TokenMarketSidebarHead";
 import { TokenMarketSidebarFilterStrip } from "@/components/token/TokenMarketSidebarFilterStrip";
-import { ArenaSwipeTradeBar } from "@/components/arena/ArenaSwipeTradeBar";
 import { HoldingsSwipeHint } from "@/components/portfolio/HoldingsSwipeHint";
 import { FieldSearchInput } from "@/components/ui/FieldSearchInput";
 import { pinMobileWindowScroll } from "@/hooks/useMobileModalScrollLock";
+import { useArenaQuickTradeSettings } from "@/hooks/useArenaQuickTradeSettings";
 import { quickTradeSwipeLabels } from "@/lib/arena-quick-trade";
+import { PumpIcon, faSettings2 } from "@/lib/icons";
 import type { TokenSidebarDensity } from "@/hooks/useTokenSidebarWidth";
 
 /** Survives rare sidebar remounts — desktop trade list should not jump to top on token switch. */
@@ -38,9 +39,9 @@ type TokenMarketSidebarProps = {
   /** Mobile sheet — search mode hides filters/columns. */
   searchActive?: boolean;
   searchInputRef?: Ref<HTMLInputElement>;
-  /** Desktop trade sidebar — quick trade prefs to the right of search. */
+  /** Desktop trade sidebar — settings icon beside search opens quick-trade prefs. */
   showQuickTrade?: boolean;
-  /** Mobile token picker sheet — swipe trade, search-row quick-trade bar, unified chrome. */
+  /** Mobile token picker sheet — swipe trade + settings icon, unified chrome. */
   mobileSheet?: boolean;
   /** When set, parent owns TradeSheet (survives sheet close). */
   onOpenQuickTrade?: (tokenAddress: string, symbol: string, side: "buy" | "sell") => void;
@@ -68,6 +69,11 @@ export function TokenMarketSidebar({
   const openQuickTrade = onOpenQuickTrade ?? internalQuickTrade.openQuickTrade;
   const quickTradeSheet = renderQuickTradeSheet ? internalQuickTrade.quickTradeSheet : null;
   const effectiveQuickTrade = showQuickTrade || mobileSheet;
+  const {
+    settingsOpen: quickTradeSettingsOpen,
+    openSettings: openQuickTradeSettings,
+    settingsLayer: quickTradeSettingsLayer,
+  } = useArenaQuickTradeSettings();
   const useArenaRows = !mobileSheet;
   const swipeHintLabels = quickTradeSwipeLabels();
 
@@ -216,15 +222,18 @@ export function TokenMarketSidebar({
             spellCheck={false}
           />
           {effectiveQuickTrade ? (
-            <div
-              className={
-                mobileSheet
-                  ? "token-market-sidebar__search-tools"
-                  : "token-market-sidebar__search-tools hidden lg:flex"
-              }
+            <button
+              type="button"
+              className={`token-market-sidebar__settings-btn${
+                quickTradeSettingsOpen ? " token-market-sidebar__settings-btn--open" : ""
+              }${mobileSheet ? "" : " hidden lg:inline-flex"}`}
+              onClick={openQuickTradeSettings}
+              aria-label="Quick trade settings"
+              aria-expanded={quickTradeSettingsOpen}
+              aria-haspopup="dialog"
             >
-              <ArenaSwipeTradeBar variant={mobileSheet ? "mobile-sheet" : "sidebar"} />
-            </div>
+              <PumpIcon icon={faSettings2} className="h-4 w-4" aria-hidden />
+            </button>
           ) : null}
         </div>
 
@@ -235,6 +244,8 @@ export function TokenMarketSidebar({
           />
         ) : null}
       </div>
+
+      {effectiveQuickTrade ? quickTradeSettingsLayer : null}
 
       {!searchActive && useArenaRows ? (
         <div ref={headWrapRef} className="token-market-sidebar__arena-anchor" aria-hidden="true" />

@@ -166,7 +166,6 @@ export function PortfolioMobileHero({
   const canOpenAccount = !guestMode && showWalletActions;
 
   const accountPanelProps = {
-    address: accountAddress,
     nativeBnb,
     nativeUsd,
     showBnb,

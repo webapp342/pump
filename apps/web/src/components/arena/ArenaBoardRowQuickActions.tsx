@@ -54,7 +54,7 @@ export function ArenaBoardRowQuickActions({
         className="arena-board-quick-btn arena-board-quick-btn--buy"
       >
         {layout === "card-compact" ? (
-          <PumpIcon icon={faBolt} className="arena-board-quick-btn__flash" aria-hidden />
+          <PumpIcon icon={faBolt} size="xs" className="arena-board-quick-btn__flash" aria-hidden />
         ) : null}
         <span className="arena-board-quick-btn__label">Buy</span>
         {layout !== "card-compact" ? (
@@ -73,7 +73,7 @@ export function ArenaBoardRowQuickActions({
         className="arena-board-quick-btn arena-board-quick-btn--sell"
       >
         {layout === "card-compact" ? (
-          <PumpIcon icon={faBolt} className="arena-board-quick-btn__flash" aria-hidden />
+          <PumpIcon icon={faBolt} size="xs" className="arena-board-quick-btn__flash" aria-hidden />
         ) : null}
         <span className="arena-board-quick-btn__label">Sell</span>
         {layout !== "card-compact" ? (

@@ -84,7 +84,7 @@ export function TokenAnnouncementsPanel({
           {items.map((item) => {
             const identity = (
               <>
-                <UserAvatarForAddress address={item.announcerAddress} size="lg" />
+                <UserAvatarForAddress address={item.announcerAddress} size="md" />
                 <span className="token-announcements-panel__name">
                   {item.announcerDisplayUsername}
                 </span>

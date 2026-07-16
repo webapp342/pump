@@ -1,14 +1,13 @@
 "use client";
 
-import { useRef } from "react";
 import { useArenaQuickTradeSettings } from "@/hooks/useArenaQuickTradeSettings";
 import { PumpIcon, faBolt, faPencil } from "@/lib/icons";
 import { formatQuickTradeBuyUsd } from "@/lib/arena-quick-trade";
 
 type ArenaSwipeTradeBarProps = {
   /**
-   * `default` — Arena inline row.
-   * `sidebar` / `mobile-sheet` — stacked amounts with per-row edit icons (trade sidebar + mobile picker).
+   * `default` — Arena inline row (legacy summary display).
+   * `sidebar` / `mobile-sheet` — stacked amounts with per-row edit icons.
    */
   variant?: "default" | "sidebar" | "mobile-sheet";
 };
@@ -31,17 +30,15 @@ function QuickTradeEditButton({
       aria-expanded={open}
       aria-haspopup="dialog"
     >
-      <PumpIcon icon={faPencil} className="arena-quick-trade-bar__edit-icon" aria-hidden />
+      <PumpIcon icon={faPencil} size="xs" className="arena-quick-trade-bar__edit-icon" aria-hidden />
     </button>
   );
 }
 
 export function ArenaSwipeTradeBar({ variant = "default" }: ArenaSwipeTradeBarProps) {
-  const anchorRef = useRef<HTMLDivElement>(null);
-  const { prefs, settingsOpen, openSettings, settingsLayer } =
-    useArenaQuickTradeSettings(anchorRef);
+  const { prefs, settingsOpen, openSettings, settingsLayer } = useArenaQuickTradeSettings();
   const stacked = variant === "sidebar" || variant === "mobile-sheet";
-  const compactLabels = variant === "sidebar" || variant === "mobile-sheet";
+  const showLabels = stacked;
 
   const barClass = [
     "arena-quick-trade-bar relative shrink-0",
@@ -53,7 +50,7 @@ export function ArenaSwipeTradeBar({ variant = "default" }: ArenaSwipeTradeBarPr
     .join(" ");
 
   return (
-    <div ref={anchorRef} className={barClass}>
+    <div className={barClass}>
       <div className="arena-quick-trade-bar__cluster">
         <div
           className={`arena-quick-trade-bar__summary${
@@ -63,10 +60,8 @@ export function ArenaSwipeTradeBar({ variant = "default" }: ArenaSwipeTradeBarPr
         >
           <span className="arena-quick-trade-bar__leg arena-quick-trade-bar__buy">
             <span className="arena-quick-trade-bar__leg-main">
-              <PumpIcon icon={faBolt} className="arena-quick-trade-bar__flash" aria-hidden />
-              {!compactLabels ? (
-                <span className="arena-quick-trade-bar__label hidden md:inline">Buy</span>
-              ) : null}
+              <PumpIcon icon={faBolt} size="xs" className="arena-quick-trade-bar__flash" aria-hidden />
+              {showLabels ? <span className="arena-quick-trade-bar__label">Buy</span> : null}
               <span className="arena-quick-trade-bar__value financial-value">
                 {formatQuickTradeBuyUsd(prefs.buyAmountUsd)}
               </span>
@@ -79,10 +74,8 @@ export function ArenaSwipeTradeBar({ variant = "default" }: ArenaSwipeTradeBarPr
           </span>
           <span className="arena-quick-trade-bar__leg arena-quick-trade-bar__sell">
             <span className="arena-quick-trade-bar__leg-main">
-              <PumpIcon icon={faBolt} className="arena-quick-trade-bar__flash" aria-hidden />
-              {!compactLabels ? (
-                <span className="arena-quick-trade-bar__label hidden md:inline">Sell</span>
-              ) : null}
+              <PumpIcon icon={faBolt} size="xs" className="arena-quick-trade-bar__flash" aria-hidden />
+              {showLabels ? <span className="arena-quick-trade-bar__label">Sell</span> : null}
               <span className="arena-quick-trade-bar__value financial-value">{prefs.sellPercent}%</span>
             </span>
             <QuickTradeEditButton

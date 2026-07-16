@@ -8,7 +8,6 @@ import { ArenaShortcutsModal } from "@/components/arena/ArenaShortcutsModal";
 import { ArenaMobileTokenRow } from "@/components/arena/ArenaMobileTokenRow";
 import { ArenaTokenCard } from "@/components/arena/ArenaTokenCard";
 import { useFavorites } from "@/components/favorites/FavoritesProvider";
-import { ArenaSwipeTradeBar } from "@/components/arena/ArenaSwipeTradeBar";
 import { HubDiscoveryScrollLock } from "@/components/layout/HubDiscoveryScrollLock";
 import { useBnbUsdPrice } from "@/hooks/useBnbUsdPrice";
 import { useArenaQuickTrade } from "@/hooks/useArenaQuickTrade";
@@ -924,11 +923,6 @@ export function ArenaListClient({
             onSelect={setArenaFilter}
             onQuickTradeSettingsOpen={openQuickTradeSettings}
             quickTradeSettingsOpen={quickTradeSettingsOpen}
-            trailing={
-              <div className="arena-filter-bar__quick-trade arena-filter-bar__quick-trade--desktop">
-                <ArenaSwipeTradeBar />
-              </div>
-            }
           />
         </div>
       </div>

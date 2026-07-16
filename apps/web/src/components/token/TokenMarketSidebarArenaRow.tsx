@@ -13,8 +13,7 @@ import {
 } from "@/lib/token-detail-client";
 import { writeLastTradeTokenAddress } from "@/lib/last-trade-token";
 import { tokenDetailPath } from "@/lib/token-routes";
-import { formatArenaQuoteUsd } from "@/lib/arena-board-format";
-import { flashText, type FlashTone } from "@/lib/arena-explore-board-core";
+import type { FlashTone } from "@/lib/arena-explore-board-core";
 
 type TokenMarketSidebarArenaRowProps = {
   token: TokenListItem;
@@ -27,16 +26,6 @@ type TokenMarketSidebarArenaRowProps = {
   onQuickTrade?: (side: "buy" | "sell") => void;
   showRowQuickActions?: boolean;
 };
-
-function mcapValueTone(mcapUsd: number | null): "low" | "mid" | "high" {
-  if (mcapUsd == null || !Number.isFinite(mcapUsd) || mcapUsd < 10_000) return "low";
-  if (mcapUsd <= 20_000) return "mid";
-  return "high";
-}
-
-function mcapToneClass(tone: "low" | "mid" | "high"): string {
-  return `arena-mobile-token-row__mcap-tone--${tone}`;
-}
 
 export function TokenMarketSidebarArenaRow({
   token,
@@ -102,14 +91,6 @@ export function TokenMarketSidebarArenaRow({
         event.stopPropagation();
       }}
     >
-      <div className="arena-mobile-token-row__metric token-market-sidebar__arena-hover-mcap">
-        <span className="arena-mobile-token-row__metric-label">MC</span>
-        <span
-          className={`arena-mobile-token-row__metric-value arena-mobile-token-row__metric-value--mc financial-value ${mcapToneClass(mcapValueTone(mcapUsd))} ${flashText(mcapFlash)}`}
-        >
-          {formatArenaQuoteUsd(mcapUsd)}
-        </span>
-      </div>
       <div className="token-market-sidebar__arena-aside-actions">
         <ArenaBoardRowQuickActions
           layout="card-compact"

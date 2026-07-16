@@ -5,16 +5,24 @@ import {
   USD_COMPACT_K_THRESHOLD,
 } from "@/lib/format-usd";
 
-export function formatAge(createdAt: string): string {
-  const ms = Date.now() - new Date(createdAt).getTime();
-  const d = Math.max(0, Math.floor(ms / 86_400_000));
-  if (d >= 365) return `${Math.floor(d / 365)}y`;
-  if (d >= 30) return `${Math.floor(d / 30)}mo`;
-  if (d >= 1) return `${d}d`;
-  const h = Math.max(0, Math.floor(ms / 3_600_000));
-  if (h >= 1) return `${h}h`;
-  const m = Math.max(0, Math.floor(ms / 60_000));
-  return `${m}m`;
+/** Relative age: single unit only — `12s` · `5m` · `3h` · `2d` · `1y`. */
+export function formatAge(createdAt: string, nowMs: number = Date.now()): string {
+  const ms = nowMs - new Date(createdAt).getTime();
+  if (!Number.isFinite(ms) || ms < 0) return "0s";
+
+  const sec = Math.floor(ms / 1_000);
+  if (sec < 60) return `${sec}s`;
+
+  const min = Math.floor(ms / 60_000);
+  if (min < 60) return `${min}m`;
+
+  const hr = Math.floor(ms / 3_600_000);
+  if (hr < 24) return `${hr}h`;
+
+  const day = Math.floor(ms / 86_400_000);
+  if (day < 365) return `${day}d`;
+
+  return `${Math.floor(day / 365)}y`;
 }
 
 export function isTokenAgeUnder1h(createdAt: string): boolean {

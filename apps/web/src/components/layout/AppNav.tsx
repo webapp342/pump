@@ -11,24 +11,20 @@ import { usePumpWallet } from "@/components/wallet/PumpWalletProvider";
 import { APP_BOTTOM_TAB_ITEMS, isBottomNavActive } from "@/lib/nav-config";
 import { PumpIcon } from "@/lib/icons";
 
-function BottomNavTab({
-  linkComponent: TabLink,
-  linkProps,
+function BottomNavTradeTab({
   label,
   icon,
   active,
   onClick,
 }: {
-  linkComponent: typeof Link | typeof TradeNavLink;
-  linkProps: { href: string } | { fallbackHref: "/" };
   label: string;
   icon: (typeof APP_BOTTOM_TAB_ITEMS)[number]["icon"];
   active: boolean;
   onClick?: (event: MouseEvent<HTMLAnchorElement>) => void;
 }) {
   return (
-    <TabLink
-      {...linkProps}
+    <TradeNavLink
+      fallbackHref="/"
       prefetch={true}
       aria-current={active ? "page" : undefined}
       aria-label={label}
@@ -36,7 +32,34 @@ function BottomNavTab({
       onClick={onClick}
     >
       <PumpIcon icon={icon} className="bottom-nav-icon" />
-    </TabLink>
+    </TradeNavLink>
+  );
+}
+
+function BottomNavRouteTab({
+  href,
+  label,
+  icon,
+  active,
+  onClick,
+}: {
+  href: string;
+  label: string;
+  icon: (typeof APP_BOTTOM_TAB_ITEMS)[number]["icon"];
+  active: boolean;
+  onClick?: (event: MouseEvent<HTMLAnchorElement>) => void;
+}) {
+  return (
+    <Link
+      href={href}
+      prefetch={true}
+      aria-current={active ? "page" : undefined}
+      aria-label={label}
+      className={`bottom-nav-item${active ? " bottom-nav-item-active" : ""}`}
+      onClick={onClick}
+    >
+      <PumpIcon icon={icon} className="bottom-nav-icon" />
+    </Link>
   );
 }
 
@@ -58,27 +81,35 @@ export function AppNavView({ pathname }: { pathname: string }) {
         ) : (
           APP_BOTTOM_TAB_ITEMS.map((item) => {
             const requiresAuth = item.href === "/portfolio";
-            const isTradeTab = item.href === "/";
-            const TabLink = isTradeTab ? TradeNavLink : Link;
-            const linkProps = isTradeTab ? { fallbackHref: "/" as const } : { href: item.href };
+            const onClick = requiresAuth
+              ? (event: MouseEvent<HTMLAnchorElement>) => {
+                  if (!ready || authenticated) return;
+                  event.preventDefault();
+                  login();
+                }
+              : undefined;
+            const active = isBottomNavActive(pathname, item.href);
+
+            if (item.href === "/") {
+              return (
+                <BottomNavTradeTab
+                  key={item.href}
+                  label={item.label}
+                  icon={item.icon}
+                  active={active}
+                  onClick={onClick}
+                />
+              );
+            }
 
             return (
-              <BottomNavTab
+              <BottomNavRouteTab
                 key={item.href}
-                linkComponent={TabLink}
-                linkProps={linkProps}
+                href={item.href}
                 label={item.label}
                 icon={item.icon}
-                active={isBottomNavActive(pathname, item.href)}
-                onClick={
-                  requiresAuth
-                    ? (event) => {
-                        if (!ready || authenticated) return;
-                        event.preventDefault();
-                        login();
-                      }
-                    : undefined
-                }
+                active={active}
+                onClick={onClick}
               />
             );
           })

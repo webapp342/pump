@@ -1,17 +1,13 @@
 "use client";
 
-import { useState } from "react";
-import { NATIVE_SYMBOL, shortAddress } from "@/config/chain";
+import { NATIVE_SYMBOL } from "@/config/chain";
 import { ThemePicker } from "@/components/theme/ThemePicker";
 import { PushNotificationsPanel } from "@/components/push/PushNotificationsPanel";
 import { useWalletFunding } from "@/components/wallet/WalletFundingProvider";
-import { copyToClipboard } from "@/lib/copy-to-clipboard";
 import {
   PumpIcon,
   faArrowDown,
   faArrowUp,
-  faCheck,
-  faCopy,
   faLogout,
   faSliders,
   faUserPen,
@@ -27,32 +23,6 @@ function formatHeaderBalanceNative(native: number): string {
   if (native >= 1) return `${native.toFixed(4)} ${NATIVE_SYMBOL}`;
   if (native >= 0.0001) return `${native.toFixed(4)} ${NATIVE_SYMBOL}`;
   return `${native.toFixed(6)} ${NATIVE_SYMBOL}`;
-}
-
-function WalletAddressRow({ address }: { address: string }) {
-  const [copied, setCopied] = useState(false);
-
-  async function onCopy() {
-    const ok = await copyToClipboard(address);
-    setCopied(ok);
-    if (ok) {
-      setTimeout(() => setCopied(false), 2000);
-    }
-  }
-
-  return (
-    <div className="wallet-account-panel__address-row">
-      <span className="financial-value wallet-account-panel__address-text">{shortAddress(address)}</span>
-      <button
-        type="button"
-        onClick={() => void onCopy()}
-        className="wallet-account-panel__address-copy"
-        aria-label={copied ? "Address copied" : "Copy wallet address"}
-      >
-        <PumpIcon icon={copied ? faCheck : faCopy} className="h-3.5 w-3.5" />
-      </button>
-    </div>
-  );
 }
 
 function WalletFundButtons({ onClose }: { onClose: () => void }) {
@@ -122,14 +92,12 @@ function BalanceUnitSwitch({
 }
 
 function AccountSummaryCard({
-  address,
   nativeBnb,
   nativeUsd,
   showBnb,
   onSelectUsd,
   onSelectNative,
 }: {
-  address: string;
   nativeBnb: number;
   nativeUsd: number;
   showBnb: boolean;
@@ -139,9 +107,6 @@ function AccountSummaryCard({
   const availablePrimary = showBnb
     ? formatHeaderBalanceNative(nativeBnb)
     : formatHeaderBalanceUsd(nativeUsd);
-  const availableSecondary = showBnb
-    ? formatHeaderBalanceUsd(nativeUsd)
-    : formatHeaderBalanceNative(nativeBnb);
 
   return (
     <section className="wallet-account-panel__summary">
@@ -152,7 +117,6 @@ function AccountSummaryCard({
             <span className="financial-value wallet-account-panel__balance-amount">
               {availablePrimary}
             </span>
-            <p className="wallet-account-panel__balance-equiv financial-value">{availableSecondary}</p>
           </div>
           <BalanceUnitSwitch
             showBnb={showBnb}
@@ -161,7 +125,6 @@ function AccountSummaryCard({
           />
         </div>
       </div>
-      <WalletAddressRow address={address} />
     </section>
   );
 }
@@ -223,7 +186,6 @@ function AccountSettingsNav({
 }
 
 export type WalletAccountPanelProps = {
-  address: string;
   nativeBnb: number;
   nativeUsd: number;
   showBnb: boolean;
@@ -237,7 +199,6 @@ export type WalletAccountPanelProps = {
 };
 
 export function WalletAccountPanel({
-  address,
   nativeBnb,
   nativeUsd,
   showBnb,
@@ -265,7 +226,6 @@ export function WalletAccountPanel({
       {isSettingsSheet ? null : (
         <>
           <AccountSummaryCard
-            address={address}
             nativeBnb={nativeBnb}
             nativeUsd={nativeUsd}
             showBnb={showBnb}

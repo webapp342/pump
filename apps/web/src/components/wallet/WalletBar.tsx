@@ -42,7 +42,6 @@ function ConnectedWalletButton({ address }: { address: string }) {
   const balanceLabel = formatHeaderBalanceUsd(nativeUsd);
 
   const panelProps = {
-    address,
     nativeBnb,
     nativeUsd,
     showBnb,

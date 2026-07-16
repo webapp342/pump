@@ -130,6 +130,42 @@ export function scaleCostBasisUsdForBalance(
   return costBasisUsd * (displayBalance / indexedBalance);
 }
 
+/**
+ * Open-lot cost in USD for entry / unrealized P/L.
+ *
+ * Prefer trade-time frozen USD when it is complete. If some buys were indexed
+ * with a missing nativeUsdRate, USD stays partial while native cost is full —
+ * that would mark almost the entire position value as "profit". Fall back to
+ * native×live FX when frozen USD is far below the live-native cost.
+ */
+export function resolveOpenLotCostUsd(
+  remainingCostBasisUsd: number,
+  remainingCostBasisBnb: number,
+  liveBnbUsd: number | null | undefined
+): number | null {
+  const frozenUsd =
+    Number.isFinite(remainingCostBasisUsd) && remainingCostBasisUsd > 0
+      ? remainingCostBasisUsd
+      : 0;
+  const liveNativeUsd =
+    liveBnbUsd != null &&
+    Number.isFinite(liveBnbUsd) &&
+    liveBnbUsd > 0 &&
+    Number.isFinite(remainingCostBasisBnb) &&
+    remainingCostBasisBnb > 0
+      ? remainingCostBasisBnb * liveBnbUsd
+      : 0;
+
+  if (frozenUsd > 0 && liveNativeUsd > 0) {
+    // Incomplete USD lot (missing oracle on some buys) — trust native cost.
+    if (frozenUsd < liveNativeUsd * 0.5) return liveNativeUsd;
+    return frozenUsd;
+  }
+  if (frozenUsd > 0) return frozenUsd;
+  if (liveNativeUsd > 0) return liveNativeUsd;
+  return null;
+}
+
 /** Avg entry USD/token — frozen cost basis first, native×live rate fallback. */
 export function positionAvgEntryUsd(
   balance: number,
@@ -137,13 +173,14 @@ export function positionAvgEntryUsd(
   remainingCostBasisBnb: number,
   liveBnbUsd: number | null | undefined
 ): number | null {
-  if (balance > 0 && remainingCostBasisUsd > 0) {
-    return remainingCostBasisUsd / balance;
-  }
-  if (balance > 0 && remainingCostBasisBnb > 0 && liveBnbUsd != null) {
-    return (remainingCostBasisBnb / balance) * liveBnbUsd;
-  }
-  return null;
+  if (!(balance > 0)) return null;
+  const costUsd = resolveOpenLotCostUsd(
+    remainingCostBasisUsd,
+    remainingCostBasisBnb,
+    liveBnbUsd
+  );
+  if (costUsd == null || costUsd <= 0) return null;
+  return costUsd / balance;
 }
 
 /**
@@ -159,12 +196,11 @@ export function positionUnrealizedUsd(
 ): number | null {
   const markUsd = bnbToUsd(balance * markPriceBnb, liveBnbUsd);
   if (markUsd == null) return null;
-  const costUsd =
-    remainingCostBasisUsd > 0
-      ? remainingCostBasisUsd
-      : liveBnbUsd != null
-        ? remainingCostBasisBnb * liveBnbUsd
-        : null;
+  const costUsd = resolveOpenLotCostUsd(
+    remainingCostBasisUsd,
+    remainingCostBasisBnb,
+    liveBnbUsd
+  );
   if (costUsd == null) return null;
   return markUsd - costUsd;
 }
@@ -175,12 +211,11 @@ export function positionUnrealizedPct(
   remainingCostBasisBnb: number,
   liveBnbUsd: number | null | undefined
 ): number | null {
-  const costUsd =
-    remainingCostBasisUsd > 0
-      ? remainingCostBasisUsd
-      : liveBnbUsd != null
-        ? remainingCostBasisBnb * liveBnbUsd
-        : null;
+  const costUsd = resolveOpenLotCostUsd(
+    remainingCostBasisUsd,
+    remainingCostBasisBnb,
+    liveBnbUsd
+  );
   if (unrealizedUsd == null || costUsd == null || costUsd <= 0) return null;
   return (unrealizedUsd / costUsd) * 100;
 }

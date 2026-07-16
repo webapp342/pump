@@ -3,11 +3,14 @@
 import { AppBottomSheet } from "@/components/ui/AppBottomSheet";
 import { WalletAccountPanel, type WalletAccountPanelProps } from "@/components/wallet/WalletAccountPanel";
 
-type AccountSheetProps = Omit<WalletAccountPanelProps, "variant"> & {
+type AccountSheetProps = WalletAccountPanelProps & {
   open: boolean;
 };
 
-/** Mobile settings sheet (no balance / address / funding — those live on Portfolio). */
+/**
+ * Corporate Settings surface — bottom sheet on mobile, centered card on desktop.
+ * No balance / address / funding (those live on Portfolio).
+ */
 export function AccountSheet({ open, onClose, ...panelProps }: AccountSheetProps) {
   return (
     <AppBottomSheet
@@ -15,12 +18,13 @@ export function AccountSheet({ open, onClose, ...panelProps }: AccountSheetProps
       onClose={onClose}
       ariaLabel="Settings"
       title="Settings"
+      subtitle="Manage appearance and account preferences."
       zIndex={100}
-      panelClassName="max-h-[min(80dvh,28rem)] lg:hidden"
+      panelClassName="wallet-account-sheet__panel max-h-[min(80dvh,32rem)] sm:max-w-md"
       bodyClassName="wallet-account-sheet__body"
       dragEntirePanel={false}
     >
-      <WalletAccountPanel {...panelProps} onClose={onClose} variant="sheet" />
+      <WalletAccountPanel {...panelProps} onClose={onClose} />
     </AppBottomSheet>
   );
 }

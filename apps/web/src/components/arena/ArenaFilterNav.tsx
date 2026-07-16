@@ -22,7 +22,6 @@ type ArenaFilterNavProps = {
   onSelect: (filter: BoardFilter) => void;
   onQuickTradeSettingsOpen?: () => void;
   quickTradeSettingsOpen?: boolean;
-  searchTrailing?: ReactNode;
   trailing?: ReactNode;
 };
 
@@ -92,7 +91,6 @@ export function ArenaFilterNav({
   onSelect,
   onQuickTradeSettingsOpen,
   quickTradeSettingsOpen = false,
-  searchTrailing,
   trailing,
 }: ArenaFilterNavProps) {
   return (
@@ -147,8 +145,19 @@ export function ArenaFilterNav({
               aria-label="Search coins"
             />
           </div>
-          {searchTrailing ? (
-            <div className="arena-filter-bar__search-tools">{searchTrailing}</div>
+          {onQuickTradeSettingsOpen ? (
+            <button
+              type="button"
+              className={`arena-filter-bar__tool-btn${
+                quickTradeSettingsOpen ? " arena-filter-bar__tool-btn--open" : ""
+              }`}
+              onClick={onQuickTradeSettingsOpen}
+              aria-label="Quick trade settings"
+              aria-expanded={quickTradeSettingsOpen}
+              aria-haspopup="dialog"
+            >
+              <PumpIcon icon={faSettings2} className="h-4 w-4" aria-hidden />
+            </button>
           ) : null}
         </div>
 
