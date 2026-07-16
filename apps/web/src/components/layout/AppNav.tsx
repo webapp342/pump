@@ -31,7 +31,7 @@ function BottomNavTradeTab({
       className={`bottom-nav-item${active ? " bottom-nav-item-active" : ""}`}
       onClick={onClick}
     >
-      <PumpIcon icon={icon} className="bottom-nav-icon" />
+      <PumpIcon icon={icon} active={active} size="lg" className="bottom-nav-icon" />
     </TradeNavLink>
   );
 }
@@ -58,7 +58,7 @@ function BottomNavRouteTab({
       className={`bottom-nav-item${active ? " bottom-nav-item-active" : ""}`}
       onClick={onClick}
     >
-      <PumpIcon icon={icon} className="bottom-nav-icon" />
+      <PumpIcon icon={icon} active={active} size="lg" className="bottom-nav-icon" />
     </Link>
   );
 }

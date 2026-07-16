@@ -37,7 +37,7 @@ Persisted page specs: `.cursor/design-system/pages/portfolio.md` (wallet actions
 | Rule | Implementation |
 |------|----------------|
 | Corporate bar | `.cursor/design-system/designs.md` — required for wallet / account / sheet UI |
-| User avatars | Circle only (`UserAvatarForAddress`); portfolio hero **32–36px** |
+| User avatars | Circle only (`UserAvatarForAddress`); portfolio hero **32px** + toolbar glyphs **20px** |
 | Portfolio mobile identity | One label (username or short address) + trailing copy — no second address row |
 | Token / chain logos | Square tile — `TokenAvatar` default `shape="rounded"`, `NativeLogo` |
 | Token symbols in UI | No leading `$` — display `symbol` as stored |
@@ -69,5 +69,5 @@ Persisted page specs: `.cursor/design-system/pages/portfolio.md` (wallet actions
 - Verify library APIs via Context7 — do not guess versions.
 - Match patterns in `apps/web/src/` before new libraries or UI primitives.
 - **No shadcn/MUI** — use `globals.css` classes and `pump-*` tokens.
-- **Icons:** Material Symbols via `PumpIcon` + `@/lib/pump-icons` (not Lucide/Font Awesome).
+- **Icons:** Coinbase CDS Icons via `PumpIcon` + `@/lib/pump-icons` (`active` for filled/selected). Social brands stay in `BrandIcons` (Font Awesome brands).
 - Dev: `npm run dev` (web :3012) · `npm run dev:admin` (:5174). Layout: `docs/repo-structure.md`.

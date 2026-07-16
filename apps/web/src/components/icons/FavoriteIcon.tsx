@@ -1,5 +1,5 @@
 import { PumpIcon } from "@/lib/icons";
-import { faStarRegular, faStarSolid } from "@/lib/pump-icons";
+import { faStarRegular } from "@/lib/pump-icons";
 import type { IconSizeRole } from "@/lib/ui-sizes";
 
 type FavoriteIconProps = {
@@ -10,10 +10,6 @@ type FavoriteIconProps = {
 
 export function FavoriteIcon({ active, className = "", size = "sm" }: FavoriteIconProps) {
   return (
-    <PumpIcon
-      icon={active ? faStarSolid : faStarRegular}
-      size={size}
-      className={className}
-    />
+    <PumpIcon icon={faStarRegular} active={active} size={size} className={className} />
   );
 }

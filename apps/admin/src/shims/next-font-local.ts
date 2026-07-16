@@ -5,10 +5,13 @@ type LocalFontOptions = {
   weight?: string;
 };
 
-/** Vite shim — Next.js localFont is not available in the admin bundle. */
+/**
+ * Vite shim — Next.js localFont is not available in the admin bundle.
+ * CoinbaseIcons @font-face lives in globals.css; class applies that family.
+ */
 export default function localFont(options: LocalFontOptions = {}) {
   return {
-    className: "material-symbols-rounded",
-    variable: options.variable ?? "--font-material-symbols",
+    className: "pump-coinbase-icons",
+    variable: options.variable ?? "--font-coinbase-icons",
   };
 }

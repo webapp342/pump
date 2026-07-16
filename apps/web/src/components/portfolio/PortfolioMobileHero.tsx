@@ -14,17 +14,18 @@ import { copyToClipboard } from "@/lib/copy-to-clipboard";
 import { formatPortfolioHoldingValueUsd, formatUsdSignedTwoDecimals } from "@/lib/format-usd";
 import {
   PumpIcon,
-  faArrowSouthWest,
-  faArrowUpRight,
   faBolt,
   faCheck,
   faCopy,
+  faDeposit,
   faMenu,
   faPlus,
   faShare,
+  faWithdraw,
 } from "@/lib/icons";
 import { portfolioSharePayload } from "@/lib/share-links";
 import { PctChange } from "@/components/ui/PctChange";
+import { USER_AVATAR_SIZE } from "@/lib/ui-sizes";
 
 type PortfolioMobileHeroProps = {
   walletAddress: string;
@@ -175,7 +176,7 @@ export function PortfolioMobileHero({
     onEditProfile: canEditProfile ? onOpenProfileEditor : undefined,
   };
 
-  const avatarSize = 36;
+  const avatarSize = USER_AVATAR_SIZE.lg;
 
   return (
     <>
@@ -273,7 +274,7 @@ export function PortfolioMobileHero({
             >
               <span className="portfolio-mobile-hero__action-icon" aria-hidden>
                 <PumpIcon
-                  icon={faArrowSouthWest}
+                  icon={faDeposit}
                   className="portfolio-mobile-hero__action-glyph"
                   fixedWidth
                 />
@@ -287,7 +288,7 @@ export function PortfolioMobileHero({
             >
               <span className="portfolio-mobile-hero__action-icon" aria-hidden>
                 <PumpIcon
-                  icon={faArrowUpRight}
+                  icon={faWithdraw}
                   className="portfolio-mobile-hero__action-glyph"
                   fixedWidth
                 />

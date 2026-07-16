@@ -2244,6 +2244,23 @@ code,
       padding-left: 0;
       padding-right: 0;
     }
+
+    /*
+     * Hub terminals hide the app header on mobile; 100dvh + overflow:hidden on the shell
+     * can leave content visually under the translucent status bar. In-page sticky chrome
+     * owns the top inset (same pattern as token-mobile-hero).
+     */
+    .app-shell--hub-terminal {
+      padding-top: 0;
+    }
+
+    .arena-page__sticky,
+    .airdrops-page__sticky,
+    .airdrops-page .airdrop-create-page__sticky,
+    .missions-page .missions-header,
+    .portfolio-page .portfolio-mobile-hero {
+      padding-top: var(--hub-mobile-top-inset);
+    }
   }
 
   @supports (height: 100dvh) {
@@ -9522,6 +9539,14 @@ code,
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     animation: toast-in 0.18s ease-out;
+    will-change: transform, opacity;
+    cursor: grab;
+    user-select: none;
+    touch-action: none;
+  }
+
+  .toast-item:active {
+    cursor: grabbing;
   }
 
   .toast-item__body {
@@ -11318,8 +11343,6 @@ code,
   }
 
   .bottom-nav-icon {
-    width: var(--mobile-bottom-nav-icon-size);
-    height: var(--mobile-bottom-nav-icon-size);
     flex-shrink: 0;
     opacity: 0.55;
     color: inherit;
@@ -12727,9 +12750,11 @@ code,
   }
 
   .airdrops-page .airdrop-trust-badge__icon {
-    width: 0.75rem;
-    height: 0.75rem;
+    font-size: var(--icon-size-xs) !important;
+    width: 1em !important;
+    height: 1em !important;
     color: rgb(var(--pump-success));
+    overflow: visible;
   }
 
   .airdrops-page .airdrop-trust-badge__label {
@@ -12801,10 +12826,12 @@ code,
   }
 
   .airdrop-toolbar-stats__icon {
-    width: 0.875rem;
-    height: 0.875rem;
+    font-size: var(--icon-size-xs) !important;
+    width: 1em !important;
+    height: 1em !important;
     flex-shrink: 0;
-    color: rgb(var(--pump-muted));
+    color: rgb(var(--pump-muted) / 0.75);
+    overflow: visible;
   }
 
   .airdrop-toolbar-stats__value {
@@ -12825,9 +12852,11 @@ code,
   }
 
   .airdrops-page .airdrop-trust-badge--compact .airdrop-trust-badge__icon {
-    width: 0.75rem;
-    height: 0.75rem;
+    font-size: var(--icon-size-xs) !important;
+    width: 1em !important;
+    height: 1em !important;
     color: rgb(var(--pump-success));
+    overflow: visible;
   }
 
   .airdrops-page .airdrop-detail-notice {
@@ -14938,29 +14967,39 @@ code,
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 0.5rem;
+    gap: 0.75rem;
     min-width: 0;
+    min-height: 2.25rem;
   }
 
   .portfolio-page .portfolio-mobile-hero__profile {
     display: flex;
     align-items: center;
-    gap: 0.625rem;
+    gap: 0.5rem;
     min-width: 0;
     flex: 1 1 auto;
-    padding-right: 0.5rem;
-    border-right: 1px solid rgb(var(--pump-border) / 0.2);
-    margin-right: 0.125rem;
+    min-height: 2.25rem;
+    padding-right: 0.75rem;
+    border-right: 1px solid rgb(var(--pump-border) / 0.22);
   }
 
   .portfolio-page .portfolio-mobile-hero__avatar-wrap {
     position: relative;
+    display: inline-flex;
     flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
   }
 
   .portfolio-page .portfolio-mobile-hero__avatar-btn {
     position: relative;
     display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
     padding: 0;
     border: none;
     background: transparent;
@@ -14975,11 +15014,12 @@ code,
 
   .portfolio-page .portfolio-mobile-hero__avatar,
   .portfolio-page .portfolio-mobile-hero__avatar img {
-    width: 2.25rem !important;
-    height: 2.25rem !important;
-    min-width: 2.25rem !important;
-    min-height: 2.25rem !important;
+    width: 2rem !important;
+    height: 2rem !important;
+    min-width: 2rem !important;
+    min-height: 2rem !important;
     border-radius: 9999px !important;
+    display: block;
   }
 
   .portfolio-page .portfolio-mobile-hero__avatar-edit {
@@ -15005,8 +15045,8 @@ code,
   }
 
   .portfolio-page .portfolio-mobile-hero__guest-avatar {
-    width: 2.25rem;
-    height: 2.25rem;
+    width: 2rem;
+    height: 2rem;
     border-radius: 9999px;
     border: 1px solid rgb(var(--pump-border) / 0.45);
     background: rgb(var(--pump-card-soft) / 0.65);
@@ -15020,6 +15060,7 @@ code,
     flex-direction: row;
     align-items: center;
     gap: 0.125rem;
+    min-height: 2rem;
   }
 
   .portfolio-page .portfolio-mobile-hero__username {
@@ -15030,14 +15071,17 @@ code,
     text-overflow: ellipsis;
     white-space: nowrap;
     font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
-    font-size: var(--text-body-sm);
-    font-weight: var(--weight-semibold);
-    line-height: 1.2;
+    font-size: var(--type-label1-size);
+    font-weight: var(--type-label1-weight);
+    line-height: 1;
     color: rgb(var(--pump-text));
     text-align: left;
   }
 
   .portfolio-page .portfolio-mobile-hero__username--btn {
+    display: inline-flex;
+    align-items: center;
+    min-height: 2rem;
     padding: 0;
     border: none;
     background: transparent;
@@ -15049,8 +15093,8 @@ code,
     flex-shrink: 0;
     align-items: center;
     justify-content: center;
-    width: 2.25rem;
-    height: 2.25rem;
+    width: 2rem;
+    height: 2rem;
     margin: 0;
     padding: 0;
     border: none;
@@ -15075,8 +15119,9 @@ code,
     display: inline-flex;
     align-items: center;
     justify-content: flex-end;
-    gap: 0;
+    gap: 0.125rem;
     flex-shrink: 0;
+    min-height: 2.25rem;
   }
 
   .portfolio-page .portfolio-mobile-hero__toolbar-btn {
@@ -15101,9 +15146,10 @@ code,
   }
 
   .portfolio-page .portfolio-mobile-hero__toolbar-icon {
-    font-size: 1.125rem !important;
-    width: 1.125rem !important;
-    height: 1.125rem !important;
+    font-size: 1.25rem !important;
+    width: 1.25rem !important;
+    height: 1.25rem !important;
+    line-height: 1;
   }
 
   .portfolio-page .portfolio-mobile-hero__balance-block {
@@ -15597,6 +15643,10 @@ code,
     width: 1em !important;
     height: 1em !important;
     flex-shrink: 0;
+  }
+
+  .portfolio-page .portfolio-toolbar__funding .portfolio-toolbar__action-icon {
+    color: rgb(var(--pump-accent));
   }
 
   .portfolio-page .portfolio-toolbar__stats {
@@ -19176,22 +19226,21 @@ code,
 }
 
 .material-symbols-rounded {
-  font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24;
-  font-feature-settings: "liga";
+  /* Legacy class kept for CSS selectors; glyphs use CoinbaseIcons via .pump-cds-icon */
   line-height: 1;
   display: inline-block;
-  vertical-align: -0.125em;
+  vertical-align: 0;
   user-select: none;
   font-size: var(--icon-size-default);
   width: 1em;
   height: 1em;
-  overflow: hidden;
+  overflow: visible;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
 
 .material-symbols-rounded--filled {
-  font-variation-settings: "FILL" 1, "wght" 400, "GRAD" 0, "opsz" 24;
+  /* no-op — filled state is CDS `active` glyph */
 }
 
 .material-symbols-rounded--fixed {
@@ -19199,10 +19248,82 @@ code,
   text-align: center;
 }
 
-.bottom-nav-icon.material-symbols-rounded {
-  font-size: var(--mobile-bottom-nav-icon-size);
-  width: var(--mobile-bottom-nav-icon-size);
-  height: var(--mobile-bottom-nav-icon-size);
+@font-face {
+  font-family: "CoinbaseIcons";
+  src: url("../fonts/CoinbaseIcons.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: block;
+}
+
+:root {
+  --font-coinbase-icons: "CoinbaseIcons";
+}
+
+.pump-coinbase-icons {
+  font-family: var(--font-coinbase-icons), "CoinbaseIcons", sans-serif;
+}
+
+.pump-cds-icon {
+  font-family: var(--font-coinbase-icons), "CoinbaseIcons", sans-serif;
+  color: currentColor;
+  font-weight: 400;
+  font-style: normal;
+  font-variant: normal;
+  text-rendering: geometricPrecision;
+  line-height: 1;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  vertical-align: 0;
+  user-select: none;
+  text-decoration: none;
+  font-size: var(--icon-size-default);
+  width: 1em;
+  height: 1em;
+  overflow: visible;
+  -webkit-font-smoothing: antialiased;
+}
+
+.pump-cds-icon--fixed {
+  width: 1.25em;
+  text-align: center;
+}
+
+.pump-cds-icon--xs {
+  font-size: var(--icon-size-xs, 0.75rem);
+  width: 1em;
+  height: 1em;
+}
+
+.pump-cds-icon--s {
+  font-size: var(--icon-size-sm, 1rem);
+  width: 1em;
+  height: 1em;
+}
+
+.pump-cds-icon--m {
+  font-size: var(--icon-size-md, 1.25rem);
+  width: 1em;
+  height: 1em;
+}
+
+.pump-cds-icon--l {
+  font-size: var(--icon-size-lg, 1.5rem);
+  width: 1em;
+  height: 1em;
+}
+
+.bottom-nav-icon.material-symbols-rounded,
+.bottom-nav-icon.pump-cds-icon {
+  /* Match hit circle: role size from PumpIcon `size="lg"`; box = 1em for optical center */
+  font-size: var(--mobile-bottom-nav-icon-size) !important;
+  width: 1em !important;
+  height: 1em !important;
+  line-height: 1;
+  vertical-align: 0;
+  overflow: visible;
 }
 
 /* ==========================================================================
@@ -19226,28 +19347,47 @@ code,
   padding: 2.5rem 1.25rem 1.5rem;
 }
 
-.sign-in-modal__close-text {
+.sign-in-modal__back {
   position: absolute;
-  left: 1rem;
+  left: 0.75rem;
   top: 0.75rem;
   z-index: 2;
-  min-height: 2.5rem;
-  padding: 0.375rem 0.25rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  padding: 0;
   border: none;
+  border-radius: var(--radius-md);
   background: transparent;
-  color: rgb(var(--pump-muted));
-  font-size: var(--type-label1-size);
-  font-weight: 500;
+  color: rgb(var(--pump-text));
   cursor: pointer;
-  transition: color 0.15s ease;
+  transition:
+    color 0.15s ease,
+    background 0.15s ease;
 }
 
-.sign-in-modal__close-text:hover {
+.sign-in-modal__back:hover {
+  background: rgb(var(--pump-border) / 0.1);
   color: rgb(var(--pump-text));
 }
 
+.sign-in-modal__back-icon {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.sign-in-modal__back-icon.material-symbols-rounded {
+  font-size: 1.25rem !important;
+  width: 1.25rem !important;
+  height: 1.25rem !important;
+  line-height: 1;
+  font-variation-settings: "FILL" 0, "wght" 500, "GRAD" 0, "opsz" 24;
+}
+
 @media (min-width: 640px) {
-  .sign-in-modal__close-text {
+  .sign-in-modal__back {
     display: none;
   }
 }
@@ -19365,6 +19505,8 @@ code,
     border-radius: 0 !important;
     border: none !important;
     box-shadow: none !important;
+    /* Match hub / token chrome — PWA translucent status bar */
+    padding-top: var(--hub-mobile-top-inset);
   }
 
   .sign-in-modal .app-bottom-sheet__grip-bar {
@@ -19384,9 +19526,9 @@ code,
     padding: 0.5rem 1.5rem 1rem;
   }
 
-  .sign-in-modal__close-text {
+  .sign-in-modal__back {
     top: 0.25rem;
-    left: 1.25rem;
+    left: 0.5rem;
   }
 
   .sign-in-modal__stack {

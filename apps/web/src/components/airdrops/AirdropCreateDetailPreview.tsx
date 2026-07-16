@@ -55,19 +55,19 @@ function PreviewToolbarStats({
   return (
     <div className="airdrop-toolbar-stats" aria-label="Campaign stats">
       <div className="airdrop-toolbar-stats__item" title="Reward pool">
-        <PumpIcon icon={MetricIcons.rewardPool} className="airdrop-toolbar-stats__icon" aria-hidden />
+        <PumpIcon icon={MetricIcons.rewardPool} size="xs" active={false} className="airdrop-toolbar-stats__icon" aria-hidden />
         <span className="airdrop-toolbar-stats__value financial-value tabular-nums">{poolLabel}</span>
       </div>
       {qualifyDurationLabel ? (
         <div className="airdrop-toolbar-stats__item" title="Qualify window">
-          <PumpIcon icon={MetricIcons.progress} className="airdrop-toolbar-stats__icon" aria-hidden />
+          <PumpIcon icon={MetricIcons.progress} size="xs" active={false} className="airdrop-toolbar-stats__icon" aria-hidden />
           <span className="airdrop-toolbar-stats__value financial-value tabular-nums">
             {qualifyDurationLabel.replace(/\s*qualify window$/i, "")}
           </span>
         </div>
       ) : null}
       <div className="airdrop-toolbar-stats__item" title="Participants" aria-label="Participants: 0">
-        <PumpIcon icon={MetricIcons.participants} className="airdrop-toolbar-stats__icon" aria-hidden />
+        <PumpIcon icon={MetricIcons.participants} size="xs" active={false} className="airdrop-toolbar-stats__icon" aria-hidden />
         <span className="airdrop-toolbar-stats__value financial-value tabular-nums">0</span>
       </div>
     </div>

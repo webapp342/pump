@@ -2,7 +2,7 @@ import { IBM_Plex_Sans } from "next/font/google";
 import { GeistMono } from "geist/font/mono";
 import { GeistSans } from "geist/font/sans";
 
-export { materialSymbols } from "@/lib/material-symbols-font";
+export { coinbaseIcons } from "@/lib/coinbase-icons-font";
 
 /** Corporate UI — Geist Sans (Swiss neo-grotesque, Vercel). */
 export const geistSans = GeistSans;

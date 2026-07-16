@@ -168,7 +168,7 @@ export function PushNotificationsPanel({
       <div className={`wallet-account-panel__push ${className}`.trim()}>
         <label className="wallet-account-panel__nav-row wallet-account-panel__nav-row--static">
           <span className="wallet-account-panel__nav-label">
-            <PumpIcon icon={faBell} className="wallet-account-panel__nav-icon" aria-hidden />
+            <PumpIcon icon={faBell} active={enabledOnThisDevice} className="wallet-account-panel__nav-icon" aria-hidden />
             Push notifications
           </span>
           <span className="wallet-account-panel__switch">
@@ -240,7 +240,7 @@ export function PushNotificationsPanel({
         <div className="wallet-account-panel__push-copy min-w-0 flex-1">
           <div className="wallet-account-panel__push-title">
             <span className="wallet-account-panel__nav-label">
-              <PumpIcon icon={faBell} className="wallet-account-panel__nav-icon" aria-hidden />
+              <PumpIcon icon={faBell} active={enabledOnThisDevice} className="wallet-account-panel__nav-icon" aria-hidden />
               Push notifications
             </span>
           </div>

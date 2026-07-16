@@ -53,7 +53,7 @@ Two Coinbase CDS themes via `data-theme` on `<html>`: `light`, `dark`. CSS vars 
 
 ## Icons & loading
 
-- Icons: `PumpIcon` + `@/lib/pump-icons` (Material Symbols Rounded)
+- Icons: `PumpIcon` + `@/lib/pump-icons` (Coinbase CDS Icons; use `active` for selected/filled). Social OAuth marks: `BrandIcons`.
 - Section icons: `IconLabel`, `MetricIcons` in `src/lib/metric-icons.ts`
 - Skeletons: `Skeleton` + route `loading.tsx` with `AppShell`
 
@@ -72,7 +72,7 @@ Two Coinbase CDS themes via `data-theme` on `<html>`: `light`, `dark`. CSS vars 
 - **Portfolio mobile hero** (`PortfolioMobileHero`, `< md`):
   - Balance + PnL centered; quick actions = **3 inline pills** (icon + label row)
   - Labels: `--text-caption` **sentence case** (not section-label uppercase)
-  - Icons: `south_west` deposit, `north_east` withdraw — see `.cursor/design-system/pages/portfolio.md`
+  - Icons: `deposit` / `withdraw` CDS names — see `.cursor/design-system/pages/portfolio.md`
 - **Portfolio desktop hero** (`PortfolioHero`, `≥ md`):
   - Own wallet: **Deposit + Withdraw** in toolbar aside; others: Share
 - **Portfolio Earnings tab** (`PortfolioFeesTab`, tab id `fees`):

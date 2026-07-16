@@ -23,7 +23,7 @@ import {
   faZap,
 } from "@/lib/pump-icons";
 
-/** Material Symbols for metrics, sections, and table headers. */
+/** CDS Icons for metrics, sections, and table headers. */
 export const MetricIcons = {
   mcap: faCircleDollarSign,
   vol24h: faActivity,

@@ -25,9 +25,9 @@ export function ThemePicker({ className, showLabel = false }: ThemePickerProps) 
       {showLabel ? (
         <span className="wallet-account-panel__appearance-value">{isDark ? "Dark" : "Light"}</span>
       ) : isDark ? (
-        <PumpIcon icon={faSun} className="app-header-utility-btn__glyph" />
+        <PumpIcon icon={faSun} active className="app-header-utility-btn__glyph" />
       ) : (
-        <PumpIcon icon={faMoon} className="app-header-utility-btn__glyph" />
+        <PumpIcon icon={faMoon} active className="app-header-utility-btn__glyph" />
       )}
     </button>
   );

@@ -3,7 +3,7 @@ import { RootProviders } from "@/components/layout/RootProviders";
 import { PwaProvider } from "@/components/pwa/PwaProvider";
 import { TelegramMiniAppBootstrap } from "@/components/telegram/TelegramMiniAppBootstrap";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
-import { geistMono, geistSans, brandWordmark } from "@/lib/fonts";
+import { geistMono, geistSans, brandWordmark, coinbaseIcons } from "@/lib/fonts";
 import "@/lib/fontawesome-config";
 import "./typography-theme.css";
 import "./size-theme.css";
@@ -78,7 +78,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       data-type-theme="coinbase-cds"
       data-size-theme="pump-cds"
       suppressHydrationWarning
-      className={`${geistSans.variable} ${geistMono.variable} ${brandWordmark.variable}`}
+      className={`${geistSans.variable} ${geistMono.variable} ${brandWordmark.variable} ${coinbaseIcons.variable}`}
     >
       <body className={geistSans.className}>
         <PwaProvider>

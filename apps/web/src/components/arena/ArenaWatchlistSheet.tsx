@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useAccount } from "wagmi";
 import type { TokenListItem } from "@/lib/db/launchpad";
 import { ToolbarSheet } from "@/components/ui/ToolbarSheet";
-import { PumpIcon, faStarSolid } from "@/lib/icons";
+import { PumpIcon, faStarRegular } from "@/lib/icons";
 import { WatchlistContent, useWatchlistTokens } from "@/components/arena/WatchlistContent";
 import { useFavorites } from "@/components/favorites/FavoritesProvider";
 
@@ -60,7 +60,7 @@ export function ArenaWatchlistSheet({
       ariaLabel="Watchlist"
       title="Watchlist"
       count={watchlistCount}
-      icon={<PumpIcon icon={faStarSolid} className="h-4 w-4 text-pump-accent" />}
+      icon={<PumpIcon icon={faStarRegular} active className="h-4 w-4 text-pump-accent" />}
     >
       <WatchlistContent
         tokens={tokens}

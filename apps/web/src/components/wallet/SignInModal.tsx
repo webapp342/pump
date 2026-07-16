@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { AppBottomSheet } from "@/components/ui/AppBottomSheet";
 import { CyclopsLogo } from "@/components/brand/CyclopsLogo";
 import { SignInProviders } from "@/components/wallet/SignInProviders";
+import { PumpIcon, faArrowLeft } from "@/lib/icons";
 
 type SignInModalProps = {
   open: boolean;
@@ -40,8 +41,13 @@ export function SignInModal({ open, onClose, onSuccess }: SignInModalProps) {
       }
     >
       <div className="sign-in-modal__layout">
-        <button type="button" onClick={onClose} className="sign-in-modal__close-text">
-          Close
+        <button
+          type="button"
+          onClick={onClose}
+          className="sign-in-modal__back"
+          aria-label="Back"
+        >
+          <PumpIcon icon={faArrowLeft} className="sign-in-modal__back-icon" aria-hidden />
         </button>
 
         <div className="sign-in-modal__stack">

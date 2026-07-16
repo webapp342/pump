@@ -2,7 +2,7 @@
 
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { PumpIcon, faChevronLeft, faChevronRight, faStarSolid } from "@/lib/icons";
+import { PumpIcon, faChevronLeft, faChevronRight, faStarRegular } from "@/lib/icons";
 import type { BoardFilter } from "@/lib/arena-filters";
 import { SIDEBAR_FILTER_ITEMS } from "@/lib/arena-explore-board-core";
 
@@ -102,7 +102,8 @@ export function TokenMarketSidebarFilterStrip({
               >
                 {isFavorites ? (
                   <PumpIcon
-                    icon={faStarSolid}
+                    icon={faStarRegular}
+                    active={isActive}
                     className={`h-3 w-3 ${isActive ? "text-pump-accent" : ""}`}
                   />
                 ) : (

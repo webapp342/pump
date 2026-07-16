@@ -81,7 +81,7 @@ export const ICON_SIZE = {
 
 export type IconSizeRole = keyof typeof ICON_SIZE;
 
-/** CSS utility class for PumpIcon / material-symbols. */
+/** CSS utility class for PumpIcon / CDS icon sizes. */
 export function iconSizeClass(role: IconSizeRole = "md"): `icon-${IconSizeRole}` {
   return `icon-${role}`;
 }

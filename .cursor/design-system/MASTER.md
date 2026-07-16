@@ -34,8 +34,8 @@ Source of truth when **ui-ux-pro-max** search conflicts with Pump. Always read *
 | Circle crop on token/chain logos | **`TokenAvatar` default `rounded` (square tile)**; **user avatars only = circle** |
 | Ad-hoc avatar/logo/icon px (14/18/22…) | **`size-theme.css` + `@/lib/ui-sizes` roles only** |
 | Skill color palette (#F59E0B, purple accent, etc.) | `pump-accent`, `pump-card-soft`, `pump-border` |
-| Phosphor / Lucide icons | `PumpIcon` + Material Symbols (`@/lib/pump-icons`) |
-| Icon sizing via `width/height` only on `.material-symbols-rounded` | Set **`font-size` + `1em`** — else glyphs clip |
+| Phosphor / Lucide icons | `PumpIcon` + Coinbase CDS Icons (`@/lib/pump-icons`) |
+| Icon sizing via `width/height` only on `.pump-cds-icon` | Set **`font-size` + `1em`** — else glyphs clip |
 
 ## Agent defaults (no user repeat needed)
 
@@ -55,11 +55,11 @@ On **every UI/UX task** in this repo — without the user asking again:
 - Trading/portfolio surfaces: prefer **`--density 7–9`**, **`--motion 3`** (subtle).
 - Motion: 100–150ms; respect `prefers-reduced-motion`.
 
-## Icons (Material Symbols)
+## Icons (Coinbase CDS)
 
 ```css
 /* Correct small icon — font-size drives glyph box */
-.pump-icon-sm.material-symbols-rounded {
+.pump-icon-sm.pump-cds-icon {
   font-size: 0.875rem !important;
   width: 1em !important;
   height: 1em !important;
@@ -67,7 +67,7 @@ On **every UI/UX task** in this repo — without the user asking again:
 }
 ```
 
-Never set `width/height` in px on Material Symbols without matching `font-size`.
+Never set `width/height` in px on CDS icons without matching `font-size`. Use `PumpIcon` `active` for filled/selected (nav, favorites, bookmarks). Social brands: `BrandIcons`.
 
 ## When to use 21st.dev
 

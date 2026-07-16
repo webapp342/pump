@@ -8,7 +8,7 @@ Overrides `MASTER.md` for `/portfolio` only.
 
 | Element | Spec |
 |---------|------|
-| Avatar | Circle **32–36px** (not ~22px) |
+| Avatar | Circle **32px** (`USER_AVATAR_SIZE.lg`) — vertically centered with username + toolbar |
 | Primary label | Username (`@name`) **or** short address — never both stacked |
 | Copy | Trailing icon button ≥44×44, right of label |
 | Forbidden | Second line with address + second copy icon |
@@ -25,15 +25,15 @@ See `.cursor/design-system/designs.md` (permanent corporate bar).
 | Layout | 3 separate pills, **icon + label inline** (row), gap 0.5rem |
 | Height | `min-height: 2.75rem` (~44px touch) |
 | Labels | **`--text-caption` sentence case** — NOT `--text-label` uppercase |
-| Icons | Deposit `south_west` · Withdraw `north_east` · Create `add` — inline left of label |
+| Icons | Deposit `deposit` · Withdraw `withdraw` · Create `add` — inline left of label |
 
 **Typography note:** `--text-label` uppercase is for **section headers / metric captions**, not wallet CTA buttons (Coinbase/Robinhood use sentence case on actions).
 
 **Deposit** → `openDeposit()` · **Withdraw** → `openWithdraw()` · **Create** → mobile bottom sheet (`CreateChoiceSheet`: Token `/create` · Airdrop `/airdrops/create`).
 
-Icon semantics (Material Symbols, matches WalletAccountPanel copy):
-- **Deposit** = funds in (`south_west`) — same modal as legacy “Receive”
-- **Withdraw** = funds out (`north_east`) — same as legacy “Send”
+Icon semantics (CDS Icons, matches WalletAccountPanel copy):
+- **Deposit** = `deposit` — same modal as legacy “Receive”
+- **Withdraw** = `withdraw` — same as legacy “Send”
 
 ## Desktop hero toolbar
 
@@ -41,7 +41,7 @@ Icon semantics (Material Symbols, matches WalletAccountPanel copy):
 |------|--------|
 | Own portfolio | **Deposit** + **Withdraw** (not Share) |
 | Other user's portfolio | **Share** only |
-| Copy address icon | `font-size` on Material Symbol, not px box clipping |
+| Copy address icon | `font-size` on CDS icon glyph, not px box clipping |
 
 **Implementation:** `PortfolioHero.tsx` + `.portfolio-toolbar__funding`.
 

@@ -7,12 +7,12 @@ import { shortAddress } from "@/config/chain";
 import { copyToClipboard } from "@/lib/copy-to-clipboard";
 import {
   PumpIcon,
-  faArrowSouthWest,
-  faArrowUpRight,
   faCheck,
   faCopy,
+  faDeposit,
   faPen,
   faShare,
+  faWithdraw,
 } from "@/lib/icons";
 import { portfolioSharePayload } from "@/lib/share-links";
 import { UserAvatarForAddress } from "@/components/user/UserAvatarForAddress";
@@ -251,7 +251,7 @@ export function PortfolioHero({
                       onClick={() => openDeposit()}
                       className="portfolio-toolbar__share-btn"
                     >
-                      <PumpIcon icon={faArrowSouthWest} className="portfolio-toolbar__action-icon" fixedWidth />
+                      <PumpIcon icon={faDeposit} className="portfolio-toolbar__action-icon" fixedWidth />
                       <span>Deposit</span>
                     </button>
                     <button
@@ -259,7 +259,7 @@ export function PortfolioHero({
                       onClick={() => openWithdraw()}
                       className="portfolio-toolbar__share-btn"
                     >
-                      <PumpIcon icon={faArrowUpRight} className="portfolio-toolbar__action-icon" fixedWidth />
+                      <PumpIcon icon={faWithdraw} className="portfolio-toolbar__action-icon" fixedWidth />
                       <span>Withdraw</span>
                     </button>
                   </div>

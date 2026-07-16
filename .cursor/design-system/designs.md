@@ -36,14 +36,15 @@ Same chrome: no `panel-surface` field cards. Form rows use full-bleed bottom div
 ## Portfolio mobile identity
 
 ```
-[ Avatar 36 ][ Username OR 0x… ][Copy]     |     [ Missions ][ Share ][ Menu ]
+[ Avatar 32 ][ Username OR 0x… ][Copy]     |     [ Missions ][ Share ][ Menu ]
 ```
 
 - Copy is **adjacent** to the label (`inline-flex`, no `flex-grow` on the name) — never spanning the gap to the toolbar
 - Soft divider between identity cluster and toolbar
 - All trailing toolbar icons same box size (36px) and vertically centered with avatar
+- Toolbar **glyphs 20px** — optical weight matches 32px avatar (not 24px chunky icons)
 - Copy sits with **identity**, not mixed into toolbar as a 4th sibling without separation
-
+- Entire top row: `align-items: center`, shared `min-height: 36px`
 ---
 
 ## Non-negotiable principles
@@ -62,7 +63,7 @@ Same chrome: no `panel-surface` field cards. Form rows use full-bleed bottom div
 
 | Surface | Corporate pattern (Coinbase Wallet / Robinhood / CDS) | Pump rule |
 |--------|------------------------------------------------------|-----------|
-| Portfolio top identity | Avatar + **one** name/address line; copy is a **trailing icon**, not a second text row | Avatar 32–36px circle · one truncated primary label · copy ≥44×44 on the **right of the identity cluster** |
+| Portfolio top identity | Avatar + **one** name/address line; copy is a **trailing icon**, not a second text row | Avatar **32px** circle · toolbar glyphs **20px** in 36px hit · one truncated primary label · copy with identity |
 | Address exposure | Address lives on Portfolio identity / Deposit — not inside Settings | Settings has **no** address row |
 | Balance block | Label → large amount → tiny secondary equiv · unit toggle on the **same row as amount** | Portfolio hero only; not in Settings |
 | Quick fund actions | Equal split Deposit / Withdraw, sentence case, equal height | Portfolio hero 3-col / desktop dropdown only |
@@ -76,14 +77,14 @@ Same chrome: no `panel-surface` field cards. Form rows use full-bleed bottom div
 **Layout (left → right):**
 
 ```
-[ Avatar 32–36 ]  [ Username OR short address ]     [ Copy ]  [ ··· toolbar ]
+[ Avatar 32px ]  [ Username OR short address ][ Copy ]     |     [ ··· toolbar ]
 ```
 
 | Do | Don't |
 |----|--------|
 | One primary line only (username if set, else short address) | Username **and** second address+copy line under it |
-| Avatar large enough to read (32–36px), circular | Tiny ~20–22px avatar that looks like a favicon |
-| Copy icon only as trailing control | Duplicate address text next to copy |
+| Avatar **32px**, toolbar glyphs **20px**, shared vertical center | Tiny 24px avatar + oversized 24px toolbar glyphs |
+| Copy icon only as trailing control on identity | Duplicate address text next to copy |
 | Prefer truncated `@username` when not address-like | Force full 0x in the title line when username exists |
 
 **Balance** stays **centered** below (portfolio net equity) — that is the hero number, not the identity block.

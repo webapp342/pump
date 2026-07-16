@@ -14,7 +14,7 @@ export function AirdropTrustBadge({ className = "", compact = false }: AirdropTr
       title="Reward pool is locked on-chain until distribution"
       aria-label="Locked reward pool"
     >
-      <PumpIcon icon={faLock} className="airdrop-trust-badge__icon shrink-0" aria-hidden />
+      <PumpIcon icon={faLock} size="xs" active={false} className="airdrop-trust-badge__icon shrink-0" aria-hidden />
       {compact ? null : <span className="airdrop-trust-badge__label">Locked pool</span>}
     </span>
   );

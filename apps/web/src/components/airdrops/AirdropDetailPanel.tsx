@@ -150,12 +150,12 @@ function AirdropToolbarStats({
   return (
     <div className="airdrop-toolbar-stats" role="list" aria-label="Campaign stats">
       <div className="airdrop-toolbar-stats__item" role="listitem" title="Reward pool">
-        <PumpIcon icon={MetricIcons.rewardPool} className="airdrop-toolbar-stats__icon" aria-hidden />
+        <PumpIcon icon={MetricIcons.rewardPool} size="xs" active={false} className="airdrop-toolbar-stats__icon" aria-hidden />
         <span className="airdrop-toolbar-stats__value financial-value tabular-nums">{poolLabel}</span>
       </div>
       {showTime ? (
         <div className="airdrop-toolbar-stats__item" role="listitem" title="Time remaining">
-          <PumpIcon icon={MetricIcons.progress} className="airdrop-toolbar-stats__icon" aria-hidden />
+          <PumpIcon icon={MetricIcons.progress} size="xs" active={false} className="airdrop-toolbar-stats__icon" aria-hidden />
           <span className="airdrop-toolbar-stats__value financial-value tabular-nums">{timeLabel}</span>
         </div>
       ) : null}
@@ -165,7 +165,7 @@ function AirdropToolbarStats({
         title="Participants"
         aria-label={`Participants: ${participantCount.toLocaleString()}`}
       >
-        <PumpIcon icon={MetricIcons.participants} className="airdrop-toolbar-stats__icon" aria-hidden />
+        <PumpIcon icon={MetricIcons.participants} size="xs" active={false} className="airdrop-toolbar-stats__icon" aria-hidden />
         <span className="airdrop-toolbar-stats__value financial-value tabular-nums">
           {participantCount.toLocaleString()}
         </span>

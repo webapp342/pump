@@ -9,7 +9,7 @@ import { useFavorites } from "@/components/favorites/FavoritesProvider";
 import { bnbToUsd } from "@/lib/format-usd";
 import { PctChange } from "@/components/ui/PctChange";
 import { formatCapForBoard } from "@/lib/arena-board-format";
-import { PumpIcon, faStarSolid } from "@/lib/icons";
+import { PumpIcon, faStarRegular } from "@/lib/icons";
 
 type FlashTone = "up" | "down";
 
@@ -94,7 +94,7 @@ export function WatchlistContent({
                 className="toolbar-sheet-row__action text-pump-accent"
                 aria-label="Remove from watchlist"
               >
-                <PumpIcon icon={faStarSolid} className="h-3.5 w-3.5" />
+                <PumpIcon icon={faStarRegular} active className="h-3.5 w-3.5" />
               </button>
               <Link href={`/token/${token.address}`} className="toolbar-sheet-row__main">
                 <TokenAvatar

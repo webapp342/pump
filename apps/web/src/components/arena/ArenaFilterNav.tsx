@@ -2,7 +2,7 @@
 
 import type { ReactNode, RefObject } from "react";
 import { FieldSearchInput } from "@/components/ui/FieldSearchInput";
-import { PumpIcon, faSettings2, faStarSolid } from "@/lib/icons";
+import { PumpIcon, faSettings2, faStarRegular } from "@/lib/icons";
 import type { BoardFilter } from "@/lib/arena-filters";
 
 export const ARENA_FILTER_TABS: { key: BoardFilter; label: string; mobileLabel?: string }[] = [
@@ -51,7 +51,8 @@ function ArenaFilterTabs({
           }
         >
           <PumpIcon
-            icon={faStarSolid}
+            icon={faStarRegular}
+            active={favoritesActive}
             className={`h-3.5 w-3.5 ${favoritesActive ? "text-pump-accent" : "text-pump-muted"}`}
           />
         </button>

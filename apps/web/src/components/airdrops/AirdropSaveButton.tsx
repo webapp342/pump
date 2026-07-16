@@ -1,7 +1,7 @@
 "use client";
 
 import { useAirdropSaves } from "@/components/airdrops/AirdropSavesProvider";
-import { PumpIcon, faBookmarkRegular, faBookmarkSolid } from "@/lib/icons";
+import { PumpIcon, faBookmarkRegular } from "@/lib/icons";
 
 export function AirdropSaveButton({
   airdropId,
@@ -26,7 +26,7 @@ export function AirdropSaveButton({
       }${className ? ` ${className}` : ""}`}
       aria-label={saved ? "Remove from saved" : "Save campaign"}
     >
-      <PumpIcon icon={saved ? faBookmarkSolid : faBookmarkRegular} className="h-3.5 w-3.5" />
+      <PumpIcon icon={faBookmarkRegular} active={saved} className="h-3.5 w-3.5" />
     </button>
   );
 }

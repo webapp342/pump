@@ -17,7 +17,7 @@ import {
 import { useAirdropSaves } from "@/components/airdrops/AirdropSavesProvider";
 import { ToolbarSheet } from "@/components/ui/ToolbarSheet";
 import { TokenAvatar } from "@/components/token/TokenAvatar";
-import { PumpIcon, faBookmarkSolid } from "@/lib/icons";
+import { PumpIcon, faBookmarkRegular } from "@/lib/icons";
 import { shortAddress } from "@/config/chain";
 import { formatUsdReadable } from "@/lib/format-usd";
 
@@ -61,7 +61,7 @@ function SavedAirdropRow({
           className="toolbar-sheet-row__action text-pump-accent"
           aria-label="Remove from saved"
         >
-          <PumpIcon icon={faBookmarkSolid} className="h-3.5 w-3.5" />
+          <PumpIcon icon={faBookmarkRegular} active className="h-3.5 w-3.5" />
         </button>
         <Link href={`/airdrops/${item.id}`} className="toolbar-sheet-row__main">
           <TokenAvatar
@@ -118,7 +118,7 @@ export function AirdropsSavedSheet({ items, bnbUsd }: AirdropsSavedSheetProps) {
         className="arena-watchlist-btn toolbar-btn shrink-0 md:hidden"
         aria-label={ariaLabel}
       >
-        <PumpIcon icon={faBookmarkSolid} className="h-3.5 w-3.5 shrink-0 text-pump-accent" />
+        <PumpIcon icon={faBookmarkRegular} active className="h-3.5 w-3.5 shrink-0 text-pump-accent" />
         <span className="arena-watchlist-btn__label text-caption">Saved</span>
         {savedItems.length > 0 ? (
           <span className="arena-watchlist-btn__count financial-value text-caption text-pump-muted">
@@ -133,7 +133,7 @@ export function AirdropsSavedSheet({ items, bnbUsd }: AirdropsSavedSheetProps) {
         ariaLabel="Saved campaigns"
         title="Saved"
         count={savedItems.length}
-        icon={<PumpIcon icon={faBookmarkSolid} className="h-4 w-4 text-pump-accent" />}
+        icon={<PumpIcon icon={faBookmarkRegular} active className="h-4 w-4 text-pump-accent" />}
       >
         {!isConnected ? (
           <div className="empty-state px-3 py-6">

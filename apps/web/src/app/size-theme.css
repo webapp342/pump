@@ -10,7 +10,7 @@ html[data-theme="dark"],
 html[data-size-theme="pump-cds"] {
   --size-theme-id: pump-cds;
 
-  /* ── Icon glyphs (Material Symbols / PumpIcon) ── */
+  /* ── Icon glyphs (Coinbase CDS / PumpIcon) ── */
   --icon-size-xs: 0.75rem; /* 12 */
   --icon-size-sm: 1rem; /* 16 */
   --icon-size-md: 1.25rem; /* 20 — default UI icon */
@@ -83,8 +83,13 @@ html[data-size-theme="pump-cds"] {
 .material-symbols-rounded.icon-sm,
 .material-symbols-rounded.icon-md,
 .material-symbols-rounded.icon-lg,
-.material-symbols-rounded.icon-xl {
-  font-size: inherit;
+.material-symbols-rounded.icon-xl,
+.pump-cds-icon.icon-xs,
+.pump-cds-icon.icon-sm,
+.pump-cds-icon.icon-md,
+.pump-cds-icon.icon-lg,
+.pump-cds-icon.icon-xl {
+  /* Role `.icon-*` owns font-size; keep 1em box so glyphs don't clip */
   width: 1em;
   height: 1em;
 }

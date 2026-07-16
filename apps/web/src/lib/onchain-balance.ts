@@ -1,7 +1,10 @@
 /** Minimum ERC20 balance treated as a non-zero holding. */
 export const ON_CHAIN_BALANCE_EPSILON = 1e-6;
 
-/** Prefer on-chain balance when verified; hide ghost indexer rows when on-chain is zero. */
+/**
+ * Prefer on-chain balance when verified; hide ghost indexer rows when on-chain is zero.
+ * (After a full sell, RPC is authoritative — do not keep showing stale indexed balance.)
+ */
 export function resolveVerifiedTokenBalance(
   indexedBalance: number,
   onChainBalance: number | null | undefined
@@ -17,14 +20,6 @@ export function resolveVerifiedTokenBalance(
   }
 
   if (onChainBalance <= ON_CHAIN_BALANCE_EPSILON) {
-    if (indexedBalance > ON_CHAIN_BALANCE_EPSILON) {
-      return {
-        displayBalance: indexedBalance,
-        hidden: false,
-        verified: false,
-        pending: true,
-      };
-    }
     return { displayBalance: 0, hidden: true, verified: true, pending: false };
   }
 

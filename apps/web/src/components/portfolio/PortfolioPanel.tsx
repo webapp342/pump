@@ -1401,6 +1401,10 @@ export function PortfolioPanel({
             setQuickTradeTarget(null);
           }}
           onConfirmed={() => {
+            if (quickTradeTarget.side === "sell") {
+              const key = quickTradeTarget.tokenAddress.toLowerCase();
+              setOnChainBalances((prev) => ({ ...prev, [key]: "0" }));
+            }
             if (address) void loadPortfolio(walletAddress);
           }}
         />
@@ -1422,6 +1426,10 @@ export function PortfolioPanel({
               : { buyMax: true }),
           }}
           onTradeConfirmed={() => {
+            if (fundingBlockedTradeTarget.side === "sell") {
+              const key = fundingBlockedTradeTarget.tokenAddress.toLowerCase();
+              setOnChainBalances((prev) => ({ ...prev, [key]: "0" }));
+            }
             setFundingBlockedTradeTarget(null);
             if (address) void loadPortfolio(walletAddress);
             window.dispatchEvent(new Event("pump:activity"));

@@ -89,7 +89,7 @@ Semantic aliases (`--text-body`, `--text-nav`, …) map to these roles. Tailwind
 | Token/chain logo | xs16 → row52 | `sm` (20) |
 | Icon | xs12 → xl28 | `md` (20) |
 
-Use `size="xl"` / `PumpIcon size="sm"` — never invent 14/18px. Portfolio identity = `xl` (36).
+Use `size="xl"` / `PumpIcon size="sm"` — never invent 14/18px. Portfolio identity = `lg` (32). Icons: Coinbase CDS via `PumpIcon` + `active` for selected states; social via `BrandIcons`.
 
 ## Spacing (4px grid)
 
