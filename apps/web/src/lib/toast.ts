@@ -75,6 +75,8 @@ function enforceSuccessLimit() {
 }
 
 function commitToast(item: ToastItem, eventType: "push" | "update") {
+  // Re-insert so updated toasts rise to the newest end of the map (display stack).
+  if (store.has(item.id)) store.delete(item.id);
   store.set(item.id, item);
   if (item.tone === "success") enforceSuccessLimit();
   if (eventType === "push") {
@@ -83,6 +85,47 @@ function commitToast(item: ToastItem, eventType: "push" | "update") {
     emit({ type: "update", id: item.id, item });
   }
   scheduleAutoDismiss(item);
+}
+
+function findMatchingToastId(
+  tone: ToastTone,
+  title: string,
+  description?: string
+): string | undefined {
+  for (const item of store.values()) {
+    if (item.tone === tone && item.title === title && item.description === description) {
+      return item.id;
+    }
+  }
+  return undefined;
+}
+
+function normalizeToastItem(
+  tone: ToastTone,
+  title: string,
+  description?: string,
+  options?: {
+    id?: string;
+    durationMs?: number;
+    persistent?: boolean;
+    action?: ToastAction;
+  }
+): ToastItem {
+  const durationMs = options?.durationMs ?? DEFAULT_DURATION_MS[tone];
+  const dedupedId =
+    options?.id ??
+    (tone === "error" || tone === "info"
+      ? findMatchingToastId(tone, title, description)
+      : undefined);
+  return {
+    id: dedupedId ?? createToastId(),
+    tone,
+    title,
+    description,
+    durationMs,
+    persistent: options?.persistent ?? tone === "loading",
+    action: options?.action,
+  };
 }
 
 function dismissToast(id: string) {
@@ -106,29 +149,6 @@ function mergeToast(id: string, patch: Partial<Omit<ToastItem, "id">>): ToastIte
     durationMs: patch.durationMs ?? DEFAULT_DURATION_MS[tone],
     persistent: patch.persistent ?? tone === "loading",
     action: patch.action,
-  };
-}
-
-function normalizeToastItem(
-  tone: ToastTone,
-  title: string,
-  description?: string,
-  options?: {
-    id?: string;
-    durationMs?: number;
-    persistent?: boolean;
-    action?: ToastAction;
-  }
-): ToastItem {
-  const durationMs = options?.durationMs ?? DEFAULT_DURATION_MS[tone];
-  return {
-    id: options?.id ?? createToastId(),
-    tone,
-    title,
-    description,
-    durationMs,
-    persistent: options?.persistent ?? tone === "loading",
-    action: options?.action,
   };
 }
 

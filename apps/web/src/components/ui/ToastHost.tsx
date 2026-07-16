@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { getActiveToasts, subscribeToasts, toast, type ToastItem } from "@/lib/toast";
 
-const MAX_VISIBLE = 4;
+const MAX_VISIBLE = 3;
 const TRADE_ACTIVITY_ID = "trade-activity";
 
 function toastPriority(item: ToastItem): number {
@@ -13,8 +13,15 @@ function toastPriority(item: ToastItem): number {
   return 40;
 }
 
+/** Newest first within the same priority — clean vertical stack (Sonner-style). */
 function sortForDisplay(items: ToastItem[]): ToastItem[] {
-  return [...items].sort((a, b) => toastPriority(b) - toastPriority(a)).slice(0, MAX_VISIBLE);
+  const newestFirst = [...items].reverse();
+  return newestFirst
+    .sort((a, b) => {
+      const delta = toastPriority(b) - toastPriority(a);
+      return delta !== 0 ? delta : 0;
+    })
+    .slice(0, MAX_VISIBLE);
 }
 
 export function ToastHost() {
@@ -46,11 +53,12 @@ export function ToastHost() {
       aria-live="polite"
       aria-label="Notifications"
     >
-      {items.map((item) => (
+      {items.map((item, index) => (
         <div
           key={item.id}
           className={`toast-item toast-item--${item.tone}`}
           role="status"
+          style={{ zIndex: items.length - index }}
         >
           <div className="toast-item__body">
             {item.tone === "loading" ? (

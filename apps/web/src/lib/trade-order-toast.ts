@@ -1,5 +1,4 @@
 import type { Hash } from "viem";
-import { explorerTxUrl } from "@/config/chain";
 import { getActiveToasts, toast } from "@/lib/toast";
 import { playTradeSound } from "@/lib/trade-sounds";
 
@@ -27,10 +26,6 @@ let clearOrdersTimer: ReturnType<typeof setTimeout> | null = null;
 
 function actionLabel(side: "buy" | "sell", symbol: string): string {
   return side === "buy" ? `Buy ${symbol}` : `Sell ${symbol}`;
-}
-
-function phaseVerb(phase: OrderPhase): string {
-  return phase === "submitting" ? "submitting" : "confirming";
 }
 
 function purgeLegacyTradeToasts(): void {
@@ -67,21 +62,6 @@ function buildSuccessTitle(confirmed: OrderRecord[]): string {
   return `${parts.join(" · ")} confirmed`;
 }
 
-function showLoadingToast(
-  title: string,
-  description: string,
-  txHash?: string
-): void {
-  toast.update(TRADE_ACTIVITY_ID, {
-    tone: "loading",
-    title,
-    description,
-    persistent: true,
-    durationMs: 0,
-    action: txHash ? { label: "View tx", href: explorerTxUrl(txHash) } : undefined,
-  });
-}
-
 function renderTradeActivityToast(options?: {
   playSuccessSound?: boolean;
   lastSide?: "buy" | "sell";
@@ -93,25 +73,9 @@ function renderTradeActivityToast(options?: {
   const confirmed = all.filter((o) => o.phase === "confirmed");
   const failed = all.filter((o) => o.phase === "failed");
 
+  // Web2 feel: stay silent while orders settle — only terminal success/error toasts.
   if (inFlight.length > 0) {
-    const lead = inFlight[0]!;
-    const title =
-      inFlight.length === 1
-        ? `${actionLabel(lead.side, lead.symbol)} · ${phaseVerb(lead.phase)}`
-        : `${inFlight.length} orders · confirming`;
-
-    const settled = confirmed.length;
-    let description =
-      settled > 0
-        ? `${settled} settled · ${inFlight.length} in progress`
-        : "Settling on-chain in the background.";
-
-    if (failed.length > 0) {
-      description = `${failed.length} failed · ${description}`;
-    }
-
-    const latestTx = [...inFlight].reverse().find((o) => o.txHash)?.txHash;
-    showLoadingToast(title, description, latestTx);
+    toast.dismiss(TRADE_ACTIVITY_ID);
     return;
   }
 
@@ -123,19 +87,27 @@ function renderTradeActivityToast(options?: {
     if (options?.playSuccessSound && options.lastSide) {
       playTradeSound(options.lastSide === "buy" ? "buy_confirmed" : "sell_confirmed");
     }
-    scheduleClearOrders(all.map((o) => o.pendingId), SUCCESS_MS + 150);
+    scheduleClearOrders(
+      all.map((o) => o.pendingId),
+      SUCCESS_MS + 150
+    );
     return;
   }
 
   if (failed.length > 0 && confirmed.length === 0) {
     const lastFail = failed[failed.length - 1]!;
     toast.error(
-      failed.length === 1 ? "Order failed" : `${failed.length} orders failed`,
+      failed.length === 1
+        ? `${actionLabel(lastFail.side, lastFail.symbol)} failed`
+        : `${failed.length} orders failed`,
       lastFail.failMessage,
       { id: TRADE_ACTIVITY_ID, durationMs: 6_000 }
     );
     playTradeSound("trade_failed");
-    scheduleClearOrders(all.map((o) => o.pendingId), 6_150);
+    scheduleClearOrders(
+      all.map((o) => o.pendingId),
+      6_150
+    );
     return;
   }
 
@@ -145,7 +117,10 @@ function renderTradeActivityToast(options?: {
       failed[failed.length - 1]?.failMessage,
       { id: TRADE_ACTIVITY_ID, durationMs: 6_000 }
     );
-    scheduleClearOrders(all.map((o) => o.pendingId), 6_150);
+    scheduleClearOrders(
+      all.map((o) => o.pendingId),
+      6_150
+    );
     return;
   }
 

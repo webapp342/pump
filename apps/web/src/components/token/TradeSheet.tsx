@@ -90,7 +90,7 @@ export function TradeSheet({
   if (!open || !mounted) return null;
 
   const tradeSide = prefill?.side ?? "buy";
-  const tradeTitle = tradeSide === "sell" ? `Sell $${symbol}` : `Buy $${symbol}`;
+  const tradeTitle = tradeSide === "sell" ? `Sell ${symbol}` : `Buy ${symbol}`;
 
   return createPortal(
     <>

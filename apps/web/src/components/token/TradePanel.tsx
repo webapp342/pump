@@ -11,7 +11,6 @@ import { PumpAmountNumpad } from "@/components/token/PumpAmountNumpad";
 import { PumpAmountPresets } from "@/components/token/PumpAmountPresets";
 import { TradeQuickOrderHeader } from "@/components/token/TradeQuickOrderHeader";
 import { TradeConfirmModal, type TradeConfirmAssetLine } from "@/components/token/TradeConfirmModal";
-import { ModalPortal } from "@/components/ui/ModalPortal";
 import { assertScwReadyForUserOp } from "@/lib/aa/scw-preflight";
 import { estimateKernelUserOpPrefundWei } from "@/lib/aa/estimate-kernel-user-op-prefund";
 import { bufferedGasCostWei } from "@/lib/aa/gas-buffer";
@@ -391,8 +390,16 @@ export function TradePanel({
   const [tradeConfirmOpen, setTradeConfirmOpen] = useState(false);
   const [tradeConfirmError, setTradeConfirmError] = useState<string | null>(null);
   const [tradeConfirmLoading, setTradeConfirmLoading] = useState(false);
-  const [confirmOnlyPreparing, setConfirmOnlyPreparing] = useState(confirmOnly);
   const confirmOnlyOpenedRef = useRef(false);
+  const confirmOnlyPrepToastIdRef = useRef<string | null>(null);
+
+  function dismissConfirmOnlyPrepToast() {
+    const id = confirmOnlyPrepToastIdRef.current;
+    if (!id) return;
+    toast.dismiss(id);
+    confirmOnlyPrepToastIdRef.current = null;
+  }
+
   const [pendingTrade, setPendingTrade] = useState<{
     side: Side;
     spend: TradeConfirmAssetLine;
@@ -2128,7 +2135,7 @@ export function TradePanel({
       });
     }
 
-    setConfirmOnlyPreparing(false);
+    dismissConfirmOnlyPrepToast();
     setTradeConfirmOpen(true);
   }
 
@@ -2364,7 +2371,20 @@ export function TradePanel({
       return;
     }
 
-    if (showDepositCta || showInsufficientTokenBalance) {
+    if (showInsufficientTokenBalance) {
+      autoSubmitPendingRef.current = false;
+      autoSubmitTriggeredRef.current = true;
+      toast.error(
+        "Insufficient balance",
+        maxSellTokenWei === 0n
+          ? `You have no ${symbol} to sell.`
+          : `Not enough ${symbol} for this sell.`,
+        { id: `insufficient-sell-${symbol}` }
+      );
+      return;
+    }
+
+    if (showDepositCta) {
       autoSubmitPendingRef.current = false;
       autoSubmitTriggeredRef.current = true;
       openQuickSubmitSheetInstead();
@@ -2374,11 +2394,13 @@ export function TradePanel({
     const gate = evaluateLiveInstantGate();
     if (!gate.ok) {
       if (isTransientInstantGateReason(gate.reason)) return;
+      autoSubmitPendingRef.current = false;
+      autoSubmitTriggeredRef.current = true;
       if (isQuickSubmitFundingBlock(gate.reason)) {
-        autoSubmitPendingRef.current = false;
-        autoSubmitTriggeredRef.current = true;
         openQuickSubmitSheetInstead();
+        return;
       }
+      toast.error("Order not sent", instantTradeGateMessage(gate.reason));
       return;
     }
 
@@ -2396,6 +2418,8 @@ export function TradePanel({
     protocolFeeBps,
     showDepositCta,
     showInsufficientTokenBalance,
+    maxSellTokenWei,
+    symbol,
   ]);
 
   useEffect(() => {
@@ -2403,7 +2427,7 @@ export function TradePanel({
 
     if (!isConnected) {
       openConnectModal?.();
-      setConfirmOnlyPreparing(false);
+      dismissConfirmOnlyPrepToast();
       onConfirmOnlyClose?.();
       return;
     }
@@ -2412,7 +2436,7 @@ export function TradePanel({
 
     if (wrongChain) {
       confirmOnlyOpenedRef.current = true;
-      setConfirmOnlyPreparing(false);
+      dismissConfirmOnlyPrepToast();
       toast.error("Wrong network", "Switch to Base Sepolia to trade.");
       onConfirmOnlyClose?.();
       return;
@@ -2420,7 +2444,7 @@ export function TradePanel({
 
     if (paused) {
       confirmOnlyOpenedRef.current = true;
-      setConfirmOnlyPreparing(false);
+      dismissConfirmOnlyPrepToast();
       toast.error("Trading paused", "This bonding curve is not accepting trades.");
       onConfirmOnlyClose?.();
       return;
@@ -2433,16 +2457,29 @@ export function TradePanel({
       if (maxBuySpendWei === 0n || buyCostWei === 0n) {
         if (showDepositCta || maxBuySpendWei === 0n) {
           confirmOnlyOpenedRef.current = true;
-          setConfirmOnlyPreparing(false);
+          dismissConfirmOnlyPrepToast();
           onConfirmOnlyFundingBlocked?.();
           onConfirmOnlyClose?.();
         }
         return;
       }
     } else if (maxSellTokenWei === 0n || sellTokenWei === 0n || !sellQuoteOut) {
-      if (showInsufficientTokenBalance || showDepositCta || maxSellTokenWei === 0n) {
+      if (showInsufficientTokenBalance || maxSellTokenWei === 0n) {
         confirmOnlyOpenedRef.current = true;
-        setConfirmOnlyPreparing(false);
+        dismissConfirmOnlyPrepToast();
+        toast.error(
+          "Insufficient balance",
+          maxSellTokenWei === 0n
+            ? `You have no ${symbol} to sell.`
+            : `Not enough ${symbol} for this sell.`,
+          { id: `insufficient-sell-${symbol}` }
+        );
+        onConfirmOnlyClose?.();
+        return;
+      }
+      if (showDepositCta) {
+        confirmOnlyOpenedRef.current = true;
+        dismissConfirmOnlyPrepToast();
         onConfirmOnlyFundingBlocked?.();
         onConfirmOnlyClose?.();
       }
@@ -2453,7 +2490,7 @@ export function TradePanel({
     if (!gate.ok) {
       if (isTransientInstantGateReason(gate.reason)) return;
       confirmOnlyOpenedRef.current = true;
-      setConfirmOnlyPreparing(false);
+      dismissConfirmOnlyPrepToast();
       if (isQuickSubmitFundingBlock(gate.reason)) {
         onConfirmOnlyFundingBlocked?.();
         onConfirmOnlyClose?.();
@@ -2486,6 +2523,7 @@ export function TradePanel({
     openConnectModal,
     onConfirmOnlyClose,
     onConfirmOnlyFundingBlocked,
+    symbol,
   ]);
 
   const submitActionLabel = (() => {
@@ -2559,29 +2597,6 @@ export function TradePanel({
   if (confirmOnly) {
     return (
       <>
-        {confirmOnlyPreparing ? (
-          <ModalPortal open>
-            <>
-              <button
-                type="button"
-                className="modal-backdrop modal-backdrop-dismiss z-[120] cursor-default"
-                aria-label="Close"
-                onClick={() => onConfirmOnlyClose?.()}
-              />
-              <div
-                className="modal-sheet-host z-[121] items-center p-4"
-                role="dialog"
-                aria-modal="true"
-                aria-busy="true"
-                aria-label="Preparing trade quote"
-              >
-                <div className="modal-panel max-w-md rounded-xl p-5">
-                  <p className="text-body-sm text-pump-muted">Preparing quote…</p>
-                </div>
-              </div>
-            </>
-          </ModalPortal>
-        ) : null}
         <TradeConfirmModal
           open={tradeConfirmOpen}
           side={pendingTrade?.side ?? side}

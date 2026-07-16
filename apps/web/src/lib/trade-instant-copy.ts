@@ -11,12 +11,11 @@ export function isTransientInstantGateReason(reason: string): boolean {
   );
 }
 
-/** Mobile dock quick trade — open sheet only when funding blocks the trade. */
+/** Mobile dock / flash trade — open funding sheet only when native gas/ETH blocks the trade. */
 export function isQuickSubmitFundingBlock(reason: string): boolean {
   return (
     reason === "insufficient_bnb" ||
     reason === "insufficient_bnb_gas" ||
-    reason === "insufficient_token" ||
     reason === "insufficient_gas"
   );
 }
@@ -41,7 +40,7 @@ export function instantTradeGateMessage(reason: string): string {
     case "insufficient_bnb_gas":
       return `Not enough ${NATIVE_SYMBOL} available for this buy.`;
     case "insufficient_token":
-      return "Insufficient token balance.";
+      return "You have no tokens to sell.";
     case "insufficient_gas":
       return `Not enough ${NATIVE_SYMBOL} for network fees.`;
     case "gas_reserve_unknown":

@@ -18,6 +18,7 @@ import { PumpIcon, faExternalLink } from "@/lib/icons";
 import { TOKEN_LOGO_SIZE_INLINE } from "@/lib/token-logo-sizes";
 import { useAccount } from "wagmi";
 import { bnbToUsd, formatUsdReadable } from "@/lib/format-usd";
+import { formatAge } from "@/lib/arena-board-format";
 
 type CreatorProfileData = CreatorProfile & {
   bnbBalance: string;
@@ -140,7 +141,9 @@ function CalloutRow({ row }: { row: PortfolioAnnouncementRow }) {
           <span className="creator-profile-sheet__balance-amount financial-value">
             {row.multiplierX.toFixed(2)}x
           </span>
-          <span className="creator-profile-sheet__balance-value">{formatShortDate(row.createdAt)}</span>
+          <span className="creator-profile-sheet__balance-value financial-value">
+            {formatAge(row.createdAt)}
+          </span>
         </div>
       </td>
     </tr>
