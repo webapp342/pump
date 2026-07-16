@@ -4,7 +4,6 @@ import { useCallback, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { PointsHubBody } from "@/components/missions/PointsHubBody";
 import { PointsHubTabs } from "@/components/missions/PointsHubTabs";
-import { PointsLevelLadder } from "@/components/missions/PointsLevelLadder";
 import { PointsStatusCard } from "@/components/missions/PointsStatusCard";
 import {
   GUEST_MISSION_ROWS,
@@ -12,7 +11,14 @@ import {
 } from "@/lib/missions-guest-data";
 import type { MissionFilter } from "@/lib/missions-types";
 import { getPointsLevel } from "@/lib/points-levels";
-import { parsePointsHubTab, pointsHubHref, type PointsHubTab } from "@/lib/points-hub-tabs";
+import {
+  parsePointsHubTab,
+  parsePointsMarketView,
+  pointsHubHref,
+  type PointsHubTab,
+  type PointsMarketView,
+} from "@/lib/points-hub-tabs";
+import { REWARDS_GUEST } from "@/lib/rewards-copy";
 import { HubDiscoveryScrollLock } from "@/components/layout/HubDiscoveryScrollLock";
 
 type MissionsGuestPanelProps = {
@@ -23,14 +29,11 @@ function GuestSignInFooter({ onSignIn }: { onSignIn: () => void }) {
   return (
     <div className="missions-sign-in-banner missions-sign-in-banner--footer">
       <div className="missions-sign-in-banner__copy">
-        <p className="missions-sign-in-banner__title">Sign in to track Pump Points</p>
-        <p className="missions-sign-in-banner__desc">
-          Earn points for trades, launches, and milestones — then climb levels and unlock Market
-          rewards.
-        </p>
+        <p className="missions-sign-in-banner__title">{REWARDS_GUEST.title}</p>
+        <p className="missions-sign-in-banner__desc">{REWARDS_GUEST.description}</p>
       </div>
       <button type="button" onClick={onSignIn} className="primary-button missions-sign-in-banner__cta">
-        Sign in
+        {REWARDS_GUEST.cta}
       </button>
     </div>
   );
@@ -40,9 +43,13 @@ export function MissionsGuestPanel({ onSignIn }: MissionsGuestPanelProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [activeFilter, setActiveFilter] = useState<MissionFilter>("open");
+  const [leaderboardRefreshKey, setLeaderboardRefreshKey] = useState(0);
   const filterCounts = guestMissionFilterCounts();
   const level = useMemo(() => getPointsLevel(0), []);
-  const activeTab = parsePointsHubTab(searchParams.get("tab"));
+  const rawTab = searchParams.get("tab");
+  const activeTab = parsePointsHubTab(rawTab);
+  const marketView: PointsMarketView =
+    rawTab === "activity" ? "inventory" : parsePointsMarketView(searchParams.get("market"));
 
   const setActiveTab = useCallback(
     (tab: PointsHubTab) => {
@@ -51,8 +58,13 @@ export function MissionsGuestPanel({ onSignIn }: MissionsGuestPanelProps) {
     [router]
   );
 
-  const pointsToEarn = GUEST_MISSION_ROWS.reduce((sum, m) => sum + m.rewardPoints, 0);
-  const openMissions = GUEST_MISSION_ROWS.filter((m) => !m.completed);
+  const setMarketView = useCallback(
+    (view: PointsMarketView) => {
+      router.replace(pointsHubHref("market", view), { scroll: false });
+    },
+    [router]
+  );
+
   const boardMissions = GUEST_MISSION_ROWS.filter((mission) =>
     activeFilter === "done" ? mission.completed : !mission.completed
   );
@@ -62,62 +74,41 @@ export function MissionsGuestPanel({ onSignIn }: MissionsGuestPanelProps) {
       <HubDiscoveryScrollLock />
       <div className="missions-hub points-hub">
         <div className="points-hub__layout">
-          <aside className="points-hub__rail">
-            <PointsStatusCard
-              variant="rail"
-              guestMode
+          <div className="points-hub__status">
+            <PointsStatusCard guestMode level={level} spendablePoints={0} />
+          </div>
+
+          <PointsHubTabs
+            activeTab={activeTab}
+            onSelect={setActiveTab}
+            showRefresh={activeTab === "leaderboard"}
+            onRefresh={() => {
+              if (activeTab === "leaderboard") {
+                setLeaderboardRefreshKey((key) => key + 1);
+                return;
+              }
+              onSignIn();
+            }}
+          />
+
+          <div className="points-hub__body">
+            <PointsHubBody
+              tab={activeTab}
+              marketView={marketView}
+              onSelectMarketView={setMarketView}
               level={level}
               spendablePoints={0}
-              pointsToEarn={pointsToEarn}
-              completedCount={0}
-              totalCount={GUEST_MISSION_ROWS.length}
-              openCount={GUEST_MISSION_ROWS.length}
-              tradingVolumeBnb={0}
-            />
-            <div className="points-hub__rail-ladder hidden md:block">
-              <PointsLevelLadder level={level} guestMode compact />
-            </div>
-          </aside>
-
-          <div className="points-hub__main">
-            <div className="points-hub__status-mobile md:hidden">
-              <PointsStatusCard
-                guestMode
-                level={level}
-                spendablePoints={0}
-                pointsToEarn={pointsToEarn}
-                completedCount={0}
-                totalCount={GUEST_MISSION_ROWS.length}
-                openCount={GUEST_MISSION_ROWS.length}
-                tradingVolumeBnb={0}
-              />
-            </div>
-
-            <PointsHubTabs
-              activeTab={activeTab}
-              onSelect={setActiveTab}
-              showRefresh
+              address=""
+              boardMissions={boardMissions}
+              activeFilter={activeFilter}
+              filterCounts={filterCounts}
+              loading={false}
+              guestMode
+              leaderboardRefreshKey={leaderboardRefreshKey}
+              onSelectFilter={setActiveFilter}
               onRefresh={onSignIn}
+              footerSlot={<GuestSignInFooter onSignIn={onSignIn} />}
             />
-
-            <div className="points-hub__body">
-              <PointsHubBody
-                tab={activeTab}
-                level={level}
-                spendablePoints={0}
-                address=""
-                openMissions={openMissions}
-                boardMissions={boardMissions}
-                activeFilter={activeFilter}
-                filterCounts={filterCounts}
-                loading={false}
-                guestMode
-                onSelectFilter={setActiveFilter}
-                onRefresh={onSignIn}
-                onSelectTab={setActiveTab}
-                footerSlot={<GuestSignInFooter onSignIn={onSignIn} />}
-              />
-            </div>
           </div>
         </div>
       </div>

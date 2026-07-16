@@ -1,11 +1,12 @@
 import type { AdminTabId } from "@/components/admin/AdminChrome";
+import { CHAIN_DISPLAY_NAME, NATIVE_SYMBOL } from "@/config/chain";
 
 /** Enterprise microcopy for Pump admin console — single source of truth. */
 export const ADMIN_COPY = {
   brand: {
     title: "Pump Console",
     subtitle: "Operations",
-    envLabel: "BSC Testnet",
+    envLabel: CHAIN_DISPLAY_NAME,
     breadcrumbRoot: "Operations",
   },
 
@@ -39,7 +40,7 @@ export const ADMIN_COPY = {
     create: "Create campaign",
     delete: "Remove",
     sweep: "Recover funds",
-    sweepAll: "Sweep all BNB",
+    sweepAll: `Sweep all ${NATIVE_SYMBOL}`,
     withdraw: "Send withdrawal",
     withdrawing: "Sending…",
     useMax: "Use maximum",
@@ -97,7 +98,7 @@ export const ADMIN_COPY = {
       },
       fees: {
         title: "Fee ledger",
-        description: "Accrued, pending, and claimed protocol fees in BNB.",
+        description: `Accrued, pending, and claimed protocol fees in ${NATIVE_SYMBOL}.`,
       },
     },
   },
@@ -129,10 +130,10 @@ export const ADMIN_COPY = {
     withdraw: {
       title: "Withdrawal",
       description: "",
-      typeBnb: "BNB",
+      typeBnb: NATIVE_SYMBOL,
       typeToken: "Token",
       recipient: "Recipient address",
-      amountBnb: "Amount (BNB)",
+      amountBnb: `Amount (${NATIVE_SYMBOL})`,
       amountToken: "Amount (tokens)",
       tokenContract: "Token contract",
       available: "Available balance",
@@ -146,7 +147,7 @@ export const ADMIN_COPY = {
       title: "Curve recovery",
       halted: "Trading halted — new buys and sells are blocked until you resume.",
       ready: "Escrow empty — curve is ready for new tokens and trades.",
-      recipient: "Send recovered BNB to",
+      recipient: `Send recovered ${NATIVE_SYMBOL} to`,
       resetDb: "Reset app database after recovery (recommended for a clean slate)",
       recoverAndResume: "Recover escrow & resume trading",
       resumeOnly: "Resume trading",
@@ -156,9 +157,9 @@ export const ADMIN_COPY = {
       hint:
         "Sweeps leftover curve escrow to the recipient, then re-enables trading automatically.",
       confirmSweep:
-        "Recover {amount} BNB from the bonding curve to {to}? Trading will pause briefly, then resume automatically.",
+        `Recover {amount} ${NATIVE_SYMBOL} from the bonding curve to {to}? Trading will pause briefly, then resume automatically.`,
       confirmSweepWithWipe:
-        "Recover {amount} BNB to {to}, resume trading, and wipe all app data (tokens, trades, indexer cursor)?",
+        `Recover {amount} ${NATIVE_SYMBOL} to {to}, resume trading, and wipe all app data (tokens, trades, indexer cursor)?`,
       confirmResume: "Re-enable curve trading (setEmergencyHalt false)?",
       confirmResumeWithWipe:
         "Re-enable curve trading and wipe all app data for a fresh start?",
@@ -217,7 +218,7 @@ export const ADMIN_COPY = {
       titleField: "Campaign title",
       titlePlaceholder: "Follow Pump on X",
       descField: "Description (optional)",
-      descPlaceholder: "Short instructions shown in Missions",
+      descPlaceholder: "Short instructions shown in Rewards",
       pointsField: "Reward points",
       urlField: "Destination URL",
       urlPlaceholder: "https://…",

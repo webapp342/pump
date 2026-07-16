@@ -3,6 +3,7 @@ import { pumpAirdropManagerAbi } from "@/lib/abis/pump-airdrop-manager";
 import { launchpadTreasuryAbi } from "@/lib/abis/launchpad-treasury";
 import { memeFactoryAbi } from "@/lib/abis/meme-factory";
 import { bondingCurveManagerAbi } from "@/lib/bonding-curve";
+import { TREASURY_ADDRESS } from "@/config/admin";
 import { contracts, pumpChain, rpcUrl } from "@/config/chain";
 
 const publicClient = createPublicClient({
@@ -144,11 +145,12 @@ export async function getAdminProtocolSnapshot() {
     }),
   ]);
 
-  const treasuryAddress = (memeTreasury as Address).toLowerCase();
+  const treasuryContract = (TREASURY_ADDRESS ?? memeTreasury) as Address;
+  const treasuryAddress = treasuryContract.toLowerCase();
   const [treasuryBalance, treasuryOwner] = await Promise.all([
-    publicClient.getBalance({ address: memeTreasury as Address }),
+    publicClient.getBalance({ address: treasuryContract }),
     publicClient.readContract({
-      address: memeTreasury as Address,
+      address: treasuryContract,
       abi: launchpadTreasuryAbi,
       functionName: "owner",
     }),
@@ -158,7 +160,7 @@ export async function getAdminProtocolSnapshot() {
     memeFactory: {
       address: factory,
       owner: memeOwner as Address,
-      treasury: memeTreasury as Address,
+      treasury: treasuryContract,
       createFeeBnb: formatEther(memeCreateFee),
       minInitialBuyBnb: formatEther(memeMinInitialBuyWei),
     },

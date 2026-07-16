@@ -18,13 +18,12 @@ export function AccountSheet({ open, onClose, ...panelProps }: AccountSheetProps
       onClose={onClose}
       ariaLabel="Settings"
       title="Settings"
-      subtitle="Manage appearance and account preferences."
       zIndex={100}
       panelClassName="wallet-account-sheet__panel max-h-[min(80dvh,32rem)] sm:max-w-md"
       bodyClassName="wallet-account-sheet__body"
       dragEntirePanel={false}
     >
-      <WalletAccountPanel {...panelProps} onClose={onClose} />
+      <WalletAccountPanel {...panelProps} onClose={onClose} variant="sheet" />
     </AppBottomSheet>
   );
 }

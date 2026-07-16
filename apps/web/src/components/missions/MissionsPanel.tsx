@@ -11,13 +11,19 @@ import { MissionsGuestPanel } from "@/components/missions/MissionsGuestPanel";
 import { MissionsPanelSkeleton } from "@/components/missions/MissionsPanelSkeleton";
 import { PointsHubBody } from "@/components/missions/PointsHubBody";
 import { PointsHubTabs } from "@/components/missions/PointsHubTabs";
-import { PointsLevelLadder } from "@/components/missions/PointsLevelLadder";
 import { PointsStatusCard } from "@/components/missions/PointsStatusCard";
 import { HubDiscoveryScrollLock } from "@/components/layout/HubDiscoveryScrollLock";
 import type { Mission, MissionFilter, MissionsData } from "@/lib/missions-types";
 import { getPointsLevel } from "@/lib/points-levels";
-import { parsePointsHubTab, pointsHubHref, type PointsHubTab } from "@/lib/points-hub-tabs";
+import {
+  parsePointsHubTab,
+  parsePointsMarketView,
+  pointsHubHref,
+  type PointsHubTab,
+  type PointsMarketView,
+} from "@/lib/points-hub-tabs";
 import type { PointsMarketItem } from "@/lib/points-market-catalog";
+import { REWARDS_CHALLENGES } from "@/lib/rewards-copy";
 import { usePumpWallet } from "@/components/wallet/PumpWalletProvider";
 
 const BURST_POLL_MS = 1_500;
@@ -36,12 +42,24 @@ export function MissionsPanel() {
   const [pendingKeys, setPendingKeys] = useState<string[]>(() => listPendingMissionKeys());
   const [completingKey, setCompletingKey] = useState<string | null>(null);
   const [redeemingId, setRedeemingId] = useState<string | null>(null);
+  const [inventoryRefreshKey, setInventoryRefreshKey] = useState(0);
+  const [leaderboardRefreshKey, setLeaderboardRefreshKey] = useState(0);
 
-  const activeTab = parsePointsHubTab(searchParams.get("tab"));
+  const rawTab = searchParams.get("tab");
+  const activeTab = parsePointsHubTab(rawTab);
+  const marketView: PointsMarketView =
+    rawTab === "activity" ? "inventory" : parsePointsMarketView(searchParams.get("market"));
 
   const setActiveTab = useCallback(
     (tab: PointsHubTab) => {
       router.replace(pointsHubHref(tab), { scroll: false });
+    },
+    [router]
+  );
+
+  const setMarketView = useCallback(
+    (view: PointsMarketView) => {
+      router.replace(pointsHubHref("market", view), { scroll: false });
     },
     [router]
   );
@@ -54,7 +72,7 @@ export function MissionsPanel() {
       const body = (await response.json()) as { data?: MissionsData; error?: string };
 
       if (!response.ok) {
-        throw new Error(body.error ?? "Failed to load missions");
+        throw new Error(body.error ?? REWARDS_CHALLENGES.loadError);
       }
 
       const next = body.data ?? null;
@@ -74,7 +92,7 @@ export function MissionsPanel() {
       }
     } catch (err) {
       setData(null);
-      setError(err instanceof Error ? err.message : "Failed to load missions");
+      setError(err instanceof Error ? err.message : REWARDS_CHALLENGES.loadError);
     } finally {
       setLoading(false);
     }
@@ -179,23 +197,19 @@ export function MissionsPanel() {
           throw new Error(body.error ?? "Redeem failed");
         }
         await loadMissions(address);
-        if (activeTab !== "activity") {
-          setActiveTab("activity");
-        }
+        setInventoryRefreshKey((key) => key + 1);
+        setMarketView("inventory");
       } catch (err) {
         setError(err instanceof Error ? err.message : "Redeem failed");
       } finally {
         setRedeemingId(null);
       }
     },
-    [address, loadMissions, activeTab, setActiveTab]
+    [address, loadMissions, setMarketView]
   );
 
   const completedCount = data?.missions.filter((m) => m.completed).length ?? 0;
   const openCount = data?.missions.filter((m) => !m.completed).length ?? 0;
-  const totalCount = data?.missions.length ?? 0;
-  const pointsToEarn =
-    data?.missions.filter((m) => !m.completed).reduce((sum, m) => sum + m.rewardPoints, 0) ?? 0;
 
   const level = useMemo(
     () => getPointsLevel(data?.lifetimePoints ?? data?.totalPoints ?? 0),
@@ -209,11 +223,6 @@ export function MissionsPanel() {
     }),
     [openCount, completedCount]
   );
-
-  const openMissions = useMemo(() => {
-    if (!data) return [];
-    return data.missions.filter((mission) => !mission.completed);
-  }, [data]);
 
   const boardMissions = useMemo(() => {
     if (!data) return [];
@@ -241,85 +250,77 @@ export function MissionsPanel() {
       <HubDiscoveryScrollLock />
       <div className="missions-hub points-hub">
         <div className="points-hub__layout">
-          <aside className="points-hub__rail">
-            {data ? (
+          {data ? (
+            <div className="points-hub__status">
               <PointsStatusCard
-                variant="rail"
                 level={level}
                 spendablePoints={data.totalPoints}
-                pointsToEarn={pointsToEarn}
-                completedCount={completedCount}
-                totalCount={totalCount}
-                openCount={openCount}
-                tradingVolumeBnb={data.tradingVolumeBnb}
               />
-            ) : null}
-            <div className="points-hub__rail-ladder hidden md:block">
-              <PointsLevelLadder level={level} compact />
             </div>
-          </aside>
+          ) : null}
 
-          <div className="points-hub__main">
-            <div className="points-hub__status-mobile md:hidden">
-              {data ? (
-                <PointsStatusCard
-                  level={level}
-                  spendablePoints={data.totalPoints}
-                  pointsToEarn={pointsToEarn}
-                  completedCount={completedCount}
-                  totalCount={totalCount}
-                  openCount={openCount}
-                  tradingVolumeBnb={data.tradingVolumeBnb}
-                />
+          {error ? (
+            <div className="missions-notice notice-error">
+              {error}
+              {error.includes("VM1_MAIN_DB_URL") ? (
+                <p className="mt-2 field-hint">
+                  Local dev: SSH tunnel ui-app 7433 → localhost 17433 and set VM1_MAIN_DB_URL in
+                  .env
+                </p>
               ) : null}
             </div>
+          ) : null}
 
-            {error ? (
-              <div className="missions-notice notice-error">
-                {error}
-                {error.includes("VM1_MAIN_DB_URL") ? (
-                  <p className="mt-2 field-hint">
-                    Local dev: SSH tunnel ui-app 7433 → localhost 17433 and set VM1_MAIN_DB_URL in
-                    .env
-                  </p>
-                ) : null}
-              </div>
-            ) : null}
+          {data && !error ? (
+            <>
+              <PointsHubTabs
+                activeTab={activeTab}
+                onSelect={setActiveTab}
+                loading={loading}
+                onRefresh={() => {
+                  if (activeTab === "leaderboard") {
+                    setLeaderboardRefreshKey((key) => key + 1);
+                    return;
+                  }
+                  void loadMissions(address);
+                }}
+                showRefresh={activeTab === "leaderboard"}
+              />
 
-            {data && !error ? (
-              <>
-                <PointsHubTabs
-                  activeTab={activeTab}
-                  onSelect={setActiveTab}
+              <div className="points-hub__body" key={`${pathname}-${activeTab}-${marketView}`}>
+                <PointsHubBody
+                  tab={activeTab}
+                  marketView={marketView}
+                  onSelectMarketView={setMarketView}
+                  level={level}
+                  spendablePoints={data.totalPoints}
+                  address={address}
+                  boardMissions={boardMissions}
+                  activeFilter={activeFilter}
+                  filterCounts={filterCounts}
                   loading={loading}
-                  onRefresh={() => void loadMissions(address)}
-                  showRefresh={activeTab !== "earn"}
+                  pendingKeys={pendingKeys}
+                  completingKey={completingKey}
+                  redeemingId={redeemingId}
+                  inventoryRefreshKey={inventoryRefreshKey}
+                  leaderboardRefreshKey={leaderboardRefreshKey}
+                  onSelectFilter={setActiveFilter}
+                  onRefresh={() => {
+                    if (activeTab === "market" && marketView === "inventory") {
+                      setInventoryRefreshKey((key) => key + 1);
+                    }
+                    if (activeTab === "leaderboard") {
+                      setLeaderboardRefreshKey((key) => key + 1);
+                      return;
+                    }
+                    void loadMissions(address);
+                  }}
+                  onAdminLinkClick={(mission) => void onAdminLinkClick(mission)}
+                  onRedeem={(item) => void onRedeem(item)}
                 />
-
-                <div className="points-hub__body" key={`${pathname}-${activeTab}`}>
-                  <PointsHubBody
-                    tab={activeTab}
-                    level={level}
-                    spendablePoints={data.totalPoints}
-                    address={address}
-                    openMissions={openMissions}
-                    boardMissions={boardMissions}
-                    activeFilter={activeFilter}
-                    filterCounts={filterCounts}
-                    loading={loading}
-                    pendingKeys={pendingKeys}
-                    completingKey={completingKey}
-                    redeemingId={redeemingId}
-                    onSelectFilter={setActiveFilter}
-                    onRefresh={() => void loadMissions(address)}
-                    onAdminLinkClick={(mission) => void onAdminLinkClick(mission)}
-                    onRedeem={(item) => void onRedeem(item)}
-                    onSelectTab={setActiveTab}
-                  />
-                </div>
-              </>
-            ) : null}
-          </div>
+              </div>
+            </>
+          ) : null}
         </div>
       </div>
     </div>

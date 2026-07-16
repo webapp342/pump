@@ -2,10 +2,11 @@
 
 import { PumpIcon, faRotateCw } from "@/lib/icons";
 import type { MissionFilter } from "@/lib/missions-types";
+import { REWARDS_CHALLENGES } from "@/lib/rewards-copy";
 
-const MISSION_FILTERS: { key: MissionFilter; label: string }[] = [
-  { key: "open", label: "Open" },
-  { key: "done", label: "Completed" },
+const CHALLENGE_FILTERS: { key: MissionFilter; label: string }[] = [
+  { key: "open", label: REWARDS_CHALLENGES.open },
+  { key: "done", label: REWARDS_CHALLENGES.done },
 ];
 
 type MissionsFilterNavProps = {
@@ -27,9 +28,9 @@ export function MissionsFilterNav({
 }: MissionsFilterNavProps) {
   return (
     <div className="missions-filter-bar">
-      <nav className="missions-tab-nav" aria-label="Mission filters">
+      <nav className="missions-tab-nav" aria-label={REWARDS_CHALLENGES.filtersAria}>
         <div className="missions-tab-nav__track" role="tablist">
-          {MISSION_FILTERS.map(({ key, label }) => {
+          {CHALLENGE_FILTERS.map(({ key, label }) => {
             const count = filterCounts[key] ?? 0;
             const isActive = activeFilter === key;
             return (
@@ -58,10 +59,14 @@ export function MissionsFilterNav({
         onClick={onRefresh}
         disabled={loading || disabled}
         className="chip-button missions-filter-bar__refresh shrink-0 disabled:opacity-50"
-        aria-label={loading ? "Refreshing missions" : "Refresh missions"}
+        aria-label={
+          loading ? REWARDS_CHALLENGES.refreshingLabel : REWARDS_CHALLENGES.refreshAria
+        }
       >
         <PumpIcon icon={faRotateCw} className={`h-3.5 w-3.5 shrink-0${loading ? " animate-spin" : ""}`} />
-        <span className="hidden sm:inline">{loading ? "Refreshing" : "Refresh"}</span>
+        <span className="hidden sm:inline">
+          {loading ? REWARDS_CHALLENGES.refreshingLabel : REWARDS_CHALLENGES.refreshLabel}
+        </span>
       </button>
     </div>
   );

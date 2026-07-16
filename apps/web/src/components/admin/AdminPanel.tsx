@@ -18,7 +18,7 @@ import { adminFetch, readAdminJson } from "@/lib/admin-api-client";
 import { WIPE_DATA_CONFIRMATION_PHRASE } from "@/lib/admin/wipe-data.constants";
 import { adminSignOut } from "@/lib/admin/auth-client";
 import { ADMIN_COPY } from "@/lib/admin/copy";
-import { contracts, explorerAddressUrl, explorerTxUrl, pumpChain, shortAddress } from "@/config/chain";
+import { contracts, explorerAddressUrl, explorerTxUrl, NATIVE_SYMBOL, pumpChain, shortAddress } from "@/config/chain";
 import { erc20Abi } from "@/lib/abis/erc20";
 import { launchpadTreasuryAbi } from "@/lib/abis/launchpad-treasury";
 import { pumpAirdropManagerAbi } from "@/lib/abis/pump-airdrop-manager";
@@ -563,7 +563,7 @@ export function AdminPanel() {
     try {
       amount = parseEther(withdrawAmount.trim() || "0");
     } catch {
-      setError("Invalid BNB amount");
+      setError(`Invalid ${NATIVE_SYMBOL} amount`);
       return;
     }
     if (amount <= 0n) {
@@ -853,7 +853,7 @@ export function AdminPanel() {
                     }
                     trend={
                       stats
-                        ? `Claimed ${formatBnb(stats.claimedTotalBnb)} BNB total`
+                        ? `Claimed ${formatBnb(stats.claimedTotalBnb)} ${NATIVE_SYMBOL} total`
                         : ADMIN_COPY.dashboard.kpi.pendingFees.hintEmpty
                     }
                   />
@@ -1006,7 +1006,7 @@ export function AdminPanel() {
             >
               {protocol ? (
                 <>
-                  {formatBnb(protocol.memeFactory.createFeeBnb)} BNB
+                  {formatBnb(protocol.memeFactory.createFeeBnb)} {NATIVE_SYMBOL}
                   {memeFeeUsd != null
                     ? ` · ${formatUsdReadable(memeFeeUsd, { compact: true })}`
                     : ""}
@@ -1020,7 +1020,7 @@ export function AdminPanel() {
               loading={platformSettingsLoading}
               onEdit={() => setMinInitialBuyModalOpen(true)}
             >
-              {formatBnb(minInitialBuyBnb)} BNB
+              {formatBnb(minInitialBuyBnb)} {NATIVE_SYMBOL}
             </AdminDataRow>
             <AdminDataRow
               label="Fee exemption"
@@ -1038,7 +1038,7 @@ export function AdminPanel() {
             >
               {protocol?.airdropManager ? (
                 <>
-                  {formatBnb(protocol.airdropManager.createFeeBnb)} BNB
+                  {formatBnb(protocol.airdropManager.createFeeBnb)} {NATIVE_SYMBOL}
                   {airdropFeeUsd != null
                     ? ` · ${formatUsdReadable(airdropFeeUsd, { compact: true })}`
                     : ""}
@@ -1223,7 +1223,7 @@ export function AdminPanel() {
                     label={ADMIN_COPY.treasury.withdraw.amountBnb}
                     hint={
                       <span className="admin-num">
-                        {formatBnb(treasuryBnb)} BNB available
+                        {formatBnb(treasuryBnb)} {NATIVE_SYMBOL} available
                       </span>
                     }
                   >

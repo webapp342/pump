@@ -16,7 +16,6 @@ const SCROLL_CONTAINER_SELECTOR = [
   ".airdrop-create-step-panel__body",
   ".missions-list__scroll",
   ".missions-body:not(:has(.missions-list))",
-  ".points-overview",
   ".points-hub-panel",
   ".points-hub__body",
   ".portfolio-holdings-mobile__body",

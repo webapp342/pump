@@ -1,26 +1,33 @@
-export type PointsHubTab = "overview" | "earn" | "levels" | "market" | "activity";
+import { REWARDS_TABS } from "@/lib/rewards-copy";
+
+export type PointsHubTab = "earn" | "market" | "leaderboard";
+
+export type PointsMarketView = "shop" | "inventory";
 
 export const POINTS_HUB_TABS: { id: PointsHubTab; label: string }[] = [
-  { id: "overview", label: "Overview" },
-  { id: "earn", label: "Earn" },
-  { id: "levels", label: "Levels" },
-  { id: "market", label: "Market" },
-  { id: "activity", label: "Activity" },
+  { id: "earn", label: REWARDS_TABS.earn },
+  { id: "market", label: REWARDS_TABS.market },
+  { id: "leaderboard", label: REWARDS_TABS.leaderboard },
 ];
 
 export function parsePointsHubTab(value: string | null | undefined): PointsHubTab {
-  if (
-    value === "earn" ||
-    value === "levels" ||
-    value === "market" ||
-    value === "overview" ||
-    value === "activity"
-  ) {
+  if (value === "market" || value === "earn" || value === "leaderboard") {
     return value;
   }
-  return "overview";
+  if (value === "overview" || value === "levels") return "earn";
+  if (value === "activity") return "market";
+  return "earn";
 }
 
-export function pointsHubHref(tab: PointsHubTab): string {
-  return tab === "overview" ? "/missions" : `/missions?tab=${tab}`;
+export function parsePointsMarketView(value: string | null | undefined): PointsMarketView {
+  if (value === "inventory") return "inventory";
+  return "shop";
+}
+
+export function pointsHubHref(tab: PointsHubTab, marketView?: PointsMarketView): string {
+  if (tab === "earn") return "/missions";
+  if (tab === "market" && marketView === "inventory") {
+    return "/missions?tab=market&market=inventory";
+  }
+  return `/missions?tab=${tab}`;
 }

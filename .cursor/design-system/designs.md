@@ -36,7 +36,7 @@ Same chrome: no `panel-surface` field cards. Form rows use full-bleed bottom div
 ## Portfolio mobile identity
 
 ```
-[ Avatar 32 ][ Username OR 0x… ][Copy]     |     [ Missions ][ Share ][ Menu ]
+[ Avatar 32 ][ Username OR 0x… ][Copy]     |     [ Rewards ][ Share ][ Menu ]
 ```
 
 - Copy is **adjacent** to the label (`inline-flex`, no `flex-grow` on the name) — never spanning the gap to the toolbar

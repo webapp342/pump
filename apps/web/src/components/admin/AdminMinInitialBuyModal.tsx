@@ -7,7 +7,7 @@ import {
   useWriteContract,
 } from "wagmi";
 import { ModalPortal } from "@/components/ui/ModalPortal";
-import { contracts, pumpChain } from "@/config/chain";
+import { contracts, NATIVE_SYMBOL, pumpChain } from "@/config/chain";
 import { memeFactoryAbi } from "@/lib/abis/meme-factory";
 import { MAX_MIN_INITIAL_BUY_BNB } from "@/lib/platform-settings";
 
@@ -66,13 +66,13 @@ export function AdminMinInitialBuyModal({
     try {
       minWei = parseEther(trimmed);
     } catch {
-      setLocalError("Enter a valid BNB amount.");
+      setLocalError(`Enter a valid ${NATIVE_SYMBOL} amount.`);
       return;
     }
 
     const maxWei = parseEther(MAX_MIN_INITIAL_BUY_BNB);
     if (minWei > maxWei) {
-      setLocalError(`Maximum is ${MAX_MIN_INITIAL_BUY_BNB} BNB.`);
+      setLocalError(`Maximum is ${MAX_MIN_INITIAL_BUY_BNB} ${NATIVE_SYMBOL}.`);
       return;
     }
 
@@ -99,19 +99,19 @@ export function AdminMinInitialBuyModal({
             Minimum initial buy
           </h2>
           <p className="mt-1 text-sm text-pump-muted">
-            On-chain rule on MemeFactory. Creators must include at least this much BNB in the
+            On-chain rule on MemeFactory. Creators must include at least this much {NATIVE_SYMBOL} in the
             initial buy (in addition to the meme launch fee, unless fee-exempt).
           </p>
 
           <div className="mt-4 rounded-md border border-pump-border/15 bg-pump-surface/35 px-3 py-2.5">
             <p className="section-label">Current value</p>
             <p className="financial-value mt-1 text-body-sm font-semibold text-pump-text">
-              {currentMinBnb} BNB
+              {currentMinBnb} {NATIVE_SYMBOL}
             </p>
           </div>
 
           <label className="mt-4 block">
-            <span className="section-label">New minimum (BNB)</span>
+            <span className="section-label">New minimum ({NATIVE_SYMBOL})</span>
             <input
               type="text"
               inputMode="decimal"
@@ -124,7 +124,7 @@ export function AdminMinInitialBuyModal({
           </label>
 
           <p className="mt-2 text-caption text-pump-muted">
-            Set to 0 to disable the minimum. Max {MAX_MIN_INITIAL_BUY_BNB} BNB. Requires MemeFactory
+            Set to 0 to disable the minimum. Max {MAX_MIN_INITIAL_BUY_BNB} {NATIVE_SYMBOL}. Requires MemeFactory
             owner wallet.
           </p>
 

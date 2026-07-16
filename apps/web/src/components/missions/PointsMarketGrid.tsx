@@ -3,10 +3,11 @@
 import { PumpIcon } from "@/lib/icons";
 import {
   POINTS_MARKET_CATALOG,
-  getFeaturedMarketItems,
+  isMarketItemStackable,
   type PointsMarketItem,
 } from "@/lib/points-market-catalog";
 import { POINTS_TIERS, type PointsLevelStatus, type PointsTierId } from "@/lib/points-levels";
+import { REWARDS_HUB, REWARDS_MARKET } from "@/lib/rewards-copy";
 
 function tierName(id: PointsTierId): string {
   return POINTS_TIERS.find((t) => t.id === id)?.name ?? id;
@@ -22,6 +23,7 @@ type PointsMarketCardProps = {
   spendablePoints: number;
   guestMode?: boolean;
   redeemingId?: string | null;
+  ownedItemIds?: Set<string>;
   onRedeem?: (item: PointsMarketItem) => void;
 };
 
@@ -31,38 +33,47 @@ function PointsMarketCard({
   spendablePoints,
   guestMode = false,
   redeemingId = null,
+  ownedItemIds,
   onRedeem,
 }: PointsMarketCardProps) {
   const unlocked = !guestMode && level.tierIndex >= tierIndex(item.unlockTier);
   const canAfford = !guestMode && spendablePoints >= item.costPts;
-  const canRedeem = unlocked && canAfford && Boolean(onRedeem);
+  const alreadyOwned = !isMarketItemStackable(item) && Boolean(ownedItemIds?.has(item.id));
+  const redeemable =
+    !item.comingSoon && unlocked && canAfford && !alreadyOwned && Boolean(onRedeem);
   const busy = redeemingId === item.id;
 
-  let cta = "Coming soon";
+  let cta = "Redeem";
   if (guestMode) cta = "Sign in to redeem";
+  else if (item.comingSoon) cta = "Coming soon";
+  else if (alreadyOwned) cta = "Owned";
   else if (!unlocked) cta = `Unlocks at ${tierName(item.unlockTier)}`;
-  else if (!canAfford) cta = "Not enough pts";
-  else if (canRedeem) cta = busy ? "Redeeming…" : "Redeem";
+  else if (!canAfford) cta = `Not enough ${REWARDS_HUB.unitShort}`;
+  else if (busy) cta = "Redeeming…";
 
   return (
     <article className="points-market-card panel-surface">
-      <div className="points-market-card__icon-wrap" aria-hidden>
-        <PumpIcon icon={item.icon} size="md" className="points-market-card__icon" />
-      </div>
-      <div className="points-market-card__body">
-        <h3 className="points-market-card__title">{item.title}</h3>
-        <p className="points-market-card__desc type-legal text-pump-muted">{item.description}</p>
+      <div className="points-market-card__top">
+        <div className="points-market-card__icon-wrap" aria-hidden>
+          <PumpIcon icon={item.icon} size="md" className="points-market-card__icon" />
+        </div>
         <div className="points-market-card__meta">
-          <span className="financial-value text-pump-accent">{item.costPts.toLocaleString()} pts</span>
+          <span className="financial-value text-pump-accent">
+            {item.costPts.toLocaleString()} {REWARDS_HUB.unitShort}
+          </span>
           <span className="type-legal text-pump-muted">
             Unlocks at {tierName(item.unlockTier)}
           </span>
         </div>
       </div>
+      <div className="points-market-card__body">
+        <h3 className="points-market-card__title">{item.title}</h3>
+        <p className="points-market-card__desc type-legal text-pump-muted">{item.description}</p>
+      </div>
       <button
         type="button"
-        className={canRedeem ? "primary-button points-market-card__cta" : "secondary-button points-market-card__cta"}
-        disabled={!canRedeem || busy}
+        className={redeemable ? "primary-button points-market-card__cta" : "secondary-button points-market-card__cta"}
+        disabled={!redeemable || busy}
         onClick={() => onRedeem?.(item)}
       >
         {cta}
@@ -75,35 +86,23 @@ type PointsMarketGridProps = {
   level: PointsLevelStatus;
   spendablePoints: number;
   guestMode?: boolean;
-  featuredOnly?: boolean;
   onRedeem?: (item: PointsMarketItem) => void;
   redeemingId?: string | null;
+  ownedItemIds?: Set<string>;
 };
 
 export function PointsMarketGrid({
   level,
   spendablePoints,
   guestMode = false,
-  featuredOnly = false,
   onRedeem,
   redeemingId = null,
+  ownedItemIds,
 }: PointsMarketGridProps) {
-  const items = featuredOnly ? getFeaturedMarketItems(3) : [...POINTS_MARKET_CATALOG];
+  const items = [...POINTS_MARKET_CATALOG];
 
   return (
-    <section className="points-market" aria-label="Points market">
-      {!featuredOnly ? (
-        <header className="points-market__head">
-          <h2 className="section-heading">Market</h2>
-          <p className="type-legal text-pump-muted">
-            Spend Pump Points on boosts and access. Redeemed items appear in Activity → Inventory.
-          </p>
-        </header>
-      ) : (
-        <header className="points-market__head points-market__head--compact">
-          <h2 className="section-heading">Featured rewards</h2>
-        </header>
-      )}
+    <section className="points-market" aria-label={REWARDS_MARKET.shopAria}>
       <div className="points-market__grid">
         {items.map((item) => (
           <PointsMarketCard
@@ -113,6 +112,7 @@ export function PointsMarketGrid({
             spendablePoints={spendablePoints}
             guestMode={guestMode}
             redeemingId={redeemingId}
+            ownedItemIds={ownedItemIds}
             onRedeem={guestMode ? undefined : onRedeem}
           />
         ))}

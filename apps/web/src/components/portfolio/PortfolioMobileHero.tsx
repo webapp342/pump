@@ -230,7 +230,7 @@ export function PortfolioMobileHero({
           {!guestMode ? (
             <div className="portfolio-mobile-hero__toolbar">
               {showWalletActions ? (
-                <Link href="/missions" className="portfolio-mobile-hero__toolbar-btn" aria-label="Missions">
+                <Link href="/missions" className="portfolio-mobile-hero__toolbar-btn" aria-label="Rewards">
                   <PumpIcon icon={faBolt} className="portfolio-mobile-hero__toolbar-icon" />
                 </Link>
               ) : null}

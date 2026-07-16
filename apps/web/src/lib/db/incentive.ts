@@ -688,40 +688,9 @@ export async function redeemMarketItem(input: {
   }
 }
 
-export async function getPointsLedger(
-  address: string,
-  limit = 40
-): Promise<import("@/lib/points-activity-types").PointsLedgerEntry[]> {
-  const db = getIncentivePool();
-  const result = await db.query<{
-    id: string | number;
-    points_awarded: number;
-    task_type: string;
-    created_at: Date;
-    metadata: Record<string, unknown> | null;
-  }>(
-    `
-      SELECT id, points_awarded, task_type, created_at, metadata
-      FROM points_audit_log
-      WHERE address = $1
-      ORDER BY created_at DESC, id DESC
-      LIMIT $2
-    `,
-    [address.toLowerCase(), Math.min(100, Math.max(1, limit))]
-  );
-
-  return result.rows.map((row) => ({
-    id: Number(row.id),
-    pointsDelta: Number(row.points_awarded),
-    taskType: row.task_type,
-    createdAt: row.created_at.toISOString(),
-    metadata: row.metadata,
-  }));
-}
-
 export async function getPointsInventory(
   address: string
-): Promise<import("@/lib/points-activity-types").PointsInventoryItem[]> {
+): Promise<import("@/lib/points-inventory-types").PointsInventoryItem[]> {
   const db = getIncentivePool();
   try {
     const result = await db.query<{
@@ -747,5 +716,70 @@ export async function getPointsInventory(
     }));
   } catch {
     return [];
+  }
+}
+
+export type XpLeaderboardEntry = {
+  rank: number;
+  address: string;
+  username: string | null;
+  lifetimePoints: number;
+};
+
+/** Top traders by lifetime XP (falls back to spendable points if lifetime column missing). */
+export async function getXpLeaderboard(limit = 100): Promise<XpLeaderboardEntry[]> {
+  const db = getIncentivePool();
+  const safeLimit = Math.min(100, Math.max(1, Math.floor(limit)));
+
+  try {
+    const result = await db.query<{
+      address: string;
+      username: string | null;
+      lifetime_points: string | number;
+    }>(
+      `
+        SELECT
+          address,
+          username,
+          COALESCE(points_lifetime, points, 0) AS lifetime_points
+        FROM users
+        WHERE COALESCE(points_lifetime, points, 0) > 0
+        ORDER BY COALESCE(points_lifetime, points, 0) DESC, address ASC
+        LIMIT $1
+      `,
+      [safeLimit]
+    );
+
+    return result.rows.map((row, index) => ({
+      rank: index + 1,
+      address: row.address,
+      username: row.username,
+      lifetimePoints: Number(row.lifetime_points) || 0,
+    }));
+  } catch {
+    const result = await db.query<{
+      address: string;
+      username: string | null;
+      lifetime_points: string | number;
+    }>(
+      `
+        SELECT
+          address,
+          username,
+          COALESCE(points, 0) AS lifetime_points
+        FROM users
+        WHERE COALESCE(points, 0) > 0
+        ORDER BY COALESCE(points, 0) DESC, address ASC
+        LIMIT $1
+      `,
+      [safeLimit]
+    );
+
+    return result.rows.map((row, index) => ({
+      rank: index + 1,
+      address: row.address,
+      username: row.username,
+      lifetimePoints: Number(row.lifetime_points) || 0,
+    }));
   }
 }

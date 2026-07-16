@@ -1,53 +1,48 @@
-# Missions / Pump Points — UI overrides
+# Rewards hub — UI overrides
 
-Overrides `MASTER.md` for `/missions` only. Product: **Pump Points loyalty hub** (earn + levels + market).
+Overrides `MASTER.md` for `/missions` only (internal route). Product: **Rewards** loyalty hub.
 
-## Product model (V1 + Faz 2 redeem)
+## Naming (user-facing)
+
+Fintech pattern: Rewards hub + Challenges + Perks + Leaderboard. Currency: **XP**.
+
+| Surface | Label |
+|---------|-------|
+| Nav | Rewards |
+| Status | Available XP · Rank (+ tip) |
+| Tabs | Challenges · Perks · Leaderboard |
+| Perks sub | Catalog · Owned |
+| List column | Challenge |
+
+Do not show “Missions” or “Pump Points” in UI. Route `/missions` may stay for now.
+
+## Product model
 
 | Surface | Behavior |
 |---------|----------|
-| Route | `/missions` · `?tab=overview\|earn\|levels\|market\|activity` |
-| Branding | Hero / status: **Pump Points**; nav label stays **Missions** |
-| Earn | Existing system + admin_link missions |
-| Levels | `users.points_lifetime` → Rookie → Cyclops |
-| Market | Catalog redeem via `POST /api/missions/redeem` → inventory |
-| Activity | Ledger (`points_audit_log`) + inventory |
-| Spendable | `users.points` (debited on redeem; lifetime never drops) |
-| Guest | Same IA with zeros + Sign in footer |
+| Route | `/missions` · `?tab=earn\|market\|leaderboard` (`levels` redirects to earn) |
+| Challenges | System + admin_link tasks |
+| Ranks | Shown in status tip (lifetime XP ladder) — no hub tab |
+| Perks Catalog | Redeem via `POST /api/missions/redeem` |
+| Perks Owned | `GET /api/missions/inventory` |
+| Leaderboard | Top 100 by lifetime XP · reward pool = 25% of treasury (USD) · share ∝ XP weight |
+| Perk effects | Catalog copy = product contract; effect wiring still TODO |
+| Copy source | `apps/web/src/lib/rewards-copy.ts` · catalog `points-market-catalog.ts` |
 
 Migration: `db/migrations/036_points_redeem.sql`
 
 ## Layout
 
-### Mobile
-1. Status card (`PointsStatusCard`): balance · tier chip · progress to next · Completed/Open/Volume  
-2. Hub tabs: Overview · Earn · Levels · Market  
-3. Overview: featured market + open missions snapshot  
-4. Earn: Open/Completed filter + mission rows with CDS icon tiles  
+1. Status strip: Available XP (hero) · tier name + tip · progress — elevation-1 panel  
+2. Hub tabs: Challenges · Perks · Leaderboard  
+3. Challenges / Perks cards: `--missions-panel-bg` = `--pump-card` (global elevation-1) + edge vs page `--pump-bg`  
+4. Leaderboard: Reward pool + #1 share + Seats (mobile: pool + seats only) · XP-weighted table  
+5. Mobile: hide hub + filter refresh controls
 
-### Desktop (`≥ md`)
-1. **Left rail ~360px**: sticky status card + compact level ladder  
-2. **Main**: hub tabs + tab body (earn table / market grid / levels)  
+## Panel surface rule (Rewards)
 
-## Tokens / components
+App-wide dark panels use elevation-1 (`--pump-card` = `#141519`). Rewards matches that via `--missions-panel-bg`.
 
-- Surfaces: `panel-surface` for status + market cards only (interaction containers)  
-- Icons: `PumpIcon` CDS; mission row tiles via `missionIcon()`  
-- Numbers: `.financial-value` + `pts` unit  
-- Volume unit: `NATIVE_SYMBOL` (BNB) — never ETH in guest copy  
+## Out of scope
 
-## Files
-
-| Piece | Path |
-|-------|------|
-| Panel | `apps/web/src/components/missions/MissionsPanel.tsx` |
-| Status | `PointsStatusCard.tsx` |
-| Tabs | `PointsHubTabs.tsx` |
-| Body | `PointsHubBody.tsx` |
-| Levels | `PointsLevelLadder.tsx` + `lib/points-levels.ts` |
-| Market | `PointsMarketGrid.tsx` + `lib/points-market-catalog.ts` |
-| CSS | `.missions-page` / `.points-*` in `globals.css` |
-
-## Out of scope (later)
-
-Seasons, streaks, admin market CRUD, on-chain fee-discount wiring.
+Seasons automation, streaks, admin catalog CRUD, on-chain fee wiring, leaderboard payout execution, URL rename to `/rewards`.

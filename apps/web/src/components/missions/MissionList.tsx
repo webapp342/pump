@@ -7,14 +7,13 @@ import { PumpIcon, faCheck } from "@/lib/icons";
 import { getMissionHref, isAdminLinkMission } from "@/lib/mission-routes";
 import type { MissionListItem } from "@/lib/missions-guest-data";
 import {
-  MISSION_KIND_LABEL,
   formatMissionProgress,
   getMissionActionLabel,
-  missionIcon,
   missionInfoText,
   missionProgressPct,
   missionStatusLabel,
 } from "@/lib/mission-ui";
+import { REWARDS_CHALLENGES, REWARDS_HUB } from "@/lib/rewards-copy";
 
 type MissionRowProps = {
   mission: MissionListItem;
@@ -23,37 +22,6 @@ type MissionRowProps = {
   guestMode?: boolean;
   onAdminLinkClick?: (mission: MissionListItem) => void;
 };
-
-function MissionProgressCell({
-  mission,
-}: {
-  mission: MissionListItem;
-}) {
-  const pct = missionProgressPct(mission.progress);
-  const done = mission.completed;
-
-  if (done) {
-    return <span className="missions-list__dash">—</span>;
-  }
-
-  if (mission.progress && pct != null) {
-    return (
-      <div className="missions-list__progress">
-        <div className="missions-list__progress-meta">
-          <span className="financial-value tabular-nums">
-            {formatMissionProgress(mission.progress)}
-          </span>
-          <span className="financial-value">{Math.round(pct)}%</span>
-        </div>
-        <div className="progress-track">
-          <div className="progress-fill" style={{ width: `${pct}%` }} />
-        </div>
-      </div>
-    );
-  }
-
-  return null;
-}
 
 function missionHasProgressBar(mission: MissionListItem): boolean {
   if (mission.completed) return false;
@@ -74,7 +42,9 @@ export function MissionRow({
   const href = guestMode ? null : getMissionHref(mission);
   const interactive = !guestMode && !done && (isLinkTask || href != null);
   const hasProgressBar = missionHasProgressBar(mission);
-  const kindLabel = MISSION_KIND_LABEL[mission.taskKind];
+  const pct = missionProgressPct(mission.progress);
+  const statusLabel = missionStatusLabel(done, syncing, completing);
+  const infoText = missionInfoText(mission.description);
 
   const rowClassName = [
     "missions-list__row",
@@ -95,95 +65,73 @@ export function MissionRow({
     if (href) router.push(href);
   }
 
-  const statusLabel = missionStatusLabel(done, syncing, completing);
-  const infoText = missionInfoText(mission.description);
-
-  const rowContent = (
-    <>
-      <div className="missions-list__cell missions-list__cell--mission">
-        <div className="missions-list__mission-main">
-          <span className="missions-list__icon-tile" aria-hidden>
-            <PumpIcon icon={missionIcon(mission)} size="sm" className="missions-list__icon" />
-          </span>
-          <div className="missions-list__mission-copy">
-            <div className="missions-list__title-row">
-              <p className="missions-list__title">{mission.title}</p>
-              {infoText ? (
-                <InfoTip label={`About ${mission.title}`} className="missions-list__info">
-                  {infoText}
-                </InfoTip>
-              ) : null}
-              <span className="missions-list__kind missions-list__kind--inline">{kindLabel}</span>
-            </div>
-            <p
-              className={`missions-list__kind missions-list__kind--mobile${
-                hasProgressBar ? " missions-list__kind--hide-mobile-progress" : ""
-              }`}
-            >
-              {kindLabel}
-            </p>
+  return (
+    <div className={rowClassName}>
+      <div className="missions-list__primary">
+        <div className="missions-list__copy">
+          <div className="missions-list__title-row">
+            <p className="missions-list__title">{mission.title}</p>
+            {infoText ? (
+              <InfoTip label={`About ${mission.title}`} className="missions-list__info">
+                {infoText}
+              </InfoTip>
+            ) : null}
           </div>
+        </div>
+
+        <div className="missions-list__trail">
+          <span className="missions-list__reward financial-value">
+            +{mission.rewardPoints} {REWARDS_HUB.unitShort}
+          </span>
+          {done ? (
+            <span className="missions-list__status missions-list__status--done">
+              <PumpIcon icon={faCheck} className="h-3 w-3" aria-hidden />
+              <span>{statusLabel}</span>
+            </span>
+          ) : actionLabel ? (
+            <button
+              type="button"
+              className="missions-list__action"
+              onClick={handleAction}
+              disabled={guestMode || completing}
+            >
+              {completing ? "Opening…" : actionLabel}
+            </button>
+          ) : (
+            <span
+              className={`missions-list__status${
+                syncing ? " missions-list__status--syncing" : ""
+              }`.trim()}
+            >
+              {statusLabel}
+            </span>
+          )}
         </div>
       </div>
 
-      <div
-        className={`missions-list__cell missions-list__cell--progress${
-          !hasProgressBar || done ? " missions-list__cell--progress-empty" : ""
-        }`}
-      >
-        <MissionProgressCell mission={mission} />
-      </div>
-
-      <div className="missions-list__cell missions-list__cell--reward">
-        <span className="missions-list__reward financial-value">+{mission.rewardPoints} pts</span>
-      </div>
-
-      <div className="missions-list__cell missions-list__cell--status">
-        {done ? (
-          <span className="missions-list__status missions-list__status--done">
-            <PumpIcon icon={faCheck} className="h-3 w-3" aria-hidden />
-            <span>{statusLabel}</span>
-          </span>
-        ) : actionLabel ? (
-          <button
-            type="button"
-            className="missions-list__action"
-            onClick={handleAction}
-            disabled={guestMode || completing}
-          >
-            {completing ? "Opening…" : actionLabel}
-          </button>
-        ) : (
-          <span
-            className={`missions-list__status${
-              syncing ? " missions-list__status--syncing" : ""
-            }`.trim()}
-          >
-            {statusLabel}
-          </span>
-        )}
-      </div>
-    </>
+      {hasProgressBar && pct != null && mission.progress ? (
+        <div className="missions-list__progress">
+          <div className="missions-list__progress-meta">
+            <span className="financial-value tabular-nums">
+              {formatMissionProgress(mission.progress)}
+            </span>
+            <span className="financial-value">{Math.round(pct)}%</span>
+          </div>
+          <div className="progress-track">
+            <div className="progress-fill" style={{ width: `${pct}%` }} />
+          </div>
+        </div>
+      ) : null}
+    </div>
   );
-
-  if (interactive) {
-    return (
-      <div className={rowClassName}>
-        {rowContent}
-      </div>
-    );
-  }
-
-  return <div className={rowClassName}>{rowContent}</div>;
 }
 
 export function MissionsListHeader() {
   return (
     <div className="missions-list__head" aria-hidden>
-      <span>Mission</span>
-      <span>Progress</span>
-      <span className="missions-list__head-num">Reward</span>
-      <span className="missions-list__head-num">Status</span>
+      <span>{REWARDS_CHALLENGES.columnTitle}</span>
+      <span className="missions-list__head-num">{REWARDS_CHALLENGES.columnReward}</span>
+      <span className="missions-list__head-num">{REWARDS_CHALLENGES.columnStatus}</span>
     </div>
   );
 }

@@ -8,7 +8,7 @@ import {
   useWaitForTransactionReceipt,
   useWriteContract,
 } from "wagmi";
-import { contracts, explorerTxUrl, pumpChain, shortAddress } from "@/config/chain";
+import { contracts, explorerTxUrl, NATIVE_SYMBOL, pumpChain, shortAddress } from "@/config/chain";
 import { memeFactoryAbi } from "@/lib/abis/meme-factory";
 import { ModalPortal } from "@/components/ui/ModalPortal";
 
@@ -95,7 +95,7 @@ export function AdminMemeCreateFeeModal({
     try {
       newFeeWei = parseEther(bnbInput.trim() || "0");
     } catch {
-      setLocalError("Enter a valid BNB amount");
+      setLocalError(`Enter a valid ${NATIVE_SYMBOL} amount`);
       return;
     }
 
@@ -155,18 +155,18 @@ export function AdminMemeCreateFeeModal({
           Meme launch fee
         </h2>
         <p className="mt-1 text-sm text-pump-muted">
-          Flat BNB fee charged when someone launches a new token. Paid entirely to the treasury.
+          Flat {NATIVE_SYMBOL} fee charged when someone launches a new token. Paid entirely to the treasury.
         </p>
 
         <div className="mt-4 rounded-md border border-pump-border/15 bg-pump-surface/35 px-3 py-2.5">
           <p className="section-label">Current on-chain</p>
           <p className="financial-value mt-1 text-body-sm font-semibold text-pump-text">
-            {currentFeeBnb} BNB
+            {currentFeeBnb} {NATIVE_SYMBOL}
           </p>
         </div>
 
         <label className="mt-4 block">
-          <span className="section-label">New fee (BNB)</span>
+          <span className="section-label">New fee ({NATIVE_SYMBOL})</span>
           <input
             type="text"
             inputMode="decimal"

@@ -2,11 +2,12 @@
 
 import { POINTS_TIERS, type PointsLevelStatus } from "@/lib/points-levels";
 import { PumpIcon, faCheck } from "@/lib/icons";
+import { REWARDS_HUB, REWARDS_RANKS } from "@/lib/rewards-copy";
 
 type PointsLevelLadderProps = {
   level: PointsLevelStatus;
   guestMode?: boolean;
-  /** Compact mini ladder for overview / rail. */
+  /** Compact mini ladder (optional). */
   compact?: boolean;
 };
 
@@ -20,14 +21,12 @@ export function PointsLevelLadder({
   return (
     <section
       className={`points-level-ladder${compact ? " points-level-ladder--compact" : ""}`}
-      aria-label="Loyalty levels"
+      aria-label={REWARDS_RANKS.heading}
     >
       {!compact ? (
         <header className="points-level-ladder__head">
-          <h2 className="section-heading">Levels</h2>
-          <p className="type-legal text-pump-muted">
-            Lifetime Pump Points unlock tiers and perks. Higher tiers open Market items earlier.
-          </p>
+          <h2 className="section-heading">{REWARDS_RANKS.heading}</h2>
+          <p className="type-legal text-pump-muted">{REWARDS_RANKS.description}</p>
         </header>
       ) : null}
 
@@ -57,7 +56,7 @@ export function PointsLevelLadder({
                 <div className="points-level-ladder__title-row">
                   <span className="points-level-ladder__name">{tier.name}</span>
                   <span className="financial-value type-legal text-pump-muted">
-                    {tier.minPoints.toLocaleString()} pts
+                    {tier.minPoints.toLocaleString()} {REWARDS_HUB.unitShort}
                   </span>
                 </div>
                 {!compact ? (

@@ -6,7 +6,7 @@ Overrides `MASTER.md` for `AppNav` / `.bottom-nav` only.
 
 | Rule | Pump status |
 |------|-------------|
-| **3–5 primary tabs** max | ✓ 5 tabs (Trade, Arena, Airdrops, Missions, Portfolio) |
+| **3–5 primary tabs** max | ✓ tabs (Arena, Airdrops, Rewards, Portfolio) |
 | **Safe area** inset bottom | ✓ `--mobile-bottom-nav-offset` uses `env(safe-area-inset-bottom)` |
 | **Icon buttons need labels** | ✓ `aria-label` on each tab; visible text optional (icon-first dock) |
 | **Touch targets** | ✓ `--mobile-bottom-nav-hit-size` 2.5rem (40px) — acceptable with padding |

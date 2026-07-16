@@ -2,10 +2,9 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
 import { normalizeAddressParam } from "@/lib/address";
-import { redeemMarketItem } from "@/lib/db/incentive";
+import { redeemMarketItem, getMissionsForAddress, getPointsInventory } from "@/lib/db/incentive";
 import { POINTS_MARKET_CATALOG } from "@/lib/points-market-catalog";
 import { POINTS_TIERS } from "@/lib/points-levels";
-import { getMissionsForAddress } from "@/lib/db/incentive";
 
 export async function POST(request: NextRequest) {
   try {
@@ -29,6 +28,9 @@ export async function POST(request: NextRequest) {
     if (!item) {
       return NextResponse.json({ error: "Unknown market item" }, { status: 404 });
     }
+    if (item.comingSoon) {
+      return NextResponse.json({ error: "This perk is coming soon" }, { status: 400 });
+    }
 
     const snapshot = await getMissionsForAddress(address);
     const tierIndex = POINTS_TIERS.findIndex((t) => t.id === item.unlockTier);
@@ -47,6 +49,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (item.stackable === false) {
+      const owned = await getPointsInventory(address);
+      if (owned.some((row) => row.itemId === item.id)) {
+        return NextResponse.json({ error: "Already owned" }, { status: 409 });
+      }
+    }
+
     const result = await redeemMarketItem({
       address,
       itemId: item.id,
@@ -56,7 +65,7 @@ export async function POST(request: NextRequest) {
     });
 
     if (result.status === "INSUFFICIENT") {
-      return NextResponse.json({ error: "Not enough Pump Points" }, { status: 400 });
+      return NextResponse.json({ error: "Not enough XP" }, { status: 400 });
     }
     if (result.status === "UNAVAILABLE") {
       return NextResponse.json(

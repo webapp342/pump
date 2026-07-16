@@ -22,7 +22,7 @@ export type Mission = {
 
 export type MissionsData = {
   address: string;
-  /** Spendable Pump Points balance. */
+  /** Spendable XP balance. */
   totalPoints: number;
   /** Lifetime earned — used for levels. */
   lifetimePoints: number;

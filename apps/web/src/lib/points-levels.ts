@@ -10,30 +10,30 @@ export type PointsTier = {
 
 /** Lifetime points → loyalty tier (V1 hardcode; admin later). */
 export const POINTS_TIERS: readonly PointsTier[] = [
-  { id: "rookie", name: "Rookie", minPoints: 0, perk: "Base earn rate on all missions." },
+  { id: "rookie", name: "Rookie", minPoints: 0, perk: "Profile badge · 10% cashback tiers (soon)." },
   {
     id: "trader",
     name: "Trader",
     minPoints: 500,
-    perk: "+5% mission points multiplier.",
+    perk: "Launch spotlight · 25% cashback tiers (soon).",
   },
   {
     id: "pro",
     name: "Pro",
     minPoints: 2_000,
-    perk: "Early access badge on your profile.",
+    perk: "Airdrop multiplier · 60% cashback tiers (soon).",
   },
   {
     id: "elite",
     name: "Elite",
     minPoints: 7_500,
-    perk: "Featured mission previews and Market early look.",
+    perk: "90% cashback tiers (soon).",
   },
   {
     id: "cyclops",
     name: "Cyclops",
     minPoints: 25_000,
-    perk: "Priority waitlist for future campaigns.",
+    perk: "Top rank — full catalog access.",
   },
 ] as const;
 

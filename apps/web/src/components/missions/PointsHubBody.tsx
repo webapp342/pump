@@ -3,91 +3,14 @@
 import type { ReactNode } from "react";
 import { MissionsFilterNav } from "@/components/missions/MissionsFilterNav";
 import { MissionsList } from "@/components/missions/MissionList";
-import { PointsActivityPanel } from "@/components/missions/PointsActivityPanel";
-import { PointsLevelLadder } from "@/components/missions/PointsLevelLadder";
-import { PointsMarketGrid } from "@/components/missions/PointsMarketGrid";
+import { PointsLeaderboardPanel } from "@/components/missions/PointsLeaderboardPanel";
+import { PointsMarketPanel } from "@/components/missions/PointsMarketPanel";
 import type { MissionListItem } from "@/lib/missions-guest-data";
 import type { MissionFilter } from "@/lib/missions-types";
 import type { PointsLevelStatus } from "@/lib/points-levels";
-import type { PointsHubTab } from "@/lib/points-hub-tabs";
+import type { PointsHubTab, PointsMarketView } from "@/lib/points-hub-tabs";
 import type { PointsMarketItem } from "@/lib/points-market-catalog";
-
-type PointsOverviewProps = {
-  level: PointsLevelStatus;
-  spendablePoints: number;
-  openMissions: MissionListItem[];
-  guestMode?: boolean;
-  pendingKeys?: string[];
-  completingKey?: string | null;
-  redeemingId?: string | null;
-  onAdminLinkClick?: (mission: MissionListItem) => void;
-  onRedeem?: (item: PointsMarketItem) => void;
-  onGoEarn: () => void;
-  onGoMarket: () => void;
-  footerSlot?: ReactNode;
-};
-
-export function PointsOverview({
-  level,
-  spendablePoints,
-  openMissions,
-  guestMode = false,
-  pendingKeys = [],
-  completingKey = null,
-  redeemingId = null,
-  onAdminLinkClick,
-  onRedeem,
-  onGoEarn,
-  onGoMarket,
-  footerSlot,
-}: PointsOverviewProps) {
-  const preview = openMissions.slice(0, 4);
-
-  return (
-    <div className="points-overview">
-      <div className="points-overview__market">
-        <PointsMarketGrid
-          level={level}
-          spendablePoints={spendablePoints}
-          guestMode={guestMode}
-          featuredOnly
-          redeemingId={redeemingId}
-          onRedeem={onRedeem}
-        />
-        <button type="button" className="chip-button points-overview__link" onClick={onGoMarket}>
-          View market
-        </button>
-      </div>
-
-      <div className="points-overview__earn">
-        <header className="points-overview__section-head">
-          <h2 className="section-heading">Open missions</h2>
-          <button type="button" className="chip-button" onClick={onGoEarn}>
-            All earn
-          </button>
-        </header>
-        {preview.length > 0 ? (
-          <MissionsList
-            missions={preview}
-            guestMode={guestMode}
-            pendingKeys={pendingKeys}
-            completingKey={completingKey}
-            onAdminLinkClick={onAdminLinkClick}
-            footerSlot={footerSlot}
-          />
-        ) : (
-          <div className="empty-state missions-empty-state">
-            <p className="empty-state-copy">All caught up.</p>
-          </div>
-        )}
-      </div>
-
-      <div className="points-overview__levels md:hidden">
-        <PointsLevelLadder level={level} guestMode={guestMode} compact />
-      </div>
-    </div>
-  );
-}
+import { REWARDS_CHALLENGES } from "@/lib/rewards-copy";
 
 type PointsEarnPanelProps = {
   missions: MissionListItem[];
@@ -150,10 +73,11 @@ export function PointsEarnPanel({
 
 type PointsHubBodyProps = {
   tab: PointsHubTab;
+  marketView: PointsMarketView;
+  onSelectMarketView: (view: PointsMarketView) => void;
   level: PointsLevelStatus;
   spendablePoints: number;
   address?: string;
-  openMissions: MissionListItem[];
   boardMissions: MissionListItem[];
   activeFilter: MissionFilter;
   filterCounts: Record<MissionFilter, number>;
@@ -162,20 +86,22 @@ type PointsHubBodyProps = {
   pendingKeys?: string[];
   completingKey?: string | null;
   redeemingId?: string | null;
+  inventoryRefreshKey?: number;
+  leaderboardRefreshKey?: number;
   onSelectFilter: (filter: MissionFilter) => void;
   onRefresh: () => void;
   onAdminLinkClick?: (mission: MissionListItem) => void;
   onRedeem?: (item: PointsMarketItem) => void;
-  onSelectTab: (tab: PointsHubTab) => void;
   footerSlot?: ReactNode;
 };
 
 export function PointsHubBody({
   tab,
+  marketView,
+  onSelectMarketView,
   level,
   spendablePoints,
   address = "",
-  openMissions,
   boardMissions,
   activeFilter,
   filterCounts,
@@ -184,56 +110,34 @@ export function PointsHubBody({
   pendingKeys = [],
   completingKey = null,
   redeemingId = null,
+  inventoryRefreshKey = 0,
+  leaderboardRefreshKey = 0,
   onSelectFilter,
   onRefresh,
   onAdminLinkClick,
   onRedeem,
-  onSelectTab,
   footerSlot,
 }: PointsHubBodyProps) {
-  if (tab === "overview") {
-    return (
-      <PointsOverview
-        level={level}
-        spendablePoints={spendablePoints}
-        openMissions={openMissions}
-        guestMode={guestMode}
-        pendingKeys={pendingKeys}
-        completingKey={completingKey}
-        redeemingId={redeemingId}
-        onAdminLinkClick={onAdminLinkClick}
-        onRedeem={onRedeem}
-        onGoEarn={() => onSelectTab("earn")}
-        onGoMarket={() => onSelectTab("market")}
-        footerSlot={footerSlot}
-      />
-    );
-  }
-
-  if (tab === "levels") {
-    return (
-      <div className="points-hub-panel">
-        <PointsLevelLadder level={level} guestMode={guestMode} />
-      </div>
-    );
+  if (tab === "leaderboard") {
+    return <PointsLeaderboardPanel address={address} refreshKey={leaderboardRefreshKey} />;
   }
 
   if (tab === "market") {
     return (
-      <div className="points-hub-panel">
-        <PointsMarketGrid
-          level={level}
-          spendablePoints={spendablePoints}
-          guestMode={guestMode}
-          redeemingId={redeemingId}
-          onRedeem={onRedeem}
-        />
-      </div>
+      <PointsMarketPanel
+        view={marketView}
+        onSelectView={onSelectMarketView}
+        level={level}
+        spendablePoints={spendablePoints}
+        address={address}
+        guestMode={guestMode}
+        redeemingId={redeemingId}
+        inventoryRefreshKey={inventoryRefreshKey}
+        loading={loading}
+        onRefresh={onRefresh}
+        onRedeem={onRedeem}
+      />
     );
-  }
-
-  if (tab === "activity") {
-    return <PointsActivityPanel address={address} guestMode={guestMode} />;
   }
 
   return (
@@ -249,7 +153,9 @@ export function PointsHubBody({
       onRefresh={onRefresh}
       onAdminLinkClick={onAdminLinkClick}
       footerSlot={footerSlot}
-      emptyCopy={activeFilter === "done" ? "Nothing completed yet." : "All caught up."}
+      emptyCopy={
+        activeFilter === "done" ? REWARDS_CHALLENGES.emptyDone : REWARDS_CHALLENGES.emptyOpen
+      }
     />
   );
 }

@@ -29,7 +29,7 @@ export const GUEST_MISSION_ROWS: MissionListItem[] = [
   {
     taskKey: "LAUNCHPAD_DEPLOY_MEME",
     title: "Launch Your Meme",
-    description: "Create your own token on Pump.",
+    description: "Create your own token on the launchpad.",
     rewardPoints: 200,
     taskKind: "ONE_TIME",
     completed: false,

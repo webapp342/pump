@@ -2,6 +2,7 @@
 
 import { POINTS_HUB_TABS, type PointsHubTab } from "@/lib/points-hub-tabs";
 import { PumpIcon, faRotateCw } from "@/lib/icons";
+import { REWARDS_HUB } from "@/lib/rewards-copy";
 
 type PointsHubTabsProps = {
   activeTab: PointsHubTab;
@@ -20,7 +21,7 @@ export function PointsHubTabs({
 }: PointsHubTabsProps) {
   return (
     <div className="points-hub-tabs">
-      <nav className="points-hub-tabs__nav" aria-label="Pump Points sections">
+      <nav className="points-hub-tabs__nav" aria-label={REWARDS_HUB.hubTabsAria}>
         <div className="points-hub-tabs__track" role="tablist">
           {POINTS_HUB_TABS.map(({ id, label }) => {
             const isActive = activeTab === id;

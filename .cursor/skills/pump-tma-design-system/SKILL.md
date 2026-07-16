@@ -14,7 +14,7 @@ Authoritative visual and layout spec for Pump. Supersedes spreadsheet/Excel meta
 
 1. **Sector-standard navigation** — Top horizontal bar on desktop; bottom tab bar on mobile. No persistent left sidebar (pump.fun, DexScreener, Binance Lite, Robinhood all use top + bottom patterns, not Excel-style side rails).
 2. **Price belongs in content, actions in dock** — Token price, mcap, and 24h change live in the header/chart summary. The mobile trade dock is **actions only**: full-width Buy | Sell split. Never duplicate price left / % right in the dock (non-standard, wastes thumb zone).
-3. **Layered dark surfaces** — Avoid flat black and spreadsheet grid lines. Use tonal elevation (`bg` → `surface` → `card`) with subtle borders and 6–8px radius. Reference: DexScreener dark UI, 2025–2026 fintech dark-mode guides (layered `#06080c` base, `#101622` cards).
+3. **Layered dark surfaces** — Avoid flat black and spreadsheet grid lines. Page `bg` → panel/sheet/modal `card` (elevation-1) → nested `card-soft`, with clear borders and 6–8px radius. Do not fill primary panels with old elevation-2 `#1E2025`.
 4. **Data density without grid prison** — Keep pro-trader information density; use row dividers and card containers instead of full cell borders. Tables = clean data tables, not Excel worksheets.
 5. **Semantic color discipline** — Green/red for P&L only (universal trading convention). Accent for brand/actions. Muted for labels. WCAG 4.5:1 on body text; supplement red/green with +/- signs.
 6. **4px spacing grid** — All padding, gaps, and min-heights on multiples of 4. Touch targets ≥ 44px on primary trade actions.
@@ -48,14 +48,14 @@ Two Coinbase CDS themes: `light`, `dark`. Default resolved theme: system prefere
 | Token | CDS light | CDS dark |
 |-------|-----------|----------|
 | `--pump-bg` | gray5 `#F7F8F9` | gray0 `#0A0B0D` |
-| `--pump-card` | `#FFFFFF` | bgElevation2 gray10 `#1E2025` |
-| `--pump-card-soft` | gray10 `#EEF0F3` | gray15 `#282B31` |
+| `--pump-surface` / `--pump-card` | `#FFFFFF` | bgElevation1 `#141519` |
+| `--pump-card-soft` | gray10 `#EEF0F3` | former elev2 `#1E2025` (nested fills) |
 | `--pump-accent` | blue60 `#0052FF` | blue70 `#578BFA` |
 | `--pump-text` | gray100 `#0A0B0D` | `#FFFFFF` |
 | `--pump-muted` | gray60 | gray60 `#8A919E` |
 | `--pump-success` / `--pump-danger` | green60 / red60 | green60 / red60 |
 
-**Elevation ladder (dark):** `#0A0B0D` → `#141519` → `#1E2025` → `#282B31` — color steps, not borders (Coinbase CDS `bgElevation1/2`).
+**Elevation ladder (dark):** `#0A0B0D` (page) → `#141519` (panels / sheets / modals / cards) → `#1E2025` (`card-soft` nested). Do not use old elevation-2 `#1E2025` as the primary panel fill.
 
 ## Typography
 

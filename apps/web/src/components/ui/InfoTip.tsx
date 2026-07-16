@@ -17,6 +17,8 @@ type InfoTipProps = {
   label: string;
   children: ReactNode;
   className?: string;
+  /** Extra classes on the floating panel (e.g. hide caret). */
+  panelClassName?: string;
 };
 
 type PanelPosition = {
@@ -32,7 +34,7 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
 }
 
-export function InfoTip({ label, children, className = "" }: InfoTipProps) {
+export function InfoTip({ label, children, className = "", panelClassName = "" }: InfoTipProps) {
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [position, setPosition] = useState<PanelPosition | null>(null);
@@ -130,7 +132,7 @@ export function InfoTip({ label, children, className = "" }: InfoTipProps) {
         role="tooltip"
         className={`info-tip__panel info-tip__panel--floating${
           position ? ` info-tip__panel--${position.placement}` : ""
-        }`}
+        } ${panelClassName}`.trim()}
         style={
           position
             ? { top: `${position.top}px`, left: `${position.left}px` }
