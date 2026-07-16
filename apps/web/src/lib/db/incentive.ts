@@ -49,7 +49,10 @@ export type AdminLinkTask = {
 
 export type MissionsSnapshot = {
   address: string;
+  /** Spendable balance (users.points). */
   totalPoints: number;
+  /** Lifetime earned — drives levels (users.points_lifetime). */
+  lifetimePoints: number;
   missions: MissionItem[];
   todayUtc: string;
 };
@@ -119,10 +122,7 @@ export async function getMissionsForAddress(address: string): Promise<MissionsSn
       `,
       [address, todayUtc]
     ),
-    db.query<{ points: number | null }>(
-      "SELECT points FROM users WHERE address = $1",
-      [address]
-    ),
+    getUserPointsBalances(db, address),
   ]);
 
   const missions: MissionItem[] = missionsResult.rows.map((row) => ({
@@ -140,10 +140,39 @@ export async function getMissionsForAddress(address: string): Promise<MissionsSn
 
   return {
     address,
-    totalPoints: pointsResult.rows[0]?.points ?? 0,
+    totalPoints: pointsResult.spendable,
+    lifetimePoints: pointsResult.lifetime,
     missions,
     todayUtc,
   };
+}
+
+async function getUserPointsBalances(
+  db: Pool,
+  address: string
+): Promise<{ spendable: number; lifetime: number }> {
+  try {
+    const result = await db.query<{ points: number | null; points_lifetime: number | null }>(
+      `
+        SELECT
+          points,
+          COALESCE(points_lifetime, points, 0) AS points_lifetime
+        FROM users
+        WHERE address = $1
+      `,
+      [address]
+    );
+    const spendable = Number(result.rows[0]?.points ?? 0);
+    const lifetime = Number(result.rows[0]?.points_lifetime ?? spendable);
+    return { spendable, lifetime: Math.max(lifetime, spendable) };
+  } catch {
+    const result = await db.query<{ points: number | null }>(
+      "SELECT points FROM users WHERE address = $1",
+      [address]
+    );
+    const spendable = Number(result.rows[0]?.points ?? 0);
+    return { spendable, lifetime: spendable };
+  }
 }
 
 /**
@@ -565,4 +594,158 @@ export async function completeAdminLinkTask(
   const status = row?.status === "SYNCED" ? "SYNCED" : "SKIPPED";
 
   return { status, pointsAwarded };
+}
+
+export type RedeemPointsResult = {
+  status: "COMPLETED" | "IDEMPOTENT" | "INSUFFICIENT" | "UNAVAILABLE" | "ERROR";
+  pointsSpent: number;
+  spendablePoints: number;
+  lifetimePoints: number;
+  inventoryId: number | null;
+  error?: string;
+};
+
+export async function redeemMarketItem(input: {
+  address: string;
+  itemId: string;
+  costPts: number;
+  redeemKey: string;
+  metadata?: Record<string, unknown>;
+}): Promise<RedeemPointsResult> {
+  const db = getIncentivePool();
+  const normalized = input.address.toLowerCase();
+
+  try {
+    const result = await db.query<{
+      status: string;
+      points_spent: number;
+      spendable_points: string | number;
+      lifetime_points: string | number;
+      inventory_id: string | number | null;
+    }>(
+      `
+        SELECT status, points_spent, spendable_points, lifetime_points, inventory_id
+        FROM launchpad_redeem_points($1, $2, $3, $4, $5::jsonb)
+      `,
+      [
+        normalized,
+        input.itemId,
+        input.costPts,
+        input.redeemKey,
+        JSON.stringify(input.metadata ?? {}),
+      ]
+    );
+
+    const row = result.rows[0];
+    if (!row) {
+      return {
+        status: "ERROR",
+        pointsSpent: 0,
+        spendablePoints: 0,
+        lifetimePoints: 0,
+        inventoryId: null,
+        error: "Empty redeem response",
+      };
+    }
+
+    return {
+      status: row.status === "IDEMPOTENT" ? "IDEMPOTENT" : "COMPLETED",
+      pointsSpent: Number(row.points_spent ?? 0),
+      spendablePoints: Number(row.spendable_points ?? 0),
+      lifetimePoints: Number(row.lifetime_points ?? 0),
+      inventoryId: row.inventory_id != null ? Number(row.inventory_id) : null,
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Redeem failed";
+    if (message.includes("insufficient_points")) {
+      return {
+        status: "INSUFFICIENT",
+        pointsSpent: 0,
+        spendablePoints: 0,
+        lifetimePoints: 0,
+        inventoryId: null,
+        error: message,
+      };
+    }
+    if (message.includes("launchpad_redeem_points") || message.includes("does not exist")) {
+      return {
+        status: "UNAVAILABLE",
+        pointsSpent: 0,
+        spendablePoints: 0,
+        lifetimePoints: 0,
+        inventoryId: null,
+        error: "Redeem is not available until migration 036 is applied.",
+      };
+    }
+    return {
+      status: "ERROR",
+      pointsSpent: 0,
+      spendablePoints: 0,
+      lifetimePoints: 0,
+      inventoryId: null,
+      error: message,
+    };
+  }
+}
+
+export async function getPointsLedger(
+  address: string,
+  limit = 40
+): Promise<import("@/lib/points-activity-types").PointsLedgerEntry[]> {
+  const db = getIncentivePool();
+  const result = await db.query<{
+    id: string | number;
+    points_awarded: number;
+    task_type: string;
+    created_at: Date;
+    metadata: Record<string, unknown> | null;
+  }>(
+    `
+      SELECT id, points_awarded, task_type, created_at, metadata
+      FROM points_audit_log
+      WHERE address = $1
+      ORDER BY created_at DESC, id DESC
+      LIMIT $2
+    `,
+    [address.toLowerCase(), Math.min(100, Math.max(1, limit))]
+  );
+
+  return result.rows.map((row) => ({
+    id: Number(row.id),
+    pointsDelta: Number(row.points_awarded),
+    taskType: row.task_type,
+    createdAt: row.created_at.toISOString(),
+    metadata: row.metadata,
+  }));
+}
+
+export async function getPointsInventory(
+  address: string
+): Promise<import("@/lib/points-activity-types").PointsInventoryItem[]> {
+  const db = getIncentivePool();
+  try {
+    const result = await db.query<{
+      id: string | number;
+      item_id: string;
+      status: string;
+      created_at: Date;
+    }>(
+      `
+        SELECT id, item_id, status, created_at
+        FROM points_inventory
+        WHERE address = $1
+        ORDER BY created_at DESC, id DESC
+        LIMIT 50
+      `,
+      [address.toLowerCase()]
+    );
+    return result.rows.map((row) => ({
+      id: Number(row.id),
+      itemId: row.item_id,
+      status: row.status,
+      createdAt: row.created_at.toISOString(),
+    }));
+  } catch {
+    return [];
+  }
 }

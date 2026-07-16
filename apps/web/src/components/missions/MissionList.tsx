@@ -10,6 +10,7 @@ import {
   MISSION_KIND_LABEL,
   formatMissionProgress,
   getMissionActionLabel,
+  missionIcon,
   missionInfoText,
   missionProgressPct,
   missionStatusLabel,
@@ -100,22 +101,29 @@ export function MissionRow({
   const rowContent = (
     <>
       <div className="missions-list__cell missions-list__cell--mission">
-        <div className="missions-list__title-row">
-          <p className="missions-list__title">{mission.title}</p>
-          {infoText ? (
-            <InfoTip label={`About ${mission.title}`} className="missions-list__info">
-              {infoText}
-            </InfoTip>
-          ) : null}
-          <span className="missions-list__kind missions-list__kind--inline">{kindLabel}</span>
+        <div className="missions-list__mission-main">
+          <span className="missions-list__icon-tile" aria-hidden>
+            <PumpIcon icon={missionIcon(mission)} size="sm" className="missions-list__icon" />
+          </span>
+          <div className="missions-list__mission-copy">
+            <div className="missions-list__title-row">
+              <p className="missions-list__title">{mission.title}</p>
+              {infoText ? (
+                <InfoTip label={`About ${mission.title}`} className="missions-list__info">
+                  {infoText}
+                </InfoTip>
+              ) : null}
+              <span className="missions-list__kind missions-list__kind--inline">{kindLabel}</span>
+            </div>
+            <p
+              className={`missions-list__kind missions-list__kind--mobile${
+                hasProgressBar ? " missions-list__kind--hide-mobile-progress" : ""
+              }`}
+            >
+              {kindLabel}
+            </p>
+          </div>
         </div>
-        <p
-          className={`missions-list__kind missions-list__kind--mobile${
-            hasProgressBar ? " missions-list__kind--hide-mobile-progress" : ""
-          }`}
-        >
-          {kindLabel}
-        </p>
       </div>
 
       <div
@@ -127,7 +135,7 @@ export function MissionRow({
       </div>
 
       <div className="missions-list__cell missions-list__cell--reward">
-        <span className="missions-list__reward financial-value">+{mission.rewardPoints}</span>
+        <span className="missions-list__reward financial-value">+{mission.rewardPoints} pts</span>
       </div>
 
       <div className="missions-list__cell missions-list__cell--status">

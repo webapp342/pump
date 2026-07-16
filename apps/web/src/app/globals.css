@@ -2564,12 +2564,24 @@ code,
       padding-bottom: var(--mobile-bottom-nav-height);
     }
 
-    html.hub-discovery-scroll-lock .missions-page .missions-body {
+    html.hub-discovery-scroll-lock .missions-page .missions-body,
+    html.hub-discovery-scroll-lock .missions-page .points-hub__body,
+    html.hub-discovery-scroll-lock .missions-page .points-earn {
       flex: 1 1 0;
       min-height: 0;
       overflow: hidden;
       display: flex;
       flex-direction: column;
+    }
+
+    html.hub-discovery-scroll-lock .missions-page .points-overview,
+    html.hub-discovery-scroll-lock .missions-page .points-hub-panel {
+      flex: 1 1 0;
+      min-height: 0;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      -webkit-overflow-scrolling: touch;
+      padding-bottom: var(--mobile-bottom-nav-height);
     }
 
     html.hub-discovery-scroll-lock .missions-page .missions-body:not(:has(.missions-list)) {
@@ -6998,6 +7010,7 @@ code,
 
     /* Tab/filter strips — open sides like portfolio (cover main side rails) */
     .app-shell--hub-terminal .missions-page .missions-filter-bar,
+    .app-shell--hub-terminal .missions-page .points-hub-tabs,
     .app-shell--hub-terminal .portfolio-page .portfolio-tab-nav {
       width: calc(100% + 2px);
       margin-inline: -1px;
@@ -17359,9 +17372,18 @@ code,
       overflow: hidden;
     }
 
+    .missions-page .points-hub__layout,
+    .missions-page .points-hub__main {
+      flex: 1 1 0;
+      min-height: 0;
+      overflow: hidden;
+    }
+
     .missions-page .missions-header,
     .missions-page .missions-filter-bar,
-    .missions-page .missions-notice {
+    .missions-page .missions-notice,
+    .missions-page .points-hub__status-mobile,
+    .missions-page .points-hub-tabs {
       flex-shrink: 0;
     }
 
@@ -17407,9 +17429,23 @@ code,
     }
 
     main.missions-page-main {
-      flex: 1 1 0;
+      flex: 1 1 auto;
       min-height: 0;
-      overflow: hidden;
+      overflow-y: auto;
+      overflow-x: hidden;
+    }
+
+    .missions-page {
+      max-width: 72rem;
+    }
+
+    .missions-page .points-hub,
+    .missions-page .points-hub__layout,
+    .missions-page .points-hub__main {
+      flex: none;
+      min-height: auto;
+      overflow: visible;
+      height: auto;
     }
   }
 
@@ -17670,8 +17706,9 @@ code,
 
   .missions-page .missions-list__kind {
     margin: 0;
-    font-size: var(--text-caption);
-    color: rgb(var(--pump-muted));
+    font-size: var(--type-legal-font-size, var(--text-caption));
+    font-weight: var(--weight-ui);
+    color: rgb(var(--pump-muted) / 0.92);
     white-space: nowrap;
   }
 
@@ -17886,6 +17923,581 @@ code,
     .missions-page .missions-sign-in-banner__desc {
       display: none;
     }
+  }
+
+  /* ── Pump Points loyalty hub ── */
+  .missions-page .points-hub {
+    flex: 1 1 0;
+    min-height: 0;
+  }
+
+  .missions-page .points-hub__layout {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    min-height: 0;
+    flex: 1 1 0;
+  }
+
+  .missions-page .points-hub__rail {
+    display: none;
+  }
+
+  .missions-page .points-hub__main {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    flex: 1 1 0;
+  }
+
+  .missions-page .points-hub__status-mobile {
+    flex-shrink: 0;
+    padding: 0.75rem var(--missions-page-gutter) 0;
+  }
+
+  .missions-page .points-hub__body {
+    flex: 1 1 0;
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  @media (min-width: 768px) {
+    .missions-page .points-hub__layout {
+      flex-direction: row;
+      align-items: flex-start;
+      gap: 1.25rem;
+      padding: 1rem var(--missions-page-gutter) 1.5rem;
+      overflow: visible;
+      flex: none;
+      min-height: auto;
+    }
+
+    .missions-page .points-hub__rail {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      width: 22.5rem;
+      flex: 0 0 22.5rem;
+      position: sticky;
+      top: 1rem;
+      max-height: none;
+      overflow: visible;
+    }
+
+    .missions-page .points-hub__main {
+      flex: 1 1 0;
+      min-width: 0;
+      min-height: auto;
+      overflow: visible;
+    }
+
+    .missions-page .points-hub__body {
+      flex: none;
+      min-height: auto;
+      overflow: visible;
+      display: block;
+    }
+
+    .missions-page .points-overview,
+    .missions-page .points-hub-panel,
+    .missions-page .points-earn {
+      flex: none;
+      overflow: visible;
+      min-height: auto;
+      padding-bottom: 1.5rem;
+    }
+
+    .missions-page .points-earn .missions-body {
+      flex: none;
+      overflow: visible;
+      display: block;
+    }
+
+    .missions-page .points-earn .missions-list,
+    .missions-page .points-earn .missions-list__scroll {
+      flex: none;
+      overflow: visible;
+      min-height: auto;
+      height: auto;
+    }
+  }
+
+  .missions-page .points-status {
+    padding: 1rem;
+    border: 1px solid rgb(var(--pump-border) / 0.22);
+    background: rgb(var(--pump-card));
+  }
+
+  .missions-page .points-status__top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+  }
+
+  .missions-page .points-status__brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    min-width: 0;
+  }
+
+  .missions-page .points-status__brand-icon {
+    color: rgb(var(--pump-accent));
+  }
+
+  .missions-page .points-status__tier-chip {
+    pointer-events: none;
+    min-height: 1.75rem;
+    padding-inline: 0.625rem;
+    font-size: var(--text-caption);
+    color: rgb(var(--pump-accent));
+    border-color: rgb(var(--pump-accent) / 0.35);
+    background: rgb(var(--pump-accent) / 0.1);
+  }
+
+  .missions-page .points-status__balance {
+    margin: 0.5rem 0 0;
+    font-size: var(--text-h2, 1.75rem);
+    font-weight: var(--weight-emphasis);
+    line-height: 1.15;
+  }
+
+  .missions-page .points-status__balance-unit {
+    margin-left: 0.35rem;
+    font-size: var(--text-caption);
+    font-weight: var(--weight-ui);
+    color: rgb(var(--pump-muted));
+  }
+
+  .missions-page .points-status__earn {
+    margin: 0.25rem 0 0;
+    font-size: var(--text-caption);
+    color: rgb(var(--pump-muted));
+  }
+
+  .missions-page .points-status__level {
+    margin-top: 0.875rem;
+  }
+
+  .missions-page .points-status__level-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-bottom: 0.375rem;
+  }
+
+  .missions-page .points-status__progress {
+    height: 0.375rem;
+  }
+
+  .missions-page .points-status__stats {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.5rem;
+    margin-top: 1rem;
+    padding-top: 0.875rem;
+    border-top: 1px solid rgb(var(--pump-border) / 0.14);
+  }
+
+  .missions-page .points-status__stat {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    min-width: 0;
+  }
+
+  .missions-page .points-status__stat .section-label {
+    font-size: var(--text-caption);
+  }
+
+  .missions-page .points-status__stat .financial-value {
+    font-size: var(--text-body-sm);
+    color: rgb(var(--pump-text));
+  }
+
+  .missions-page .points-status__stat-suffix {
+    color: rgb(var(--pump-muted));
+    font-weight: var(--weight-ui);
+  }
+
+  .missions-page .points-hub-tabs {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    flex-shrink: 0;
+    border-bottom: 1px solid rgb(var(--pump-border) / 0.14);
+    background: rgb(var(--pump-bg));
+    position: sticky;
+    top: 0;
+    z-index: 4;
+  }
+
+  @media (min-width: 768px) {
+    .missions-page .points-hub-tabs {
+      position: static;
+    }
+  }
+
+  .missions-page .points-hub-tabs__nav {
+    min-width: 0;
+    flex: 1 1 auto;
+    padding-inline: var(--missions-page-gutter);
+  }
+
+  .missions-page .points-hub-tabs__track {
+    display: flex;
+    align-items: stretch;
+    gap: 0.125rem;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .missions-page .points-hub-tabs__track::-webkit-scrollbar {
+    display: none;
+  }
+
+  .missions-page .points-hub-tabs__item {
+    flex: 0 0 auto;
+    min-height: 2.75rem;
+    padding: 0.625rem 0.75rem;
+    border: none;
+    border-bottom: 2px solid transparent;
+    background: transparent;
+    color: rgb(var(--pump-muted));
+    font-size: var(--text-body-sm);
+    font-weight: var(--weight-ui);
+    cursor: pointer;
+  }
+
+  .missions-page .points-hub-tabs__item:hover:not(.points-hub-tabs__item--active) {
+    color: rgb(var(--pump-text));
+  }
+
+  .missions-page .points-hub-tabs__item--active {
+    color: rgb(var(--pump-accent));
+    border-bottom-color: rgb(var(--pump-accent));
+    font-weight: var(--weight-emphasis);
+  }
+
+  .missions-page .points-hub-tabs__refresh {
+    margin-right: var(--missions-page-gutter);
+  }
+
+  @media (min-width: 768px) {
+    .missions-page .points-overview {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 1.5rem;
+      padding-top: 1rem;
+    }
+
+    .missions-page .points-overview__market .points-market__grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+
+  @media (min-width: 1100px) {
+    .missions-page .points-overview {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .missions-page .points-overview__section-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .missions-page .points-overview__link {
+    margin-top: 0.75rem;
+  }
+
+  .missions-page .points-hub-panel {
+    padding: 0.875rem var(--missions-page-gutter) 1.25rem;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .missions-page .points-earn {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    flex: 1 1 0;
+    overflow: hidden;
+  }
+
+  .missions-page .points-level-ladder__head,
+  .missions-page .points-market__head {
+    margin-bottom: 0.875rem;
+  }
+
+  .missions-page .points-level-ladder__head .section-heading,
+  .missions-page .points-market__head .section-heading,
+  .missions-page .points-overview__section-head .section-heading {
+    margin: 0;
+  }
+
+  .missions-page .points-level-ladder__head p,
+  .missions-page .points-market__head p {
+    margin: 0.35rem 0 0;
+  }
+
+  .missions-page .points-level-ladder__list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .missions-page .points-level-ladder__item {
+    display: flex;
+    gap: 0.75rem;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid rgb(var(--pump-border) / 0.12);
+  }
+
+  .missions-page .points-level-ladder__item:last-child {
+    border-bottom: none;
+  }
+
+  .missions-page .points-level-ladder__item--current {
+    background: rgb(var(--pump-accent) / 0.06);
+    margin-inline: -0.5rem;
+    padding-inline: 0.5rem;
+    border-radius: var(--radius-lg);
+  }
+
+  .missions-page .points-level-ladder__marker {
+    width: 1.25rem;
+    height: 1.25rem;
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 0.125rem;
+  }
+
+  .missions-page .points-level-ladder__check {
+    color: rgb(var(--pump-accent));
+  }
+
+  .missions-page .points-level-ladder__dot {
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 50%;
+    background: rgb(var(--pump-muted) / 0.35);
+  }
+
+  .missions-page .points-level-ladder__item--reached .points-level-ladder__dot {
+    background: rgb(var(--pump-accent) / 0.55);
+  }
+
+  .missions-page .points-level-ladder__body {
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+
+  .missions-page .points-level-ladder__title-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.5rem;
+  }
+
+  .missions-page .points-level-ladder__name {
+    font-size: var(--text-body-sm);
+    font-weight: var(--weight-emphasis);
+    color: rgb(var(--pump-text));
+  }
+
+  .missions-page .points-level-ladder__perk {
+    margin: 0.25rem 0 0;
+  }
+
+  .missions-page .points-level-ladder--compact {
+    padding: 0.75rem;
+    border: 1px solid rgb(var(--pump-border) / 0.18);
+    border-radius: var(--radius-lg);
+    background: rgb(var(--pump-card));
+  }
+
+  .missions-page .points-level-ladder--compact .points-level-ladder__item {
+    padding-block: 0.5rem;
+  }
+
+  .missions-page .points-market__grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+
+  @media (min-width: 768px) {
+    .missions-page .points-market__grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @media (min-width: 1100px) {
+    .missions-page .points-market__grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+
+  .missions-page .points-market-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding: 1rem;
+    border: 1px solid rgb(var(--pump-border) / 0.18);
+  }
+
+  .missions-page .points-market-card__icon-wrap {
+    width: 2.5rem;
+    height: 2.5rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-md);
+    background: rgb(var(--pump-accent) / 0.1);
+    color: rgb(var(--pump-accent));
+  }
+
+  .missions-page .points-market-card__title {
+    margin: 0;
+    font-size: var(--text-body-sm);
+    font-weight: var(--weight-emphasis);
+    color: rgb(var(--pump-text));
+  }
+
+  .missions-page .points-market-card__desc {
+    margin: 0.35rem 0 0;
+  }
+
+  .missions-page .points-market-card__meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 0.75rem;
+    margin-top: 0.625rem;
+  }
+
+  .missions-page .points-market-card__cta {
+    width: 100%;
+    margin-top: auto;
+    opacity: 0.72;
+  }
+
+  .missions-page .missions-list__mission-main {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.625rem;
+    min-width: 0;
+  }
+
+  .missions-page .missions-list__icon-tile {
+    width: 2rem;
+    height: 2rem;
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-md);
+    background: rgb(var(--pump-card-soft));
+    color: rgb(var(--pump-muted));
+  }
+
+  .missions-page .missions-list__mission-copy {
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+
+  .missions-page .missions-list__reward {
+    color: rgb(var(--pump-accent));
+  }
+
+  @media (max-width: 767px) {
+    .missions-page .points-hub__body {
+      overflow: hidden;
+    }
+
+    .missions-page .points-overview,
+    .missions-page .points-hub-panel {
+      flex: 1 1 0;
+      padding-bottom: calc(var(--mobile-bottom-nav-height) + 0.75rem);
+    }
+
+    .missions-page .points-earn .missions-body {
+      flex: 1 1 0;
+      min-height: 0;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+  }
+
+  .missions-page .points-activity__list {
+    list-style: none;
+    margin: 0.5rem 0 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .missions-page .points-activity__row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid rgb(var(--pump-border) / 0.12);
+  }
+
+  .missions-page .points-activity__row:last-child {
+    border-bottom: none;
+  }
+
+  .missions-page .points-activity__icon {
+    flex-shrink: 0;
+    color: rgb(var(--pump-muted));
+  }
+
+  .missions-page .points-activity__copy {
+    min-width: 0;
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+  }
+
+  .missions-page .points-activity__title {
+    font-size: var(--text-body-sm);
+    font-weight: var(--weight-ui);
+    color: rgb(var(--pump-text));
+  }
+
+  .missions-page .points-activity__delta {
+    flex-shrink: 0;
+    font-size: var(--text-body-sm);
+  }
+
+  .missions-page .points-activity__inventory,
+  .missions-page .points-activity__ledger {
+    margin-bottom: 1.25rem;
+  }
+
+  .missions-page .points-market-card__cta:disabled {
+    opacity: 0.72;
   }
 
   /* Airdrops — portfolio-width corporate rewards hub */
