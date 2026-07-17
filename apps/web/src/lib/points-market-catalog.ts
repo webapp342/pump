@@ -73,8 +73,8 @@ const CASHBACK_CATALOG: PointsMarketItem[] = [
 export const POINTS_MARKET_CATALOG: readonly PointsMarketItem[] = [
   {
     id: "status_badge",
-    title: "Profile badge",
-    description: "Badge next to your name.",
+    title: "Profile frame",
+    description: "Premium avatar ring + highlighted name.",
     costPts: 500,
     unlockTier: "rookie",
     featured: true,

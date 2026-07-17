@@ -6,6 +6,8 @@ import { useUserDisplayNames } from "@/hooks/useUserDisplayNames";
 type UserDisplayNameProps = {
   address: string;
   username?: string | null;
+  /** Premium name styling when the wallet owns Profile frame. */
+  hasStatusBadge?: boolean;
   compact?: boolean;
   className?: string;
 };
@@ -13,16 +15,31 @@ type UserDisplayNameProps = {
 export function UserDisplayName({
   address,
   username,
+  hasStatusBadge: hasStatusBadgeProp,
   compact = false,
   className,
 }: UserDisplayNameProps) {
-  const lookup = useUserDisplayNames(username === undefined ? [address] : [], compact);
+  const needsLookup = username === undefined || hasStatusBadgeProp === undefined;
+  const lookup = useUserDisplayNames(needsLookup ? [address] : [], compact);
+  const meta = lookup.get(address.toLowerCase());
 
   const label =
     username !== undefined
       ? resolveDisplayUsername(address, username, compact)
-      : (lookup.get(address.toLowerCase()) ??
-        resolveDisplayUsername(address, null, compact));
+      : (meta?.label ?? resolveDisplayUsername(address, null, compact));
 
-  return <span className={className}>{label}</span>;
+  const premium =
+    hasStatusBadgeProp !== undefined
+      ? hasStatusBadgeProp
+      : Boolean(meta?.hasStatusBadge);
+
+  return (
+    <span
+      className={`user-display-name${premium ? " user-display-name--premium" : ""}${
+        className ? ` ${className}` : ""
+      }`}
+    >
+      <span className="user-display-name__label">{label}</span>
+    </span>
+  );
 }

@@ -100,6 +100,7 @@ type PortfolioPosition = {
 type PortfolioData = {
   address: string;
   username?: string | null;
+  hasStatusBadge?: boolean;
   totalVolumeBnb: number;
   buyVolumeBnb: number;
   sellVolumeBnb: number;
@@ -659,7 +660,7 @@ export function PortfolioPanel({
   const [followModalOpen, setFollowModalOpen] = useState(false);
   const [followModalTab, setFollowModalTab] = useState<"following" | "followers">("following");
   const [avatarPickerOpen, setAvatarPickerOpen] = useState(false);
-  const { avatarId, username: ownUsername, displayUsername: ownDisplayUsername } = useUserAvatar();
+  const { avatarId, username: ownUsername, displayUsername: ownDisplayUsername, hasStatusBadge: ownHasStatusBadge } = useUserAvatar();
   const [walletHoldings, setWalletHoldings] = useState<WalletLaunchpadHolding[]>([]);
   const [onChainBalances, setOnChainBalances] = useState<Record<string, string>>({});
   const [holdingsReady, setHoldingsReady] = useState(false);
@@ -1352,6 +1353,9 @@ export function PortfolioPanel({
   const displayUsername = isOwnPortfolio
     ? (ownDisplayUsername ?? resolveDisplayUsername(walletAddress, ownUsername))
     : resolveDisplayUsername(walletAddress, data.username);
+  const hasStatusBadge = isOwnPortfolio
+    ? ownHasStatusBadge
+    : Boolean(data.hasStatusBadge);
 
   const feesPending =
     pendingBnb > 0 || (pendingReferrerWei != null && pendingReferrerWei > 0n);
@@ -1443,6 +1447,7 @@ export function PortfolioPanel({
         <PortfolioMobileHero
           walletAddress={walletAddress}
           displayUsername={displayUsername}
+          hasStatusBadge={hasStatusBadge}
           canEditProfile={isOwnPortfolio && isConnected}
           onOpenProfileEditor={() => setAvatarPickerOpen(true)}
           totalValueUsd={totalEstimatedUsd}
@@ -1455,6 +1460,7 @@ export function PortfolioPanel({
         <PortfolioHero
           walletAddress={walletAddress}
           displayUsername={displayUsername}
+          hasStatusBadge={hasStatusBadge}
           canEditProfile={isOwnPortfolio && isConnected}
           onOpenProfileEditor={() => setAvatarPickerOpen(true)}
           onOpenFollowing={() => {

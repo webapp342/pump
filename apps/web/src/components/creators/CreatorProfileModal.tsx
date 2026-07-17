@@ -27,6 +27,7 @@ type CreatorProfileData = CreatorProfile & {
   creatorFeesTotalBnb: number;
   referralFeesPendingBnb: number;
   referralFeesTotalBnb: number;
+  hasStatusBadge?: boolean;
 };
 
 type CreatorFollowNetworkEntry = {
@@ -168,7 +169,7 @@ function FollowingRow({ row }: { row: CreatorFollowNetworkEntry }) {
           <UserAvatarForAddress address={row.address} size="lg" />
           <span className="creator-profile-sheet__coin-copy min-w-0">
             <span className="creator-profile-sheet__coin-name">
-              {row.displayUsername ?? <UserDisplayName address={row.address} compact />}
+              <UserDisplayName address={row.address} compact />
             </span>
             <span className="creator-profile-sheet__coin-symbol">{formatShortDate(row.followedAt)}</span>
           </span>
@@ -372,18 +373,25 @@ export function CreatorProfileModal({ open, onClose, creatorAddress }: CreatorPr
               <UserAvatarForAddress
                 address={creatorAddress}
                 size="2xl"
+                framed={Boolean(profile.hasStatusBadge)}
                 className="creator-profile-sheet__avatar"
               />
               <div className="creator-profile-sheet__identity-copy min-w-0">
                 <div className="creator-profile-sheet__name-row">
                   <p
                     id="creator-profile-title"
-                    className="creator-profile-sheet__title"
+                    className={`creator-profile-sheet__title${
+                      profile.hasStatusBadge ? " identity-name--premium" : ""
+                    }`}
                     role="heading"
                     aria-level={2}
                   >
                     {profile.displayUsername ?? (
-                      <UserDisplayName address={creatorAddress} compact />
+                      <UserDisplayName
+                        address={creatorAddress}
+                        hasStatusBadge={Boolean(profile.hasStatusBadge)}
+                        compact
+                      />
                     )}
                   </p>
                   <a

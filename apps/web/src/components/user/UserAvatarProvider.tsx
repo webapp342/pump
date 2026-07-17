@@ -12,11 +12,13 @@ import { useAccount } from "wagmi";
 import { subscribeUserBootstrap } from "@/lib/user-bootstrap";
 import type { UserAvatarId } from "@/lib/user-avatars";
 import { resolveDisplayUsername } from "@/lib/username";
+import { invalidateDisplayNameCache } from "@/hooks/useUserDisplayNames";
 
 type UserAvatarContextValue = {
   avatarId: UserAvatarId | null;
   username: string | null;
   displayUsername: string | null;
+  hasStatusBadge: boolean;
   loading: boolean;
   refresh: () => Promise<void>;
   updateAvatar: (avatarId: UserAvatarId) => Promise<void>;
@@ -24,6 +26,8 @@ type UserAvatarContextValue = {
     avatarId?: UserAvatarId;
     username?: string | null;
   }) => Promise<void>;
+  /** Optimistic after redeeming Profile frame. */
+  setHasStatusBadge: (value: boolean) => void;
 };
 
 const UserAvatarContext = createContext<UserAvatarContextValue | null>(null);
@@ -32,6 +36,7 @@ export function UserAvatarProvider({ children }: { children: React.ReactNode }) 
   const { address } = useAccount();
   const [avatarId, setAvatarId] = useState<UserAvatarId | null>(null);
   const [username, setUsername] = useState<string | null>(null);
+  const [hasStatusBadge, setHasStatusBadge] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const displayUsername = useMemo(() => {
@@ -40,9 +45,14 @@ export function UserAvatarProvider({ children }: { children: React.ReactNode }) 
   }, [address, username]);
 
   const applyProfile = useCallback(
-    (next: { avatarId?: UserAvatarId | null; username?: string | null }) => {
+    (next: {
+      avatarId?: UserAvatarId | null;
+      username?: string | null;
+      hasStatusBadge?: boolean;
+    }) => {
       if (next.avatarId) setAvatarId(next.avatarId);
       if (next.username !== undefined) setUsername(next.username);
+      if (next.hasStatusBadge !== undefined) setHasStatusBadge(next.hasStatusBadge);
     },
     []
   );
@@ -51,6 +61,7 @@ export function UserAvatarProvider({ children }: { children: React.ReactNode }) 
     if (!address) {
       setAvatarId(null);
       setUsername(null);
+      setHasStatusBadge(false);
       return;
     }
 
@@ -61,11 +72,17 @@ export function UserAvatarProvider({ children }: { children: React.ReactNode }) 
         { cache: "no-store" }
       );
       const body = (await response.json()) as {
-        data?: { avatarId?: UserAvatarId; username?: string | null };
+        data?: {
+          avatarId?: UserAvatarId;
+          username?: string | null;
+          hasStatusBadge?: boolean;
+        };
       };
       if (response.ok && body.data) {
         if (body.data.avatarId) setAvatarId(body.data.avatarId);
         setUsername(body.data.username ?? null);
+        setHasStatusBadge(Boolean(body.data.hasStatusBadge));
+        invalidateDisplayNameCache(address);
       }
     } catch {
       // ignore
@@ -78,6 +95,7 @@ export function UserAvatarProvider({ children }: { children: React.ReactNode }) 
     if (!address) {
       setAvatarId(null);
       setUsername(null);
+      setHasStatusBadge(false);
       return;
     }
 
@@ -90,6 +108,7 @@ export function UserAvatarProvider({ children }: { children: React.ReactNode }) 
       applyProfile({
         avatarId: data.avatarId,
         username: data.username,
+        hasStatusBadge: Boolean(data.hasStatusBadge),
       });
       setLoading(false);
     });
@@ -156,12 +175,23 @@ export function UserAvatarProvider({ children }: { children: React.ReactNode }) 
       avatarId,
       username,
       displayUsername,
+      hasStatusBadge,
       loading,
       refresh,
       updateAvatar,
       updateProfile,
+      setHasStatusBadge,
     }),
-    [avatarId, username, displayUsername, loading, refresh, updateAvatar, updateProfile]
+    [
+      avatarId,
+      username,
+      displayUsername,
+      hasStatusBadge,
+      loading,
+      refresh,
+      updateAvatar,
+      updateProfile,
+    ]
   );
 
   return <UserAvatarContext.Provider value={value}>{children}</UserAvatarContext.Provider>;

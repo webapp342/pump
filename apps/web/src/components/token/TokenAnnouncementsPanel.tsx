@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { CalloutHoldingsSnapshot } from "@/components/token/CalloutHoldingsSnapshot";
 import { UserAvatarForAddress } from "@/components/user/UserAvatarForAddress";
+import { UserDisplayName } from "@/components/user/UserDisplayName";
 import type { TokenAnnouncementRow } from "@/lib/token-announcements-shared";
 import { formatAge } from "@/lib/arena-board-format";
 
@@ -76,7 +77,7 @@ export function TokenAnnouncementsPanel({
             variant === "aside" ? "mt-3" : ""
           } text-body-sm leading-relaxed text-pump-muted`}
         >
-          No callouts yet. Hold at least 1 of this token to announce and notify your followers.
+          No callouts yet.
         </p>
       ) : (
         <ul
@@ -92,7 +93,7 @@ export function TokenAnnouncementsPanel({
                 <UserAvatarForAddress address={item.announcerAddress} size="md" />
                 <span className="token-announcements-panel__identity-copy">
                   <span className="token-announcements-panel__name">
-                    {item.announcerDisplayUsername}
+                    <UserDisplayName address={item.announcerAddress} compact />
                   </span>
                   <CalloutHoldingsSnapshot
                     tokenAddress={tokenAddress}

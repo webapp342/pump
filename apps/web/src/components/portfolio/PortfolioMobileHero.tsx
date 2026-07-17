@@ -30,6 +30,7 @@ import { USER_AVATAR_SIZE } from "@/lib/ui-sizes";
 type PortfolioMobileHeroProps = {
   walletAddress: string;
   displayUsername: string;
+  hasStatusBadge?: boolean;
   canEditProfile: boolean;
   onOpenProfileEditor: () => void;
   totalValueUsd: number | null;
@@ -109,6 +110,7 @@ function MobileHeroPnl({
 export function PortfolioMobileHero({
   walletAddress,
   displayUsername,
+  hasStatusBadge = false,
   canEditProfile,
   onOpenProfileEditor,
   totalValueUsd,
@@ -196,6 +198,7 @@ export function PortfolioMobileHero({
                   <UserAvatarForAddress
                     address={walletAddress}
                     size={avatarSize}
+                    framed={hasStatusBadge && !guestMode}
                     className="portfolio-mobile-hero__avatar"
                   />
                 </button>
@@ -203,6 +206,7 @@ export function PortfolioMobileHero({
                 <UserAvatarForAddress
                   address={walletAddress}
                   size={avatarSize}
+                  framed={hasStatusBadge && !guestMode}
                   className="portfolio-mobile-hero__avatar"
                 />
               )}
@@ -213,13 +217,19 @@ export function PortfolioMobileHero({
                 <button
                   type="button"
                   onClick={openAccount}
-                  className="portfolio-mobile-hero__username portfolio-mobile-hero__username--btn"
+                  className={`portfolio-mobile-hero__username portfolio-mobile-hero__username--btn${
+                    hasStatusBadge && !guestMode ? " identity-name--premium" : ""
+                  }`}
                   aria-label="Open settings"
                 >
                   {formatHeroUsername(displayUsername, guestMode)}
                 </button>
               ) : (
-                <p className="portfolio-mobile-hero__username">
+                <p
+                  className={`portfolio-mobile-hero__username${
+                    hasStatusBadge && !guestMode ? " identity-name--premium" : ""
+                  }`}
+                >
                   {formatHeroUsername(displayUsername, guestMode)}
                 </p>
               )}

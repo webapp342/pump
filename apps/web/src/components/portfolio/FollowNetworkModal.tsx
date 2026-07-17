@@ -45,12 +45,8 @@ function FollowList({
           <div className="flex min-w-0 items-center gap-3">
             <UserAvatarForAddress address={entry.address} size="xl" />
             <div className="min-w-0">
-              <span className="financial-value text-body-sm font-medium text-pump-text">
-                {entry.displayUsername ? (
-                  entry.displayUsername
-                ) : (
-                  <UserDisplayName address={entry.address} compact />
-                )}
+              <span className="text-body-sm font-medium text-pump-text">
+                <UserDisplayName address={entry.address} compact />
               </span>
               <p className="mt-0.5 text-caption text-pump-muted">
                 {formatFollowDate(entry.followedAt)}

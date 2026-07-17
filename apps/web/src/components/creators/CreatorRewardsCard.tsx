@@ -5,8 +5,8 @@ import type { Address } from "viem";
 import { explorerTxUrl } from "@/config/chain";
 import { UserDisplayName } from "@/components/user/UserDisplayName";
 import { useCreatorFollows } from "@/components/creators/CreatorFollowsProvider";
-import { PumpIcon, faUsers, faWallet } from "@/lib/icons";
 import { UserAvatarForAddress } from "@/components/user/UserAvatarForAddress";
+import { PumpIcon, faBaseWallet, faFollowing } from "@/lib/icons";
 import { useWalletTotalBalance } from "@/hooks/useWalletTotalBalance";
 
 type CreatorRewardsCardProps = {
@@ -39,6 +39,7 @@ export function CreatorRewardsCard({
   const following = isFollowing(creatorAddress);
   const isSelf = address?.toLowerCase() === creatorAddress.toLowerCase();
   const timelineHref = launchTxHash ? explorerTxUrl(launchTxHash) : undefined;
+  const followers = Math.max(0, followerCount);
 
   return (
     <section
@@ -55,7 +56,7 @@ export function CreatorRewardsCard({
             href={timelineHref}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-caption font-medium text-pump-success hover:underline"
+            className="creator-rewards-card__timeline"
           >
             Coin timeline
           </a>
@@ -73,22 +74,35 @@ export function CreatorRewardsCard({
           >
             <UserAvatarForAddress address={creatorAddress} size="xl" />
             <div className="creator-rewards-card__identity-copy">
-              <span className="creator-rewards-card__name financial-value">
-                {creatorDisplayUsername ?? (
-                  <UserDisplayName address={creatorAddress} compact />
-                )}
+              <span className="creator-rewards-card__name">
+                <UserDisplayName address={creatorAddress} compact />
               </span>
-              <div className="creator-rewards-card__meta">
-                <span className="creator-rewards-card__meta-item">
-                  <PumpIcon icon={faWallet} size="xs" className="creator-rewards-card__meta-icon" aria-hidden />
-                  <span className="financial-value">{formatWalletUsdTotal(totalUsd)}</span>
-                </span>
-                <span className="creator-rewards-card__meta-item">
-                  <PumpIcon icon={faUsers} size="xs" className="creator-rewards-card__meta-icon" aria-hidden />
-                  <span className="financial-value">
-                    {Math.max(0, followerCount).toLocaleString()}
+              <div className="creator-rewards-card__meta" aria-label="Creator stats">
+                <div className="creator-rewards-card__stat" title="Balance">
+                  <PumpIcon
+                    icon={faBaseWallet}
+                    size="xs"
+                    className="creator-rewards-card__stat-icon"
+                    aria-hidden
+                  />
+                  <span className="creator-rewards-card__stat-value financial-value">
+                    {formatWalletUsdTotal(totalUsd)}
                   </span>
+                </div>
+                <span className="creator-rewards-card__stat-sep" aria-hidden>
+                  ·
                 </span>
+                <div className="creator-rewards-card__stat" title="Followers">
+                  <PumpIcon
+                    icon={faFollowing}
+                    size="xs"
+                    className="creator-rewards-card__stat-icon"
+                    aria-hidden
+                  />
+                  <span className="creator-rewards-card__stat-value financial-value">
+                    {followers.toLocaleString()}
+                  </span>
+                </div>
               </div>
             </div>
           </button>

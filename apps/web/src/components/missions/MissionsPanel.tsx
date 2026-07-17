@@ -27,6 +27,8 @@ import {
 import type { PointsMarketItem } from "@/lib/points-market-catalog";
 import { REWARDS_CHALLENGES } from "@/lib/rewards-copy";
 import { usePumpWallet } from "@/components/wallet/PumpWalletProvider";
+import { useUserAvatar } from "@/components/user/UserAvatarProvider";
+import { invalidateDisplayNameCache } from "@/hooks/useUserDisplayNames";
 
 const BURST_POLL_MS = 1_500;
 const BURST_DURATION_MS = 60_000;
@@ -34,6 +36,7 @@ const BURST_DURATION_MS = 60_000;
 export function MissionsPanel() {
   const { address, isConnected } = useAccount();
   const { login } = usePumpWallet();
+  const { refresh: refreshProfile, setHasStatusBadge } = useUserAvatar();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -257,13 +260,18 @@ export function MissionsPanel() {
         await loadMissions(address);
         setInventoryRefreshKey((key) => key + 1);
         setMarketView("inventory");
+        if (item.id === "status_badge") {
+          setHasStatusBadge(true);
+          invalidateDisplayNameCache(address);
+          void refreshProfile();
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : "Redeem failed");
       } finally {
         setRedeemingId(null);
       }
     },
-    [address, loadMissions, setMarketView]
+    [address, loadMissions, refreshProfile, setHasStatusBadge, setMarketView]
   );
 
   const completedCount =

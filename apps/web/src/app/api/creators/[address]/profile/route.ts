@@ -4,12 +4,15 @@ import { NextResponse } from "next/server";
 import { normalizeAddressParam } from "@/lib/address";
 import { contracts, pumpChain } from "@/config/chain";
 import { bondingCurveManagerAbi } from "@/lib/bonding-curve";
+import { hasActiveMarketItem } from "@/lib/db/incentive";
 import { getCreatorProfile, getReferralStats } from "@/lib/db/launchpad";
 
 const publicClient = createPublicClient({
   chain: pumpChain,
   transport: http(pumpChain.rpcUrls.default.http[0]),
 });
+
+const STATUS_BADGE_ITEM_ID = "status_badge";
 
 type RouteContext = { params: Promise<{ address: string }> };
 
@@ -21,8 +24,11 @@ export async function GET(_request: NextRequest, context: RouteContext) {
   }
 
   try {
-    const profile = await getCreatorProfile(creatorAddress);
-    const referralStats = await getReferralStats(creatorAddress);
+    const [profile, referralStats, hasStatusBadge] = await Promise.all([
+      getCreatorProfile(creatorAddress),
+      getReferralStats(creatorAddress),
+      hasActiveMarketItem(creatorAddress, STATUS_BADGE_ITEM_ID),
+    ]);
     let bnbBalance = "0";
     let creatorFeesPendingBnb = 0;
     let referralFeesPendingBnb = 0;
@@ -55,6 +61,7 @@ export async function GET(_request: NextRequest, context: RouteContext) {
     return NextResponse.json({
       data: {
         ...profile,
+        hasStatusBadge,
         bnbBalance,
         creatorFeesPendingBnb,
         creatorFeesTotalBnb,

@@ -790,6 +790,68 @@ export async function getPointsInventory(
   }
 }
 
+/** True when the wallet owns an active `status_badge` (or other) inventory row. */
+export async function hasActiveMarketItem(
+  address: string,
+  itemId: string
+): Promise<boolean> {
+  const db = getIncentivePool();
+  try {
+    const result = await db.query<{ ok: number }>(
+      `
+        SELECT 1 AS ok
+        FROM points_inventory
+        WHERE address = $1
+          AND item_id = $2
+          AND status = 'active'
+          AND (expires_at IS NULL OR expires_at > now())
+        LIMIT 1
+      `,
+      [address.toLowerCase(), itemId]
+    );
+    return result.rows.length > 0;
+  } catch {
+    return false;
+  }
+}
+
+/** Batch: which addresses own an active inventory item (e.g. profile badge). */
+export async function addressesWithActiveMarketItem(
+  addresses: string[],
+  itemId: string
+): Promise<Set<string>> {
+  const normalized = [
+    ...new Set(
+      addresses
+        .map((address) => address.toLowerCase())
+        .filter((address) => /^0x[a-f0-9]{40}$/.test(address))
+    ),
+  ];
+  const owned = new Set<string>();
+  if (normalized.length === 0) return owned;
+
+  const db = getIncentivePool();
+  try {
+    const result = await db.query<{ address: string }>(
+      `
+        SELECT DISTINCT address
+        FROM points_inventory
+        WHERE address = ANY($1::text[])
+          AND item_id = $2
+          AND status = 'active'
+          AND (expires_at IS NULL OR expires_at > now())
+      `,
+      [normalized, itemId]
+    );
+    for (const row of result.rows) {
+      owned.add(row.address.toLowerCase());
+    }
+  } catch {
+    // incentive DB unavailable — treat as no badges
+  }
+  return owned;
+}
+
 export type XpLeaderboardEntry = {
   rank: number;
   address: string;

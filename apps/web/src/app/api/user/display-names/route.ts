@@ -1,9 +1,12 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { normalizeAddressParam } from "@/lib/address";
+import { addressesWithActiveMarketItem } from "@/lib/db/incentive";
 import { buildDisplayUsernameRecord } from "@/lib/user-display";
 import { getUsernamesMap } from "@/lib/db/users";
 import { resolveDisplayUsername } from "@/lib/username";
+
+const STATUS_BADGE_ITEM_ID = "status_badge";
 
 export async function GET(request: NextRequest) {
   const raw = request.nextUrl.searchParams.get("addresses")?.trim();
@@ -22,12 +25,17 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const usernameMap = await getUsernamesMap(addresses);
-    const displayNames = await buildDisplayUsernameRecord(addresses, compact);
+    const [usernameMap, displayNames, badgeOwners] = await Promise.all([
+      getUsernamesMap(addresses),
+      buildDisplayUsernameRecord(addresses, compact),
+      addressesWithActiveMarketItem(addresses, STATUS_BADGE_ITEM_ID),
+    ]);
     const usernames: Record<string, string | null> = {};
+    const statusBadges: Record<string, boolean> = {};
     for (const address of addresses) {
       const key = address.toLowerCase();
       usernames[key] = usernameMap.get(key) ?? null;
+      statusBadges[key] = badgeOwners.has(key);
     }
 
     return NextResponse.json(
@@ -35,6 +43,7 @@ export async function GET(request: NextRequest) {
         data: {
           displayNames,
           usernames,
+          statusBadges,
           resolve: Object.fromEntries(
             addresses.map((address) => [
               address.toLowerCase(),

@@ -7,6 +7,7 @@ export type UserBootstrapData = {
   creatorFollows: string[];
   avatarId: UserAvatarId | null;
   username: string | null;
+  hasStatusBadge?: boolean;
 };
 
 export const USER_BOOTSTRAP_EVENT = "pump:user-bootstrap";

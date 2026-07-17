@@ -20,6 +20,7 @@ import { UserAvatarForAddress } from "@/components/user/UserAvatarForAddress";
 type PortfolioHeroProps = {
   walletAddress: string;
   displayUsername: string;
+  hasStatusBadge?: boolean;
   canEditProfile: boolean;
   onOpenProfileEditor: () => void;
   onOpenFollowing: () => void;
@@ -140,6 +141,7 @@ function ProfileStatsRow({
 export function PortfolioHero({
   walletAddress,
   displayUsername,
+  hasStatusBadge = false,
   canEditProfile,
   onOpenProfileEditor,
   onOpenFollowing,
@@ -179,6 +181,7 @@ export function PortfolioHero({
                     <UserAvatarForAddress
                       address={walletAddress}
                       size="xl"
+                      framed={hasStatusBadge && !guestMode}
                       className="portfolio-toolbar__avatar token-detail-toolbar__logo shrink-0 !ring-0"
                     />
                     <span className="portfolio-toolbar__avatar-edit" aria-hidden>
@@ -189,6 +192,7 @@ export function PortfolioHero({
                   <UserAvatarForAddress
                     address={walletAddress}
                     size="xl"
+                    framed={hasStatusBadge && !guestMode}
                     className="portfolio-toolbar__avatar token-detail-toolbar__logo shrink-0 !ring-0"
                   />
                 )}
@@ -202,7 +206,9 @@ export function PortfolioHero({
                         className={
                           guestMode
                             ? "portfolio-toolbar__display-name portfolio-toolbar__display-name--guest"
-                            : "portfolio-toolbar__display-name"
+                            : hasStatusBadge
+                              ? "portfolio-toolbar__display-name identity-name--premium"
+                              : "portfolio-toolbar__display-name"
                         }
                       >
                         {guestMode ? "—" : displayUsername}

@@ -35,6 +35,7 @@ export function UserBootstrapProvider({ children }: { children: React.ReactNode 
             creatorFollows?: string[];
             avatarId?: UserAvatarId | null;
             username?: string | null;
+            hasStatusBadge?: boolean;
           };
         };
         if (cancelled || !response.ok || !body.data) return;
@@ -46,6 +47,7 @@ export function UserBootstrapProvider({ children }: { children: React.ReactNode 
           creatorFollows: (body.data.creatorFollows ?? []).map((item) => item.toLowerCase()),
           avatarId: body.data.avatarId ?? null,
           username: body.data.username ?? null,
+          hasStatusBadge: Boolean(body.data.hasStatusBadge),
         };
         setUserBootstrap(payload);
       } catch {

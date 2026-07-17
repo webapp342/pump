@@ -2,6 +2,7 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { normalizeAddressParam } from "@/lib/address";
 import { loadWalletSessionFromRequest } from "@/lib/auth/wallet-session";
+import { hasActiveMarketItem } from "@/lib/db/incentive";
 import {
   getUserProfile,
   isUsernameAvailable,
@@ -14,6 +15,8 @@ import {
   resolveDisplayUsername,
   validateUsername,
 } from "@/lib/username";
+
+const STATUS_BADGE_ITEM_ID = "status_badge";
 
 export async function GET(request: NextRequest) {
   const address = normalizeAddressParam(request.nextUrl.searchParams.get("address"));
@@ -40,10 +43,14 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const profile = await getUserProfile(address);
+    const [profile, hasStatusBadge] = await Promise.all([
+      getUserProfile(address),
+      hasActiveMarketItem(address, STATUS_BADGE_ITEM_ID),
+    ]);
     return NextResponse.json({
       data: {
         ...profile,
+        hasStatusBadge,
         displayUsername: resolveDisplayUsername(address, profile.username),
         catalog: USER_AVATAR_IDS,
       },

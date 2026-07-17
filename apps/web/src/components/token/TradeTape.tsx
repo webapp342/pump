@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { TokenHolderSnapshot, TradeItem } from "@/lib/db/launchpad";
 import { explorerTxUrl, shortAddress } from "@/config/chain";
-import { PumpIcon, faCrown, faExternalLink } from "@/lib/icons";
+import { PumpIcon, faExternalLink, faWellness } from "@/lib/icons";
 import { UserAvatarForAddress } from "@/components/user/UserAvatarForAddress";
 import { PctChange } from "@/components/ui/PctChange";
 import { ACTIVITY_PAGE_SIZE } from "@/lib/activity-page-size";
@@ -58,7 +58,7 @@ const DESKTOP_TAPE_TABS: ReadonlyArray<{ id: ActivityTab; label: string }> = [
 const MOBILE_TAPE_TABS: ReadonlyArray<{ id: ActivityTab; label: string }> = [
   { id: "trades", label: "Trades" },
   { id: "holders", label: "Holders" },
-  { id: "social", label: "Social" },
+  { id: "social", label: "Callouts" },
   { id: "about", label: "About" },
 ];
 
@@ -209,22 +209,14 @@ function mergeHolderRows(existing: HolderRow[], incoming: HolderRow[]): HolderRo
   return [...byAddress.values()].sort((a, b) => b.netTokens - a.netTokens);
 }
 
-function CreatorBadge({ iconOnly = false }: { iconOnly?: boolean }) {
-  if (iconOnly) {
-    return (
-      <span
-        className="token-tape-creator-icon inline-flex shrink-0 items-center justify-center text-pump-accent"
-        title="Creator"
-        aria-label="Creator"
-      >
-        <PumpIcon icon={faCrown} className="token-tape-creator-icon__glyph" aria-hidden />
-      </span>
-    );
-  }
-
+function CreatorBadge() {
   return (
-    <span className="shrink-0 rounded-full bg-pump-accent/15 px-1.5 py-px text-label font-semibold uppercase tracking-wide text-pump-accent ring-1 ring-inset ring-pump-accent/30">
-      Creator
+    <span
+      className="token-tape-creator-icon inline-flex shrink-0 items-center justify-center text-pump-accent"
+      title="Creator"
+      aria-label="Creator"
+    >
+      <PumpIcon icon={faWellness} className="token-tape-creator-icon__glyph" aria-hidden />
     </span>
   );
 }
@@ -232,12 +224,14 @@ function CreatorBadge({ iconOnly = false }: { iconOnly?: boolean }) {
 function IdentityPill({
   address,
   displayUsername,
+  hasStatusBadge = false,
   showCreatorBadge = false,
   onAddressClick,
   compact = false,
 }: {
   address: string;
   displayUsername?: string;
+  hasStatusBadge?: boolean;
   showCreatorBadge?: boolean;
   onAddressClick: (address: string) => void;
   compact?: boolean;
@@ -250,15 +244,22 @@ function IdentityPill({
       type="button"
       onClick={() => onAddressClick(address)}
       className={compact ? "token-tape-identity token-tape-identity--compact" : "token-tape-identity"}
-      aria-label={`View profile ${label}${showCreatorBadge ? ", creator" : ""}`}
+      aria-label={`View profile ${label}${showCreatorBadge ? ", creator" : ""}${hasStatusBadge ? ", profile frame" : ""}`}
     >
       <UserAvatarForAddress
         address={address}
         size={compact ? 16 : 18}
+        framed={hasStatusBadge}
         className="shrink-0"
       />
-      <span className="token-tape-identity__label">{label}</span>
-      {showCreatorBadge ? <CreatorBadge iconOnly={compact} /> : null}
+      <span
+        className={`token-tape-identity__label${
+          hasStatusBadge ? " identity-name--premium" : ""
+        }`}
+      >
+        {label}
+      </span>
+      {showCreatorBadge ? <CreatorBadge /> : null}
     </button>
   );
 }
@@ -619,7 +620,11 @@ export function TradeTape({
                               address={row.address}
                               displayUsername={
                                 row.displayUsername ??
+                                displayNameLookup.get(row.address.toLowerCase())?.label
+                              }
+                              hasStatusBadge={
                                 displayNameLookup.get(row.address.toLowerCase())
+                                  ?.hasStatusBadge
                               }
                               showCreatorBadge={row.address.toLowerCase() === creatorKey}
                               onAddressClick={onAddressClick}
@@ -654,7 +659,11 @@ export function TradeTape({
                             address={row.address}
                             displayUsername={
                               row.displayUsername ??
+                              displayNameLookup.get(row.address.toLowerCase())?.label
+                            }
+                            hasStatusBadge={
                               displayNameLookup.get(row.address.toLowerCase())
+                                ?.hasStatusBadge
                             }
                             showCreatorBadge={row.address.toLowerCase() === creatorKey}
                             onAddressClick={onAddressClick}
@@ -736,7 +745,11 @@ export function TradeTape({
                           address={trade.traderAddress}
                           displayUsername={
                             trade.traderDisplayUsername ??
+                            displayNameLookup.get(trade.traderAddress.toLowerCase())?.label
+                          }
+                          hasStatusBadge={
                             displayNameLookup.get(trade.traderAddress.toLowerCase())
+                              ?.hasStatusBadge
                           }
                           showCreatorBadge={
                             trade.traderAddress.toLowerCase() === creatorKey
@@ -816,7 +829,11 @@ export function TradeTape({
                           address={trade.traderAddress}
                           displayUsername={
                             trade.traderDisplayUsername ??
+                            displayNameLookup.get(trade.traderAddress.toLowerCase())?.label
+                          }
+                          hasStatusBadge={
                             displayNameLookup.get(trade.traderAddress.toLowerCase())
+                              ?.hasStatusBadge
                           }
                           showCreatorBadge={trade.traderAddress.toLowerCase() === creatorKey}
                           onAddressClick={onAddressClick}

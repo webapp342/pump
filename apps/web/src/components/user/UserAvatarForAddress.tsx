@@ -5,12 +5,17 @@ import type { UserAvatarId } from "@/lib/user-avatars";
 import { UserAvatar } from "@/components/user/UserAvatar";
 import { fetchUserAvatarId, getCachedUserAvatarId } from "@/lib/user-avatar-cache";
 import { USER_AVATAR_SIZE, type UserAvatarSizeRole } from "@/lib/ui-sizes";
+import { useUserDisplayNames } from "@/hooks/useUserDisplayNames";
 
 type UserAvatarForAddressProps = {
   address: string;
   /** Named role or px. Prefer `USER_AVATAR_SIZE` roles. Default: `2xl` (40). */
   size?: number | UserAvatarSizeRole;
   className?: string;
+  /**
+   * Premium profile frame. When omitted, resolves from display-names / inventory cache.
+   */
+  framed?: boolean;
 };
 
 function resolveAvatarPx(size: number | UserAvatarSizeRole | undefined): number {
@@ -23,12 +28,17 @@ export function UserAvatarForAddress({
   address,
   size = "2xl",
   className = "",
+  framed,
 }: UserAvatarForAddressProps) {
   const normalized = address.toLowerCase();
   const px = resolveAvatarPx(size);
   const [avatarId, setAvatarId] = useState<UserAvatarId | null>(
     () => getCachedUserAvatarId(normalized)
   );
+
+  const badgeLookup = useUserDisplayNames(framed === undefined ? [address] : [], true);
+  const resolvedFramed =
+    framed ?? Boolean(badgeLookup.get(normalized)?.hasStatusBadge);
 
   useEffect(() => {
     const cached = getCachedUserAvatarId(normalized);
@@ -48,15 +58,24 @@ export function UserAvatarForAddress({
   }, [normalized]);
 
   if (!avatarId) {
+    const skeletonPx = resolvedFramed
+      ? px + (px <= 32 ? 4 : px <= 48 ? 6 : 8)
+      : px;
     return (
       <span
         className={`skeleton-shimmer inline-block shrink-0 rounded-full ${className}`}
-        style={{ width: px, height: px }}
+        style={{ width: skeletonPx, height: skeletonPx }}
       />
     );
   }
 
   return (
-    <UserAvatar address={address} avatarId={avatarId} size={px} className={className} />
+    <UserAvatar
+      address={address}
+      avatarId={avatarId}
+      size={px}
+      className={className}
+      framed={resolvedFramed}
+    />
   );
 }
