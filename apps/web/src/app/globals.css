@@ -2290,9 +2290,14 @@ code,
     .arena-page__sticky,
     .airdrops-page__sticky,
     .airdrops-page .airdrop-create-page__sticky,
-    .missions-page .missions-header,
+    .missions-page .points-hub__status,
     .portfolio-page .portfolio-mobile-hero {
       padding-top: var(--hub-mobile-top-inset);
+    }
+
+    /* Status card owns content pad + PWA/status-bar inset (same chrome role as arena sticky). */
+    .missions-page .points-hub__status {
+      padding-top: calc(0.5rem + var(--hub-mobile-top-inset));
     }
   }
 
@@ -2682,7 +2687,7 @@ code,
     html.hub-discovery-scroll-lock .arena-page__sticky,
     html.hub-discovery-scroll-lock .airdrops-page__sticky,
     html.hub-discovery-scroll-lock .airdrops-page .airdrops-filter-bar,
-    html.hub-discovery-scroll-lock .missions-page .missions-header,
+    html.hub-discovery-scroll-lock .missions-page .points-hub__status,
     html.hub-discovery-scroll-lock .missions-page .missions-filter-bar,
     html.hub-discovery-scroll-lock .portfolio-page .portfolio-mobile-hero,
     html.hub-discovery-scroll-lock .portfolio-page .portfolio-header,
@@ -17925,6 +17930,7 @@ code,
   .missions-page .points-hub__status {
     flex-shrink: 0;
     padding: 0.5rem var(--missions-page-gutter) 0;
+    background: rgb(var(--pump-bg));
   }
 
   .missions-page .points-hub__body {
@@ -17946,6 +17952,7 @@ code,
 
     .missions-page .points-hub__status {
       padding: 0 0 0.5rem;
+      background: transparent;
     }
 
     .missions-page .points-hub__body {
@@ -17954,7 +17961,17 @@ code,
       overflow: visible;
       display: block;
     }
+  }
 
+  /* Hub terminal hides app header ≤1023px — keep PWA safe area after desktop pad reset. */
+  @media (min-width: 768px) and (max-width: 1023px) {
+    .missions-page .points-hub__status {
+      padding-top: calc(0.5rem + var(--hub-mobile-top-inset));
+      background: rgb(var(--pump-bg));
+    }
+  }
+
+  @media (min-width: 768px) {
     .missions-page .points-hub-panel,
     .missions-page .points-earn,
     .missions-page .points-market-panel,
