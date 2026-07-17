@@ -1270,8 +1270,6 @@ export function TokenDetailLive({
           </section>
           <TokenAnnouncementsPanel
             tokenAddress={streamAddress}
-            tokenSymbol={liveToken.symbol}
-            tokenLogoUrl={liveToken.logoUrl}
             refreshKey={announcementsRefreshKey}
             onOpenProfile={setProfileAddress}
           />

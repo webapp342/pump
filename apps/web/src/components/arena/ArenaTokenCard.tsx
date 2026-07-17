@@ -241,7 +241,12 @@ export function ArenaTokenCard({
         <div className="arena-token-card__header">
           <div className="arena-token-card__identity">
             <p className="arena-token-card__name truncate">{token.name}</p>
-            <p className="arena-token-card__symbol truncate">${token.symbol}</p>
+            <p className="arena-token-card__symbol truncate">
+              {token.symbol}
+              {token.spotlightPinned ? (
+                <span className="token-spotlight-badge token-spotlight-badge--inline">Pinned</span>
+              ) : null}
+            </p>
           </div>
           <div className="arena-token-card__trade-row">
             <ArenaBoardRowQuickActions

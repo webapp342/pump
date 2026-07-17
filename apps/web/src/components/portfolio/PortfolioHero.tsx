@@ -180,9 +180,9 @@ export function PortfolioHero({
                   >
                     <UserAvatarForAddress
                       address={walletAddress}
-                      size="xl"
+                      size="2xl"
                       framed={hasStatusBadge && !guestMode}
-                      className="portfolio-toolbar__avatar token-detail-toolbar__logo shrink-0 !ring-0"
+                      className="portfolio-toolbar__avatar shrink-0"
                     />
                     <span className="portfolio-toolbar__avatar-edit" aria-hidden>
                       <PumpIcon icon={faPen} className="portfolio-toolbar__avatar-edit-glyph" />
@@ -191,9 +191,9 @@ export function PortfolioHero({
                 ) : (
                   <UserAvatarForAddress
                     address={walletAddress}
-                    size="xl"
+                    size="2xl"
                     framed={hasStatusBadge && !guestMode}
-                    className="portfolio-toolbar__avatar token-detail-toolbar__logo shrink-0 !ring-0"
+                    className="portfolio-toolbar__avatar shrink-0"
                   />
                 )}
               </div>
@@ -206,12 +206,16 @@ export function PortfolioHero({
                         className={
                           guestMode
                             ? "portfolio-toolbar__display-name portfolio-toolbar__display-name--guest"
-                            : hasStatusBadge
-                              ? "portfolio-toolbar__display-name identity-name--premium"
-                              : "portfolio-toolbar__display-name"
+                            : "portfolio-toolbar__display-name"
                         }
                       >
-                        {guestMode ? "—" : displayUsername}
+                        <span
+                          className={`portfolio-toolbar__display-name-text${
+                            !guestMode && hasStatusBadge ? " identity-name--premium" : ""
+                          }`}
+                        >
+                          {guestMode ? "—" : displayUsername}
+                        </span>
                       </p>
                       <WalletAddressChip address={walletAddress} guestMode={guestMode} />
                     </div>

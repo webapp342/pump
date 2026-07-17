@@ -1,5 +1,13 @@
 import { randomUUID } from "node:crypto";
 import { Pool } from "pg";
+import {
+  AIRDROP_WEIGHT_ITEM_ID,
+  AIRDROP_WEIGHT_MULTIPLIER,
+  LAUNCH_SPOTLIGHT_DURATION_MS,
+  LAUNCH_SPOTLIGHT_ITEM_ID,
+  type ActiveLaunchPin,
+} from "@/lib/points-perk-effects";
+import type { ActivatePerkResult, PointsInventoryItem } from "@/lib/points-inventory-types";
 
 let pool: Pool | null = null;
 
@@ -761,7 +769,7 @@ export async function redeemMarketItem(input: {
 
 export async function getPointsInventory(
   address: string
-): Promise<import("@/lib/points-inventory-types").PointsInventoryItem[]> {
+): Promise<PointsInventoryItem[]> {
   const db = getIncentivePool();
   try {
     const result = await db.query<{
@@ -774,6 +782,8 @@ export async function getPointsInventory(
         SELECT id, item_id, status, created_at
         FROM points_inventory
         WHERE address = $1
+          AND status = 'active'
+          AND (expires_at IS NULL OR expires_at > now())
         ORDER BY created_at DESC, id DESC
         LIMIT 50
       `,
@@ -787,6 +797,378 @@ export async function getPointsInventory(
     }));
   } catch {
     return [];
+  }
+}
+
+export async function countUsableMarketItems(
+  address: string,
+  itemId: string
+): Promise<number> {
+  const db = getIncentivePool();
+  try {
+    const result = await db.query<{ n: string }>(
+      `
+        SELECT COUNT(*)::text AS n
+        FROM points_inventory
+        WHERE address = $1
+          AND item_id = $2
+          AND status = 'active'
+          AND (expires_at IS NULL OR expires_at > now())
+      `,
+      [address.toLowerCase(), itemId]
+    );
+    return Number(result.rows[0]?.n ?? 0);
+  } catch {
+    return 0;
+  }
+}
+
+/**
+ * Active Launch spotlight pins (consumed inventory still within 24h window).
+ * Keyed by lowercased token address.
+ */
+export async function getActiveLaunchPins(): Promise<Map<string, ActiveLaunchPin>> {
+  const map = new Map<string, ActiveLaunchPin>();
+  const db = getIncentivePool();
+  try {
+    const result = await db.query<{
+      id: string | number;
+      address: string;
+      token_address: string;
+      expires_at: Date;
+    }>(
+      `
+        SELECT
+          id,
+          address,
+          LOWER(metadata->>'token_address') AS token_address,
+          expires_at
+        FROM points_inventory
+        WHERE item_id = 'launch_boost'
+          AND status = 'consumed'
+          AND expires_at IS NOT NULL
+          AND expires_at > now()
+          AND COALESCE(metadata->>'token_address', '') ~ '^0x[a-fA-F0-9]{40}$'
+        ORDER BY expires_at DESC, id DESC
+      `
+    );
+    for (const row of result.rows) {
+      const tokenAddress = row.token_address.toLowerCase();
+      if (map.has(tokenAddress)) continue;
+      map.set(tokenAddress, {
+        tokenAddress,
+        pinnerAddress: row.address.toLowerCase(),
+        expiresAt: row.expires_at.toISOString(),
+        inventoryId: Number(row.id),
+      });
+    }
+  } catch {
+    // incentive DB unavailable
+  }
+  return map;
+}
+
+export async function getActiveLaunchPinForToken(
+  tokenAddress: string
+): Promise<ActiveLaunchPin | null> {
+  const pins = await getActiveLaunchPins();
+  return pins.get(tokenAddress.toLowerCase()) ?? null;
+}
+
+/**
+ * Consume one Launch spotlight and pin `tokenAddress` for 24h.
+ * Caller must verify the wallet is the token creator (launchpad DB).
+ */
+export async function activateLaunchSpotlight(input: {
+  address: string;
+  tokenAddress: string;
+  inventoryId?: number | null;
+}): Promise<ActivatePerkResult> {
+  const address = input.address.toLowerCase();
+  const tokenAddress = input.tokenAddress.toLowerCase();
+  if (!/^0x[a-f0-9]{40}$/.test(address) || !/^0x[a-f0-9]{40}$/.test(tokenAddress)) {
+    return { ok: false, error: "Invalid address", code: "INVALID" };
+  }
+
+  const db = getIncentivePool();
+  const client = await db.connect();
+  try {
+    await client.query("BEGIN");
+
+    const existing = await client.query<{ id: string | number }>(
+      `
+        SELECT id
+        FROM points_inventory
+        WHERE item_id = $1
+          AND status = 'consumed'
+          AND expires_at IS NOT NULL
+          AND expires_at > now()
+          AND LOWER(metadata->>'token_address') = $2
+        LIMIT 1
+        FOR UPDATE
+      `,
+      [LAUNCH_SPOTLIGHT_ITEM_ID, tokenAddress]
+    );
+    if (existing.rows[0]) {
+      await client.query("ROLLBACK");
+      return {
+        ok: false,
+        error: "This token is already pinned. Wait until the spotlight expires.",
+        code: "ALREADY_PINNED",
+      };
+    }
+
+    const pick = await client.query<{ id: string | number }>(
+      input.inventoryId != null
+        ? `
+            SELECT id
+            FROM points_inventory
+            WHERE id = $3
+              AND address = $1
+              AND item_id = $2
+              AND status = 'active'
+              AND (expires_at IS NULL OR expires_at > now())
+            LIMIT 1
+            FOR UPDATE
+          `
+        : `
+            SELECT id
+            FROM points_inventory
+            WHERE address = $1
+              AND item_id = $2
+              AND status = 'active'
+              AND (expires_at IS NULL OR expires_at > now())
+            ORDER BY created_at ASC, id ASC
+            LIMIT 1
+            FOR UPDATE
+          `,
+      input.inventoryId != null
+        ? [address, LAUNCH_SPOTLIGHT_ITEM_ID, input.inventoryId]
+        : [address, LAUNCH_SPOTLIGHT_ITEM_ID]
+    );
+
+    const inv = pick.rows[0];
+    if (!inv) {
+      await client.query("ROLLBACK");
+      return {
+        ok: false,
+        error: "No Launch spotlight perk available",
+        code: "NO_INVENTORY",
+      };
+    }
+
+    const expiresAt = new Date(Date.now() + LAUNCH_SPOTLIGHT_DURATION_MS);
+    await client.query(
+      `
+        UPDATE points_inventory
+        SET
+          status = 'consumed',
+          expires_at = $2::timestamptz,
+          metadata = COALESCE(metadata, '{}'::jsonb) || $3::jsonb
+        WHERE id = $1
+      `,
+      [
+        inv.id,
+        expiresAt.toISOString(),
+        JSON.stringify({
+          token_address: tokenAddress,
+          activated_at: new Date().toISOString(),
+          effect: "launch_spotlight",
+        }),
+      ]
+    );
+
+    await client.query("COMMIT");
+    return {
+      ok: true,
+      inventoryId: Number(inv.id),
+      itemId: LAUNCH_SPOTLIGHT_ITEM_ID,
+      expiresAt: expiresAt.toISOString(),
+      tokenAddress,
+    };
+  } catch (error) {
+    try {
+      await client.query("ROLLBACK");
+    } catch {
+      // ignore
+    }
+    const message = error instanceof Error ? error.message : "Activation failed";
+    return { ok: false, error: message, code: "UNAVAILABLE" };
+  } finally {
+    client.release();
+  }
+}
+
+/** Addresses that applied airdrop_weight to this campaign (consumed, permanent for campaign). */
+export async function getAirdropWeightBoostAddresses(
+  airdropId: string
+): Promise<Set<string>> {
+  const owned = new Set<string>();
+  const id = airdropId.trim();
+  if (!id) return owned;
+  const db = getIncentivePool();
+  try {
+    const result = await db.query<{ address: string }>(
+      `
+        SELECT DISTINCT address
+        FROM points_inventory
+        WHERE item_id = 'airdrop_weight'
+          AND status = 'consumed'
+          AND metadata->>'airdrop_id' = $1
+      `,
+      [id]
+    );
+    for (const row of result.rows) {
+      owned.add(row.address.toLowerCase());
+    }
+  } catch {
+    // ignore
+  }
+  return owned;
+}
+
+export async function hasAirdropWeightBoost(
+  address: string,
+  airdropId: string
+): Promise<boolean> {
+  const db = getIncentivePool();
+  try {
+    const result = await db.query<{ ok: number }>(
+      `
+        SELECT 1 AS ok
+        FROM points_inventory
+        WHERE address = $1
+          AND item_id = 'airdrop_weight'
+          AND status = 'consumed'
+          AND metadata->>'airdrop_id' = $2
+        LIMIT 1
+      `,
+      [address.toLowerCase(), airdropId.trim()]
+    );
+    return result.rows.length > 0;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Consume one Airdrop multiplier and attach it to a campaign.
+ * Caller verifies airdrop exists / is open (launchpad DB).
+ */
+export async function activateAirdropWeight(input: {
+  address: string;
+  airdropId: string;
+  inventoryId?: number | null;
+}): Promise<ActivatePerkResult> {
+  const address = input.address.toLowerCase();
+  const airdropId = input.airdropId.trim();
+  if (!/^0x[a-f0-9]{40}$/.test(address) || !airdropId) {
+    return { ok: false, error: "Invalid input", code: "INVALID" };
+  }
+
+  const db = getIncentivePool();
+  const client = await db.connect();
+  try {
+    await client.query("BEGIN");
+
+    const existing = await client.query<{ id: string | number }>(
+      `
+        SELECT id
+        FROM points_inventory
+        WHERE address = $1
+          AND item_id = $2
+          AND status = 'consumed'
+          AND metadata->>'airdrop_id' = $3
+        LIMIT 1
+        FOR UPDATE
+      `,
+      [address, AIRDROP_WEIGHT_ITEM_ID, airdropId]
+    );
+    if (existing.rows[0]) {
+      await client.query("ROLLBACK");
+      return {
+        ok: false,
+        error: "Multiplier already applied to this airdrop",
+        code: "ALREADY_APPLIED",
+      };
+    }
+
+    const pick = await client.query<{ id: string | number }>(
+      input.inventoryId != null
+        ? `
+            SELECT id
+            FROM points_inventory
+            WHERE id = $3
+              AND address = $1
+              AND item_id = $2
+              AND status = 'active'
+              AND (expires_at IS NULL OR expires_at > now())
+            LIMIT 1
+            FOR UPDATE
+          `
+        : `
+            SELECT id
+            FROM points_inventory
+            WHERE address = $1
+              AND item_id = $2
+              AND status = 'active'
+              AND (expires_at IS NULL OR expires_at > now())
+            ORDER BY created_at ASC, id ASC
+            LIMIT 1
+            FOR UPDATE
+          `,
+      input.inventoryId != null
+        ? [address, AIRDROP_WEIGHT_ITEM_ID, input.inventoryId]
+        : [address, AIRDROP_WEIGHT_ITEM_ID]
+    );
+
+    const inv = pick.rows[0];
+    if (!inv) {
+      await client.query("ROLLBACK");
+      return {
+        ok: false,
+        error: "No Airdrop multiplier perk available",
+        code: "NO_INVENTORY",
+      };
+    }
+
+    await client.query(
+      `
+        UPDATE points_inventory
+        SET
+          status = 'consumed',
+          metadata = COALESCE(metadata, '{}'::jsonb) || $2::jsonb
+        WHERE id = $1
+      `,
+      [
+        inv.id,
+        JSON.stringify({
+          airdrop_id: airdropId,
+          activated_at: new Date().toISOString(),
+          effect: "airdrop_weight",
+          multiplier: AIRDROP_WEIGHT_MULTIPLIER,
+        }),
+      ]
+    );
+
+    await client.query("COMMIT");
+    return {
+      ok: true,
+      inventoryId: Number(inv.id),
+      itemId: AIRDROP_WEIGHT_ITEM_ID,
+      expiresAt: null,
+      airdropId,
+    };
+  } catch (error) {
+    try {
+      await client.query("ROLLBACK");
+    } catch {
+      // ignore
+    }
+    const message = error instanceof Error ? error.message : "Activation failed";
+    return { ok: false, error: message, code: "UNAVAILABLE" };
+  } finally {
+    client.release();
   }
 }
 

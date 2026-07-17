@@ -217,20 +217,26 @@ export function PortfolioMobileHero({
                 <button
                   type="button"
                   onClick={openAccount}
-                  className={`portfolio-mobile-hero__username portfolio-mobile-hero__username--btn${
-                    hasStatusBadge && !guestMode ? " identity-name--premium" : ""
-                  }`}
+                  className="portfolio-mobile-hero__username portfolio-mobile-hero__username--btn"
                   aria-label="Open settings"
                 >
-                  {formatHeroUsername(displayUsername, guestMode)}
+                  <span
+                    className={`portfolio-mobile-hero__username-text${
+                      hasStatusBadge && !guestMode ? " identity-name--premium" : ""
+                    }`}
+                  >
+                    {formatHeroUsername(displayUsername, guestMode)}
+                  </span>
                 </button>
               ) : (
-                <p
-                  className={`portfolio-mobile-hero__username${
-                    hasStatusBadge && !guestMode ? " identity-name--premium" : ""
-                  }`}
-                >
-                  {formatHeroUsername(displayUsername, guestMode)}
+                <p className="portfolio-mobile-hero__username">
+                  <span
+                    className={`portfolio-mobile-hero__username-text${
+                      hasStatusBadge && !guestMode ? " identity-name--premium" : ""
+                    }`}
+                  >
+                    {formatHeroUsername(displayUsername, guestMode)}
+                  </span>
                 </p>
               )}
               <MobileIdentityCopy address={walletAddress} guestMode={guestMode} />

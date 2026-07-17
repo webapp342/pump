@@ -138,9 +138,6 @@ function CalloutRow({ row }: { row: PortfolioAnnouncementRow }) {
             <span className="creator-profile-sheet__coin-name">{row.tokenName}</span>
             <span className="creator-profile-sheet__coin-symbol">{row.tokenSymbol}</span>
             <CalloutHoldingsSnapshot
-              tokenAddress={row.tokenAddress}
-              tokenSymbol={row.tokenSymbol}
-              tokenLogoUrl={row.tokenLogoUrl}
               balance={row.tokenBalanceAtAnnounce}
               balanceUsd={row.tokenBalanceUsdAtAnnounce}
             />

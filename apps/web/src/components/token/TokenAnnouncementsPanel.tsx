@@ -17,8 +17,6 @@ function formatMultiplierX(value: number): string {
 
 type TokenAnnouncementsPanelProps = {
   tokenAddress: string;
-  tokenSymbol: string;
-  tokenLogoUrl?: string | null;
   refreshKey?: number;
   onOpenProfile?: (address: string) => void;
   /** aside = desktop callout card; tape = Social / About feed (no nested panel). */
@@ -27,8 +25,6 @@ type TokenAnnouncementsPanelProps = {
 
 export function TokenAnnouncementsPanel({
   tokenAddress,
-  tokenSymbol,
-  tokenLogoUrl = null,
   refreshKey = 0,
   onOpenProfile,
   variant = "aside",
@@ -96,9 +92,6 @@ export function TokenAnnouncementsPanel({
                     <UserDisplayName address={item.announcerAddress} compact />
                   </span>
                   <CalloutHoldingsSnapshot
-                    tokenAddress={tokenAddress}
-                    tokenSymbol={tokenSymbol}
-                    tokenLogoUrl={tokenLogoUrl}
                     balance={item.tokenBalanceAtAnnounce}
                     balanceUsd={item.tokenBalanceUsdAtAnnounce}
                   />

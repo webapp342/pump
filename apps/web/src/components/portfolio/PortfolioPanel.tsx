@@ -1343,7 +1343,6 @@ export function PortfolioPanel({
   const claimedBnb = data.creatorFeesClaimedBnb ?? 0;
   const pendingBnb = pendingWei != null ? Number(formatEther(pendingWei)) : 0;
   const tokenHoldingsCount = sortedHoldingsRows.length;
-  const holdingsCount = tokenHoldingsCount + 1;
   const visibleHoldingsRows = sortedHoldingsRows.slice(0, holdingsVisibleLimit);
   const hasMoreHoldings = visibleHoldingsRows.length < sortedHoldingsRows.length;
   const showEmptyHoldings = tokenHoldingsCount === 0 && nativeBnb <= 0;
@@ -1487,14 +1486,7 @@ export function PortfolioPanel({
 
         {error ? <div className="notice-error p-4">{error}</div> : null}
 
-        <PortfolioTabNav
-          active={activeTab}
-          counts={{
-            holdings: holdingsCount,
-            launched: data.createdTokensTotal,
-          }}
-          feesPending={feesPending}
-        />
+        <PortfolioTabNav active={activeTab} feesPending={feesPending} />
 
         <div className="portfolio-hub__body">
         {activeTab === "holdings" ? (
@@ -1733,6 +1725,7 @@ export function PortfolioPanel({
                     tokens={data.createdTokens}
                     bnbUsd={bnbUsd}
                     holdingMetricsByAddress={launchedHoldingMetricsByAddress}
+                    walletAddress={isOwnPortfolio ? address : null}
                   />
                   {data.createdTokens.length < data.createdTokensTotal ? (
                     <div className="flex justify-center border-t border-pump-border/10 px-3 py-3">

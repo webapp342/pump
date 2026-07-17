@@ -6,13 +6,11 @@ import type { PortfolioTab } from "@/lib/portfolio-tabs";
 
 type PortfolioTabNavProps = {
   active: PortfolioTab;
-  counts?: Partial<Record<PortfolioTab, number>>;
   feesPending?: boolean;
 };
 
 export function PortfolioTabNav({
   active,
-  counts = {},
   feesPending = false,
 }: PortfolioTabNavProps) {
   return (
@@ -20,7 +18,6 @@ export function PortfolioTabNav({
       <div className="portfolio-tab-nav__track" role="tablist">
         {PORTFOLIO_TABS.map((tab) => {
           const isActive = tab === active;
-          const count = counts[tab];
           const showDot = tab === "fees" && feesPending && !isActive;
 
           return (
@@ -38,9 +35,6 @@ export function PortfolioTabNav({
               }
             >
               <span className="portfolio-tab-nav__label">{PORTFOLIO_TAB_LABELS[tab]}</span>
-              {count != null && count > 0 ? (
-                <span className="portfolio-tab-nav__count financial-value">{count}</span>
-              ) : null}
               {showDot ? (
                 <span className="portfolio-tab-nav__dot" aria-label="Claimable earnings" />
               ) : null}

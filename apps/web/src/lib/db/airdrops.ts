@@ -8,6 +8,8 @@ import {
 } from "@/lib/airdrop-participant-snapshot";
 import { getAirdropDisplayStatus, isPromotableAirdropStatus, type AirdropDisplayStatus } from "@/lib/airdrop-status";
 import { getLaunchpadPool } from "@/lib/db/launchpad";
+import { getAirdropWeightBoostAddresses } from "@/lib/db/incentive";
+import { AIRDROP_WEIGHT_MULTIPLIER } from "@/lib/points-perk-effects";
 import { sqlBondingMarkPrice } from "@/lib/db/bonding-mark-price-sql";
 import {
   queryQualifyingBuyVolumeBnb,
@@ -684,12 +686,16 @@ export async function getAirdropLeaderboard(
     };
   });
 
+  const boosted = await getAirdropWeightBoostAddresses(airdropId);
+
   const ranked = scored
     .filter((row) => row.qualified)
     .sort((a, b) => {
-      const holdDiff = Number(b.holdAmount) - Number(a.holdAmount);
+      const aMult = boosted.has(a.address.toLowerCase()) ? AIRDROP_WEIGHT_MULTIPLIER : 1;
+      const bMult = boosted.has(b.address.toLowerCase()) ? AIRDROP_WEIGHT_MULTIPLIER : 1;
+      const holdDiff = Number(b.holdAmount) * bMult - Number(a.holdAmount) * aMult;
       if (holdDiff !== 0) return holdDiff;
-      return Number(b.buyVolumeBnb) - Number(a.buyVolumeBnb);
+      return Number(b.buyVolumeBnb) * bMult - Number(a.buyVolumeBnb) * aMult;
     });
 
   let viewer: LeaderboardViewer | null = null;

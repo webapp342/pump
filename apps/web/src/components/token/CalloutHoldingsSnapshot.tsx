@@ -1,6 +1,5 @@
 "use client";
 
-import { TokenAvatar } from "@/components/token/TokenAvatar";
 import {
   formatAnnounceBalance,
   type TokenAnnouncementRow,
@@ -8,19 +7,13 @@ import {
 import { formatUsdReadable } from "@/lib/format-usd";
 
 type CalloutHoldingsSnapshotProps = {
-  tokenAddress: string;
-  tokenSymbol: string;
-  tokenLogoUrl?: string | null;
   balance: TokenAnnouncementRow["tokenBalanceAtAnnounce"];
   balanceUsd: TokenAnnouncementRow["tokenBalanceUsdAtAnnounce"];
   className?: string;
 };
 
-/** Frozen holdings line under callout identity — no live fetches. */
+/** Frozen holdings line — amount only (no mini token logo; row already has the tile). */
 export function CalloutHoldingsSnapshot({
-  tokenAddress,
-  tokenSymbol,
-  tokenLogoUrl = null,
   balance,
   balanceUsd,
   className = "",
@@ -36,14 +29,6 @@ export function CalloutHoldingsSnapshot({
 
   return (
     <span className={`callout-holdings-snapshot ${className}`.trim()}>
-      <TokenAvatar
-        address={tokenAddress}
-        symbol={tokenSymbol}
-        logoUrl={tokenLogoUrl}
-        size="xs"
-        shape="rounded"
-        className="callout-holdings-snapshot__logo"
-      />
       <span className="callout-holdings-snapshot__amount financial-value">
         {formatAnnounceBalance(balance)}
       </span>

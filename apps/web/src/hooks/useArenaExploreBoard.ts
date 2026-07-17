@@ -8,6 +8,11 @@ import { useFavorites } from "@/components/favorites/FavoritesProvider";
 import { useBnbUsdPrice } from "@/hooks/useBnbUsdPrice";
 import { bnbToUsd } from "@/lib/format-usd";
 import { listTokenPriceUsd } from "@/lib/arena-board-format";
+import {
+  isTokenSpotlightPinned,
+  sortTokensWithSpotlightFirst,
+  useLaunchSpotlightPins,
+} from "@/hooks/useLaunchSpotlightPins";
 import { useLiveChannel, resolveLivePollDelay } from "@/hooks/useLiveChannel";
 import { useRafMessageQueue } from "@/hooks/useRafMessageQueue";
 import { useLiveBoardAnimations } from "@/hooks/useLiveBoardAnimations";
@@ -86,6 +91,7 @@ export function useArenaExploreBoard(options: UseArenaExploreBoardOptions = {}) 
   } = useFavorites();
   const { bnbUsd: hookBnbUsd } = useBnbUsdPrice();
   const effectiveBnbUsd = resolveDisplayNativeUsd(hookBnbUsd, apiBnbUsd);
+  const { byToken: spotlightByToken } = useLaunchSpotlightPins();
   const effectiveBnbUsdRef = useRef(effectiveBnbUsd);
   effectiveBnbUsdRef.current = effectiveBnbUsd;
   const flashTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
@@ -596,8 +602,18 @@ export function useArenaExploreBoard(options: UseArenaExploreBoardOptions = {}) 
     airdropTokenAddresses,
   ]);
 
-  const exploreBoardTokens =
-    activeFilter === "favorites" || tokens !== null ? marketTokens : [];
+  const exploreBoardTokens = useMemo(() => {
+    const base = activeFilter === "favorites" || tokens !== null ? marketTokens : [];
+    return sortTokensWithSpotlightFirst(base, spotlightByToken).map((token) => {
+      const pinned = isTokenSpotlightPinned(token.address, spotlightByToken);
+      if (!pinned && !token.spotlightPinned) return token;
+      return {
+        ...token,
+        spotlightPinned: pinned,
+        spotlightExpiresAt: spotlightByToken[token.address.toLowerCase()] ?? null,
+      };
+    });
+  }, [activeFilter, tokens, marketTokens, spotlightByToken]);
 
   const showLoadMore =
     activeFilter !== "favorites" &&

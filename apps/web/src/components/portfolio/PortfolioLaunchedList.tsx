@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { LaunchSpotlightPinButton } from "@/components/portfolio/LaunchSpotlightPinButton";
 import { PortfolioHoldingMobileCard } from "@/components/portfolio/PortfolioHoldingMobileCard";
 import {
   PortfolioHoldingsGridHead,
@@ -23,6 +24,8 @@ import {
   type PortfolioHoldingsSortDir,
   type PortfolioHoldingsSortKey,
 } from "@/lib/portfolio-holdings-sort";
+import { LAUNCH_SPOTLIGHT_ITEM_ID } from "@/lib/points-perk-effects";
+import type { PointsInventoryItem } from "@/lib/points-inventory-types";
 
 export type LaunchedTokenHoldingMetrics = {
   balance: number;
@@ -37,6 +40,8 @@ type PortfolioLaunchedListProps = {
   tokens: TokenListItem[];
   bnbUsd: number | null;
   holdingMetricsByAddress: Record<string, LaunchedTokenHoldingMetrics>;
+  /** Own portfolio wallet — enables Launch spotlight pin CTAs. */
+  walletAddress?: string | null;
 };
 
 function shouldShowLaunchedPnl(valueUsd: number, pnlUsd: number | null): pnlUsd is number {
@@ -76,8 +81,14 @@ function buildLaunchedRows(
 
 function LaunchedDesktopRow({
   row,
+  walletAddress,
+  usableSpotlights,
+  onPinUsed,
 }: {
   row: LaunchedTokenRow & LaunchedTokenHoldingMetrics;
+  walletAddress?: string | null;
+  usableSpotlights: number;
+  onPinUsed: () => void;
 }) {
   const { token } = row;
   const showPnl = shouldShowLaunchedPnl(row.valueUsd, row.pnlUsd);
@@ -98,7 +109,17 @@ function LaunchedDesktopRow({
           <p className="portfolio-holdings-grid__coin-symbol truncate">{token.symbol}</p>
         </Link>
       </td>
-      <td className="portfolio-holdings-grid__actions-cell px-4 py-3" aria-hidden />
+      <td className="portfolio-holdings-grid__actions-cell px-4 py-3">
+        {walletAddress ? (
+          <LaunchSpotlightPinButton
+            walletAddress={walletAddress}
+            tokenAddress={token.address}
+            tokenSymbol={token.symbol}
+            usableCount={usableSpotlights}
+            onUsed={onPinUsed}
+          />
+        ) : null}
+      </td>
       <td className="portfolio-holdings-grid__num portfolio-holdings-grid__data px-4 py-3 financial-value text-pump-text">
         {formatPortfolioTokenAmount(row.balance)}
       </td>
@@ -121,9 +142,45 @@ export function PortfolioLaunchedList({
   tokens,
   bnbUsd,
   holdingMetricsByAddress,
+  walletAddress = null,
 }: PortfolioLaunchedListProps) {
   const [sortKey, setSortKey] = useState<PortfolioHoldingsSortKey>("value");
   const [sortDir, setSortDir] = useState<PortfolioHoldingsSortDir>("desc");
+  const [usableSpotlights, setUsableSpotlights] = useState(0);
+  const [invTick, setInvTick] = useState(0);
+
+  const refreshInventory = useCallback(() => {
+    setInvTick((n) => n + 1);
+  }, []);
+
+  useEffect(() => {
+    if (!walletAddress) {
+      setUsableSpotlights(0);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const response = await fetch(
+          `/api/missions/inventory?address=${encodeURIComponent(walletAddress)}`,
+          { cache: "no-store" }
+        );
+        const body = (await response.json()) as {
+          data?: { inventory?: PointsInventoryItem[] };
+        };
+        if (cancelled || !response.ok) return;
+        const count = (body.data?.inventory ?? []).filter(
+          (row) => row.itemId === LAUNCH_SPOTLIGHT_ITEM_ID
+        ).length;
+        setUsableSpotlights(count);
+      } catch {
+        if (!cancelled) setUsableSpotlights(0);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [walletAddress, invTick]);
 
   function onSort(column: PortfolioHoldingsSortKey) {
     const next = togglePortfolioHoldingsSort(sortKey, sortDir, column);
@@ -164,6 +221,17 @@ export function PortfolioLaunchedList({
                     {row.token.symbol}
                   </Link>
                 }
+                action={
+                  walletAddress ? (
+                    <LaunchSpotlightPinButton
+                      walletAddress={walletAddress}
+                      tokenAddress={row.token.address}
+                      tokenSymbol={row.token.symbol}
+                      usableCount={usableSpotlights}
+                      onUsed={refreshInventory}
+                    />
+                  ) : null
+                }
                 amount={formatPortfolioTokenAmount(row.balance)}
                 valueUsd={row.valueUsd}
                 pnlUsd={showPnl ? row.pnlUsd : null}
@@ -188,7 +256,13 @@ export function PortfolioLaunchedList({
           </thead>
           <tbody>
             {sortedRows.map((row) => (
-              <LaunchedDesktopRow key={row.token.address} row={row} />
+              <LaunchedDesktopRow
+                key={row.token.address}
+                row={row}
+                walletAddress={walletAddress}
+                usableSpotlights={usableSpotlights}
+                onPinUsed={refreshInventory}
+              />
             ))}
           </tbody>
         </table>

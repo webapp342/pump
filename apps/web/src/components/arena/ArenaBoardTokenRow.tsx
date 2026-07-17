@@ -138,6 +138,11 @@ export function ArenaBoardTokenRow({
           <div className="arena-mobile-token-row__meta-line">
             <span className="arena-mobile-token-row__meta-copy">
               <span className="arena-mobile-token-row__symbol">{token.symbol}</span>
+              {token.spotlightPinned ? (
+                <span className="token-spotlight-badge" title="Pinned in Arena for 24h">
+                  Pinned
+                </span>
+              ) : null}
               <span
                 className={`arena-mobile-token-row__age ${ageIsFresh ? rowToneClass("success") : ""}`}
               >

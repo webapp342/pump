@@ -8,6 +8,7 @@ import {
   airdropDetailRewardProps,
 } from "@/components/airdrops/AirdropMetricCells";
 import { AirdropTrustBadge } from "@/components/airdrops/AirdropTrustBadge";
+import { AirdropMultiplierCard } from "@/components/airdrops/AirdropMultiplierCard";
 import { type ReactNode, useCallback, useEffect, useState } from "react";
 import { parseEther } from "viem";
 import { useOpenConnectModal } from "@/hooks/useOpenConnectModal";
@@ -1452,6 +1453,14 @@ export function AirdropDetailPanel({ airdropId }: { airdropId: string }) {
                         returnTo={airdropReturnTo}
                       />
                   </section>
+                ) : null}
+
+                {isConnected && address && !detail.merkleRoot ? (
+                  <AirdropMultiplierCard
+                    airdropId={airdropId}
+                    walletAddress={address}
+                    onApplied={() => void load()}
+                  />
                 ) : null}
 
                 {showNotQualifiedPanel ? (

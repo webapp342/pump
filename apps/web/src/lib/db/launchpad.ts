@@ -71,6 +71,9 @@ export type TokenListItem = {
   socialLinks: TokenSocialLinks;
   creatorHoldPct: number | null;
   top10HoldPct: number | null;
+  /** Active Launch spotlight pin (24h). Enriched client/server for board sort. */
+  spotlightPinned?: boolean;
+  spotlightExpiresAt?: string | null;
 };
 
 export type KothHistoryItem = {

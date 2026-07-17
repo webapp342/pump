@@ -79,16 +79,14 @@ export function PortfolioCalloutsSection({ address }: { address: string }) {
                 symbol={item.tokenSymbol}
                 logoUrl={item.tokenLogoUrl}
                 size="2xl"
+                shape="rounded"
               />
               <div className="portfolio-callouts__token">
                 <span className="portfolio-callouts__symbol">{item.tokenSymbol}</span>
-                <span className="portfolio-callouts__name text-pump-muted">{item.tokenName}</span>
                 <CalloutHoldingsSnapshot
-                  tokenAddress={item.tokenAddress}
-                  tokenSymbol={item.tokenSymbol}
-                  tokenLogoUrl={item.tokenLogoUrl}
                   balance={item.tokenBalanceAtAnnounce}
                   balanceUsd={item.tokenBalanceUsdAtAnnounce}
+                  className="portfolio-callouts__balance"
                 />
               </div>
               <div className="portfolio-callouts__meta">
