@@ -2865,6 +2865,14 @@ code,
     cursor: pointer;
   }
 
+  .token-announcements-panel__identity-copy {
+    display: flex;
+    min-width: 0;
+    flex: 1 1 auto;
+    flex-direction: column;
+    gap: 0.125rem;
+  }
+
   .token-announcements-panel__identity:hover .token-announcements-panel__name {
     color: rgb(var(--pump-accent));
   }
@@ -2877,6 +2885,33 @@ code,
     font-weight: var(--type-label1-weight);
     line-height: var(--type-label1-leading);
     color: rgb(var(--pump-text));
+  }
+
+  .callout-holdings-snapshot {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .callout-holdings-snapshot__logo {
+    flex-shrink: 0;
+  }
+
+  .callout-holdings-snapshot__amount,
+  .callout-holdings-snapshot__usd {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--type-legal-size);
+    font-weight: var(--type-legal-weight);
+    line-height: var(--type-legal-leading);
+    color: rgb(var(--pump-muted));
+  }
+
+  .callout-holdings-snapshot__amount {
+    color: rgb(var(--pump-muted));
   }
 
   .token-announcements-panel__meta {

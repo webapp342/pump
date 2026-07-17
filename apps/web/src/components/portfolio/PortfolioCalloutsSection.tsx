@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import { CalloutHoldingsSnapshot } from "@/components/token/CalloutHoldingsSnapshot";
 import { TokenAvatar } from "@/components/token/TokenAvatar";
-import type { PortfolioAnnouncementRow } from "@/lib/db/token-announcements";
+import type { PortfolioAnnouncementRow } from "@/lib/token-announcements-shared";
 import { formatAge } from "@/lib/arena-board-format";
 
 function formatMultiplierX(value: number): string {
@@ -82,6 +83,13 @@ export function PortfolioCalloutsSection({ address }: { address: string }) {
               <div className="portfolio-callouts__token">
                 <span className="portfolio-callouts__symbol">{item.tokenSymbol}</span>
                 <span className="portfolio-callouts__name text-pump-muted">{item.tokenName}</span>
+                <CalloutHoldingsSnapshot
+                  tokenAddress={item.tokenAddress}
+                  tokenSymbol={item.tokenSymbol}
+                  tokenLogoUrl={item.tokenLogoUrl}
+                  balance={item.tokenBalanceAtAnnounce}
+                  balanceUsd={item.tokenBalanceUsdAtAnnounce}
+                />
               </div>
               <div className="portfolio-callouts__meta">
                 <span className="portfolio-callouts__x financial-value">

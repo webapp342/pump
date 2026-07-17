@@ -12,7 +12,7 @@ export type AppNavItem = {
   icon: PumpIconDefinition;
 };
 
-/** Desktop header — discovery + account (Trade is logo / home only). */
+/** Desktop header — Arena opens Trade home; discovery list stays on mobile dock. */
 export const APP_NAV_ITEMS: AppNavItem[] = [
   { href: "/arena", label: "Arena", icon: faTokenLaunchRocket },
   { href: "/airdrops", label: "Airdrops", icon: faAirdropParachute },

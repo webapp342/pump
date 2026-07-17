@@ -1,7 +1,7 @@
 import { getLaunchpadReadPool } from "@/lib/db/pool";
 import { sendPushToUser } from "@/lib/push/send";
 import { isVapidConfigured } from "@/lib/push/vapid";
-import type { TokenAnnouncementRow } from "@/lib/db/token-announcements";
+import type { TokenAnnouncementRow } from "@/lib/token-announcements-shared";
 
 function pushFollowerAnnouncementsEnabled(): boolean {
   return (

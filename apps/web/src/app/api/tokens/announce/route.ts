@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { normalizeAddressParam } from "@/lib/address";
-import { createTokenAnnouncement } from "@/lib/db/token-announcements";
+import {
+  ANNOUNCE_HOLDINGS_ERROR,
+  createTokenAnnouncement,
+} from "@/lib/db/token-announcements";
 import { dispatchFollowerAnnouncementPush } from "@/lib/push/dispatch-announcement";
 
 export async function POST(request: Request) {
@@ -32,11 +35,13 @@ export async function POST(request: Request) {
     const status =
       message === "Token not found"
         ? 404
-        : message.includes("wait a few minutes")
-          ? 429
-          : message.includes("unavailable")
-            ? 409
-            : 500;
+        : message === ANNOUNCE_HOLDINGS_ERROR
+          ? 403
+          : message.includes("wait a few minutes")
+            ? 429
+            : message.includes("unavailable")
+              ? 409
+              : 500;
     return NextResponse.json({ error: message }, { status });
   }
 }

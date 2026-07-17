@@ -281,6 +281,7 @@ export function TradeTape({
   tokenAddress,
   creatorAddress,
   symbol,
+  logoUrl = null,
   headTrades,
   wsConnected = false,
   holdersRefreshKey = 0,
@@ -302,6 +303,7 @@ export function TradeTape({
   tokenAddress: string;
   creatorAddress: string;
   symbol: string;
+  logoUrl?: string | null;
   /** Latest trades from live poll + optimistic layer (tape head). */
   headTrades: TradeItem[];
   wsConnected?: boolean;
@@ -533,6 +535,8 @@ export function TradeTape({
         {tab === "social" ? (
           <TokenAnnouncementsPanel
             tokenAddress={tokenAddress}
+            tokenSymbol={symbol}
+            tokenLogoUrl={logoUrl}
             refreshKey={announcementsRefreshKey}
             onOpenProfile={onAddressClick}
             variant="tape"

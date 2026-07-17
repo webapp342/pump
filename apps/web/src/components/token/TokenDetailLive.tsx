@@ -11,7 +11,7 @@ import {
 } from "@/lib/icons";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { createPublicClient, http } from "viem";
+import { createPublicClient, http, parseUnits, type Address } from "viem";
 import { useReadContract, useAccount } from "wagmi";
 import type { TokenHolderSnapshot, TokenDetail, TradeItem } from "@/lib/db/launchpad";
 import {
@@ -47,6 +47,11 @@ import {
   removeOptimisticActivities,
 } from "@/lib/optimistic-activity";
 import { contracts, explorerAddressUrl, pumpChain, shortAddress } from "@/config/chain";
+import { erc20Abi } from "@/lib/abis/erc20";
+import {
+  ANNOUNCE_HOLDINGS_ERROR,
+  ANNOUNCE_MIN_TOKEN_BALANCE,
+} from "@/lib/token-announcements-shared";
 import { copyToClipboard } from "@/lib/copy-to-clipboard";
 import { TradePanel, type TradeConfirmedPayload, type TradeOptimisticPayload, type TradeSubmittedPayload } from "@/components/token/TradePanel";
 import { QuickTradeConfirmModal } from "@/components/token/QuickTradeConfirmModal";
@@ -286,6 +291,19 @@ export function TokenDetailLive({
   const { isFavorite, toggleFavorite, upsertFavoriteSnapshots } = useFavorites();
   const [announceBusy, setAnnounceBusy] = useState(false);
   const [announcementsRefreshKey, setAnnouncementsRefreshKey] = useState(0);
+
+  const { data: announceTokenBalance } = useReadContract({
+    address: streamAddress as Address,
+    abi: erc20Abi,
+    functionName: "balanceOf",
+    args: address ? [address] : undefined,
+    chainId: pumpChain.id,
+    query: { enabled: Boolean(address) },
+  });
+
+  const canAnnounceHoldings =
+    announceTokenBalance != null &&
+    announceTokenBalance >= parseUnits(String(ANNOUNCE_MIN_TOKEN_BALANCE), 18);
   const burstUntilRef = useRef(0);
   const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const optimisticRef = useRef<TradeItem[]>([]);
@@ -331,6 +349,7 @@ export function TokenDetailLive({
 
   const hasLivePending = optimisticTrades.length > 0 || indexerSyncing;
   const tradeLocked = !contentSynced;
+  const announceDisabled = tradeLocked || announceBusy || (isConnected && !canAnnounceHoldings);
 
   const { data: chainCurve, refetch: refetchCurve } = useReadContract({
     address: contracts.bondingCurveManager,
@@ -764,6 +783,10 @@ export function TokenDetailLive({
       return;
     }
     if (announceBusy || tradeLocked) return;
+    if (!canAnnounceHoldings) {
+      toast.error("Announce locked", ANNOUNCE_HOLDINGS_ERROR);
+      return;
+    }
 
     setAnnounceBusy(true);
     try {
@@ -797,6 +820,7 @@ export function TokenDetailLive({
   }, [
     address,
     announceBusy,
+    canAnnounceHoldings,
     isConnected,
     openConnectModal,
     streamAddress,
@@ -812,6 +836,7 @@ export function TokenDetailLive({
     tokenAddress: streamAddress,
     creatorAddress: liveToken.creatorAddress,
     symbol: liveToken.symbol,
+    logoUrl: liveToken.logoUrl,
     headTrades: trades,
     wsConnected,
     holdersRefreshKey,
@@ -1070,9 +1095,13 @@ export function TokenDetailLive({
           <button
             type="button"
             onClick={() => void onAnnounce()}
-            disabled={tradeLocked || announceBusy}
+            disabled={announceDisabled}
             aria-label="Announce token"
-            title="Announce"
+            title={
+              isConnected && !canAnnounceHoldings
+                ? ANNOUNCE_HOLDINGS_ERROR
+                : "Announce"
+            }
             className="token-detail-toolbar__announce-btn"
           >
             <PumpIcon icon={faCampaign} size="md" />
@@ -1126,6 +1155,12 @@ export function TokenDetailLive({
               tradeLocked={tradeLocked}
               copiedAddress={copiedAddress}
               announceBusy={announceBusy}
+              announceDisabled={isConnected && !canAnnounceHoldings}
+              announceTitle={
+                isConnected && !canAnnounceHoldings
+                  ? ANNOUNCE_HOLDINGS_ERROR
+                  : "Announce"
+              }
               onToggleFavorite={() => toggleFavorite(streamAddress, liveToken)}
               onAnnounce={() => void onAnnounce()}
               onCopyAddress={() => void onCopyAddress()}
@@ -1214,6 +1249,8 @@ export function TokenDetailLive({
           </section>
           <TokenAnnouncementsPanel
             tokenAddress={streamAddress}
+            tokenSymbol={liveToken.symbol}
+            tokenLogoUrl={liveToken.logoUrl}
             refreshKey={announcementsRefreshKey}
             onOpenProfile={setProfileAddress}
           />

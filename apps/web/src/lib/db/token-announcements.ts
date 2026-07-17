@@ -3,22 +3,27 @@ import {
   BONDING_TOKEN_SUPPLY_HUMAN,
   BONDING_VIRTUAL_BNB_HUMAN,
 } from "@/lib/bonding-curve";
+import { fetchLiveTokenBalance } from "@/lib/airdrop-onchain";
+import { bnbToUsd } from "@/lib/format-usd";
+import { fetchNativeUsdPrice } from "@/lib/native-usd-price";
+import {
+  ANNOUNCE_COOLDOWN_MS,
+  ANNOUNCE_HOLDINGS_ERROR,
+  ANNOUNCE_MIN_TOKEN_BALANCE,
+  type PortfolioAnnouncementRow,
+  type TokenAnnouncementRow,
+} from "@/lib/token-announcements-shared";
 import { attachAddressDisplayNames } from "@/lib/user-display";
 import { resolveDisplayUsername } from "@/lib/username";
 
-/** Soft anti-spam while still allowing announcement history. */
-export const ANNOUNCE_COOLDOWN_MS = 5 * 60 * 1000;
-
-export type TokenAnnouncementRow = {
-  id: string;
-  tokenAddress: string;
-  announcerAddress: string;
-  announcerDisplayUsername: string;
-  marketCapZugAtAnnounce: string;
-  launchMcapZug: string;
-  multiplierX: number;
-  createdAt: string;
-};
+export {
+  ANNOUNCE_COOLDOWN_MS,
+  ANNOUNCE_HOLDINGS_ERROR,
+  ANNOUNCE_MIN_TOKEN_BALANCE,
+  formatAnnounceBalance,
+  type PortfolioAnnouncementRow,
+  type TokenAnnouncementRow,
+} from "@/lib/token-announcements-shared";
 
 type SnapshotRow = {
   market_cap_zug: string;
@@ -32,10 +37,20 @@ type AnnouncementDbRow = {
   market_cap_zug_at_announce: string;
   launch_mcap_zug: string;
   multiplier_x: string;
+  token_balance_at_announce: string | null;
+  token_balance_usd_at_announce: string | null;
   created_at: Date;
 };
 
-function mapAnnouncement(row: AnnouncementDbRow): Omit<TokenAnnouncementRow, "announcerDisplayUsername"> {
+function parseOptionalNumber(value: string | null | undefined): number | null {
+  if (value == null || value === "") return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+function mapAnnouncement(
+  row: AnnouncementDbRow
+): Omit<TokenAnnouncementRow, "announcerDisplayUsername"> {
   return {
     id: row.id,
     tokenAddress: row.token_address,
@@ -43,6 +58,8 @@ function mapAnnouncement(row: AnnouncementDbRow): Omit<TokenAnnouncementRow, "an
     marketCapZugAtAnnounce: row.market_cap_zug_at_announce,
     launchMcapZug: row.launch_mcap_zug,
     multiplierX: Number(row.multiplier_x),
+    tokenBalanceAtAnnounce: parseOptionalNumber(row.token_balance_at_announce),
+    tokenBalanceUsdAtAnnounce: parseOptionalNumber(row.token_balance_usd_at_announce),
     createdAt: row.created_at.toISOString(),
   };
 }
@@ -88,6 +105,14 @@ export async function fetchTokenMcapSnapshot(tokenAddress: string): Promise<Snap
   return row;
 }
 
+function holdingsUsdAtAnnounce(balanceHuman: number, marketCapZug: number, nativeUsd: number | null): number | null {
+  if (!Number.isFinite(balanceHuman) || balanceHuman <= 0) return null;
+  if (!Number.isFinite(marketCapZug) || marketCapZug <= 0) return null;
+  const priceBnb = marketCapZug / BONDING_TOKEN_SUPPLY_HUMAN;
+  if (!Number.isFinite(priceBnb) || priceBnb <= 0) return null;
+  return bnbToUsd(balanceHuman * priceBnb, nativeUsd);
+}
+
 export async function createTokenAnnouncement(
   announcerAddress: string,
   tokenAddress: string
@@ -110,6 +135,11 @@ export async function createTokenAnnouncement(
     throw new Error("Launch market cap unavailable");
   }
 
+  const balanceHuman = Number(await fetchLiveTokenBalance(token, announcer));
+  if (!Number.isFinite(balanceHuman) || balanceHuman < ANNOUNCE_MIN_TOKEN_BALANCE) {
+    throw new Error(ANNOUNCE_HOLDINGS_ERROR);
+  }
+
   const recent = await db.query<{ created_at: Date }>(
     `
     SELECT created_at
@@ -125,6 +155,9 @@ export async function createTokenAnnouncement(
     throw new Error("Please wait a few minutes before announcing again");
   }
 
+  const nativePrice = await fetchNativeUsdPrice();
+  const balanceUsd = holdingsUsdAtAnnounce(balanceHuman, mcap, nativePrice.nativeUsd);
+
   const multiplier = mcap / launch;
   const inserted = await db.query<AnnouncementDbRow>(
     `
@@ -133,9 +166,11 @@ export async function createTokenAnnouncement(
       announcer_address,
       market_cap_zug_at_announce,
       launch_mcap_zug,
-      multiplier_x
+      multiplier_x,
+      token_balance_at_announce,
+      token_balance_usd_at_announce
     )
-    VALUES ($1, $2, $3::numeric, $4::numeric, $5::numeric)
+    VALUES ($1, $2, $3::numeric, $4::numeric, $5::numeric, $6::numeric, $7::numeric)
     RETURNING
       id::text,
       token_address,
@@ -143,9 +178,19 @@ export async function createTokenAnnouncement(
       market_cap_zug_at_announce::text,
       launch_mcap_zug::text,
       multiplier_x::text,
+      token_balance_at_announce::text,
+      token_balance_usd_at_announce::text,
       created_at
     `,
-    [token, announcer, String(mcap), String(launch), String(multiplier)]
+    [
+      token,
+      announcer,
+      String(mcap),
+      String(launch),
+      String(multiplier),
+      String(balanceHuman),
+      balanceUsd != null ? String(balanceUsd) : null,
+    ]
   );
 
   const row = inserted.rows[0];
@@ -162,6 +207,18 @@ export async function createTokenAnnouncement(
   };
 }
 
+const ANNOUNCEMENT_SELECT_COLS = `
+  id::text,
+  token_address,
+  announcer_address,
+  market_cap_zug_at_announce::text,
+  launch_mcap_zug::text,
+  multiplier_x::text,
+  token_balance_at_announce::text,
+  token_balance_usd_at_announce::text,
+  created_at
+`;
+
 export async function listTokenAnnouncements(
   tokenAddress: string,
   limit = 40
@@ -172,14 +229,7 @@ export async function listTokenAnnouncements(
 
   const result = await db.query<AnnouncementDbRow>(
     `
-    SELECT
-      id::text,
-      token_address,
-      announcer_address,
-      market_cap_zug_at_announce::text,
-      launch_mcap_zug::text,
-      multiplier_x::text,
-      created_at
+    SELECT ${ANNOUNCEMENT_SELECT_COLS}
     FROM token_announcements
     WHERE token_address = $1
     ORDER BY created_at DESC
@@ -205,12 +255,6 @@ export async function listTokenAnnouncements(
   }));
 }
 
-export type PortfolioAnnouncementRow = TokenAnnouncementRow & {
-  tokenSymbol: string;
-  tokenName: string;
-  tokenLogoUrl: string | null;
-};
-
 export async function listAnnouncementsByUser(
   announcerAddress: string,
   limit = 50
@@ -234,6 +278,8 @@ export async function listAnnouncementsByUser(
       a.market_cap_zug_at_announce::text,
       a.launch_mcap_zug::text,
       a.multiplier_x::text,
+      a.token_balance_at_announce::text,
+      a.token_balance_usd_at_announce::text,
       a.created_at,
       t.symbol,
       t.name,

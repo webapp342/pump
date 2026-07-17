@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { CalloutHoldingsSnapshot } from "@/components/token/CalloutHoldingsSnapshot";
 import { UserAvatarForAddress } from "@/components/user/UserAvatarForAddress";
-import type { TokenAnnouncementRow } from "@/lib/db/token-announcements";
+import type { TokenAnnouncementRow } from "@/lib/token-announcements-shared";
 import { formatAge } from "@/lib/arena-board-format";
 
 function formatMultiplierX(value: number): string {
@@ -15,6 +16,8 @@ function formatMultiplierX(value: number): string {
 
 type TokenAnnouncementsPanelProps = {
   tokenAddress: string;
+  tokenSymbol: string;
+  tokenLogoUrl?: string | null;
   refreshKey?: number;
   onOpenProfile?: (address: string) => void;
   /** aside = desktop callout card; tape = Social / About feed (no nested panel). */
@@ -23,6 +26,8 @@ type TokenAnnouncementsPanelProps = {
 
 export function TokenAnnouncementsPanel({
   tokenAddress,
+  tokenSymbol,
+  tokenLogoUrl = null,
   refreshKey = 0,
   onOpenProfile,
   variant = "aside",
@@ -71,7 +76,7 @@ export function TokenAnnouncementsPanel({
             variant === "aside" ? "mt-3" : ""
           } text-body-sm leading-relaxed text-pump-muted`}
         >
-          No callouts yet. Announce this token to notify your followers.
+          No callouts yet. Hold at least 1 of this token to announce and notify your followers.
         </p>
       ) : (
         <ul
@@ -85,8 +90,17 @@ export function TokenAnnouncementsPanel({
             const identity = (
               <>
                 <UserAvatarForAddress address={item.announcerAddress} size="md" />
-                <span className="token-announcements-panel__name">
-                  {item.announcerDisplayUsername}
+                <span className="token-announcements-panel__identity-copy">
+                  <span className="token-announcements-panel__name">
+                    {item.announcerDisplayUsername}
+                  </span>
+                  <CalloutHoldingsSnapshot
+                    tokenAddress={tokenAddress}
+                    tokenSymbol={tokenSymbol}
+                    tokenLogoUrl={tokenLogoUrl}
+                    balance={item.tokenBalanceAtAnnounce}
+                    balanceUsd={item.tokenBalanceUsdAtAnnounce}
+                  />
                 </span>
               </>
             );
@@ -125,4 +139,3 @@ export function TokenAnnouncementsPanel({
     </section>
   );
 }
-

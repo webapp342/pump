@@ -9,6 +9,7 @@ import type {
 } from "@/lib/db/launchpad";
 import { UserDisplayName } from "@/components/user/UserDisplayName";
 import { TokenAvatar } from "@/components/token/TokenAvatar";
+import { CalloutHoldingsSnapshot } from "@/components/token/CalloutHoldingsSnapshot";
 import { UserAvatarForAddress } from "@/components/user/UserAvatarForAddress";
 import { useCreatorFollows } from "@/components/creators/CreatorFollowsProvider";
 import { AppBottomSheet } from "@/components/ui/AppBottomSheet";
@@ -49,6 +50,8 @@ type PortfolioAnnouncementRow = {
   tokenName: string;
   tokenLogoUrl: string | null;
   multiplierX: number;
+  tokenBalanceAtAnnounce: number | null;
+  tokenBalanceUsdAtAnnounce: number | null;
   createdAt: string;
 };
 
@@ -133,6 +136,13 @@ function CalloutRow({ row }: { row: PortfolioAnnouncementRow }) {
           <span className="creator-profile-sheet__coin-copy min-w-0">
             <span className="creator-profile-sheet__coin-name">{row.tokenName}</span>
             <span className="creator-profile-sheet__coin-symbol">{row.tokenSymbol}</span>
+            <CalloutHoldingsSnapshot
+              tokenAddress={row.tokenAddress}
+              tokenSymbol={row.tokenSymbol}
+              tokenLogoUrl={row.tokenLogoUrl}
+              balance={row.tokenBalanceAtAnnounce}
+              balanceUsd={row.tokenBalanceUsdAtAnnounce}
+            />
           </span>
         </Link>
       </td>

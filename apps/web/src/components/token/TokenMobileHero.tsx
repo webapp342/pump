@@ -22,6 +22,8 @@ type TokenMobileHeroProps = {
   tradeLocked: boolean;
   copiedAddress: boolean;
   announceBusy?: boolean;
+  announceDisabled?: boolean;
+  announceTitle?: string;
   onToggleFavorite: () => void;
   onAnnounce: () => void;
   onCopyAddress: () => void;
@@ -93,6 +95,8 @@ export function TokenMobileHero({
   tradeLocked,
   copiedAddress,
   announceBusy = false,
+  announceDisabled = false,
+  announceTitle = "Announce",
   onToggleFavorite,
   onAnnounce,
   onCopyAddress,
@@ -160,8 +164,9 @@ export function TokenMobileHero({
           <button
             type="button"
             onClick={handleAnnounce}
-            disabled={tradeLocked || announceBusy}
+            disabled={tradeLocked || announceBusy || announceDisabled}
             aria-label="Announce token"
+            title={announceTitle}
             className="token-mobile-hero__icon-btn"
           >
             <PumpIcon icon={faCampaign} className="token-mobile-hero__fav-icon" aria-hidden />
