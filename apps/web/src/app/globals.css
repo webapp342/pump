@@ -2289,15 +2289,8 @@ code,
 
     .arena-page__sticky,
     .airdrops-page__sticky,
-    .airdrops-page .airdrop-create-page__sticky,
-    .missions-page .points-hub__status,
-    .portfolio-page .portfolio-mobile-hero {
+    .airdrops-page .airdrop-create-page__sticky {
       padding-top: var(--hub-mobile-top-inset);
-    }
-
-    /* Status card owns content pad + PWA/status-bar inset (same chrome role as arena sticky). */
-    .missions-page .points-hub__status {
-      padding-top: calc(0.5rem + var(--hub-mobile-top-inset));
     }
   }
 
@@ -14981,6 +14974,14 @@ code,
     gap: 1.25rem;
     padding: 0.875rem var(--portfolio-page-gutter) 1rem;
     flex-shrink: 0;
+    background: rgb(var(--pump-bg));
+  }
+
+  /* After shorthand pad — hub terminal owns top inset (PWA status bar), same as arena sticky. */
+  @media (max-width: 1023px) {
+    .app-shell--hub-terminal .portfolio-page .portfolio-mobile-hero {
+      padding-top: calc(0.875rem + var(--hub-mobile-top-inset));
+    }
   }
 
   .portfolio-page .portfolio-mobile-hero__top {
@@ -17933,6 +17934,13 @@ code,
     background: rgb(var(--pump-bg));
   }
 
+  /* After shorthand pad — hub terminal owns top inset (PWA status bar), same as arena sticky. */
+  @media (max-width: 1023px) {
+    .app-shell--hub-terminal .missions-page .points-hub__status {
+      padding-top: calc(0.5rem + var(--hub-mobile-top-inset));
+    }
+  }
+
   .missions-page .points-hub__body {
     flex: 1 1 0;
     min-height: 0;
@@ -17965,7 +17973,7 @@ code,
 
   /* Hub terminal hides app header ≤1023px — keep PWA safe area after desktop pad reset. */
   @media (min-width: 768px) and (max-width: 1023px) {
-    .missions-page .points-hub__status {
+    .app-shell--hub-terminal .missions-page .points-hub__status {
       padding-top: calc(0.5rem + var(--hub-mobile-top-inset));
       background: rgb(var(--pump-bg));
     }
