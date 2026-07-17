@@ -10,7 +10,6 @@ export const ARENA_FILTER_TABS: { key: BoardFilter; label: string; mobileLabel?:
   { key: "all", label: "All" },
   { key: "movers", label: "Movers" },
   { key: "hasAirdrop", label: "Airdrop" },
-  { key: "kothContenders", label: "KOTH" },
 ];
 
 type ArenaFilterNavProps = {

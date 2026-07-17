@@ -44,6 +44,14 @@ export const GUEST_MISSION_ROWS: MissionListItem[] = [
     progress: { current: 0, target: 0.01, unit: "BNB" },
   },
   {
+    taskKey: "LAUNCHPAD_INVITED_FIRST_TRADE",
+    title: "Invited Trader",
+    description: "Join with an invite link — completes when your first trade binds the referral.",
+    rewardPoints: 250,
+    taskKind: "ONE_TIME",
+    completed: false,
+  },
+  {
     taskKey: "LAUNCHPAD_VOLUME_MONSTER",
     title: "Volume Monster",
     description: "Reach 1 BNB in cumulative trading volume.",
@@ -51,14 +59,6 @@ export const GUEST_MISSION_ROWS: MissionListItem[] = [
     taskKind: "MILESTONE",
     completed: false,
     progress: { current: 0, target: 1, unit: "BNB" },
-  },
-  {
-    taskKey: "LAUNCHPAD_KING_OF_HILL",
-    title: "King of the Hill",
-    description: "Hold the #1 market cap among bonding tokens as creator.",
-    rewardPoints: 350,
-    taskKind: "MILESTONE",
-    completed: false,
   },
 ];
 

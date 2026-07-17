@@ -30,7 +30,6 @@ const BOARD_FILTERS: ArenaBoardFilter[] = [
   "all",
   "new",
   "movers",
-  "kothContenders",
   "hasAirdrop",
 ];
 

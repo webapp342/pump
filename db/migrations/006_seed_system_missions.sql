@@ -1,5 +1,5 @@
--- 5 sabit system mission — launchpad_tasks boşsa (wipe sonrası) yeniden ekler.
--- Idempotent: task_key varsa reward_points / metinler güncellenir.
+﻿-- 5 sabit system mission â€” launchpad_tasks boإںsa (wipe sonrasؤ±) yeniden ekler.
+-- Idempotent: task_key varsa reward_points / metinler gأ¼ncellenir.
 
 INSERT INTO launchpad_tasks (
   task_key, title, description, reward_points, task_kind, task_source, is_active
@@ -32,19 +32,19 @@ INSERT INTO launchpad_tasks (
     true
   ),
   (
-    'LAUNCHPAD_VOLUME_MONSTER',
-    'Volume Monster',
-    'Reach 1 BNB in cumulative trading volume.',
-    300,
-    'MILESTONE',
+    'LAUNCHPAD_INVITED_FIRST_TRADE',
+    'Invited Trader',
+    'Join with an invite link — completes when your first trade binds the referral.',
+    250,
+    'ONE_TIME',
     'system',
     true
   ),
   (
-    'LAUNCHPAD_KING_OF_HILL',
-    'King of the Hill',
-    'Hold the #1 market cap among bonding tokens as creator.',
-    350,
+    'LAUNCHPAD_VOLUME_MONSTER',
+    'Volume Monster',
+    'Reach 1 BNB in cumulative trading volume.',
+    300,
     'MILESTONE',
     'system',
     true

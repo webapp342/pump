@@ -6,8 +6,8 @@ export const TASK_KEYS = {
   dailySwap: "LAUNCHPAD_DAILY_SWAP",
   deployMeme: "LAUNCHPAD_DEPLOY_MEME",
   firstSmartBuy: "LAUNCHPAD_FIRST_SMART_BUY",
-  volumeMonster: "LAUNCHPAD_VOLUME_MONSTER",
-  kingOfHill: "LAUNCHPAD_KING_OF_HILL"
+  invitedFirstTrade: "LAUNCHPAD_INVITED_FIRST_TRADE",
+  volumeMonster: "LAUNCHPAD_VOLUME_MONSTER"
 } as const;
 
 type AwardInput = {

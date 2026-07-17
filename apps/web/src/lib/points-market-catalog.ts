@@ -2,6 +2,7 @@
 import type { PumpIconDefinition } from "@/lib/icons";
 import {
   faAirdropParachute,
+  faCalendarMoney,
   faCoins,
   faPercent,
   faRocket,
@@ -13,17 +14,8 @@ export type PointsMarketItemId =
   | "launch_boost"
   | "airdrop_weight"
   | "cashback_10_daily"
-  | "cashback_10_weekly"
-  | "cashback_10_monthly"
-  | "cashback_25_daily"
   | "cashback_25_weekly"
-  | "cashback_25_monthly"
-  | "cashback_60_daily"
-  | "cashback_60_weekly"
-  | "cashback_60_monthly"
-  | "cashback_90_daily"
-  | "cashback_90_weekly"
-  | "cashback_90_monthly";
+  | "cashback_60_monthly";
 
 export type PointsMarketItem = {
   id: PointsMarketItemId;
@@ -39,53 +31,40 @@ export type PointsMarketItem = {
   comingSoon?: boolean;
 };
 
-type CashbackPeriod = "daily" | "weekly" | "monthly";
-type CashbackRate = 10 | 25 | 60 | 90;
-
-const CASHBACK_PERIOD: Record<
-  CashbackPeriod,
-  { label: string; duration: string; costMul: number }
-> = {
-  daily: { label: "Daily", duration: "24h", costMul: 1 },
-  weekly: { label: "Weekly", duration: "7 days", costMul: 5 },
-  monthly: { label: "Monthly", duration: "30 days", costMul: 18 },
-};
-
-const CASHBACK_RATE: Record<
-  CashbackRate,
-  { baseCost: number; unlockTier: PointsTierId; featuredPeriod?: CashbackPeriod }
-> = {
-  10: { baseCost: 300, unlockTier: "rookie", featuredPeriod: "daily" },
-  25: { baseCost: 750, unlockTier: "trader" },
-  60: { baseCost: 2_000, unlockTier: "pro" },
-  90: { baseCost: 4_500, unlockTier: "elite", featuredPeriod: "monthly" },
-};
-
-function cashbackItem(
-  rate: CashbackRate,
-  period: CashbackPeriod
-): PointsMarketItem {
-  const rateCfg = CASHBACK_RATE[rate];
-  const periodCfg = CASHBACK_PERIOD[period];
-  const id = `cashback_${rate}_${period}` as PointsMarketItemId;
-  return {
-    id,
-    title: `${rate}% ${periodCfg.label} cashback`,
-    description: `${rate}% fee cashback for ${periodCfg.duration}. Coming soon.`,
-    costPts: Math.round(rateCfg.baseCost * periodCfg.costMul),
-    unlockTier: rateCfg.unlockTier,
-    featured: rateCfg.featuredPeriod === period,
+/** Three fee-cashback perks — one rate × one duration each (no 12-cell matrix). */
+const CASHBACK_CATALOG: PointsMarketItem[] = [
+  {
+    id: "cashback_10_daily",
+    title: "10% Daily cashback",
+    description: "10% fees · 24h.",
+    costPts: 300,
+    unlockTier: "rookie",
+    featured: true,
     stackable: true,
     comingSoon: true,
-    icon: period === "daily" ? faPercent : faCoins,
-  };
-}
-
-const CASHBACK_CATALOG: PointsMarketItem[] = (
-  [10, 25, 60, 90] as const
-).flatMap((rate) =>
-  (["daily", "weekly", "monthly"] as const).map((period) => cashbackItem(rate, period))
-);
+    icon: faPercent,
+  },
+  {
+    id: "cashback_25_weekly",
+    title: "25% Weekly cashback",
+    description: "25% fees · 7 days.",
+    costPts: 1_500,
+    unlockTier: "trader",
+    stackable: true,
+    comingSoon: true,
+    icon: faCoins,
+  },
+  {
+    id: "cashback_60_monthly",
+    title: "60% Monthly cashback",
+    description: "60% fees · 30 days.",
+    costPts: 6_000,
+    unlockTier: "pro",
+    stackable: true,
+    comingSoon: true,
+    icon: faCalendarMoney,
+  },
+];
 
 /**
  * Perks catalog — redeem spends XP into `points_inventory`.
@@ -95,8 +74,8 @@ export const POINTS_MARKET_CATALOG: readonly PointsMarketItem[] = [
   {
     id: "status_badge",
     title: "Profile badge",
-    description: "One-time. Badge next to your name on profile.",
-    costPts: 150,
+    description: "Badge next to your name.",
+    costPts: 500,
     unlockTier: "rookie",
     featured: true,
     stackable: false,
@@ -105,8 +84,8 @@ export const POINTS_MARKET_CATALOG: readonly PointsMarketItem[] = [
   {
     id: "launch_boost",
     title: "Launch spotlight",
-    description: "Pin any of your launched tokens in Arena for 24h.",
-    costPts: 800,
+    description: "Pin a launch in Arena 24h.",
+    costPts: 2_500,
     unlockTier: "trader",
     featured: true,
     stackable: true,
@@ -115,7 +94,7 @@ export const POINTS_MARKET_CATALOG: readonly PointsMarketItem[] = [
   {
     id: "airdrop_weight",
     title: "Airdrop multiplier",
-    description: "1.5× score on one campaign. Buy again anytime.",
+    description: "1.5× score on one campaign.",
     costPts: 1_200,
     unlockTier: "pro",
     featured: true,

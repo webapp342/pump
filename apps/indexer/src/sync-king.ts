@@ -2,12 +2,10 @@ import type { Hash } from "viem";
 import { config } from "./config.js";
 import { closePools, createPools } from "./db.js";
 import { getTopMcapToken, recomputeKing } from "./king.js";
-import { PointsBridge } from "./points.js";
 
-/** One-off backfill when a token is already #1 but king mission was never awarded. */
+/** One-off backfill for king_history when #1 bonding token is already clear. */
 async function main(): Promise<void> {
   const pools = createPools(config.launchpadDatabaseUrl, config.vm1MainDatabaseUrl);
-  const pointsBridge = new PointsBridge(pools.vm1);
 
   try {
     const top = await getTopMcapToken(pools.launchpad);
@@ -26,13 +24,9 @@ async function main(): Promise<void> {
       `Current #1: ${top.tokenAddress} (creator ${top.creatorAddress}, mcap ${top.marketCapBnb} BNB)`
     );
 
-    await recomputeKing(
-      { launchpadPool: pools.launchpad, pointsBridge },
-      new Date(),
-      txHash
-    );
+    await recomputeKing({ launchpadPool: pools.launchpad }, new Date(), txHash);
 
-    console.log("King sync complete. Refresh /missions in the TMA.");
+    console.log("King history sync complete.");
   } finally {
     await closePools(pools);
   }

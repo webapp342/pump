@@ -39,7 +39,6 @@ import { resolveDisplayNativeUsd } from "@/lib/native-usd-price";
 
 const SERVER_BOARD_FILTERS = new Set<BoardFilter>([
   "movers",
-  "kothContenders",
   "hasAirdrop",
 ]);
 
@@ -104,8 +103,6 @@ function emptyExploreFilterCopy(
       return "No favorites to show.";
     case "movers":
       return "No movers with 1%+ 24h change right now.";
-    case "kothContenders":
-      return "No KOTH contenders yet.";
     case "hasAirdrop":
       return "No coins with an active airdrop right now.";
     default:
@@ -117,7 +114,6 @@ type FlashTone = "up" | "down";
 type SortKey = "mcap" | "ath" | "age" | "txns" | "vol24h" | "traders" | "h1" | "h6" | "h24";
 type SortDir = "asc" | "desc";
 
-const KOTH_CONTENDER_RANK = 5;
 const ARENA_PAGE_INITIAL = 50;
 const ARENA_PAGE_INCREMENT = 25;
 
@@ -145,7 +141,6 @@ function matchesBoardFilter(
   token: TokenListItem,
   filter: BoardFilter,
   favorites: Set<string>,
-  kothContenderAddresses: Set<string>,
   airdropTokenAddresses: Set<string>
 ): boolean {
   if (filter === "new") {
@@ -153,9 +148,6 @@ function matchesBoardFilter(
   }
   if (filter === "movers") {
     return Math.abs(token.change24hPct ?? 0) >= 1;
-  }
-  if (filter === "kothContenders") {
-    return kothContenderAddresses.has(token.address.toLowerCase());
   }
   if (filter === "favorites") {
     return favorites.has(token.address.toLowerCase());
@@ -763,24 +755,6 @@ export function ArenaListClient({
   }, [tokens, effectiveBnbUsd, animateCap, setAnimatedCap]);
 
   const resolvedTokens = tokens ?? [];
-  const mcapRankedTokens = useMemo(
-    () =>
-      topByMcap.length > 0
-        ? topByMcap
-        : [...resolvedTokens].sort(
-            (a, b) => Number(b.marketCapBnb ?? 0) - Number(a.marketCapBnb ?? 0)
-          ),
-    [topByMcap, resolvedTokens]
-  );
-  const kothContenderAddresses = useMemo(
-    () =>
-      new Set(
-        mcapRankedTokens
-          .slice(0, KOTH_CONTENDER_RANK)
-          .map((token) => token.address.toLowerCase())
-      ),
-    [mcapRankedTokens]
-  );
 
   const marketTokens = useMemo(() => {
     const searchTerm = search.trim().toLowerCase();
@@ -804,7 +778,6 @@ export function ArenaListClient({
         token,
         activeFilter,
         favorites,
-        kothContenderAddresses,
         airdropTokenAddresses
       );
     });
@@ -851,7 +824,6 @@ export function ArenaListClient({
     sortDir,
     useServerBoardOrder,
     effectiveBnbUsd,
-    kothContenderAddresses,
     airdropTokenAddresses,
   ]);
 

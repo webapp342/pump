@@ -17704,9 +17704,10 @@ code,
 
   .missions-page .missions-list__primary {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
-    gap: 0.75rem;
+    gap: 0.5rem 0.75rem;
     min-width: 0;
   }
 
@@ -17793,10 +17794,12 @@ code,
 
   .missions-page .missions-list__progress {
     display: flex;
+    flex: 1 1 100%;
     flex-direction: column;
     gap: 0.25rem;
     min-width: 0;
     max-width: 100%;
+    order: 3;
   }
 
   .missions-page .missions-list__progress-meta {
@@ -17820,7 +17823,7 @@ code,
 
     .missions-page .missions-list__row {
       padding: 0.75rem 1rem;
-      gap: 0.5rem;
+      gap: 0;
     }
 
     .missions-page .missions-list__primary {
@@ -17828,6 +17831,17 @@ code,
       grid-template-columns: minmax(0, 1fr) auto;
       align-items: center;
       gap: 1rem;
+      flex-wrap: nowrap;
+    }
+
+    .missions-page .missions-list__row--has-progress .missions-list__primary {
+      grid-template-columns: minmax(0, 1fr) minmax(9rem, 14rem) auto;
+    }
+
+    .missions-page .missions-list__progress {
+      flex: none;
+      order: 0;
+      max-width: none;
     }
 
     .missions-page .missions-list__trail {
@@ -17846,10 +17860,6 @@ code,
       min-width: 4.5rem;
       min-height: 2rem;
       padding: 0.375rem 0.625rem;
-    }
-
-    .missions-page .missions-list__progress {
-      max-width: 22rem;
     }
   }
 
@@ -18532,7 +18542,7 @@ code,
     display: flex;
     flex-direction: column;
     gap: 0.625rem;
-    padding: 0.875rem;
+    padding: 0.75rem;
     border: 1px solid var(--missions-panel-border);
     background: var(--missions-panel-bg);
     box-shadow: none;
@@ -18543,8 +18553,7 @@ code,
   .missions-page .points-market-card__top {
     display: flex;
     align-items: flex-start;
-    justify-content: space-between;
-    gap: 0.75rem;
+    gap: 0.625rem;
   }
 
   .missions-page .points-market-card__icon-wrap {
@@ -18559,34 +18568,40 @@ code,
     color: rgb(var(--pump-accent));
   }
 
-  .missions-page .points-market-card__meta {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    gap: 0.125rem;
+  .missions-page .points-market-card__copy {
+    flex: 1 1 auto;
     min-width: 0;
+  }
+
+  .missions-page .points-market-card__meta {
+    flex-shrink: 0;
     text-align: right;
+    padding-top: 0.125rem;
   }
 
   .missions-page .points-market-card__title {
     margin: 0;
     font-size: var(--text-body-sm);
     font-weight: var(--weight-emphasis);
+    line-height: 1.25;
     color: rgb(var(--pump-text));
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .missions-page .points-market-card__desc {
-    margin: 0.25rem 0 0;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
+    margin: 0.125rem 0 0;
+    display: block;
+    white-space: nowrap;
     overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .missions-page .points-market-card__cta {
     width: 100%;
-    margin-top: auto;
-    min-height: 2.5rem;
+    margin-top: 0;
+    min-height: 2.25rem;
   }
 
   .missions-page .missions-list__reward {

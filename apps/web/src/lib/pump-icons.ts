@@ -33,6 +33,7 @@ export const faChevronRight = cds("caretRight");
 export const faChevronUp = cds("caretUp");
 export const faClock = cds("clock");
 export const faClockRotateLeft = cds("orderHistory");
+export const faCalendarMoney = cds("calendarMoney");
 export const faCoins = cds("cashCoins", true);
 export const faCopy = cds("copy");
 export const faCrown = cds("starAward", true);

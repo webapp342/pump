@@ -32,7 +32,6 @@ import {
   apiBoardFilter,
   applyBoardFilterDefaults,
   boardCacheKey,
-  KOTH_CONTENDER_RANK,
   matchesBoardFilter,
   SERVER_BOARD_FILTERS,
   type BoardSortDir,
@@ -525,24 +524,6 @@ export function useArenaExploreBoard(options: UseArenaExploreBoardOptions = {}) 
   }, [tokens, effectiveBnbUsd, animateCap, setAnimatedCap]);
 
   const resolvedTokens = tokens ?? [];
-  const mcapRankedTokens = useMemo(
-    () =>
-      topByMcap.length > 0
-        ? topByMcap
-        : [...resolvedTokens].sort(
-            (a, b) => Number(b.marketCapBnb ?? 0) - Number(a.marketCapBnb ?? 0)
-          ),
-    [topByMcap, resolvedTokens]
-  );
-  const kothContenderAddresses = useMemo(
-    () =>
-      new Set(
-        mcapRankedTokens
-          .slice(0, KOTH_CONTENDER_RANK)
-          .map((token) => token.address.toLowerCase())
-      ),
-    [mcapRankedTokens]
-  );
 
   const marketTokens = useMemo(() => {
     const searchTerm = search.trim().toLowerCase();
@@ -566,7 +547,6 @@ export function useArenaExploreBoard(options: UseArenaExploreBoardOptions = {}) 
         token,
         activeFilter,
         favorites,
-        kothContenderAddresses,
         airdropTokenAddresses
       );
     });
@@ -613,7 +593,6 @@ export function useArenaExploreBoard(options: UseArenaExploreBoardOptions = {}) 
     sortDir,
     useServerBoardOrder,
     effectiveBnbUsd,
-    kothContenderAddresses,
     airdropTokenAddresses,
   ]);
 

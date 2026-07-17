@@ -4,17 +4,20 @@ import { NATIVE_SYMBOL } from "@/config/chain";
 import { normalizeAddressParam } from "@/lib/address";
 import {
   ensureFirstSmartBuyAward,
+  ensureInvitedFirstTradeAward,
   ensureVolumeMonsterAward,
   getMissionsForAddress,
 } from "@/lib/db/incentive";
 import {
   FIRST_SMART_BUY_MIN_BNB,
   getFirstSmartBuyQualifyingTrade,
+  getInvitedFirstTradeEvidence,
   getUserVolumeBnb,
 } from "@/lib/db/launchpad";
 
 const VOLUME_MONSTER_KEY = "LAUNCHPAD_VOLUME_MONSTER";
 const FIRST_SMART_BUY_KEY = "LAUNCHPAD_FIRST_SMART_BUY";
+const INVITED_FIRST_TRADE_KEY = "LAUNCHPAD_INVITED_FIRST_TRADE";
 const VOLUME_MONSTER_TARGET = 1;
 
 export async function GET(request: NextRequest) {
@@ -34,6 +37,9 @@ export async function GET(request: NextRequest) {
     const smartBuyAlreadyDone = snapshot.missions.some(
       (mission) => mission.taskKey === FIRST_SMART_BUY_KEY && mission.completed
     );
+    const invitedAlreadyDone = snapshot.missions.some(
+      (mission) => mission.taskKey === INVITED_FIRST_TRADE_KEY && mission.completed
+    );
     const volumeMonsterAlreadyDone = snapshot.missions.some(
       (mission) => mission.taskKey === VOLUME_MONSTER_KEY && mission.completed
     );
@@ -49,6 +55,14 @@ export async function GET(request: NextRequest) {
           tokenAddress: smartBuyTrade.tokenAddress,
           zugAmountBnb: smartBuyTrade.zugAmountBnb,
         });
+        missionsChanged = missionsChanged || changed;
+      }
+    }
+
+    if (!invitedAlreadyDone) {
+      const invited = await getInvitedFirstTradeEvidence(address);
+      if (invited) {
+        const changed = await ensureInvitedFirstTradeAward(address, invited);
         missionsChanged = missionsChanged || changed;
       }
     }

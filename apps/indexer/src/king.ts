@@ -1,11 +1,9 @@
 import pg from "pg";
 import type { Hash } from "viem";
-import { PointsBridge, TASK_KEYS } from "./points.js";
 import { KOTH_TOKEN_SUPPLY } from "./koth-config.js";
 
 export type KingContext = {
   launchpadPool: pg.Pool;
-  pointsBridge: PointsBridge;
 };
 
 type TopToken = {
@@ -94,36 +92,14 @@ async function dethroneActiveKing(pool: pg.Pool, blockTime: Date): Promise<void>
   );
 }
 
-async function awardKingMission(
-  ctx: KingContext,
-  creatorAddress: string,
-  tokenAddress: string,
-  txHash: Hash,
-  blockTime: Date,
-  marketCapBnb: number
-): Promise<void> {
-  await ctx.pointsBridge.award({
-    address: creatorAddress,
-    taskKey: TASK_KEYS.kingOfHill,
-    eventId: tokenAddress,
-    txHash,
-    blockTime,
-    metadata: {
-      token: tokenAddress,
-      market_cap_zug: marketCapBnb,
-      source: "king_of_the_hill",
-    },
-  });
-}
-
 /**
- * Updates king_history when #1 MCAP changes and awards LAUNCHPAD_KING_OF_HILL once per creator.
- * Safe to call repeatedly — points bridge is idempotent.
+ * Updates king_history when #1 MCAP among bonding tokens changes.
+ * Safe to call repeatedly.
  */
 export async function recomputeKing(
   ctx: KingContext,
   blockTime: Date,
-  txHash: Hash
+  _txHash: Hash
 ): Promise<void> {
   const top = await getTopMcapToken(ctx.launchpadPool);
   const activeKingToken = await getActiveKingToken(ctx.launchpadPool);
@@ -136,14 +112,6 @@ export async function recomputeKing(
   }
 
   if (activeKingToken === top.tokenAddress) {
-    await awardKingMission(
-      ctx,
-      top.creatorAddress,
-      top.tokenAddress,
-      txHash,
-      blockTime,
-      top.marketCapBnb
-    );
     return;
   }
 
@@ -162,7 +130,7 @@ export async function recomputeKing(
       );
     }
 
-    const pointsEventId = `${TASK_KEYS.kingOfHill}:${top.tokenAddress}`;
+    const pointsEventId = `koth:${top.tokenAddress}`;
 
     await client.query(
       `
@@ -190,15 +158,6 @@ export async function recomputeKing(
     );
 
     await client.query("COMMIT");
-
-    await awardKingMission(
-      ctx,
-      top.creatorAddress,
-      top.tokenAddress,
-      txHash,
-      blockTime,
-      top.marketCapBnb
-    );
   } catch (error) {
     await client.query("ROLLBACK");
     throw error;

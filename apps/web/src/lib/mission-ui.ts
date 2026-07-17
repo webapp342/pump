@@ -2,10 +2,10 @@ import type { PumpIconDefinition } from "@/lib/icons";
 import {
   faAirdropParachute,
   faBolt,
-  faCrown,
   faRocket,
   faRightLeft,
   faLink,
+  faUsers,
 } from "@/lib/pump-icons";
 import { getMissionHref, isAdminLinkMission } from "@/lib/mission-routes";
 import type { MissionListItem } from "@/lib/missions-guest-data";
@@ -13,8 +13,8 @@ import type { MissionListItem } from "@/lib/missions-guest-data";
 const DEPLOY_MEME_TASK_KEY = "LAUNCHPAD_DEPLOY_MEME";
 const DAILY_SWAP_TASK_KEY = "LAUNCHPAD_DAILY_SWAP";
 const FIRST_SMART_BUY_TASK_KEY = "LAUNCHPAD_FIRST_SMART_BUY";
+const INVITED_FIRST_TRADE_TASK_KEY = "LAUNCHPAD_INVITED_FIRST_TRADE";
 const VOLUME_MONSTER_TASK_KEY = "LAUNCHPAD_VOLUME_MONSTER";
-const KING_OF_HILL_TASK_KEY = "LAUNCHPAD_KING_OF_HILL";
 
 export const MISSION_KIND_LABEL: Record<MissionListItem["taskKind"], string> = {
   DAILY: "Daily",
@@ -29,10 +29,10 @@ export function missionIcon(mission: Pick<MissionListItem, "taskKey" | "taskKind
     case FIRST_SMART_BUY_TASK_KEY:
     case VOLUME_MONSTER_TASK_KEY:
       return faRightLeft;
+    case INVITED_FIRST_TRADE_TASK_KEY:
+      return faUsers;
     case DEPLOY_MEME_TASK_KEY:
       return faRocket;
-    case KING_OF_HILL_TASK_KEY:
-      return faCrown;
     default:
       if (mission.taskKind === "ADMIN_LINK") return faLink;
       if (mission.taskKind === "MILESTONE") return faBolt;

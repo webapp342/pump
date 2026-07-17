@@ -2,7 +2,6 @@ export type BoardFilter =
   | "all"
   | "new"
   | "movers"
-  | "kothContenders"
   | "favorites"
   | "hasAirdrop";
 
@@ -12,7 +11,6 @@ const FILTER_VALUES: BoardFilter[] = [
   "all",
   "new",
   "movers",
-  "kothContenders",
   "favorites",
   "hasAirdrop",
 ];
@@ -21,7 +19,7 @@ export function readArenaFilter(): BoardFilter {
   if (typeof window === "undefined") return "new";
   try {
     const stored = localStorage.getItem(ARENA_FILTER_STORAGE_KEY);
-    if (stored === "highVol") return "new";
+    if (stored === "highVol" || stored === "kothContenders") return "new";
     if (stored && FILTER_VALUES.includes(stored as BoardFilter)) {
       return stored as BoardFilter;
     }

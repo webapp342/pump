@@ -79,6 +79,20 @@ export function MissionRow({
           </div>
         </div>
 
+        {hasProgressBar && pct != null && mission.progress ? (
+          <div className="missions-list__progress">
+            <div className="missions-list__progress-meta">
+              <span className="financial-value tabular-nums">
+                {formatMissionProgress(mission.progress)}
+              </span>
+              <span className="financial-value">{Math.round(pct)}%</span>
+            </div>
+            <div className="progress-track">
+              <div className="progress-fill" style={{ width: `${pct}%` }} />
+            </div>
+          </div>
+        ) : null}
+
         <div className="missions-list__trail">
           <span className="missions-list__reward financial-value">
             +{mission.rewardPoints} {REWARDS_HUB.unitShort}
@@ -108,20 +122,6 @@ export function MissionRow({
           )}
         </div>
       </div>
-
-      {hasProgressBar && pct != null && mission.progress ? (
-        <div className="missions-list__progress">
-          <div className="missions-list__progress-meta">
-            <span className="financial-value tabular-nums">
-              {formatMissionProgress(mission.progress)}
-            </span>
-            <span className="financial-value">{Math.round(pct)}%</span>
-          </div>
-          <div className="progress-track">
-            <div className="progress-fill" style={{ width: `${pct}%` }} />
-          </div>
-        </div>
-      ) : null}
     </div>
   );
 }

@@ -4,7 +4,6 @@ import {
   faArrowTrendUp,
   faAirdropParachute,
   faCircleDollarSign,
-  faCrown,
   faRocket,
   faSparkles,
 } from "@/lib/pump-icons";
@@ -22,13 +21,13 @@ const STRIP_MODE_VALUES: TokenWatchlistStripMode[] = [
   "new",
   "movers",
   "hasAirdrop",
-  "kothContenders",
 ];
 
 export function readTokenWatchlistStripMode(): TokenWatchlistStripMode {
   if (typeof window === "undefined") return "auto";
   try {
     const stored = localStorage.getItem(TOKEN_WATCHLIST_STRIP_PREFS_KEY);
+    if (stored === "kothContenders") return "all";
     if (stored && STRIP_MODE_VALUES.includes(stored as TokenWatchlistStripMode)) {
       return stored as TokenWatchlistStripMode;
     }
@@ -68,8 +67,6 @@ export function tokenWatchlistStripLabel(filter: BoardFilter): string {
       return "Movers";
     case "hasAirdrop":
       return "Airdrop";
-    case "kothContenders":
-      return "KOTH";
     default:
       return "Watchlist";
   }
@@ -87,8 +84,6 @@ export function tokenWatchlistStripIcon(filter: BoardFilter): TokenWatchlistStri
       return faArrowTrendUp;
     case "hasAirdrop":
       return faAirdropParachute;
-    case "kothContenders":
-      return faCrown;
     default:
       return faCircleDollarSign;
   }
@@ -134,10 +129,5 @@ export const TOKEN_WATCHLIST_STRIP_SOURCE_OPTIONS: {
     key: "hasAirdrop",
     label: "Airdrop",
     description: "Tokens with active airdrops",
-  },
-  {
-    key: "kothContenders",
-    label: "KOTH",
-    description: "King of the Hill contenders",
   },
 ];

@@ -59,6 +59,7 @@ export type MissionsSnapshot = {
 
 const VOLUME_MONSTER_KEY = "LAUNCHPAD_VOLUME_MONSTER";
 const FIRST_SMART_BUY_KEY = "LAUNCHPAD_FIRST_SMART_BUY";
+const INVITED_FIRST_TRADE_KEY = "LAUNCHPAD_INVITED_FIRST_TRADE";
 
 export type FirstSmartBuyAwardInput = {
   eventId: string;
@@ -212,6 +213,48 @@ export async function ensureFirstSmartBuyAward(
         source: "missions_api_reconcile",
         token: trade.tokenAddress,
         zug_amount_bnb: trade.zugAmountBnb,
+      }),
+    ]
+  );
+
+  return (awardResult.rows[0]?.points_awarded ?? 0) > 0;
+}
+
+/**
+ * Award Invited Trader when referral_bindings + a trade exist but indexer missed the points write.
+ */
+export async function ensureInvitedFirstTradeAward(
+  address: string,
+  evidence: { eventId: string; txHash: string; referrerAddress: string }
+): Promise<boolean> {
+  const db = getIncentivePool();
+  const normalized = address.toLowerCase();
+
+  const existing = await db.query(
+    `
+      SELECT 1
+      FROM launchpad_user_task_completions
+      WHERE address = $1 AND task_key = $2
+      LIMIT 1
+    `,
+    [normalized, INVITED_FIRST_TRADE_KEY]
+  );
+  if ((existing.rowCount ?? 0) > 0) return false;
+
+  const awardResult = await db.query<{ status: string; points_awarded: number }>(
+    `
+      SELECT status, points_awarded
+      FROM launchpad_award_points($1, $2, $3, $4, $5, $6::jsonb)
+    `,
+    [
+      normalized,
+      INVITED_FIRST_TRADE_KEY,
+      `${INVITED_FIRST_TRADE_KEY}:${evidence.eventId}`,
+      evidence.txHash,
+      null,
+      JSON.stringify({
+        source: "missions_api_reconcile",
+        referrer: evidence.referrerAddress,
       }),
     ]
   );

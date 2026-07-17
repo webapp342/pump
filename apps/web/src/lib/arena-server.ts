@@ -39,7 +39,6 @@ function filterCountKey(
   filter: ArenaBoardFilter
 ): keyof ArenaFilterCounts {
   if (filter === "movers") return "movers";
-  if (filter === "kothContenders") return "kothContenders";
   if (filter === "hasAirdrop") return "hasAirdrop";
   if (filter === "new") return "new";
   return "all";

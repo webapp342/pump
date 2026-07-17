@@ -62,6 +62,5 @@ export const MetricIcons = {
   missions: faTarget,
   pumpPoints: faHurricane,
   launch: faRocket,
-  kingOfHill: faCrown,
   graph: faActivity,
 } as const satisfies Record<string, PumpIconDefinition>;

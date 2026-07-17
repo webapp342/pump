@@ -57,18 +57,15 @@ function PointsMarketCard({
         <div className="points-market-card__icon-wrap" aria-hidden>
           <PumpIcon icon={item.icon} size="md" className="points-market-card__icon" />
         </div>
+        <div className="points-market-card__copy">
+          <h3 className="points-market-card__title">{item.title}</h3>
+          <p className="points-market-card__desc type-legal text-pump-muted">{item.description}</p>
+        </div>
         <div className="points-market-card__meta">
           <span className="financial-value text-pump-accent">
             {item.costPts.toLocaleString()} {REWARDS_HUB.unitShort}
           </span>
-          <span className="type-legal text-pump-muted">
-            Unlocks at {tierName(item.unlockTier)}
-          </span>
         </div>
-      </div>
-      <div className="points-market-card__body">
-        <h3 className="points-market-card__title">{item.title}</h3>
-        <p className="points-market-card__desc type-legal text-pump-muted">{item.description}</p>
       </div>
       <button
         type="button"

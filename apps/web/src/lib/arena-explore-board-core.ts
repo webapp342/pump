@@ -8,16 +8,13 @@ export const SIDEBAR_FILTER_ITEMS = [
   ["all", "All"],
   ["movers", "Movers"],
   ["hasAirdrop", "Has airdrop"],
-  ["kothContenders", "KOTH"],
 ] as const satisfies ReadonlyArray<readonly [BoardFilter, string | null]>;
 
 export const SERVER_BOARD_FILTERS = new Set<BoardFilter>([
   "movers",
-  "kothContenders",
   "hasAirdrop",
 ]);
 
-export const KOTH_CONTENDER_RANK = 5;
 export const ARENA_BOARD_PAGE_INITIAL = 50;
 export const ARENA_BOARD_PAGE_INCREMENT = 25;
 
@@ -98,8 +95,6 @@ export function emptyExploreFilterCopy(
       return "No watchlist tokens to show.";
     case "movers":
       return "No movers with 1%+ 24h change right now.";
-    case "kothContenders":
-      return "No KOTH contenders yet.";
     case "hasAirdrop":
       return "No coins with an active airdrop right now.";
     default:
@@ -111,7 +106,6 @@ export function matchesBoardFilter(
   token: TokenListItem,
   filter: BoardFilter,
   favorites: Set<string>,
-  kothContenderAddresses: Set<string>,
   airdropTokenAddresses: Set<string>
 ): boolean {
   if (filter === "new") {
@@ -119,9 +113,6 @@ export function matchesBoardFilter(
   }
   if (filter === "movers") {
     return Math.abs(token.change24hPct ?? 0) >= 1;
-  }
-  if (filter === "kothContenders") {
-    return kothContenderAddresses.has(token.address.toLowerCase());
   }
   if (filter === "favorites") {
     return favorites.has(token.address.toLowerCase());
