@@ -1,7 +1,24 @@
 "use client";
 
 import { type ReactNode, createContext, useContext, useEffect, useMemo, useState } from "react";
-import { PumpIcon, type PumpIconDefinition, faBell, faChevronRight, faPencil, faRefreshCw, faSearch } from "@/lib/icons";
+import {
+  PumpIcon,
+  type PumpIconDefinition,
+  faChartColumn,
+  faChevronRight,
+  faCoins,
+  faListUl,
+  faLock,
+  faMenu,
+  faParachuteBox,
+  faPencil,
+  faCampaign,
+  faRefreshCw,
+  faSearch,
+  faSettings2,
+  faWallet,
+  faXmark,
+} from "@/lib/icons";
 import { explorerAddressUrl, pumpChain, shortAddress } from "@/config/chain";
 import { PumpLogo } from "@/components/brand/PumpLogo";
 import { ADMIN_COPY } from "@/lib/admin/copy";
@@ -19,7 +36,14 @@ export type AdminTabId =
 type NavItem = {
   id: AdminTabId;
   label: string;
-  icon?: React.ElementType;
+  desc: string;
+  icon: PumpIconDefinition;
+};
+
+type NavGroup = {
+  id: "overview" | "operations" | "finance" | "system";
+  label: string;
+  items: NavItem[];
 };
 
 type AdminShellContextValue = {
@@ -40,16 +64,84 @@ export function useAdminShell(): AdminShellContextValue {
 export const ADMIN_PAGE_META: Record<AdminTabId, { title: string; description: string }> =
   ADMIN_COPY.pages;
 
-const NAV_ITEMS: NavItem[] = [
-  { id: "dashboard", label: ADMIN_COPY.nav.items.dashboard.label },
-  { id: "todos", label: ADMIN_COPY.nav.items.todos.label },
-  { id: "portfolio", label: ADMIN_COPY.nav.items.portfolio.label },
-  { id: "airdrops", label: ADMIN_COPY.nav.items.airdrops.label },
-  { id: "promo", label: ADMIN_COPY.nav.items.promo.label },
-  { id: "treasury", label: ADMIN_COPY.nav.items.treasury.label },
-  { id: "contracts", label: ADMIN_COPY.nav.items.contracts.label },
-  { id: "environment", label: ADMIN_COPY.nav.items.environment.label },
+const NAV_GROUPS: NavGroup[] = [
+  {
+    id: "overview",
+    label: ADMIN_COPY.nav.overview,
+    items: [
+      {
+        id: "dashboard",
+        label: ADMIN_COPY.nav.items.dashboard.label,
+        desc: ADMIN_COPY.nav.items.dashboard.desc,
+        icon: faChartColumn,
+      },
+    ],
+  },
+  {
+    id: "operations",
+    label: ADMIN_COPY.nav.operations,
+    items: [
+      {
+        id: "todos",
+        label: ADMIN_COPY.nav.items.todos.label,
+        desc: ADMIN_COPY.nav.items.todos.desc,
+        icon: faListUl,
+      },
+      {
+        id: "airdrops",
+        label: ADMIN_COPY.nav.items.airdrops.label,
+        desc: ADMIN_COPY.nav.items.airdrops.desc,
+        icon: faParachuteBox,
+      },
+      {
+        id: "promo",
+        label: ADMIN_COPY.nav.items.promo.label,
+        desc: ADMIN_COPY.nav.items.promo.desc,
+        icon: faCampaign,
+      },
+    ],
+  },
+  {
+    id: "finance",
+    label: ADMIN_COPY.nav.finance,
+    items: [
+      {
+        id: "treasury",
+        label: ADMIN_COPY.nav.items.treasury.label,
+        desc: ADMIN_COPY.nav.items.treasury.desc,
+        icon: faCoins,
+      },
+      {
+        id: "portfolio",
+        label: ADMIN_COPY.nav.items.portfolio.label,
+        desc: ADMIN_COPY.nav.items.portfolio.desc,
+        icon: faWallet,
+      },
+    ],
+  },
+  {
+    id: "system",
+    label: ADMIN_COPY.nav.system,
+    items: [
+      {
+        id: "contracts",
+        label: ADMIN_COPY.nav.items.contracts.label,
+        desc: ADMIN_COPY.nav.items.contracts.desc,
+        icon: faLock,
+      },
+      {
+        id: "environment",
+        label: ADMIN_COPY.nav.items.environment.label,
+        desc: ADMIN_COPY.nav.items.environment.desc,
+        icon: faSettings2,
+      },
+    ],
+  },
 ];
+
+function groupForTab(tab: AdminTabId): NavGroup {
+  return NAV_GROUPS.find((g) => g.items.some((i) => i.id === tab)) ?? NAV_GROUPS[0]!;
+}
 
 export function AdminShell({ children }: { children: ReactNode }) {
   const [globalQuery, setGlobalQuery] = useState("");
@@ -62,13 +154,58 @@ export function AdminShell({ children }: { children: ReactNode }) {
   );
 }
 
+function AdminSidebarNav({
+  activeTab,
+  onTabChange,
+  onNavigate,
+}: {
+  activeTab: AdminTabId;
+  onTabChange: (tab: AdminTabId) => void;
+  onNavigate?: () => void;
+}) {
+  return (
+    <nav className="admin-sidebar-nav" aria-label="Admin sections">
+      {NAV_GROUPS.map((group) => (
+        <div key={group.id} className="admin-sidebar-group">
+          <p className="admin-sidebar-group-label">{group.label}</p>
+          {group.items.map((item) => {
+            const active = activeTab === item.id;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => {
+                  onTabChange(item.id);
+                  onNavigate?.();
+                }}
+                className={
+                  active ? "admin-sidebar-link admin-sidebar-link-active" : "admin-sidebar-link"
+                }
+                aria-current={active ? "page" : undefined}
+              >
+                <span className="admin-sidebar-link-icon" aria-hidden>
+                  <PumpIcon icon={item.icon} className="h-3.5 w-3.5" />
+                </span>
+                <span className="admin-sidebar-link-text">
+                  <span className="admin-sidebar-link-label">{item.label}</span>
+                  <span className="admin-sidebar-link-desc">{item.desc}</span>
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      ))}
+    </nav>
+  );
+}
+
 export function AdminLayout({
   activeTab,
   onTabChange,
   address,
   onRefreshAll,
   refreshing,
-  headerActions,
+  onSignOut,
   children,
 }: {
   activeTab: AdminTabId;
@@ -76,11 +213,14 @@ export function AdminLayout({
   address?: string;
   onRefreshAll?: () => void;
   refreshing?: boolean;
-  headerActions?: ReactNode;
+  onSignOut?: () => void;
   children: ReactNode;
 }) {
   const { globalQuery, setGlobalQuery } = useAdminShell();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const page = ADMIN_PAGE_META[activeTab];
+  const group = groupForTab(activeTab);
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -89,42 +229,112 @@ export function AdminLayout({
         const input = document.querySelector<HTMLInputElement>(".admin-ent-global-search-input");
         input?.focus();
       }
+      if (e.key === "Escape") setMobileOpen(false);
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
 
+  useEffect(() => {
+    setMobileOpen(false);
+    setUserMenuOpen(false);
+  }, [activeTab]);
+
+  const sidebarBrand = (
+    <div className="admin-sidebar-brand">
+      <PumpLogo size={32} variant="rounded" className="admin-sidebar-brand-logo" />
+      <div className="admin-sidebar-brand-copy">
+        <p className="admin-sidebar-brand-title">{ADMIN_COPY.brand.title}</p>
+        <p className="admin-sidebar-brand-sub">
+          {ADMIN_COPY.brand.subtitle}
+          <span className="admin-sidebar-env" title={ADMIN_COPY.nav.environment}>
+            {ADMIN_COPY.brand.envLabel}
+          </span>
+        </p>
+      </div>
+    </div>
+  );
+
+  const sidebarFoot = (
+    <div className="admin-sidebar-foot">
+      <div className="admin-wallet-widget">
+        <div className="admin-wallet-widget-main">
+          <span className="admin-wallet-dot" aria-hidden />
+          <div className="admin-wallet-widget-copy">
+            <span className="admin-wallet-widget-label">{ADMIN_COPY.auth.sidebarConnected}</span>
+            <span className="admin-num admin-wallet-widget-addr">
+              {address ? shortAddress(address, true) : "—"}
+            </span>
+          </div>
+        </div>
+        <span className="admin-wallet-network">{pumpChain.name}</span>
+      </div>
+    </div>
+  );
+
   return (
     <div className="admin-layout admin-layout--enterprise">
-      <header className="admin-ent-header">
-        <div className="admin-ent-header-row">
-          <div className="admin-ent-brand">
-            <PumpLogo size={36} variant="rounded" className="admin-ent-brand-logo" />
-            <div className="admin-ent-brand-text">
-              <span className="admin-ent-brand-title">{ADMIN_COPY.brand.title}</span>
-              <span className="admin-ent-env" title={ADMIN_COPY.nav.environment}>
-                {ADMIN_COPY.brand.envLabel}
-              </span>
+      <aside className="admin-sidebar admin-sidebar--desktop" aria-label="Console navigation">
+        {sidebarBrand}
+        <AdminSidebarNav activeTab={activeTab} onTabChange={onTabChange} />
+        {sidebarFoot}
+      </aside>
+
+      <div
+        className={
+          mobileOpen ? "admin-mobile-drawer admin-mobile-drawer--open" : "admin-mobile-drawer"
+        }
+      >
+        <button
+          type="button"
+          className="admin-mobile-drawer-scrim"
+          aria-label="Close menu"
+          onClick={() => setMobileOpen(false)}
+        />
+        <div className="admin-mobile-drawer-panel">
+          <div className="admin-mobile-drawer-head">
+            {sidebarBrand}
+            <button
+              type="button"
+              className="admin-mobile-menu-btn"
+              aria-label="Close menu"
+              onClick={() => setMobileOpen(false)}
+            >
+              <PumpIcon icon={faXmark} className="h-4 w-4" />
+            </button>
+          </div>
+          <AdminSidebarNav
+            activeTab={activeTab}
+            onTabChange={onTabChange}
+            onNavigate={() => setMobileOpen(false)}
+          />
+          {sidebarFoot}
+        </div>
+      </div>
+
+      <div className="admin-main">
+        <header className="admin-topbar">
+          <div className="admin-topbar-start">
+            <button
+              type="button"
+              className="admin-mobile-menu-btn"
+              aria-label="Open menu"
+              onClick={() => setMobileOpen(true)}
+            >
+              <PumpIcon icon={faMenu} className="h-4 w-4" />
+            </button>
+            <div className="admin-topbar-titles">
+              <div className="admin-breadcrumb" aria-label="Breadcrumb">
+                <span className="admin-breadcrumb-root">{group.label}</span>
+                <PumpIcon icon={faChevronRight} className="admin-breadcrumb-sep h-3 w-3" />
+                <span className="admin-breadcrumb-current">{page.title}</span>
+              </div>
+              <h1 className="admin-topbar-title">{page.title}</h1>
+              {page.description ? <p className="admin-topbar-desc">{page.description}</p> : null}
             </div>
           </div>
 
-          <nav className="admin-ent-nav" aria-label="Admin sections">
-            {NAV_ITEMS.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => onTabChange(item.id)}
-                className={
-                  activeTab === item.id ? "admin-ent-nav-link admin-ent-nav-link--active" : "admin-ent-nav-link"
-                }
-                aria-current={activeTab === item.id ? "page" : undefined}
-              >
-                {item.label}
-              </button>
-            ))}
-          </nav>
-
-          <div className="admin-ent-header-tools">
+          <div className="admin-topbar-actions">
             <label className="admin-ent-global-search">
               <PumpIcon icon={faSearch} className="h-3.5 w-3.5" />
               <input
@@ -138,22 +348,14 @@ export function AdminLayout({
               <kbd className="admin-kbd">⌘K</kbd>
             </label>
 
-            <button
-              type="button"
-              className="admin-ent-icon-btn"
-              aria-label={ADMIN_COPY.nav.notifications}
-              disabled
-              title="No new alerts"
-            >
-              <PumpIcon icon={faBell} className="h-[0.9375rem] w-[0.9375rem]" />
-            </button>
-
             {onRefreshAll ? (
               <button
                 type="button"
                 onClick={onRefreshAll}
                 disabled={refreshing}
-                className={refreshing ? "admin-btn admin-btn-sm admin-btn-loading" : "admin-btn admin-btn-sm"}
+                className={
+                  refreshing ? "admin-btn admin-btn-sm admin-btn-loading" : "admin-btn admin-btn-sm"
+                }
               >
                 <PumpIcon
                   icon={faRefreshCw}
@@ -162,8 +364,6 @@ export function AdminLayout({
                 {refreshing ? ADMIN_COPY.actions.refreshing : ADMIN_COPY.actions.refresh}
               </button>
             ) : null}
-
-            {headerActions}
 
             <div className="admin-ent-user">
               <button
@@ -188,19 +388,32 @@ export function AdminLayout({
                   >
                     {shortAddress(address)}
                   </a>
-                  <span className="admin-ent-user-menu-meta" role="menuitem">
+                  <span className="admin-ent-user-menu-meta">
                     {pumpChain.name} · chain {pumpChain.id}
                   </span>
+                  {onSignOut ? (
+                    <button
+                      type="button"
+                      className="admin-ent-user-menu-item admin-ent-user-menu-item--danger"
+                      role="menuitem"
+                      onClick={() => {
+                        setUserMenuOpen(false);
+                        onSignOut();
+                      }}
+                    >
+                      {ADMIN_COPY.actions.signOut}
+                    </button>
+                  ) : null}
                 </div>
               ) : null}
             </div>
           </div>
-        </div>
-      </header>
+        </header>
 
-      <main className="admin-ent-main">
-        <div className="admin-ent-main-inner">{children}</div>
-      </main>
+        <main className="admin-content">
+          <div className="admin-content-inner">{children}</div>
+        </main>
+      </div>
     </div>
   );
 }
@@ -378,14 +591,16 @@ export function AdminBlock({
   description,
   actions,
   children,
+  padded,
 }: {
   title?: string;
   description?: string;
   actions?: ReactNode;
   children: ReactNode;
+  padded?: boolean;
 }) {
   return (
-    <AdminCard title={title} description={description} actions={actions}>
+    <AdminCard title={title} description={description} actions={actions} padded={padded}>
       {children}
     </AdminCard>
   );
@@ -614,7 +829,7 @@ export function AdminPill({ children }: { children: ReactNode }) {
   return <span className="admin-pill">{children}</span>;
 }
 
-/** @deprecated use AdminLayout top navigation */
+/** @deprecated Legacy horizontal tabs — use AdminLayout sidebar. */
 export function AdminTabs({
   active,
   onChange,
@@ -622,9 +837,10 @@ export function AdminTabs({
   active: AdminTabId;
   onChange: (tab: AdminTabId) => void;
 }) {
+  const items = NAV_GROUPS.flatMap((g) => g.items);
   return (
     <nav className="admin-tabs" aria-label="Admin sections">
-      {NAV_ITEMS.map((tab) => (
+      {items.map((tab) => (
         <button
           key={tab.id}
           type="button"

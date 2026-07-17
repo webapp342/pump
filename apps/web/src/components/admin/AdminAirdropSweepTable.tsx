@@ -158,7 +158,7 @@ export function AdminAirdropSweepTable({
       id: "symbol",
       header: ADMIN_COPY.airdrops.columns.symbol,
       width: "5rem",
-      cell: (r) => (r.linkedSymbol ? `$${r.linkedSymbol}` : "—"),
+      cell: (r) => (r.linkedSymbol ? r.linkedSymbol : "—"),
     },
     {
       id: "pool",

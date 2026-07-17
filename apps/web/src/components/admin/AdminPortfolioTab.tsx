@@ -233,54 +233,60 @@ export function AdminPortfolioTab({ address }: { address: string }) {
       />
 
       <AdminBlock
-        title="Bonding-curve holdings"
+        title={ADMIN_COPY.portfolio.title}
+        description={ADMIN_COPY.portfolio.description}
         actions={
-          <div className="flex items-center gap-2">
-            <AdminBtn onClick={() => void load()} disabled={loading}>
-              {loading ? "Loading…" : "Refresh"}
+          <div className="admin-card-actions">
+            <AdminBtn size="sm" onClick={() => void load()} disabled={loading}>
+              {loading ? ADMIN_COPY.portfolio.loading : ADMIN_COPY.portfolio.refresh}
             </AdminBtn>
             <AdminBtn
+              size="sm"
               onClick={() => setSellAllOpen(true)}
               disabled={loading || rows.length === 0}
             >
-              Sell all
+              {ADMIN_COPY.portfolio.sellAll}
             </AdminBtn>
           </div>
         }
       >
-        <p className="admin-note mb-3">
-          Wallet{" "}
-          <a
-            href={explorerAddressUrl(address)}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="admin-link admin-num"
-          >
-            {shortAddress(address)}
-          </a>
-          {rows.length > 0 ? (
-            <>
-              {" "}
-              · {rows.length} holding{rows.length === 1 ? "" : "s"} · est.{" "}
-              {formatPortfolioHoldingValueUsd(totalValueUsd > 0 ? totalValueUsd : null)}
-            </>
+        <div className="admin-card-inset">
+          <p className="admin-note">
+            Wallet{" "}
+            <a
+              href={explorerAddressUrl(address)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="admin-link admin-num"
+            >
+              {shortAddress(address)}
+            </a>
+            {rows.length > 0 ? (
+              <>
+                {" "}
+                · {rows.length} holding{rows.length === 1 ? "" : "s"} · est.{" "}
+                {formatPortfolioHoldingValueUsd(totalValueUsd > 0 ? totalValueUsd : null)}
+              </>
+            ) : null}
+          </p>
+
+          {error ? <AdminAlert>{error}</AdminAlert> : null}
+
+          {loading && rows.length === 0 ? (
+            <p className="admin-meta">{ADMIN_COPY.portfolio.loadingHoldings}</p>
+          ) : rows.length === 0 ? (
+            <AdminEmpty>{ADMIN_COPY.portfolio.emptyHoldings}</AdminEmpty>
           ) : null}
-        </p>
+        </div>
 
-        {error ? <AdminAlert>{error}</AdminAlert> : null}
-
-        {loading && rows.length === 0 ? (
-          <p className="admin-meta">Loading holdings…</p>
-        ) : rows.length === 0 ? (
-          <AdminEmpty>No sellable bonding-curve holdings found for this wallet.</AdminEmpty>
-        ) : (
+        {rows.length > 0 ? (
           <AdminGridTable>
             <thead>
               <tr>
-                <th>Token</th>
-                <th>Value</th>
-                <th>Balance</th>
-                <th />
+                <th>{ADMIN_COPY.portfolio.columns.token}</th>
+                <th>{ADMIN_COPY.portfolio.columns.value}</th>
+                <th>{ADMIN_COPY.portfolio.columns.balance}</th>
+                <th>{ADMIN_COPY.portfolio.columns.action}</th>
               </tr>
             </thead>
             <tbody>
@@ -296,16 +302,16 @@ export function AdminPortfolioTab({ address }: { address: string }) {
                 return (
                   <tr key={row.tokenAddress}>
                     <td>
-                      <div className="flex min-w-0 items-center gap-2.5">
+                      <div className="admin-token-cell">
                         <TokenAvatar
                           address={row.tokenAddress}
                           symbol={row.symbol}
                           logoUrl={row.logoUrl}
                           size="lg"
                         />
-                        <div className="min-w-0">
-                          <p className="truncate font-medium">${row.symbol}</p>
-                          <p className="truncate admin-meta">{row.name}</p>
+                        <div className="admin-token-cell-copy">
+                          <p className="admin-token-cell-symbol">{row.symbol}</p>
+                          <p className="admin-meta">{row.name}</p>
                         </div>
                       </div>
                     </td>
@@ -315,7 +321,7 @@ export function AdminPortfolioTab({ address }: { address: string }) {
                     <td className="admin-num whitespace-nowrap">{formatTokenBalance(row.balance)}</td>
                     <td className="whitespace-nowrap text-right">
                       <AdminTextButton onClick={() => setSellMaxTarget(sellInput)}>
-                        Sell max
+                        {ADMIN_COPY.portfolio.sellMax}
                       </AdminTextButton>
                     </td>
                   </tr>
@@ -323,7 +329,7 @@ export function AdminPortfolioTab({ address }: { address: string }) {
               })}
             </tbody>
           </AdminGridTable>
-        )}
+        ) : null}
       </AdminBlock>
     </>
   );

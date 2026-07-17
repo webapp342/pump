@@ -320,6 +320,7 @@ export function AdminEnvTab() {
               ? `${ADMIN_COPY.environment.variablesTitle} (${variables.length})`
               : ADMIN_COPY.environment.variablesTitle
           }
+          description={ADMIN_COPY.environment.variablesDescription}
           actions={
             <div className="admin-env-toolbar-actions">
               {dirty ? (

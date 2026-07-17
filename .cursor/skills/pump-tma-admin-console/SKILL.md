@@ -27,20 +27,22 @@ Use these when extending admin UI:
 ## Information architecture
 
 ```
-Sidebar (256px, grouped)
+Sidebar (264px, grouped)
 ├── Overview
-│   └── Dashboard          — KPIs, infra health, activity snapshot
+│   └── Dashboard          — KPIs, infra health, fee ledger, recovery snapshot
 ├── Operations
-│   ├── Portfolio          — Admin wallet holdings & liquidation
+│   ├── Todo list          — Ops checklist
 │   ├── Airdrop recovery   — Escrow sweep queue
 │   └── Promo campaigns    — Off-chain points tasks
 ├── Finance
-│   └── Treasury & fees    — Protocol fees, balances, withdrawals
+│   ├── Treasury & fees    — Protocol fees, balances, withdrawals
+│   └── Portfolio          — Admin wallet holdings & liquidation
 └── System
-    └── Contract registry  — UUPS proxy addresses
+    ├── Contract registry  — UUPS proxy addresses
+    └── Environment        — Service env vars + data wipe
 ```
 
-Top bar: breadcrumb `Operations › {page}` · page title · one-line purpose · **Refresh** · **Sign out**.
+Top bar: breadcrumb `{group} › {page}` · page title · purpose line · search · **Refresh** · wallet menu (**Sign out**).
 
 ## Layout layers (Stripe / internal-tools pattern)
 
@@ -101,7 +103,7 @@ src/app/admin/admin.css     — Admin-only styles (imported by admin-console)
 ## Verify
 
 ```bash
-cd admin-console && npm run build
+cd apps/admin && npm run build
 ```
 
 Check: sidebar groups, KPI hints, section descriptions, empty states, danger confirmations.

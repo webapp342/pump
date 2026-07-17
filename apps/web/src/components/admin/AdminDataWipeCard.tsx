@@ -74,7 +74,7 @@ export function AdminDataWipeCard({ onWiped }: AdminDataWipeCardProps) {
   }
 
   return (
-    <AdminBlock title={ADMIN_COPY.wipe.title}>
+    <AdminBlock title={ADMIN_COPY.wipe.title} description={ADMIN_COPY.wipe.description} padded>
       <div className="admin-wipe-zone">
         <div className="admin-wipe-warning">
           <PumpIcon icon={faAlertTriangle} className="h-4 w-4" />

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { adminFetch } from "@/lib/admin-api-client";
 import { ADMIN_COPY } from "@/lib/admin/copy";
 import type { AdminTodo, AdminTodoPriority, AdminTodoSortMode } from "@/lib/db/admin-todos";
-import { AdminAlert, AdminBtn } from "@/components/admin/AdminChrome";
+import { AdminAlert, AdminBlock, AdminBtn } from "@/components/admin/AdminChrome";
 import { ModalPortal } from "@/components/ui/ModalPortal";
 import { PumpIcon, faCheck, faGripVertical, faPencil, faPlus, faTrash2, faX } from "@/lib/icons";
 
@@ -317,6 +317,15 @@ export function AdminTodosTab() {
 
   return (
     <>
+      <AdminBlock
+        title={ADMIN_COPY.todos.listTitle}
+        description={ADMIN_COPY.todos.listDesc}
+        actions={
+          <AdminBtn size="sm" onClick={() => void load()} disabled={loading}>
+            {loading ? ADMIN_COPY.todos.loading : ADMIN_COPY.actions.refresh}
+          </AdminBtn>
+        }
+      >
     <div className="admin-todos-shell">
         <div className="admin-todos-shell-bar">
           <div className="admin-todos-filters" role="tablist" aria-label="Todo filters">
@@ -369,10 +378,6 @@ export function AdminTodosTab() {
               {ADMIN_COPY.todos.sortManual}
             </button>
           </div>
-
-          <AdminBtn onClick={() => void load()} disabled={loading}>
-            {loading ? ADMIN_COPY.actions.refreshing : ADMIN_COPY.actions.refresh}
-          </AdminBtn>
         </div>
 
         <form className="admin-todos-prompt" onSubmit={(e) => void onCreate(e)}>
@@ -559,6 +564,7 @@ export function AdminTodosTab() {
           </ul>
         )}
       </div>
+      </AdminBlock>
 
       {viewingTodo ? (
         <AdminTodoDetailModal

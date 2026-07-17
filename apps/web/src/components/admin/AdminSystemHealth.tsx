@@ -327,10 +327,11 @@ export function AdminSystemHealth() {
     <>
       <AdminBlock
         title={ADMIN_COPY.health.title}
+        description={ADMIN_COPY.health.description}
         actions={
           <>
-            <AdminBtn onClick={() => void load()} disabled={loading}>
-              {loading ? "…" : ADMIN_COPY.actions.refresh}
+            <AdminBtn size="sm" onClick={() => void load()} disabled={loading}>
+              {loading ? ADMIN_COPY.actions.refreshing : ADMIN_COPY.actions.refresh}
             </AdminBtn>
             <AdminTextButton onClick={() => setModalOpen(true)}>
               {ADMIN_COPY.actions.viewDetails}

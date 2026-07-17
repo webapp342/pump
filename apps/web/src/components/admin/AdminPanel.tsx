@@ -772,18 +772,10 @@ export function AdminPanel() {
         address={address}
         onRefreshAll={() => void refreshAll()}
         refreshing={loading || statsLoading || promoLoading}
-        headerActions={
-          <button
-            type="button"
-            className="admin-btn"
-            onClick={() => {
-              void adminSignOut();
-              disconnect();
-            }}
-          >
-            {ADMIN_COPY.auth.disconnect}
-          </button>
-        }
+        onSignOut={() => {
+          void adminSignOut();
+          disconnect();
+        }}
       >
         {error ? <AdminAlert>{error}</AdminAlert> : null}
 
@@ -874,8 +866,12 @@ export function AdminPanel() {
             <AdminPageGridCell span={12}>
               <p className="admin-ent-sync-line">
                 <PumpIcon icon={faClock} className="h-3 w-3" />
-                <span className="admin-num">
-                  {lastRefreshedAt ? lastRefreshedAt.toLocaleTimeString() : "—"}
+                <span>
+                  {ADMIN_COPY.dashboard.lastRefreshed}{" "}
+                  <span className="admin-num">
+                    {lastRefreshedAt ? lastRefreshedAt.toLocaleTimeString() : "—"}
+                  </span>
+                  <span className="admin-meta"> · {ADMIN_COPY.dashboard.autoRefresh}</span>
                 </span>
               </p>
             </AdminPageGridCell>
@@ -885,7 +881,10 @@ export function AdminPanel() {
             </AdminPageGridCell>
 
             <AdminPageGridCell span={8}>
-              <AdminBlock title={ADMIN_COPY.dashboard.financialPanel}>
+              <AdminBlock
+                title={ADMIN_COPY.dashboard.sections.fees.title}
+                description={ADMIN_COPY.dashboard.sections.fees.description}
+              >
                 <AdminDataTable>
                   <AdminDataRow label="Treasury share (trades)" loading={statsLoading && !stats}>
                     {stats ? (
@@ -917,6 +916,7 @@ export function AdminPanel() {
 
             <AdminPageGridCell span={12}>
               <AdminAirdropSweepTable
+                title={ADMIN_COPY.dashboard.recoveryTable}
                 rows={airdrops}
                 loading={loading}
                 bnbUsd={bnbUsd}
@@ -928,25 +928,16 @@ export function AdminPanel() {
                 onSweep={onSweep}
                 toolbar={
                   <AdminBtn size="sm" onClick={() => void load()} disabled={loading}>
-                    {loading ? "…" : ADMIN_COPY.actions.refreshList}
+                    {loading ? ADMIN_COPY.actions.refreshing : ADMIN_COPY.actions.refreshList}
                   </AdminBtn>
                 }
-              />
-            </AdminPageGridCell>
-
-            <AdminPageGridCell span={12}>
-              <AdminDataWipeCard
-                onWiped={() => {
-                  void load();
-                  void loadStats();
-                }}
               />
             </AdminPageGridCell>
           </AdminPageGrid>
         </AdminTabPanel>
 
       <AdminTabPanel id="todos" active={activeTab}>
-        {address ? <AdminTodosTab /> : <AdminEmptyState title={ADMIN_COPY.portfolio.empty} />}
+        {address ? <AdminTodosTab /> : <AdminEmptyState title={ADMIN_COPY.todos.connectRequired} />}
       </AdminTabPanel>
 
       <AdminTabPanel id="portfolio" active={activeTab}>
@@ -959,7 +950,10 @@ export function AdminPanel() {
 
       <AdminTabPanel id="treasury" active={activeTab}>
         <AdminContentGrid columns={2}>
-        <AdminBlock title={ADMIN_COPY.treasury.feeSettings.title}>
+        <AdminBlock
+          title={ADMIN_COPY.treasury.feeSettings.title}
+          description={ADMIN_COPY.treasury.feeSettings.description}
+        >
           <AdminDataTable>
             <AdminDataRow
               label="Trade fee"
@@ -1050,7 +1044,10 @@ export function AdminPanel() {
           </AdminDataTable>
         </AdminBlock>
 
-        <AdminBlock title={ADMIN_COPY.treasury.balances.title}>
+        <AdminBlock
+          title={ADMIN_COPY.treasury.balances.title}
+          description={ADMIN_COPY.treasury.balances.description}
+        >
           <AdminDataTable>
             <AdminDataRow label="Treasury">
               {treasuryContract ? (
@@ -1178,7 +1175,11 @@ export function AdminPanel() {
         </AdminContentGrid>
 
         {canWithdrawTreasury ? (
-          <AdminBlock title={ADMIN_COPY.treasury.withdraw.title}>
+          <AdminBlock
+            title={ADMIN_COPY.treasury.withdraw.title}
+            description={ADMIN_COPY.treasury.withdraw.description}
+            padded
+          >
             <div className="admin-compact-form admin-compact-form--withdraw">
               <div className="admin-compact-row">
                 <span className="admin-field-label">Type</span>
@@ -1330,13 +1331,15 @@ export function AdminPanel() {
       <AdminTabPanel id="promo" active={activeTab}>
         <AdminBlock
           title={ADMIN_COPY.promo.create.title}
+          description={ADMIN_COPY.promo.create.description}
+          padded
           actions={
-            <AdminBtn onClick={() => void loadPromoTasks()} disabled={promoLoading}>
-              {promoLoading ? "…" : ADMIN_COPY.actions.refreshList}
+            <AdminBtn size="sm" onClick={() => void loadPromoTasks()} disabled={promoLoading}>
+              {promoLoading ? ADMIN_COPY.actions.refreshing : ADMIN_COPY.actions.refreshList}
             </AdminBtn>
           }
         >
-          <div className="admin-form-grid" style={{ padding: "16px" }}>
+          <div className="admin-form-grid">
             <AdminField label={ADMIN_COPY.promo.create.titleField}>
               <input
                 type="text"
@@ -1390,7 +1393,10 @@ export function AdminPanel() {
           </div>
         </AdminBlock>
 
-        <AdminBlock title={ADMIN_COPY.promo.list.title}>
+        <AdminBlock
+          title={ADMIN_COPY.promo.list.title}
+          description={ADMIN_COPY.promo.list.description}
+        >
           {promoLoading ? (
             <p className="admin-empty">{ADMIN_COPY.empty.loading}</p>
           ) : promoTasks.length === 0 ? (
@@ -1432,10 +1438,13 @@ export function AdminPanel() {
                     </td>
                     <td>
                       <AdminBtn
+                        size="sm"
                         onClick={() => void onDeletePromoTask(task.taskKey, task.title)}
                         disabled={deletingKey === task.taskKey}
                       >
-                        {deletingKey === task.taskKey ? "…" : ADMIN_COPY.actions.delete}
+                        {deletingKey === task.taskKey
+                          ? ADMIN_COPY.actions.refreshing
+                          : ADMIN_COPY.actions.delete}
                       </AdminBtn>
                     </td>
                   </tr>
@@ -1447,7 +1456,10 @@ export function AdminPanel() {
       </AdminTabPanel>
 
       <AdminTabPanel id="contracts" active={activeTab}>
-        <AdminBlock title={ADMIN_COPY.pages.contracts.title}>
+        <AdminBlock
+          title={ADMIN_COPY.contracts.tableTitle}
+          description={ADMIN_COPY.contracts.tableDescription}
+        >
           <AdminDataTable>
             {[
               [ADMIN_COPY.contracts.labels.memeFactory, protocol?.memeFactory.address ?? contracts.memeFactory],
@@ -1482,9 +1494,17 @@ export function AdminPanel() {
 
       <AdminTabPanel id="environment" active={activeTab}>
         {address ? (
-          <AdminEnvTab />
+          <>
+            <AdminEnvTab />
+            <AdminDataWipeCard
+              onWiped={() => {
+                void load();
+                void loadStats();
+              }}
+            />
+          </>
         ) : (
-          <AdminEmptyState title={ADMIN_COPY.portfolio.empty} />
+          <AdminEmptyState title={ADMIN_COPY.environment.connectRequired} />
         )}
       </AdminTabPanel>
       </AdminLayout>

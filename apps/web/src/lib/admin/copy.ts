@@ -48,14 +48,38 @@ export const ADMIN_COPY = {
   },
 
   pages: {
-    dashboard: { title: "Dashboard", description: "" },
-    todos: { title: "Todo list", description: "" },
-    portfolio: { title: "Portfolio", description: "" },
-    treasury: { title: "Treasury & fees", description: "" },
-    airdrops: { title: "Airdrop recovery", description: "" },
-    promo: { title: "Promo campaigns", description: "" },
-    contracts: { title: "Contract registry", description: "" },
-    environment: { title: "Environment", description: "" },
+    dashboard: {
+      title: "Dashboard",
+      description: "Platform activity, fee ledger, and infrastructure health.",
+    },
+    todos: {
+      title: "Todo list",
+      description: "Operations checklist for launches, incidents, and follow-ups.",
+    },
+    portfolio: {
+      title: "Portfolio",
+      description: "Admin wallet bonding-curve holdings and liquidation tools.",
+    },
+    treasury: {
+      title: "Treasury & fees",
+      description: "Protocol fee config, balances, recovery, and withdrawals.",
+    },
+    airdrops: {
+      title: "Airdrop recovery",
+      description: "Escrow sweep queue for finished or recoverable campaigns.",
+    },
+    promo: {
+      title: "Promo campaigns",
+      description: "Off-chain points tasks shown in Rewards missions.",
+    },
+    contracts: {
+      title: "Contract registry",
+      description: "UUPS proxy addresses for factory, curve, airdrop, and treasury.",
+    },
+    environment: {
+      title: "Environment",
+      description: "Service key-value config for web, realtime, and indexer.",
+    },
   } satisfies Record<AdminTabId, { title: string; description: string }>,
 
   nav: {
@@ -105,7 +129,7 @@ export const ADMIN_COPY = {
 
   health: {
     title: "Infrastructure",
-    description: "",
+    description: "Realtime API, indexer, Redis, and host metrics for this environment.",
     status: "Overall status",
     checks: "Service checks",
     checkedAt: "Last checked",
@@ -121,15 +145,15 @@ export const ADMIN_COPY = {
   treasury: {
     feeSettings: {
       title: "Protocol fees",
-      description: "",
+      description: "On-chain trade fee, share splits, and launch fees. Edits require the owner wallet.",
     },
     balances: {
       title: "Balances",
-      description: "",
+      description: `Treasury contract balances and available ${NATIVE_SYMBOL} for withdrawal.`,
     },
     withdraw: {
       title: "Withdrawal",
-      description: "",
+      description: `Send ${NATIVE_SYMBOL} or ERC-20 from LaunchpadTreasury to a recipient address.`,
       typeBnb: NATIVE_SYMBOL,
       typeToken: "Token",
       recipient: "Recipient address",
@@ -214,7 +238,7 @@ export const ADMIN_COPY = {
   promo: {
     create: {
       title: "New campaign",
-      description: "",
+      description: "Create an off-chain points task. It appears in Rewards missions after save.",
       titleField: "Campaign title",
       titlePlaceholder: "Follow Pump on X",
       descField: "Description (optional)",
@@ -225,13 +249,15 @@ export const ADMIN_COPY = {
     },
     list: {
       title: "Campaigns",
-      description: "",
+      description: "Active promo tasks and point rewards shown to users.",
       empty: "No promo campaigns configured.",
     },
   },
 
   contracts: {
     intro: "",
+    tableTitle: "Proxy addresses",
+    tableDescription: "UUPS proxies used by the web app and indexer. Verify on the explorer before upgrades.",
     labels: {
       memeFactory: "MemeFactory",
       bonding: "BondingCurveManager",
@@ -245,6 +271,7 @@ export const ADMIN_COPY = {
     servicesTitle: "Services",
     variablesTitle: "Environment variables",
     variablesDescription: "Key-value configuration for the selected service. Sensitive values are masked at rest in the UI.",
+    connectRequired: "Connect the operations wallet to manage environment variables.",
     searchPlaceholder: "Search by name…",
     filterAll: "All",
     filterClient: "Client",
@@ -286,9 +313,24 @@ export const ADMIN_COPY = {
 
   portfolio: {
     empty: "Connect the operations wallet to view holdings.",
+    title: "Bonding-curve holdings",
+    description: "Sellable positions held by the operations wallet on active curves.",
+    refresh: "Refresh",
+    loading: "Loading…",
+    loadingHoldings: "Loading holdings…",
+    sellAll: "Sell all",
+    sellMax: "Sell max",
+    emptyHoldings: "No sellable bonding-curve holdings found for this wallet.",
+    columns: {
+      token: "Token",
+      value: "Value",
+      balance: "Balance",
+      action: "Action",
+    },
   },
 
   todos: {
+    connectRequired: "Connect the operations wallet to manage the todo list.",
     add: "Add",
     creating: "Adding…",
     save: "Save",
@@ -332,7 +374,7 @@ export const ADMIN_COPY = {
 
   wipe: {
     title: "Reset data",
-    description: "",
+    description: "Destructive maintenance for this environment. On-chain contracts and balances are not modified.",
     warning: "Deletes indexed app data. On-chain state unchanged.",
     preservedTitle: "Kept",
     wipedTitle: "Deleted",
