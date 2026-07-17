@@ -10,6 +10,7 @@ import {
   faShare,
 } from "@/lib/icons";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createPublicClient, http, parseUnits, type Address } from "viem";
 import { useReadContract, useAccount } from "wagmi";
@@ -103,6 +104,7 @@ import {
 } from "@/lib/token-live-delta";
 import { hapticTap } from "@/lib/haptic";
 import { useOpenConnectModal } from "@/hooks/useOpenConnectModal";
+import { scheduleTradeWalletBalanceRefresh } from "@/lib/trade-balance-refresh";
 
 const CHAIN_LIVE_POLL_MS = 2_000;
 const BURST_POLL_MS = 1_500;
@@ -287,6 +289,7 @@ export function TokenDetailLive({
   const router = useRouter();
   const { address, isConnected } = useAccount();
   const { openConnectModal } = useOpenConnectModal();
+  const queryClient = useQueryClient();
   const { bnbUsd } = useBnbUsdPrice();
   const { isFavorite, toggleFavorite, upsertFavoriteSnapshots } = useFavorites();
   const [announceBusy, setAnnounceBusy] = useState(false);
@@ -637,10 +640,17 @@ export function TokenDetailLive({
         missionKeys: [MISSION_KEYS.dailySwap],
       });
 
+      if (address) {
+        scheduleTradeWalletBalanceRefresh(queryClient, {
+          address,
+          tokenAddress: streamAddress as Address,
+        });
+      }
+
       await applyOptimisticFromReceipt(payload);
       void fetchLive();
     },
-    [applyOptimisticFromReceipt, fetchLive, streamAddress]
+    [address, applyOptimisticFromReceipt, fetchLive, queryClient, streamAddress]
   );
 
   useEffect(() => {

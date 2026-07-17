@@ -2,6 +2,7 @@
 
 import { PumpIcon, faCheck, faChevronDown } from "@/lib/icons";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { encodeFunctionData, formatEther, formatUnits, parseEther, parseSignature, parseUnits } from "viem";
 import type { Address, TransactionReceipt } from "viem";
 import { useOpenConnectModal } from "@/hooks/useOpenConnectModal";
@@ -34,6 +35,10 @@ import { loadTradeAutoConfirm, saveTradeAutoConfirm } from "@/lib/trade-confirm-
 import { persistTokenMobileTradeFromPanel } from "@/lib/token-mobile-trade-prefs";
 import { instantTradeGateMessage, isQuickSubmitFundingBlock, isTransientInstantGateReason } from "@/lib/trade-instant-copy";
 import { invalidateScwBalance } from "@/lib/scw-balance-sync";
+import {
+  applyOptimisticTradeWalletBalances,
+  scheduleTradeWalletBalanceRefresh,
+} from "@/lib/trade-balance-refresh";
 import {
   isTradeOrderSettled,
   resolvePendingIdFromTxHash,
@@ -383,6 +388,7 @@ export function TradePanel({
   overrideTokenBalanceWei,
   onConfirmOnlyFundingBlocked,
 }: TradePanelProps) {
+  const queryClient = useQueryClient();
   const { address, isConnected, chain } = useAccount();
   const { data: gasPrice } = useGasPrice({ chainId: pumpChain.id });
   const { openConnectModal } = useOpenConnectModal();
@@ -1623,6 +1629,41 @@ export function TradePanel({
       return;
     }
 
+    const reservation = pendingLedgerRef.current.entries.get(pendingId);
+    const parsedFill =
+      activeReceipt != null
+        ? parseTradesFromReceipt(activeReceipt, tokenAddress)[0]
+        : undefined;
+
+    if (address) {
+      let nativeDeltaWei = 0n;
+      let tokenDeltaWei = 0n;
+      if (parsedFill) {
+        if (side === "buy") {
+          // Reservation includes spend + gas buffer; fill has curve spend only.
+          nativeDeltaWei = -(reservation?.nativeReservedWei ?? parsedFill.nativeAmount);
+          tokenDeltaWei = parsedFill.tokenAmount;
+        } else {
+          nativeDeltaWei = parsedFill.nativeAmount - parsedFill.feeBnb;
+          tokenDeltaWei = -(reservation?.tokenReservedWei ?? parsedFill.tokenAmount);
+        }
+      } else if (reservation) {
+        if (side === "buy") {
+          nativeDeltaWei = -reservation.nativeReservedWei;
+        } else {
+          tokenDeltaWei = -reservation.tokenReservedWei;
+        }
+      }
+      if (nativeDeltaWei !== 0n || tokenDeltaWei !== 0n) {
+        applyOptimisticTradeWalletBalances(queryClient, {
+          address,
+          tokenAddress,
+          nativeDeltaWei,
+          tokenDeltaWei,
+        });
+      }
+    }
+
     releasePendingReservation(pendingId);
     if (pendingTradeReferrerRef.current) {
       clearStoredReferrer();
@@ -1633,8 +1674,7 @@ export function TradePanel({
     quoteUsdAtSubmitRef.current = null;
 
     if (activeReceipt && quoteUsd != null && quoteUsd > 0 && bnbUsd != null && bnbUsd > 0) {
-      const parsed = parseTradesFromReceipt(activeReceipt, tokenAddress);
-      const trade = parsed[0];
+      const trade = parsedFill;
       if (trade) {
         const native = formatEther(trade.nativeAmount);
         const fee = formatEther(trade.feeBnb);
@@ -1671,8 +1711,15 @@ export function TradePanel({
     void (async () => {
       const t0 = performance.now();
       tradeTraceStep("ux.refetch_balances.start");
-      await Promise.all([refetchBnbBalance(), refetchBalance(), refetchAllowance()]);
-      invalidateScwBalance();
+      if (address) {
+        scheduleTradeWalletBalanceRefresh(queryClient, {
+          address,
+          tokenAddress,
+        });
+      } else {
+        await Promise.all([refetchBnbBalance(), refetchBalance(), refetchAllowance()]);
+        invalidateScwBalance();
+      }
       tradeTraceStep("ux.refetch_balances.done", {
         ms: Math.round(performance.now() - t0),
       });
