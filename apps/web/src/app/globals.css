@@ -2914,6 +2914,86 @@ code,
     color: rgb(var(--pump-muted));
   }
 
+  .announce-callout-sheet {
+    display: flex;
+    flex-direction: column;
+    gap: 0.875rem;
+  }
+
+  .announce-callout-sheet__token {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    min-width: 0;
+    padding: 0.75rem;
+    border: 1px solid rgb(var(--pump-border) / 0.35);
+    border-radius: var(--radius-md);
+    background: rgb(var(--pump-border) / 0.04);
+  }
+
+  .announce-callout-sheet__token-copy {
+    display: flex;
+    min-width: 0;
+    flex: 1 1 auto;
+    flex-direction: column;
+    gap: 0.125rem;
+  }
+
+  .announce-callout-sheet__token-name {
+    margin: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--type-label1-size);
+    font-weight: var(--type-label1-weight);
+    line-height: var(--type-label1-leading);
+    color: rgb(var(--pump-text));
+  }
+
+  .announce-callout-sheet__token-symbol {
+    margin: 0;
+    font-size: var(--type-legal-size);
+    font-weight: var(--type-legal-weight);
+    line-height: var(--type-legal-leading);
+    color: rgb(var(--pump-muted));
+  }
+
+  .announce-callout-sheet__rules {
+    margin: 0;
+    padding-left: 1.125rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+    font-size: var(--text-caption);
+    line-height: 1.45;
+    color: rgb(var(--pump-muted));
+  }
+
+  .announce-callout-sheet__status {
+    margin: 0;
+    padding: 0.625rem 0.75rem;
+    border-radius: var(--radius-md);
+    border: 1px solid rgb(var(--pump-border) / 0.35);
+    font-size: var(--text-caption);
+    line-height: 1.4;
+  }
+
+  .announce-callout-sheet__status--ok {
+    border-color: rgb(var(--pump-success) / 0.35);
+    background: rgb(var(--pump-success) / 0.08);
+    color: rgb(var(--pump-success));
+  }
+
+  .announce-callout-sheet__status--blocked {
+    border-color: rgb(var(--pump-warning) / 0.35);
+    background: rgb(var(--pump-warning) / 0.08);
+    color: rgb(var(--pump-warning));
+  }
+
+  .announce-callout-sheet__error {
+    margin: 0;
+  }
+
   .token-announcements-panel__meta {
     display: flex;
     flex-shrink: 0;

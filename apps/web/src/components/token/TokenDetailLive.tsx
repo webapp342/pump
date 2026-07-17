@@ -48,10 +48,7 @@ import {
 } from "@/lib/optimistic-activity";
 import { contracts, explorerAddressUrl, pumpChain, shortAddress } from "@/config/chain";
 import { erc20Abi } from "@/lib/abis/erc20";
-import {
-  ANNOUNCE_HOLDINGS_ERROR,
-  ANNOUNCE_MIN_TOKEN_BALANCE,
-} from "@/lib/token-announcements-shared";
+import { ANNOUNCE_MIN_TOKEN_BALANCE } from "@/lib/token-announcements-shared";
 import { copyToClipboard } from "@/lib/copy-to-clipboard";
 import { TradePanel, type TradeConfirmedPayload, type TradeOptimisticPayload, type TradeSubmittedPayload } from "@/components/token/TradePanel";
 import { QuickTradeConfirmModal } from "@/components/token/QuickTradeConfirmModal";
@@ -76,6 +73,10 @@ import { FavoriteIcon } from "@/components/icons/FavoriteIcon";
 import { useFavorites } from "@/components/favorites/FavoritesProvider";
 import { TokenAvatar } from "@/components/token/TokenAvatar";
 import { TokenAnnouncementsPanel } from "@/components/token/TokenAnnouncementsPanel";
+import {
+  AnnounceCalloutSheet,
+  type AnnounceCalloutPhase,
+} from "@/components/token/AnnounceCalloutSheet";
 import { CreatorProfileModal } from "@/components/creators/CreatorProfileModal";
 import { CreatorRewardsCard } from "@/components/creators/CreatorRewardsCard";
 import { ShareSheetModal } from "@/components/ui/ShareSheetModal";
@@ -102,7 +103,6 @@ import {
 } from "@/lib/token-live-delta";
 import { hapticTap } from "@/lib/haptic";
 import { useOpenConnectModal } from "@/hooks/useOpenConnectModal";
-import { toast } from "@/lib/toast";
 
 const CHAIN_LIVE_POLL_MS = 2_000;
 const BURST_POLL_MS = 1_500;
@@ -290,9 +290,13 @@ export function TokenDetailLive({
   const { bnbUsd } = useBnbUsdPrice();
   const { isFavorite, toggleFavorite, upsertFavoriteSnapshots } = useFavorites();
   const [announceBusy, setAnnounceBusy] = useState(false);
+  const [announceSheetOpen, setAnnounceSheetOpen] = useState(false);
+  const [announcePhase, setAnnouncePhase] = useState<AnnounceCalloutPhase>("confirm");
+  const [announceError, setAnnounceError] = useState<string | null>(null);
+  const [announceSuccessX, setAnnounceSuccessX] = useState<number | null>(null);
   const [announcementsRefreshKey, setAnnouncementsRefreshKey] = useState(0);
 
-  const { data: announceTokenBalance } = useReadContract({
+  const { data: announceTokenBalance, isFetching: announceHoldingsLoading } = useReadContract({
     address: streamAddress as Address,
     abi: erc20Abi,
     functionName: "balanceOf",
@@ -349,7 +353,7 @@ export function TokenDetailLive({
 
   const hasLivePending = optimisticTrades.length > 0 || indexerSyncing;
   const tradeLocked = !contentSynced;
-  const announceDisabled = tradeLocked || announceBusy || (isConnected && !canAnnounceHoldings);
+  const announceButtonDisabled = tradeLocked || announceBusy;
 
   const { data: chainCurve, refetch: refetchCurve } = useReadContract({
     address: contracts.bondingCurveManager,
@@ -776,19 +780,37 @@ export function TokenDetailLive({
 
   const favorited = isFavorite(streamAddress);
 
-  const onAnnounce = useCallback(async () => {
+  const openAnnounceSheet = useCallback(() => {
     hapticTap();
     if (!isConnected || !address) {
       openConnectModal();
       return;
     }
-    if (announceBusy || tradeLocked) return;
-    if (!canAnnounceHoldings) {
-      toast.error("Announce locked", ANNOUNCE_HOLDINGS_ERROR);
+    if (tradeLocked) return;
+    setAnnounceError(null);
+    setAnnounceSuccessX(null);
+    setAnnouncePhase("confirm");
+    setAnnounceSheetOpen(true);
+  }, [address, isConnected, openConnectModal, tradeLocked]);
+
+  const closeAnnounceSheet = useCallback(() => {
+    if (announceBusy) return;
+    setAnnounceSheetOpen(false);
+    setAnnouncePhase("confirm");
+    setAnnounceError(null);
+    setAnnounceSuccessX(null);
+  }, [announceBusy]);
+
+  const confirmAnnounce = useCallback(async () => {
+    if (!isConnected || !address) {
+      openConnectModal();
       return;
     }
+    if (announceBusy || tradeLocked || !canAnnounceHoldings) return;
 
     setAnnounceBusy(true);
+    setAnnouncePhase("submitting");
+    setAnnounceError(null);
     try {
       const response = await fetch("/api/tokens/announce", {
         method: "POST",
@@ -800,20 +822,19 @@ export function TokenDetailLive({
         data?: { announcement?: { multiplierX?: number } };
       };
       if (!response.ok) {
-        toast.error("Announce failed", body.error ?? "Could not announce this token.");
+        setAnnounceError(body.error ?? "Could not announce this token.");
+        setAnnouncePhase("error");
         return;
       }
       const x = body.data?.announcement?.multiplierX;
-      const xLabel =
-        x != null && Number.isFinite(x)
-          ? x >= 10
-            ? `${x.toFixed(1)}x`
-            : `${x.toFixed(2)}x`
-          : null;
-      toast.success(xLabel ? `Announced at ${xLabel}` : "Announced", "Added to Callouts.");
+      setAnnounceSuccessX(
+        x != null && Number.isFinite(x) ? x : null
+      );
+      setAnnouncePhase("success");
       setAnnouncementsRefreshKey((key) => key + 1);
     } catch {
-      toast.error("Announce failed", "Network error. Try again.");
+      setAnnounceError("Network error. Try again.");
+      setAnnouncePhase("error");
     } finally {
       setAnnounceBusy(false);
     }
@@ -1094,14 +1115,10 @@ export function TokenDetailLive({
           </button>
           <button
             type="button"
-            onClick={() => void onAnnounce()}
-            disabled={announceDisabled}
+            onClick={openAnnounceSheet}
+            disabled={announceButtonDisabled}
             aria-label="Announce token"
-            title={
-              isConnected && !canAnnounceHoldings
-                ? ANNOUNCE_HOLDINGS_ERROR
-                : "Announce"
-            }
+            title="Announce"
             className="token-detail-toolbar__announce-btn"
           >
             <PumpIcon icon={faCampaign} size="md" />
@@ -1155,14 +1172,8 @@ export function TokenDetailLive({
               tradeLocked={tradeLocked}
               copiedAddress={copiedAddress}
               announceBusy={announceBusy}
-              announceDisabled={isConnected && !canAnnounceHoldings}
-              announceTitle={
-                isConnected && !canAnnounceHoldings
-                  ? ANNOUNCE_HOLDINGS_ERROR
-                  : "Announce"
-              }
               onToggleFavorite={() => toggleFavorite(streamAddress, liveToken)}
-              onAnnounce={() => void onAnnounce()}
+              onAnnounce={openAnnounceSheet}
               onCopyAddress={() => void onCopyAddress()}
               isRefreshing={isRefreshing}
             />
@@ -1290,6 +1301,21 @@ export function TokenDetailLive({
         payload={sharePayload}
         title="Share token"
         description={`Spread the word about $${liveToken.symbol}.`}
+      />
+
+      <AnnounceCalloutSheet
+        open={announceSheetOpen}
+        onClose={closeAnnounceSheet}
+        phase={announcePhase}
+        tokenAddress={streamAddress}
+        tokenSymbol={liveToken.symbol}
+        tokenName={liveToken.name}
+        tokenLogoUrl={liveToken.logoUrl}
+        canAnnounceHoldings={canAnnounceHoldings}
+        holdingsLoading={Boolean(address) && announceHoldingsLoading && announceTokenBalance == null}
+        errorMessage={announceError}
+        successMultiplierX={announceSuccessX}
+        onConfirm={() => void confirmAnnounce()}
       />
 
       <TradeSheet
