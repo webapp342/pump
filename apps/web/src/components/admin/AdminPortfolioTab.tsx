@@ -16,6 +16,7 @@ import {
 import { TokenAvatar } from "@/components/token/TokenAvatar";
 import { explorerAddressUrl, shortAddress } from "@/config/chain";
 import { useBnbUsdPrice } from "@/hooks/useBnbUsdPrice";
+import { ADMIN_COPY } from "@/lib/admin/copy";
 import { bnbToUsd, formatPortfolioHoldingValueUsd } from "@/lib/format-usd";
 import { resolveVerifiedTokenBalance } from "@/lib/onchain-balance";
 import {
