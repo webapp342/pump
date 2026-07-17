@@ -9,14 +9,13 @@ import type { MissionListItem } from "@/lib/missions-guest-data";
 import {
   formatMissionProgress,
   getMissionActionLabel,
-  getMissionDisplayReward,
+  formatMissionRewardLabel,
   isReferralInviteMission,
   missionInfoText,
   missionProgressPct,
-  missionRewardSuffix,
   missionStatusLabel,
 } from "@/lib/mission-ui";
-import { REWARDS_CHALLENGES, REWARDS_HUB } from "@/lib/rewards-copy";
+import { REWARDS_CHALLENGES } from "@/lib/rewards-copy";
 
 type MissionRowProps = {
   mission: MissionListItem;
@@ -25,6 +24,7 @@ type MissionRowProps = {
   guestMode?: boolean;
   onAdminLinkClick?: (mission: MissionListItem) => void;
   onReferralClaim?: (mission: MissionListItem) => void;
+  onReferralInvite?: (mission: MissionListItem) => void;
 };
 
 function missionHasProgressBar(mission: MissionListItem): boolean {
@@ -39,22 +39,25 @@ export function MissionRow({
   guestMode = false,
   onAdminLinkClick,
   onReferralClaim,
+  onReferralInvite,
 }: MissionRowProps) {
   const router = useRouter();
   const done = mission.completed;
   const actionLabel = guestMode ? null : getMissionActionLabel(mission);
   const isLinkTask = isAdminLinkMission(mission) && Boolean(mission.targetUrl);
   const href = guestMode ? null : getMissionHref(mission);
+  const referralClaimable = mission.referralClaim?.claimableCount ?? 0;
   const isReferralClaim =
-    !guestMode && !done && isReferralInviteMission(mission) && actionLabel != null;
+    !guestMode && !done && isReferralInviteMission(mission) && referralClaimable > 0;
+  const isReferralInvite =
+    !guestMode && !done && isReferralInviteMission(mission) && referralClaimable === 0;
   const interactive =
-    !guestMode && !done && (isReferralClaim || isLinkTask || href != null);
+    !guestMode && !done && (isReferralClaim || isReferralInvite || isLinkTask || href != null);
   const hasProgressBar = missionHasProgressBar(mission);
   const pct = missionProgressPct(mission.progress);
   const statusLabel = missionStatusLabel(done, syncing, completing, mission);
-  const infoText = missionInfoText(mission.description);
-  const displayReward = getMissionDisplayReward(mission);
-  const rewardSuffix = missionRewardSuffix(mission);
+  const infoText = missionInfoText(mission);
+  const rewardLabel = formatMissionRewardLabel(mission);
 
   const rowClassName = [
     "missions-list__row",
@@ -70,6 +73,10 @@ export function MissionRow({
     if (guestMode || done) return;
     if (isReferralClaim) {
       onReferralClaim?.(mission);
+      return;
+    }
+    if (isReferralInvite) {
+      onReferralInvite?.(mission);
       return;
     }
     if (isLinkTask) {
@@ -108,10 +115,7 @@ export function MissionRow({
         ) : null}
 
         <div className="missions-list__trail">
-          <span className="missions-list__reward financial-value">
-            +{displayReward} {REWARDS_HUB.unitShort}
-            {rewardSuffix ? ` ${rewardSuffix}` : ""}
-          </span>
+          <span className="missions-list__reward financial-value">{rewardLabel}</span>
           {done ? (
             <span className="missions-list__status missions-list__status--done">
               <PumpIcon icon={faCheck} className="h-3 w-3" aria-hidden />
@@ -162,6 +166,7 @@ type MissionsListProps = {
   completingKey?: string | null;
   onAdminLinkClick?: (mission: MissionListItem) => void;
   onReferralClaim?: (mission: MissionListItem) => void;
+  onReferralInvite?: (mission: MissionListItem) => void;
   footerSlot?: ReactNode;
 };
 
@@ -172,6 +177,7 @@ export function MissionsList({
   completingKey = null,
   onAdminLinkClick,
   onReferralClaim,
+  onReferralInvite,
   footerSlot,
 }: MissionsListProps) {
   return (
@@ -188,6 +194,7 @@ export function MissionsList({
               completing={completingKey === mission.taskKey}
               onAdminLinkClick={onAdminLinkClick}
               onReferralClaim={onReferralClaim}
+              onReferralInvite={onReferralInvite}
             />
           ))}
         </div>

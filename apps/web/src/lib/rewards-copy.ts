@@ -67,6 +67,16 @@ export const REWARDS_CHALLENGES = {
   loadError: "Couldn’t load challenges",
 } as const;
 
+export const REWARDS_REFERRAL_INVITE = {
+  actionInvite: "Invite",
+  modalTitle: "Invite friends",
+  modalSubtitle: "Share your link — they must open it before their first trade.",
+  xpNote: "50 XP once per invite when they start trading.",
+  earningsNote: "Referral fee earnings continue on every trade they make.",
+  challengeTooltip:
+    "50 XP once per friend when their first trade binds your link — claim when ready. Referral fee earnings continue on every trade they make. Friends must open your invite link before their first trade.",
+} as const;
+
 export const REWARDS_RANKS = {
   heading: "Ranks",
   tipLabel: "About ranks",

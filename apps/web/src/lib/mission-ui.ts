@@ -9,6 +9,7 @@ import {
 } from "@/lib/pump-icons";
 import { getMissionHref, isAdminLinkMission } from "@/lib/mission-routes";
 import type { MissionListItem } from "@/lib/missions-guest-data";
+import { REWARDS_HUB, REWARDS_REFERRAL_INVITE } from "@/lib/rewards-copy";
 
 const DEPLOY_MEME_TASK_KEY = "LAUNCHPAD_DEPLOY_MEME";
 const DAILY_SWAP_TASK_KEY = "LAUNCHPAD_DAILY_SWAP";
@@ -53,28 +54,26 @@ type MissionActionInput = Pick<
 >;
 
 export function getMissionDisplayReward(mission: MissionListItem): number {
-  if (mission.referralClaim && mission.referralClaim.claimableCount > 0) {
-    return mission.referralClaim.claimablePoints;
-  }
-  if (mission.referralClaim) {
-    return mission.referralClaim.pointsPerInvite;
+  if (isReferralInviteMission(mission)) {
+    return mission.referralClaim?.claimablePoints ?? 0;
   }
   return mission.rewardPoints;
 }
 
-export function missionRewardSuffix(mission: MissionListItem): string | null {
-  if (mission.referralClaim && mission.referralClaim.claimableCount === 0) {
-    return "each";
+export function formatMissionRewardLabel(mission: MissionListItem): string {
+  const amount = getMissionDisplayReward(mission);
+  if (isReferralInviteMission(mission) && amount <= 0) {
+    return `0 ${REWARDS_HUB.unitShort}`;
   }
-  return null;
+  return `+${amount} ${REWARDS_HUB.unitShort}`;
 }
 
 export function getMissionActionLabel(mission: MissionActionInput): string | null {
   if (mission.completed) return null;
   if (isReferralInviteMission(mission)) {
     const count = mission.referralClaim?.claimableCount ?? 0;
-    if (count <= 0) return null;
-    return count === 1 ? "Claim" : `Claim (${count})`;
+    if (count > 0) return count === 1 ? "Claim" : `Claim (${count})`;
+    return REWARDS_REFERRAL_INVITE.actionInvite;
   }
   if (isAdminLinkMission(mission)) return "Open link";
   if (mission.taskKey === DEPLOY_MEME_TASK_KEY) return "Create";
@@ -116,12 +115,17 @@ export function missionStatusLabel(
   if (mission && isReferralInviteMission(mission)) {
     const claimable = mission.referralClaim?.claimableCount ?? 0;
     if (claimable > 0) return "Ready";
-    return "Waiting";
+    return "Open";
   }
   return "Open";
 }
 
-export function missionInfoText(description: string | null | undefined): string | null {
-  const text = description?.trim();
+export function missionInfoText(
+  mission: Pick<MissionListItem, "taskKey" | "description">
+): string | null {
+  if (isReferralInviteMission(mission)) {
+    return REWARDS_REFERRAL_INVITE.challengeTooltip;
+  }
+  const text = mission.description?.trim();
   return text ? text : null;
 }

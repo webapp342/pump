@@ -12,6 +12,7 @@ import {
   useWaitForTransactionReceipt,
 } from "wagmi";
 import { useKernelWriteContract } from "@/hooks/useKernelWriteContract";
+import { HubDiscoveryScrollLock } from "@/components/layout/HubDiscoveryScrollLock";
 import { formatTradeError } from "@/lib/trade-errors";
 import { contracts, NATIVE_SYMBOL, pumpChain } from "@/config/chain";
 import { memeFactoryAbi } from "@/lib/abis/meme-factory";
@@ -565,7 +566,7 @@ export function CreateMemeForm() {
       type="submit"
       disabled={submitDisabled}
       aria-busy={formSubmitPending}
-      className={`primary-button min-w-0 flex-1 sm:flex-none sm:min-w-[9.5rem] sm:px-8${formSubmitPending ? " form-submit-button--loading" : ""}`}
+      className={`primary-button flex min-w-0 flex-1 items-center justify-center gap-2 sm:flex-none sm:min-w-[9.5rem] sm:px-8${formSubmitPending ? " form-submit-button--loading" : ""}`}
     >
       {formSubmitPending ? (
         <>
@@ -630,6 +631,7 @@ export function CreateMemeForm() {
   return (
     <>
       <div className="airdrops-page airdrop-create-page airdrop-create-page--token">
+        <HubDiscoveryScrollLock />
         <div className="airdrop-create-hub">
           <div className="airdrop-create-body">
             <form onSubmit={onSubmit} className="airdrop-create-form">

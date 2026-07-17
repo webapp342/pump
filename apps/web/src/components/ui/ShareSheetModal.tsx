@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { useCallback, useEffect, useState } from "react";
 import {
   LinkedInBrandIcon,
@@ -23,6 +24,7 @@ type ShareSheetModalProps = {
   payload: SharePayload;
   title?: string;
   description?: string;
+  footnote?: ReactNode;
 };
 
 function ShareChannelIcon({ channel }: { channel: ShareChannel }) {
@@ -48,6 +50,7 @@ export function ShareSheetModal({
   payload,
   title = "Share",
   description,
+  footnote,
 }: ShareSheetModalProps) {
   const [copied, setCopied] = useState(false);
   const [nativePending, setNativePending] = useState(false);
@@ -152,6 +155,8 @@ export function ShareSheetModal({
               )}
             </div>
           </div>
+
+          {footnote ? <div className="share-sheet-footnote mt-4">{footnote}</div> : null}
     </AppBottomSheet>
   );
 }

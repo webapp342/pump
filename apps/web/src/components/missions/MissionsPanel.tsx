@@ -8,6 +8,7 @@ import {
   type OptimisticActivity,
 } from "@/lib/optimistic-activity";
 import { MissionsGuestPanel } from "@/components/missions/MissionsGuestPanel";
+import { ReferralInviteShareModal } from "@/components/missions/ReferralInviteShareModal";
 import { MissionsPanelSkeleton } from "@/components/missions/MissionsPanelSkeleton";
 import { PointsHubBody } from "@/components/missions/PointsHubBody";
 import { PointsHubTabs } from "@/components/missions/PointsHubTabs";
@@ -43,6 +44,7 @@ export function MissionsPanel() {
   const [pendingKeys, setPendingKeys] = useState<string[]>(() => listPendingMissionKeys());
   const [completingKey, setCompletingKey] = useState<string | null>(null);
   const [redeemingId, setRedeemingId] = useState<string | null>(null);
+  const [referralInviteOpen, setReferralInviteOpen] = useState(false);
   const [inventoryRefreshKey, setInventoryRefreshKey] = useState(0);
   const [leaderboardRefreshKey, setLeaderboardRefreshKey] = useState(0);
 
@@ -230,6 +232,10 @@ export function MissionsPanel() {
     [address, loadMissions]
   );
 
+  const onReferralInvite = useCallback(() => {
+    setReferralInviteOpen(true);
+  }, []);
+
   const onRedeem = useCallback(
     async (item: PointsMarketItem) => {
       if (!address) return;
@@ -374,6 +380,7 @@ export function MissionsPanel() {
                   }}
                   onAdminLinkClick={(mission) => void onAdminLinkClick(mission)}
                   onReferralClaim={(mission) => void onReferralClaim(mission)}
+                  onReferralInvite={() => onReferralInvite()}
                   onRedeem={(item) => void onRedeem(item)}
                 />
               </div>
@@ -381,6 +388,12 @@ export function MissionsPanel() {
           ) : null}
         </div>
       </div>
+
+      <ReferralInviteShareModal
+        open={referralInviteOpen}
+        onClose={() => setReferralInviteOpen(false)}
+        address={address}
+      />
     </div>
   );
 }

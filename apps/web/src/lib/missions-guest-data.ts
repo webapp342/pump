@@ -48,7 +48,7 @@ export const GUEST_MISSION_ROWS: MissionListItem[] = [
   {
     taskKey: "LAUNCHPAD_REFERRAL_INVITE_XP",
     title: "Referral Invites",
-    description: "Earn 50 XP per invitee when their first trade binds your referral link.",
+    description: "Invite friends and earn XP when they start trading.",
     rewardPoints: 50,
     taskKind: "MILESTONE",
     completed: false,
