@@ -23,6 +23,7 @@ type PointsEarnPanelProps = {
   onSelectFilter: (filter: MissionFilter) => void;
   onRefresh: () => void;
   onAdminLinkClick?: (mission: MissionListItem) => void;
+  onReferralClaim?: (mission: MissionListItem) => void;
   footerSlot?: ReactNode;
   emptyCopy: string;
 };
@@ -38,6 +39,7 @@ export function PointsEarnPanel({
   onSelectFilter,
   onRefresh,
   onAdminLinkClick,
+  onReferralClaim,
   footerSlot,
   emptyCopy,
 }: PointsEarnPanelProps) {
@@ -58,6 +60,7 @@ export function PointsEarnPanel({
             pendingKeys={pendingKeys}
             completingKey={completingKey}
             onAdminLinkClick={onAdminLinkClick}
+            onReferralClaim={onReferralClaim}
             footerSlot={footerSlot}
           />
         ) : (
@@ -91,6 +94,7 @@ type PointsHubBodyProps = {
   onSelectFilter: (filter: MissionFilter) => void;
   onRefresh: () => void;
   onAdminLinkClick?: (mission: MissionListItem) => void;
+  onReferralClaim?: (mission: MissionListItem) => void;
   onRedeem?: (item: PointsMarketItem) => void;
   footerSlot?: ReactNode;
 };
@@ -115,6 +119,7 @@ export function PointsHubBody({
   onSelectFilter,
   onRefresh,
   onAdminLinkClick,
+  onReferralClaim,
   onRedeem,
   footerSlot,
 }: PointsHubBodyProps) {
@@ -152,6 +157,7 @@ export function PointsHubBody({
       onSelectFilter={onSelectFilter}
       onRefresh={onRefresh}
       onAdminLinkClick={onAdminLinkClick}
+      onReferralClaim={onReferralClaim}
       footerSlot={footerSlot}
       emptyCopy={
         activeFilter === "done" ? REWARDS_CHALLENGES.emptyDone : REWARDS_CHALLENGES.emptyOpen

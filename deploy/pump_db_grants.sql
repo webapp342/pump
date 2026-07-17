@@ -28,6 +28,7 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO pu
 
 GRANT EXECUTE ON FUNCTION launchpad_ensure_user(text, jsonb) TO pump_indexer, pump_app;
 GRANT EXECUTE ON FUNCTION launchpad_award_points(text, text, text, text, date, jsonb) TO pump_indexer, pump_app;
+GRANT EXECUTE ON FUNCTION claim_referral_invite_xp(text) TO pump_indexer, pump_app;
 
 -- Indexer runs REFRESH MATERIALIZED VIEW CONCURRENTLY (must be MV owner)
 DO $$

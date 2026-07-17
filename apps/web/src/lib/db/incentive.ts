@@ -59,7 +59,16 @@ export type MissionsSnapshot = {
 
 const VOLUME_MONSTER_KEY = "LAUNCHPAD_VOLUME_MONSTER";
 const FIRST_SMART_BUY_KEY = "LAUNCHPAD_FIRST_SMART_BUY";
-const INVITED_FIRST_TRADE_KEY = "LAUNCHPAD_INVITED_FIRST_TRADE";
+export const REFERRAL_INVITE_XP_KEY = "LAUNCHPAD_REFERRAL_INVITE_XP";
+export const REFERRAL_INVITE_XP_PER_INVITE = 50;
+
+export type ReferralInviteXpStatus = {
+  claimableCount: number;
+  claimablePoints: number;
+  claimedInviteCount: number;
+  totalSuccessfulInvites: number;
+  pointsPerInvite: number;
+};
 
 export type FirstSmartBuyAwardInput = {
   eventId: string;
@@ -220,46 +229,65 @@ export async function ensureFirstSmartBuyAward(
   return (awardResult.rows[0]?.points_awarded ?? 0) > 0;
 }
 
-/**
- * Award Invited Trader when referral_bindings + a trade exist but indexer missed the points write.
- */
-export async function ensureInvitedFirstTradeAward(
-  address: string,
-  evidence: { eventId: string; txHash: string; referrerAddress: string }
-): Promise<boolean> {
+export async function getReferralInviteXpStatus(
+  referrerAddress: string
+): Promise<ReferralInviteXpStatus> {
   const db = getIncentivePool();
-  const normalized = address.toLowerCase();
+  const normalized = referrerAddress.toLowerCase();
 
-  const existing = await db.query(
+  const result = await db.query<{
+    total_successful: string;
+    claimed_count: string;
+    claimable_count: string;
+  }>(
     `
-      SELECT 1
-      FROM launchpad_user_task_completions
-      WHERE address = $1 AND task_key = $2
-      LIMIT 1
+      SELECT
+        (SELECT COUNT(*)::text FROM referral_bindings WHERE referrer_address = $1) AS total_successful,
+        (SELECT COUNT(*)::text FROM referral_invite_xp_claims WHERE referrer_address = $1) AS claimed_count,
+        (
+          SELECT COUNT(*)::text
+          FROM referral_bindings rb
+          LEFT JOIN referral_invite_xp_claims c ON c.invitee_address = rb.invitee_address
+          WHERE rb.referrer_address = $1
+            AND c.invitee_address IS NULL
+        ) AS claimable_count
     `,
-    [normalized, INVITED_FIRST_TRADE_KEY]
-  );
-  if ((existing.rowCount ?? 0) > 0) return false;
-
-  const awardResult = await db.query<{ status: string; points_awarded: number }>(
-    `
-      SELECT status, points_awarded
-      FROM launchpad_award_points($1, $2, $3, $4, $5, $6::jsonb)
-    `,
-    [
-      normalized,
-      INVITED_FIRST_TRADE_KEY,
-      `${INVITED_FIRST_TRADE_KEY}:${evidence.eventId}`,
-      evidence.txHash,
-      null,
-      JSON.stringify({
-        source: "missions_api_reconcile",
-        referrer: evidence.referrerAddress,
-      }),
-    ]
+    [normalized]
   );
 
-  return (awardResult.rows[0]?.points_awarded ?? 0) > 0;
+  const row = result.rows[0];
+  const totalSuccessfulInvites = Number(row?.total_successful ?? 0);
+  const claimedInviteCount = Number(row?.claimed_count ?? 0);
+  const claimableCount = Number(row?.claimable_count ?? 0);
+
+  return {
+    totalSuccessfulInvites,
+    claimedInviteCount,
+    claimableCount,
+    claimablePoints: claimableCount * REFERRAL_INVITE_XP_PER_INVITE,
+    pointsPerInvite: REFERRAL_INVITE_XP_PER_INVITE,
+  };
+}
+
+export async function claimReferralInviteXp(
+  referrerAddress: string
+): Promise<{ claimedInvites: number; pointsAwarded: number }> {
+  const db = getIncentivePool();
+  const normalized = referrerAddress.toLowerCase();
+
+  const result = await db.query<{ claimed_invites: number; points_awarded: number }>(
+    `
+      SELECT claimed_invites, points_awarded
+      FROM claim_referral_invite_xp($1)
+    `,
+    [normalized]
+  );
+
+  const row = result.rows[0];
+  return {
+    claimedInvites: Number(row?.claimed_invites ?? 0),
+    pointsAwarded: Number(row?.points_awarded ?? 0),
+  };
 }
 
 /**

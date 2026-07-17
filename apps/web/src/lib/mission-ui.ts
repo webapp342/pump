@@ -13,7 +13,7 @@ import type { MissionListItem } from "@/lib/missions-guest-data";
 const DEPLOY_MEME_TASK_KEY = "LAUNCHPAD_DEPLOY_MEME";
 const DAILY_SWAP_TASK_KEY = "LAUNCHPAD_DAILY_SWAP";
 const FIRST_SMART_BUY_TASK_KEY = "LAUNCHPAD_FIRST_SMART_BUY";
-const INVITED_FIRST_TRADE_TASK_KEY = "LAUNCHPAD_INVITED_FIRST_TRADE";
+const REFERRAL_INVITE_XP_TASK_KEY = "LAUNCHPAD_REFERRAL_INVITE_XP";
 const VOLUME_MONSTER_TASK_KEY = "LAUNCHPAD_VOLUME_MONSTER";
 
 export const MISSION_KIND_LABEL: Record<MissionListItem["taskKind"], string> = {
@@ -23,13 +23,19 @@ export const MISSION_KIND_LABEL: Record<MissionListItem["taskKind"], string> = {
   ADMIN_LINK: "Promo",
 };
 
+export function isReferralInviteMission(
+  mission: Pick<MissionListItem, "taskKey">
+): boolean {
+  return mission.taskKey === REFERRAL_INVITE_XP_TASK_KEY;
+}
+
 export function missionIcon(mission: Pick<MissionListItem, "taskKey" | "taskKind">): PumpIconDefinition {
   switch (mission.taskKey) {
     case DAILY_SWAP_TASK_KEY:
     case FIRST_SMART_BUY_TASK_KEY:
     case VOLUME_MONSTER_TASK_KEY:
       return faRightLeft;
-    case INVITED_FIRST_TRADE_TASK_KEY:
+    case REFERRAL_INVITE_XP_TASK_KEY:
       return faUsers;
     case DEPLOY_MEME_TASK_KEY:
       return faRocket;
@@ -41,14 +47,35 @@ export function missionIcon(mission: Pick<MissionListItem, "taskKey" | "taskKind
   }
 }
 
-
 type MissionActionInput = Pick<
   MissionListItem,
-  "taskKey" | "taskKind" | "taskSource" | "targetUrl" | "completed"
+  "taskKey" | "taskKind" | "taskSource" | "targetUrl" | "completed" | "referralClaim"
 >;
+
+export function getMissionDisplayReward(mission: MissionListItem): number {
+  if (mission.referralClaim && mission.referralClaim.claimableCount > 0) {
+    return mission.referralClaim.claimablePoints;
+  }
+  if (mission.referralClaim) {
+    return mission.referralClaim.pointsPerInvite;
+  }
+  return mission.rewardPoints;
+}
+
+export function missionRewardSuffix(mission: MissionListItem): string | null {
+  if (mission.referralClaim && mission.referralClaim.claimableCount === 0) {
+    return "each";
+  }
+  return null;
+}
 
 export function getMissionActionLabel(mission: MissionActionInput): string | null {
   if (mission.completed) return null;
+  if (isReferralInviteMission(mission)) {
+    const count = mission.referralClaim?.claimableCount ?? 0;
+    if (count <= 0) return null;
+    return count === 1 ? "Claim" : `Claim (${count})`;
+  }
   if (isAdminLinkMission(mission)) return "Open link";
   if (mission.taskKey === DEPLOY_MEME_TASK_KEY) return "Create";
   if (getMissionHref(mission)) return "Trade";
@@ -77,11 +104,20 @@ export function formatMissionProgress(progress: NonNullable<MissionListItem["pro
 export function missionStatusLabel(
   done: boolean,
   syncing: boolean,
-  completing?: boolean
+  completing?: boolean,
+  mission?: Pick<MissionListItem, "taskKey" | "referralClaim">
 ): string {
   if (done) return "Complete";
-  if (completing) return "Opening";
+  if (completing) {
+    if (mission && isReferralInviteMission(mission)) return "Claiming";
+    return "Opening";
+  }
   if (syncing) return "Syncing";
+  if (mission && isReferralInviteMission(mission)) {
+    const claimable = mission.referralClaim?.claimableCount ?? 0;
+    if (claimable > 0) return "Ready";
+    return "Waiting";
+  }
   return "Open";
 }
 

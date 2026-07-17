@@ -21,7 +21,6 @@ async function main(): Promise<void> {
   let deployCount = 0;
   let swapCount = 0;
   let smartBuyCount = 0;
-  let invitedCount = 0;
   let volumeCount = 0;
 
   try {
@@ -120,33 +119,6 @@ async function main(): Promise<void> {
       volumeCount++;
     }
 
-    const invitedRows = await pools.launchpad.query<{
-      invitee_address: string;
-      referrer_address: string;
-      bound_tx_hash: string;
-      bound_at: Date;
-    }>(
-      `
-        SELECT invitee_address, referrer_address, bound_tx_hash, bound_at
-        FROM referral_bindings
-      `
-    );
-
-    for (const row of invitedRows.rows) {
-      await pointsBridge.award({
-        address: row.invitee_address,
-        taskKey: TASK_KEYS.invitedFirstTrade,
-        eventId: row.invitee_address,
-        txHash: row.bound_tx_hash as Hash,
-        blockTime: row.bound_at,
-        metadata: {
-          source: "sync_missions",
-          referrer: row.referrer_address,
-        },
-      });
-      invitedCount++;
-    }
-
     const topTx = await pools.launchpad.query<{ launch_tx_hash: string }>(
       `
         SELECT launch_tx_hash FROM tokens
@@ -159,7 +131,7 @@ async function main(): Promise<void> {
     await recomputeKing({ launchpadPool: pools.launchpad }, new Date(), kingTx);
 
     console.log(
-      `Mission sync complete: deploy=${deployCount}, dailySwap=${swapCount}, smartBuy=${smartBuyCount}, invited=${invitedCount}, volumeMonster=${volumeCount}, kingHistory=recomputed`
+      `Mission sync complete: deploy=${deployCount}, dailySwap=${swapCount}, smartBuy=${smartBuyCount}, volumeMonster=${volumeCount}, kingHistory=recomputed`
     );
     console.log("Refresh /missions in the TMA.");
   } finally {

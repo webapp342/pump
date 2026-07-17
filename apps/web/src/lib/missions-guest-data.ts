@@ -1,4 +1,5 @@
 import type { MissionFilter } from "@/lib/missions-types";
+import type { ReferralInviteClaimMeta } from "@/lib/missions-types";
 
 export type MissionListItem = {
   taskKey: string;
@@ -14,6 +15,7 @@ export type MissionListItem = {
     target: number;
     unit: string;
   };
+  referralClaim?: ReferralInviteClaimMeta;
 };
 
 /** Static preview rows — same shape as live missions for guest placeholder UI. */
@@ -44,11 +46,11 @@ export const GUEST_MISSION_ROWS: MissionListItem[] = [
     progress: { current: 0, target: 0.01, unit: "BNB" },
   },
   {
-    taskKey: "LAUNCHPAD_INVITED_FIRST_TRADE",
-    title: "Invited Trader",
-    description: "Join with an invite link — completes when your first trade binds the referral.",
-    rewardPoints: 250,
-    taskKind: "ONE_TIME",
+    taskKey: "LAUNCHPAD_REFERRAL_INVITE_XP",
+    title: "Referral Invites",
+    description: "Earn 50 XP per invitee when their first trade binds your referral link.",
+    rewardPoints: 50,
+    taskKind: "MILESTONE",
     completed: false,
   },
   {

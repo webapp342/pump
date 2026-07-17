@@ -1647,45 +1647,6 @@ export async function getFirstSmartBuyQualifyingTrade(
   };
 }
 
-export type InvitedFirstTradeEvidence = {
-  eventId: string;
-  txHash: string;
-  referrerAddress: string;
-};
-
-/**
- * Same signal as referrer invite_count: a row in referral_bindings for this invitee.
- * Binding is written on ReferrerSet (invitee's first trade with a ref).
- */
-export async function getInvitedFirstTradeEvidence(
-  inviteeAddress: string
-): Promise<InvitedFirstTradeEvidence | null> {
-  const db = getLaunchpadReadPool();
-  const normalized = inviteeAddress.toLowerCase();
-
-  const result = await db.query<{
-    referrer_address: string;
-    bound_tx_hash: string;
-  }>(
-    `
-      SELECT referrer_address, bound_tx_hash
-      FROM referral_bindings
-      WHERE invitee_address = $1
-      LIMIT 1
-    `,
-    [normalized]
-  );
-
-  const row = result.rows[0];
-  if (!row) return null;
-
-  return {
-    eventId: normalized,
-    txHash: row.bound_tx_hash,
-    referrerAddress: row.referrer_address,
-  };
-}
-
 export type PortfolioPosition = {
   tokenAddress: string;
   symbol: string;

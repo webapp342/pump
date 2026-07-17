@@ -6,7 +6,6 @@ export const TASK_KEYS = {
   dailySwap: "LAUNCHPAD_DAILY_SWAP",
   deployMeme: "LAUNCHPAD_DEPLOY_MEME",
   firstSmartBuy: "LAUNCHPAD_FIRST_SMART_BUY",
-  invitedFirstTrade: "LAUNCHPAD_INVITED_FIRST_TRADE",
   volumeMonster: "LAUNCHPAD_VOLUME_MONSTER"
 } as const;
 

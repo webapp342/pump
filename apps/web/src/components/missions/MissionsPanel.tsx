@@ -14,6 +14,7 @@ import { PointsHubTabs } from "@/components/missions/PointsHubTabs";
 import { PointsStatusCard } from "@/components/missions/PointsStatusCard";
 import { HubDiscoveryScrollLock } from "@/components/layout/HubDiscoveryScrollLock";
 import type { Mission, MissionFilter, MissionsData } from "@/lib/missions-types";
+import { isReferralInviteMission } from "@/lib/mission-ui";
 import { getPointsLevel } from "@/lib/points-levels";
 import {
   parsePointsHubTab,
@@ -178,6 +179,57 @@ export function MissionsPanel() {
     [address, loadMissions]
   );
 
+  const onReferralClaim = useCallback(
+    async (mission: Pick<Mission, "taskKey">) => {
+      if (!address) return;
+
+      setCompletingKey(mission.taskKey);
+      setError(null);
+
+      try {
+        const response = await fetch("/api/missions/referral-claim", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ address }),
+        });
+        const body = (await response.json()) as {
+          data?: {
+            claimedInvites: number;
+            pointsAwarded: number;
+            totalPoints: number;
+            lifetimePoints: number;
+            missions: Mission[];
+          };
+          error?: string;
+        };
+
+        if (!response.ok) {
+          throw new Error(body.error ?? "Failed to claim referral XP");
+        }
+
+        if (body.data) {
+          setData((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  totalPoints: body.data!.totalPoints,
+                  lifetimePoints: body.data!.lifetimePoints,
+                  missions: body.data!.missions,
+                }
+              : prev
+          );
+        } else {
+          await loadMissions(address);
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to claim referral XP");
+      } finally {
+        setCompletingKey(null);
+      }
+    },
+    [address, loadMissions]
+  );
+
   const onRedeem = useCallback(
     async (item: PointsMarketItem) => {
       if (!address) return;
@@ -208,8 +260,10 @@ export function MissionsPanel() {
     [address, loadMissions, setMarketView]
   );
 
-  const completedCount = data?.missions.filter((m) => m.completed).length ?? 0;
-  const openCount = data?.missions.filter((m) => !m.completed).length ?? 0;
+  const completedCount =
+    data?.missions.filter((m) => m.completed && !isReferralInviteMission(m)).length ?? 0;
+  const openCount =
+    data?.missions.filter((m) => !m.completed || isReferralInviteMission(m)).length ?? 0;
 
   const level = useMemo(
     () => getPointsLevel(data?.lifetimePoints ?? data?.totalPoints ?? 0),
@@ -226,9 +280,12 @@ export function MissionsPanel() {
 
   const boardMissions = useMemo(() => {
     if (!data) return [];
-    return data.missions.filter((mission) =>
-      activeFilter === "done" ? mission.completed : !mission.completed
-    );
+    return data.missions.filter((mission) => {
+      if (isReferralInviteMission(mission)) {
+        return activeFilter === "open";
+      }
+      return activeFilter === "done" ? mission.completed : !mission.completed;
+    });
   }, [data, activeFilter]);
 
   if (!isConnected || !address) {
@@ -316,6 +373,7 @@ export function MissionsPanel() {
                     void loadMissions(address);
                   }}
                   onAdminLinkClick={(mission) => void onAdminLinkClick(mission)}
+                  onReferralClaim={(mission) => void onReferralClaim(mission)}
                   onRedeem={(item) => void onRedeem(item)}
                 />
               </div>

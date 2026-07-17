@@ -778,16 +778,6 @@ export class LaunchpadEventHandlers {
       `,
       [invitee, referrer, txHash.toLowerCase()]
     );
-
-    // Same signal as referrer "successful invite": binding row exists (set on invitee's first trade).
-    await this.context.pointsBridge.award({
-      address: invitee,
-      taskKey: TASK_KEYS.invitedFirstTrade,
-      eventId: invitee,
-      txHash,
-      blockTime: await this.getBlockTime(log.blockNumber),
-      metadata: { referrer, source: "referral_bindings" },
-    });
   }
 
   private async handleReferrerFeeClaimed(log: ParsedLaunchpadLog): Promise<void> {

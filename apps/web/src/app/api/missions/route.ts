@@ -4,21 +4,32 @@ import { NATIVE_SYMBOL } from "@/config/chain";
 import { normalizeAddressParam } from "@/lib/address";
 import {
   ensureFirstSmartBuyAward,
-  ensureInvitedFirstTradeAward,
   ensureVolumeMonsterAward,
   getMissionsForAddress,
+  getReferralInviteXpStatus,
+  REFERRAL_INVITE_XP_KEY,
 } from "@/lib/db/incentive";
 import {
   FIRST_SMART_BUY_MIN_BNB,
   getFirstSmartBuyQualifyingTrade,
-  getInvitedFirstTradeEvidence,
   getUserVolumeBnb,
 } from "@/lib/db/launchpad";
 
 const VOLUME_MONSTER_KEY = "LAUNCHPAD_VOLUME_MONSTER";
 const FIRST_SMART_BUY_KEY = "LAUNCHPAD_FIRST_SMART_BUY";
-const INVITED_FIRST_TRADE_KEY = "LAUNCHPAD_INVITED_FIRST_TRADE";
 const VOLUME_MONSTER_TARGET = 1;
+
+function attachReferralClaimMeta<T extends { taskKey: string; completed: boolean }>(
+  mission: T,
+  referralStatus: Awaited<ReturnType<typeof getReferralInviteXpStatus>>
+): T & { completed: boolean; referralClaim?: typeof referralStatus } {
+  if (mission.taskKey !== REFERRAL_INVITE_XP_KEY) return mission;
+  return {
+    ...mission,
+    completed: false,
+    referralClaim: referralStatus,
+  };
+}
 
 export async function GET(request: NextRequest) {
   const address = normalizeAddressParam(request.nextUrl.searchParams.get("address"));
@@ -27,18 +38,16 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    let [snapshot, volumeBnb] = await Promise.all([
+    let [snapshot, volumeBnb, referralStatus] = await Promise.all([
       getMissionsForAddress(address),
       getUserVolumeBnb(address),
+      getReferralInviteXpStatus(address),
     ]);
 
     let missionsChanged = false;
 
     const smartBuyAlreadyDone = snapshot.missions.some(
       (mission) => mission.taskKey === FIRST_SMART_BUY_KEY && mission.completed
-    );
-    const invitedAlreadyDone = snapshot.missions.some(
-      (mission) => mission.taskKey === INVITED_FIRST_TRADE_KEY && mission.completed
     );
     const volumeMonsterAlreadyDone = snapshot.missions.some(
       (mission) => mission.taskKey === VOLUME_MONSTER_KEY && mission.completed
@@ -59,27 +68,24 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    if (!invitedAlreadyDone) {
-      const invited = await getInvitedFirstTradeEvidence(address);
-      if (invited) {
-        const changed = await ensureInvitedFirstTradeAward(address, invited);
-        missionsChanged = missionsChanged || changed;
-      }
-    }
-
     if (!volumeMonsterAlreadyDone && volumeBnb >= VOLUME_MONSTER_TARGET) {
       const changed = await ensureVolumeMonsterAward(address);
       missionsChanged = missionsChanged || changed;
     }
 
     if (missionsChanged) {
-      snapshot = await getMissionsForAddress(address);
+      [snapshot, referralStatus] = await Promise.all([
+        getMissionsForAddress(address),
+        getReferralInviteXpStatus(address),
+      ]);
     }
 
     const missions = snapshot.missions.map((mission) => {
-      if (mission.taskKey === VOLUME_MONSTER_KEY && !mission.completed) {
+      const withReferral = attachReferralClaimMeta(mission, referralStatus);
+
+      if (withReferral.taskKey === VOLUME_MONSTER_KEY && !withReferral.completed) {
         return {
-          ...mission,
+          ...withReferral,
           progress: {
             current: volumeBnb,
             target: VOLUME_MONSTER_TARGET,
@@ -88,9 +94,9 @@ export async function GET(request: NextRequest) {
         };
       }
 
-      if (mission.taskKey === FIRST_SMART_BUY_KEY && !mission.completed && !smartBuyTrade) {
+      if (withReferral.taskKey === FIRST_SMART_BUY_KEY && !withReferral.completed && !smartBuyTrade) {
         return {
-          ...mission,
+          ...withReferral,
           progress: {
             current: 0,
             target: FIRST_SMART_BUY_MIN_BNB,
@@ -99,7 +105,7 @@ export async function GET(request: NextRequest) {
         };
       }
 
-      return mission;
+      return withReferral;
     });
 
     return NextResponse.json({

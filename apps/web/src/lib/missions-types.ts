@@ -6,6 +6,14 @@ export type MissionProgress = {
   unit: string;
 };
 
+export type ReferralInviteClaimMeta = {
+  claimableCount: number;
+  claimablePoints: number;
+  claimedInviteCount: number;
+  totalSuccessfulInvites: number;
+  pointsPerInvite: number;
+};
+
 export type Mission = {
   taskKey: string;
   title: string;
@@ -18,6 +26,7 @@ export type Mission = {
   completedAt: string | null;
   pointsAwarded: number;
   progress?: MissionProgress;
+  referralClaim?: ReferralInviteClaimMeta;
 };
 
 export type MissionsData = {

@@ -9,8 +9,11 @@ import type { MissionListItem } from "@/lib/missions-guest-data";
 import {
   formatMissionProgress,
   getMissionActionLabel,
+  getMissionDisplayReward,
+  isReferralInviteMission,
   missionInfoText,
   missionProgressPct,
+  missionRewardSuffix,
   missionStatusLabel,
 } from "@/lib/mission-ui";
 import { REWARDS_CHALLENGES, REWARDS_HUB } from "@/lib/rewards-copy";
@@ -21,6 +24,7 @@ type MissionRowProps = {
   completing?: boolean;
   guestMode?: boolean;
   onAdminLinkClick?: (mission: MissionListItem) => void;
+  onReferralClaim?: (mission: MissionListItem) => void;
 };
 
 function missionHasProgressBar(mission: MissionListItem): boolean {
@@ -34,17 +38,23 @@ export function MissionRow({
   completing = false,
   guestMode = false,
   onAdminLinkClick,
+  onReferralClaim,
 }: MissionRowProps) {
   const router = useRouter();
   const done = mission.completed;
   const actionLabel = guestMode ? null : getMissionActionLabel(mission);
   const isLinkTask = isAdminLinkMission(mission) && Boolean(mission.targetUrl);
   const href = guestMode ? null : getMissionHref(mission);
-  const interactive = !guestMode && !done && (isLinkTask || href != null);
+  const isReferralClaim =
+    !guestMode && !done && isReferralInviteMission(mission) && actionLabel != null;
+  const interactive =
+    !guestMode && !done && (isReferralClaim || isLinkTask || href != null);
   const hasProgressBar = missionHasProgressBar(mission);
   const pct = missionProgressPct(mission.progress);
-  const statusLabel = missionStatusLabel(done, syncing, completing);
+  const statusLabel = missionStatusLabel(done, syncing, completing, mission);
   const infoText = missionInfoText(mission.description);
+  const displayReward = getMissionDisplayReward(mission);
+  const rewardSuffix = missionRewardSuffix(mission);
 
   const rowClassName = [
     "missions-list__row",
@@ -58,6 +68,10 @@ export function MissionRow({
 
   function handleAction() {
     if (guestMode || done) return;
+    if (isReferralClaim) {
+      onReferralClaim?.(mission);
+      return;
+    }
     if (isLinkTask) {
       onAdminLinkClick?.(mission);
       return;
@@ -95,7 +109,8 @@ export function MissionRow({
 
         <div className="missions-list__trail">
           <span className="missions-list__reward financial-value">
-            +{mission.rewardPoints} {REWARDS_HUB.unitShort}
+            +{displayReward} {REWARDS_HUB.unitShort}
+            {rewardSuffix ? ` ${rewardSuffix}` : ""}
           </span>
           {done ? (
             <span className="missions-list__status missions-list__status--done">
@@ -109,7 +124,11 @@ export function MissionRow({
               onClick={handleAction}
               disabled={guestMode || completing}
             >
-              {completing ? "Opening…" : actionLabel}
+              {completing
+                ? isReferralClaim
+                  ? "Claiming…"
+                  : "Opening…"
+                : actionLabel}
             </button>
           ) : (
             <span
@@ -142,6 +161,7 @@ type MissionsListProps = {
   pendingKeys?: string[];
   completingKey?: string | null;
   onAdminLinkClick?: (mission: MissionListItem) => void;
+  onReferralClaim?: (mission: MissionListItem) => void;
   footerSlot?: ReactNode;
 };
 
@@ -151,6 +171,7 @@ export function MissionsList({
   pendingKeys = [],
   completingKey = null,
   onAdminLinkClick,
+  onReferralClaim,
   footerSlot,
 }: MissionsListProps) {
   return (
@@ -166,6 +187,7 @@ export function MissionsList({
               syncing={pendingKeys.includes(mission.taskKey)}
               completing={completingKey === mission.taskKey}
               onAdminLinkClick={onAdminLinkClick}
+              onReferralClaim={onReferralClaim}
             />
           ))}
         </div>

@@ -32,11 +32,11 @@ INSERT INTO launchpad_tasks (
     true
   ),
   (
-    'LAUNCHPAD_INVITED_FIRST_TRADE',
-    'Invited Trader',
-    'Join with an invite link — completes when your first trade binds the referral.',
-    250,
-    'ONE_TIME',
+    'LAUNCHPAD_REFERRAL_INVITE_XP',
+    'Referral Invites',
+    'Earn 50 XP per invitee when their first trade binds your referral link.',
+    50,
+    'MILESTONE',
     'system',
     true
   ),
