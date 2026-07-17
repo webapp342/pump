@@ -2634,20 +2634,22 @@ code,
       flex-direction: column;
     }
 
+    /* +0.75rem: nav-height alone ends flush with the floating pill (see mobile
+       .points-hub-panel rule); scroll-lock must not strip that breathing room. */
     html.hub-discovery-scroll-lock .missions-page .points-hub-panel {
       flex: 1 1 0;
       min-height: 0;
       overflow-y: auto;
       overscroll-behavior: contain;
       -webkit-overflow-scrolling: touch;
-      padding-bottom: var(--mobile-bottom-nav-height);
+      padding-bottom: calc(var(--mobile-bottom-nav-height) + 0.75rem);
     }
 
     html.hub-discovery-scroll-lock .missions-page .missions-body:not(:has(.missions-list)) {
       overflow-y: auto;
       overscroll-behavior: contain;
       -webkit-overflow-scrolling: touch;
-      padding-bottom: var(--mobile-bottom-nav-height);
+      padding-bottom: calc(var(--mobile-bottom-nav-height) + 0.75rem);
     }
 
     html.hub-discovery-scroll-lock .missions-page .missions-list {
@@ -2669,7 +2671,7 @@ code,
       overflow-y: auto;
       overscroll-behavior: contain;
       -webkit-overflow-scrolling: touch;
-      padding-bottom: var(--mobile-bottom-nav-height);
+      padding-bottom: calc(var(--mobile-bottom-nav-height) + 0.75rem);
     }
 
     html.hub-discovery-scroll-lock .portfolio-page .portfolio-hub__body {
@@ -18697,8 +18699,12 @@ code,
   .missions-page .points-leaderboard__trader {
     display: flex;
     align-items: center;
-    gap: 0.375rem;
+    gap: 0.5rem;
     min-width: 0;
+  }
+
+  .missions-page .points-leaderboard__avatar {
+    flex-shrink: 0;
   }
 
   .missions-page .points-leaderboard__name {
@@ -18706,15 +18712,7 @@ code,
     text-overflow: ellipsis;
     white-space: nowrap;
     font-size: 0.875rem;
-  }
-
-  .missions-page .points-leaderboard__you-chip {
-    flex-shrink: 0;
-    font-size: 0.625rem;
-    font-weight: 700;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    color: rgb(var(--pump-accent));
+    min-width: 0;
   }
 
   .missions-page .points-leaderboard__num {

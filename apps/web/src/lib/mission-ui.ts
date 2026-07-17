@@ -75,7 +75,7 @@ export function getMissionActionLabel(mission: MissionActionInput): string | nul
     if (count > 0) return count === 1 ? "Claim" : `Claim (${count})`;
     return REWARDS_REFERRAL_INVITE.actionInvite;
   }
-  if (isAdminLinkMission(mission)) return "Open link";
+  if (isAdminLinkMission(mission)) return "Open";
   if (mission.taskKey === DEPLOY_MEME_TASK_KEY) return "Create";
   if (getMissionHref(mission)) return "Trade";
   return null;

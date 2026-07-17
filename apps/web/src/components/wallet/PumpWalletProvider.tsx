@@ -129,12 +129,7 @@ export function PumpWalletProvider({ children }: { children: ReactNode }) {
     if (!ready) return;
     if (authenticated) {
       setLoginModalOpen(false);
-      return;
     }
-    if (typeof window !== "undefined" && window.location.pathname.startsWith("/auth/")) {
-      return;
-    }
-    setLoginModalOpen(true);
   }, [ready, authenticated]);
 
   const login = useCallback(() => {

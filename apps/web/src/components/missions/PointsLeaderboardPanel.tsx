@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { UserAvatarForAddress } from "@/components/user/UserAvatarForAddress";
+import { UserDisplayName } from "@/components/user/UserDisplayName";
 import { useNativeUsdPrice } from "@/hooks/useBnbUsdPrice";
 import { bnbToUsd } from "@/lib/format-usd";
 import { REWARDS_LEADERBOARD } from "@/lib/rewards-copy";
@@ -22,11 +24,6 @@ type LeaderboardData = {
   seatCount: number;
   entries: LeaderboardRow[];
 };
-
-function shortAddress(address: string): string {
-  if (address.length < 10) return address;
-  return `${address.slice(0, 6)}…${address.slice(-4)}`;
-}
 
 /** Match admin treasury USD style: $6.11 not compact $6.1 / subscript. */
 function formatShareUsd(
@@ -166,8 +163,7 @@ export function PointsLeaderboardPanel({
           </div>
           <ul className="points-leaderboard__list">
             {data.entries.map((row) => {
-              const isYou = viewer && row.address.toLowerCase() === viewer;
-              const label = row.username || shortAddress(row.address);
+              const isYou = Boolean(viewer && row.address.toLowerCase() === viewer);
               return (
                 <li
                   key={row.address}
@@ -175,10 +171,18 @@ export function PointsLeaderboardPanel({
                 >
                   <span className="financial-value points-leaderboard__rank">{row.rank}</span>
                   <span className="points-leaderboard__trader">
-                    <span className="points-leaderboard__name">{label}</span>
-                    {isYou ? (
-                      <span className="points-leaderboard__you-chip">{REWARDS_LEADERBOARD.you}</span>
-                    ) : null}
+                    <UserAvatarForAddress
+                      address={row.address}
+                      size="md"
+                      className="points-leaderboard__avatar"
+                    />
+                    <span className="points-leaderboard__name">
+                      <UserDisplayName
+                        address={row.address}
+                        username={row.username}
+                        compact
+                      />
+                    </span>
                   </span>
                   <span className="financial-value points-leaderboard__num">
                     {row.lifetimePoints.toLocaleString()}
