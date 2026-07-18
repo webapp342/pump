@@ -78,9 +78,9 @@ export async function updateTokenPeakMultiplier(
       SET launch_mcap_zug = COALESCE(launch_mcap_zug, $2::numeric),
           peak_multiplier_x = GREATEST(COALESCE(peak_multiplier_x, 1), $3::numeric),
           updated_at = now()
-      WHERE token_address = $1
+      WHERE token_address = $1::text
     `,
-    [tokenAddress, String(launch), peakX]
+    [tokenAddress, String(launch), String(peakX)]
   );
 }
 
@@ -106,10 +106,10 @@ export async function upsertUserTradeStatsAfterTrade(
         last_trade_at,
         updated_at
       ) VALUES (
-        $1,
+        $1::text,
         1,
-        CASE WHEN $2 THEN 1 ELSE 0 END,
-        CASE WHEN $2 THEN 0 ELSE 1 END,
+        CASE WHEN $2::boolean THEN 1 ELSE 0 END,
+        CASE WHEN $2::boolean THEN 0 ELSE 1 END,
         1,
         $3::numeric,
         $4::timestamptz,
@@ -118,17 +118,17 @@ export async function upsertUserTradeStatsAfterTrade(
       )
       ON CONFLICT (address) DO UPDATE SET
         trade_count = user_trade_stats.trade_count + 1,
-        buy_count = user_trade_stats.buy_count + CASE WHEN $2 THEN 1 ELSE 0 END,
-        sell_count = user_trade_stats.sell_count + CASE WHEN $2 THEN 0 ELSE 1 END,
+        buy_count = user_trade_stats.buy_count + CASE WHEN $2::boolean THEN 1 ELSE 0 END,
+        sell_count = user_trade_stats.sell_count + CASE WHEN $2::boolean THEN 0 ELSE 1 END,
         distinct_tokens = (
-          SELECT COUNT(DISTINCT token_address)::integer FROM trades WHERE trader_address = $1
+          SELECT COUNT(DISTINCT token_address)::integer FROM trades WHERE trader_address = $1::text
         ),
         total_volume_zug = user_trade_stats.total_volume_zug + $3::numeric,
         first_trade_at = LEAST(user_trade_stats.first_trade_at, $4::timestamptz),
         last_trade_at = GREATEST(user_trade_stats.last_trade_at, $4::timestamptz),
         updated_at = now()
     `,
-    [input.traderAddress, input.isBuy, String(vol), input.blockTime]
+    [input.traderAddress, input.isBuy, String(vol), input.blockTime.toISOString()]
   );
 }
 
@@ -142,7 +142,7 @@ export async function upsertReferrerNetworkAfterTrade(
     `
       SELECT referrer_address
       FROM referral_bindings
-      WHERE invitee_address = $1
+      WHERE invitee_address = $1::text
     `,
     [input.traderAddress]
   );
@@ -164,31 +164,31 @@ export async function upsertReferrerNetworkAfterTrade(
         updated_at
       )
       SELECT
-        $1,
+        $1::text,
         COUNT(*)::integer,
         $2::numeric,
         $3::numeric,
         CASE WHEN COUNT(*) > 0 THEN $2::numeric / COUNT(*) ELSE 0 END,
         now()
       FROM referral_bindings
-      WHERE referrer_address = $1
+      WHERE referrer_address = $1::text
       ON CONFLICT (referrer_address) DO UPDATE SET
         network_volume_zug = referrer_network_stats.network_volume_zug + $2::numeric,
         network_fee_earned_zug = referrer_network_stats.network_fee_earned_zug + $3::numeric,
         qualified_invite_count = (
-          SELECT COUNT(*)::integer FROM referral_bindings WHERE referrer_address = $1
+          SELECT COUNT(*)::integer FROM referral_bindings WHERE referrer_address = $1::text
         ),
         avg_volume_per_invitee = (
           SELECT CASE WHEN COUNT(*) > 0
             THEN (referrer_network_stats.network_volume_zug + $2::numeric) / COUNT(*)
             ELSE 0 END
-          FROM referral_bindings WHERE referrer_address = $1
+          FROM referral_bindings WHERE referrer_address = $1::text
         ),
         repeat_trader_count = (
           SELECT COUNT(*)::integer
           FROM referral_bindings rb
           INNER JOIN user_trade_stats uts ON uts.address = rb.invitee_address
-          WHERE rb.referrer_address = $1 AND uts.trade_count >= 2
+          WHERE rb.referrer_address = $1::text AND uts.trade_count >= 2
         ),
         repeat_trader_rate = (
           SELECT CASE WHEN COUNT(*) > 0
@@ -196,10 +196,10 @@ export async function upsertReferrerNetworkAfterTrade(
               SELECT COUNT(*)::numeric
               FROM referral_bindings rb
               INNER JOIN user_trade_stats uts ON uts.address = rb.invitee_address
-              WHERE rb.referrer_address = $1 AND uts.trade_count >= 2
+              WHERE rb.referrer_address = $1::text AND uts.trade_count >= 2
             ) / COUNT(*)
             ELSE 0 END
-          FROM referral_bindings WHERE referrer_address = $1
+          FROM referral_bindings WHERE referrer_address = $1::text
         ),
         updated_at = now()
     `,
@@ -220,6 +220,7 @@ export async function updateHoldStatsAfterTrade(
   const launch = await fetchLaunchMcap(client, input.tokenAddress);
   const peakX =
     launch != null && launch > 0 && Number.isFinite(mcap) ? mcap / launch : null;
+  const openedAt = input.blockTime.toISOString();
 
   if (input.isBuy && input.oldBalance <= 0 && input.newBalance > 0) {
     await client.query(
@@ -230,14 +231,20 @@ export async function updateHoldStatsAfterTrade(
           opened_at,
           entry_mcap_zug,
           peak_multiplier_x
-        ) VALUES ($1, $2, $3, $4::numeric, $5::numeric)
+        ) VALUES (
+          $1::text,
+          $2::text,
+          $3::timestamptz,
+          $4::numeric,
+          $5::numeric
+        )
       `,
       [
         input.tokenAddress,
         input.traderAddress,
-        input.blockTime,
+        openedAt,
         Number.isFinite(mcap) ? String(mcap) : null,
-        peakX != null && Number.isFinite(peakX) ? peakX : 1,
+        peakX != null && Number.isFinite(peakX) ? String(peakX) : "1",
       ]
     );
     return;
@@ -247,12 +254,12 @@ export async function updateHoldStatsAfterTrade(
     await client.query(
       `
         UPDATE user_position_lots
-        SET peak_multiplier_x = GREATEST(peak_multiplier_x, $4::numeric)
-        WHERE token_address = $1
-          AND address = $2
+        SET peak_multiplier_x = GREATEST(peak_multiplier_x, $3::numeric)
+        WHERE token_address = $1::text
+          AND address = $2::text
           AND closed_at IS NULL
       `,
-      [input.tokenAddress, input.traderAddress, input.blockTime, peakX]
+      [input.tokenAddress, input.traderAddress, String(peakX)]
     );
     return;
   }
@@ -261,14 +268,14 @@ export async function updateHoldStatsAfterTrade(
     const closed = await client.query<{ opened_at: Date }>(
       `
         UPDATE user_position_lots
-        SET closed_at = $3,
+        SET closed_at = $3::timestamptz,
             hold_seconds = EXTRACT(EPOCH FROM ($3::timestamptz - opened_at))::bigint
-        WHERE token_address = $1
-          AND address = $2
+        WHERE token_address = $1::text
+          AND address = $2::text
           AND closed_at IS NULL
         RETURNING opened_at
       `,
-      [input.tokenAddress, input.traderAddress, input.blockTime]
+      [input.tokenAddress, input.traderAddress, openedAt]
     );
 
     const holdSeconds = closed.rows.reduce((sum, row) => {
@@ -285,7 +292,7 @@ export async function updateHoldStatsAfterTrade(
           total_hold_seconds,
           avg_hold_seconds,
           updated_at
-        ) VALUES ($1, 1, $2::bigint, $2::numeric, now())
+        ) VALUES ($1::text, 1, $2::bigint, $2::numeric, now())
         ON CONFLICT (address) DO UPDATE SET
           closed_lot_count = user_hold_stats.closed_lot_count + 1,
           total_hold_seconds = user_hold_stats.total_hold_seconds + $2::bigint,
@@ -323,7 +330,7 @@ export async function seedBoardStatsLaunchMcap(
       SET launch_mcap_zug = COALESCE(launch_mcap_zug, $2::numeric),
           peak_multiplier_x = GREATEST(COALESCE(peak_multiplier_x, 1), 1),
           updated_at = now()
-      WHERE token_address = $1
+      WHERE token_address = $1::text
     `,
     [tokenAddress, launchMcapZug]
   );
@@ -341,10 +348,10 @@ export async function refreshReferrerNetworkOnBind(
         referrer_address,
         qualified_invite_count,
         updated_at
-      ) VALUES ($1, 1, now())
+      ) VALUES ($1::text, 1, now())
       ON CONFLICT (referrer_address) DO UPDATE SET
         qualified_invite_count = (
-          SELECT COUNT(*)::integer FROM referral_bindings WHERE referrer_address = $1
+          SELECT COUNT(*)::integer FROM referral_bindings WHERE referrer_address = $1::text
         ),
         updated_at = now()
     `,

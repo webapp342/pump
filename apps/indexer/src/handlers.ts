@@ -447,18 +447,29 @@ export class LaunchpadEventHandlers {
       const newBalance = Number(newBalanceRow.rows[0]?.token_balance ?? 0);
       const tradeMcap = marketCapZugFromSpot(markPrice);
 
-      await applyTradeStatsRollups(client, {
-        traderAddress: trader,
-        tokenAddress: token,
-        isBuy,
-        zugAmount: weiToDecimal(zugAmount),
-        referrerFeeZug: weiToDecimal(feeSplit.referrerFee),
-        blockTime,
-        marketCapZug: tradeMcap,
-        launchMcapZug: null,
-        oldBalance,
-        newBalance,
-      });
+      try {
+        await client.query("SAVEPOINT stats_rollups");
+        await applyTradeStatsRollups(client, {
+          traderAddress: trader,
+          tokenAddress: token,
+          isBuy,
+          zugAmount: weiToDecimal(zugAmount),
+          referrerFeeZug: weiToDecimal(feeSplit.referrerFee),
+          blockTime,
+          marketCapZug: tradeMcap,
+          launchMcapZug: null,
+          oldBalance,
+          newBalance,
+        });
+        await client.query("RELEASE SAVEPOINT stats_rollups");
+      } catch (rollupError) {
+        await client.query("ROLLBACK TO SAVEPOINT stats_rollups");
+        console.error("[stats-rollups] trade rollup failed (trade still indexed)", {
+          token,
+          trader,
+          error: rollupError instanceof Error ? rollupError.message : rollupError,
+        });
+      }
 
       const candleUpdates = await upsertCandlesAfterTrade(client, {
         tokenAddress: token,
