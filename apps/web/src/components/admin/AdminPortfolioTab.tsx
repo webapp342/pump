@@ -320,7 +320,7 @@ export function AdminPortfolioTab({ address }: { address: string }) {
                       {formatPortfolioHoldingValueUsd(valueUsd)}
                     </td>
                     <td className="admin-num whitespace-nowrap">{formatTokenBalance(row.balance)}</td>
-                    <td className="whitespace-nowrap text-right">
+                    <td className="admin-table-col--action whitespace-nowrap text-right">
                       <AdminTextButton onClick={() => setSellMaxTarget(sellInput)}>
                         {ADMIN_COPY.portfolio.sellMax}
                       </AdminTextButton>

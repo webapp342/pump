@@ -496,7 +496,7 @@ export function AdminKpiCard({
           : "";
 
   return (
-    <article className="admin-kpi-card admin-kpi-card--compact">
+    <article className="admin-kpi-card">
       <p className="admin-kpi-label">{label}</p>
       <p className={`admin-kpi-value ${toneClass}`.trim()}>{value}</p>
       {trend ? <p className="admin-kpi-trend">{trend}</p> : null}
@@ -647,7 +647,7 @@ export function AdminScroll({ children }: { children: ReactNode }) {
 export function AdminGridTable({ children }: { children: ReactNode }) {
   return (
     <AdminScroll>
-      <table className="admin-grid">{children}</table>
+      <table className="admin-grid admin-grid--data">{children}</table>
     </AdminScroll>
   );
 }
@@ -655,7 +655,7 @@ export function AdminGridTable({ children }: { children: ReactNode }) {
 export function AdminKvTable({ children }: { children: ReactNode }) {
   return (
     <div className="admin-data-table-wrap">
-      <table className="admin-grid">
+      <table className="admin-grid admin-grid--kv">
         <tbody>{children}</tbody>
       </table>
     </div>
@@ -805,8 +805,11 @@ export function AdminField({
 
 export function AdminEmpty({ children }: { children: ReactNode }) {
   return (
-    <div className="empty-state admin-empty">
-      <p className="empty-state-copy">{children}</p>
+    <div className="admin-empty admin-empty--panel">
+      <div className="admin-empty-icon" aria-hidden>
+        <span />
+      </div>
+      <p className="admin-empty-copy">{children}</p>
     </div>
   );
 }

@@ -68,6 +68,26 @@ function sweepStatusLabel(status: string): string {
   }
 }
 
+/** Compact status for dense tables — full label stays in title tooltip. */
+function sweepStatusShort(status: string): string {
+  switch (status) {
+    case "ready":
+      return "Ready";
+    case "claim_window_open":
+      return "Claiming";
+    case "claim_window_open_no_winners":
+      return "No winners";
+    case "swept":
+      return "Recovered";
+    case "not_finalized":
+      return "Pending";
+    case "nothing_to_sweep":
+      return "Claimed";
+    default:
+      return status;
+  }
+}
+
 function AdminRewardText({
   amount,
   rewardToken,
@@ -87,10 +107,12 @@ function AdminRewardText({
       ? Number(amount) * Number(rewardPriceBnb) * bnbUsd
       : null;
   return (
-    <span>
-      {amount} {sym}
+    <span className="admin-table-stack admin-table-stack--end">
+      <span className="admin-table-stack-primary admin-num">
+        {amount} <span className="admin-table-unit">{sym}</span>
+      </span>
       {usd != null ? (
-        <span className="admin-meta"> · {formatUsdReadable(usd, { compact: true })}</span>
+        <span className="admin-table-stack-meta">{formatUsdReadable(usd, { compact: true })}</span>
       ) : null}
     </span>
   );
@@ -109,7 +131,7 @@ function AdminSweepCountdown({
   if (sweepStatus === "swept") return <span className="admin-meta">Done</span>;
   if (!claimEndUnix) return <span className="admin-meta">—</span>;
   const ms = claimEndUnix * 1000 - Date.now();
-  if (ms <= 0) return <span className="admin-meta">Window closed</span>;
+  if (ms <= 0) return <span className="admin-meta">Closed</span>;
   const h = Math.floor(ms / 3_600_000);
   const m = Math.floor((ms % 3_600_000) / 60_000);
   return (
@@ -135,35 +157,28 @@ export function AdminAirdropSweepTable({
 }: AdminAirdropSweepTableProps) {
   const columns: AdminTableColumn<SweepRow>[] = [
     {
-      id: "id",
-      header: ADMIN_COPY.airdrops.columns.id,
-      align: "right",
-      width: "4.5rem",
-      sortable: true,
-      sortValue: (r) => Number(r.onChainId),
-      cell: (r) => r.onChainId,
-    },
-    {
       id: "campaign",
       header: ADMIN_COPY.airdrops.columns.campaign,
+      minWidth: "11rem",
       sortable: true,
       sortValue: (r) => r.title ?? r.linkedSymbol ?? "",
       cell: (r) => (
-        <Link href={`/airdrops/${r.id}`} className="admin-link">
-          {r.title ?? r.linkedSymbol ?? `#${r.id}`}
-        </Link>
+        <span className="admin-table-stack">
+          <Link href={`/airdrops/${r.id}`} className="admin-link admin-table-truncate">
+            {r.title ?? r.linkedSymbol ?? `#${r.id}`}
+          </Link>
+          <span className="admin-table-stack-meta admin-num">
+            #{r.onChainId}
+            {r.linkedSymbol ? ` · ${r.linkedSymbol}` : ""}
+          </span>
+        </span>
       ),
-    },
-    {
-      id: "symbol",
-      header: ADMIN_COPY.airdrops.columns.symbol,
-      width: "5rem",
-      cell: (r) => (r.linkedSymbol ? r.linkedSymbol : "—"),
     },
     {
       id: "pool",
       header: ADMIN_COPY.airdrops.columns.pool,
       align: "right",
+      minWidth: "7.5rem",
       sortable: true,
       sortValue: (r) => Number(r.totalFunded),
       cell: (r) => (
@@ -180,6 +195,7 @@ export function AdminAirdropSweepTable({
       id: "claimed",
       header: ADMIN_COPY.airdrops.columns.claimed,
       align: "right",
+      minWidth: "7.5rem",
       sortable: true,
       sortValue: (r) => Number(r.totalClaimedBnb),
       cell: (r) => (
@@ -196,6 +212,7 @@ export function AdminAirdropSweepTable({
       id: "remaining",
       header: ADMIN_COPY.airdrops.columns.remaining,
       align: "right",
+      minWidth: "7.5rem",
       sortable: true,
       sortValue: (r) => Number(r.remainingBnb),
       cell: (r) => (
@@ -211,18 +228,22 @@ export function AdminAirdropSweepTable({
     {
       id: "claimUntil",
       header: ADMIN_COPY.airdrops.columns.claimUntil,
-      width: "9rem",
-      cell: (r) =>
-        r.claimEndUnix
-          ? formatQualifyDateTime(new Date(r.claimEndUnix * 1000).toISOString())
-          : r.claimEnd
-            ? formatQualifyDateTime(r.claimEnd)
-            : "—",
+      minWidth: "8.5rem",
+      cell: (r) => (
+        <span className="admin-table-datetime admin-num">
+          {r.claimEndUnix
+            ? formatQualifyDateTime(new Date(r.claimEndUnix * 1000).toISOString())
+            : r.claimEnd
+              ? formatQualifyDateTime(r.claimEnd)
+              : "—"}
+        </span>
+      ),
     },
     {
       id: "sweepIn",
       header: ADMIN_COPY.airdrops.columns.sweepIn,
-      width: "6rem",
+      align: "right",
+      width: "5.5rem",
       cell: (r) => (
         <AdminSweepCountdown
           claimEndUnix={r.claimEndUnix}
@@ -234,7 +255,7 @@ export function AdminAirdropSweepTable({
     {
       id: "status",
       header: ADMIN_COPY.airdrops.columns.status,
-      width: "7rem",
+      minWidth: "7rem",
       cell: (r) => (
         <AdminStatusBadge
           tone={
@@ -245,15 +266,16 @@ export function AdminAirdropSweepTable({
                 : "neutral"
           }
         >
-          {sweepStatusLabel(r.sweepStatus)}
+          <span title={sweepStatusLabel(r.sweepStatus)}>{sweepStatusShort(r.sweepStatus)}</span>
         </AdminStatusBadge>
       ),
     },
     {
       id: "action",
       header: ADMIN_COPY.airdrops.columns.action,
-      width: "6.5rem",
+      width: "7rem",
       align: "right",
+      className: "admin-table-col--action",
       cell: (r) =>
         r.canSweep ? (
           <AdminBtn
@@ -280,16 +302,11 @@ export function AdminAirdropSweepTable({
       rowKey={(r) => r.id}
       loading={loading}
       emptyMessage={ADMIN_COPY.airdrops.empty}
-      searchPlaceholder="Filter…"
+      searchPlaceholder="Filter campaigns…"
       searchQuery={searchQuery}
       onSearchQueryChange={onSearchQueryChange}
       searchFilter={(row, q) => {
-        const hay = [
-          row.onChainId,
-          row.title,
-          row.linkedSymbol,
-          row.sweepStatus,
-        ]
+        const hay = [row.onChainId, row.title, row.linkedSymbol, row.sweepStatus]
           .filter(Boolean)
           .join(" ")
           .toLowerCase();

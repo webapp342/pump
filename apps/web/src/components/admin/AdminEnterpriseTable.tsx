@@ -12,9 +12,12 @@ export type AdminTableColumn<T> = {
   header: string;
   align?: "left" | "right" | "center";
   width?: string;
+  minWidth?: string;
   sortable?: boolean;
   sortValue?: (row: T) => string | number;
   cell: (row: T) => ReactNode;
+  /** Extra class on th/td (e.g. admin-table-col--action) */
+  className?: string;
 };
 
 type AdminEnterpriseTableProps<T> = {
@@ -140,17 +143,22 @@ export function AdminEnterpriseTable<T>({
         <table className={`admin-ent-grid${zebra ? " admin-ent-grid--zebra" : ""}`}>
           <thead>
             <tr>
-              {columns.map((col) => (
+              {columns.map((col) => {
+                const alignClass =
+                  col.align === "right"
+                    ? "admin-ent-align-right"
+                    : col.align === "center"
+                      ? "admin-ent-align-center"
+                      : undefined;
+                const thClass = [alignClass, col.className].filter(Boolean).join(" ") || undefined;
+                return (
                 <th
                   key={col.id}
-                  className={
-                    col.align === "right"
-                      ? "admin-ent-align-right"
-                      : col.align === "center"
-                        ? "admin-ent-align-center"
-                        : undefined
-                  }
-                  style={col.width ? { width: col.width } : undefined}
+                  className={thClass}
+                  style={{
+                    ...(col.width ? { width: col.width } : {}),
+                    ...(col.minWidth ? { minWidth: col.minWidth } : {}),
+                  }}
                 >
                   {col.sortable ? (
                     <button
@@ -173,7 +181,8 @@ export function AdminEnterpriseTable<T>({
                     col.header
                   )}
                 </th>
-              ))}
+                );
+              })}
             </tr>
           </thead>
           <tbody>
@@ -192,20 +201,20 @@ export function AdminEnterpriseTable<T>({
             ) : (
               pageRows.map((row) => (
                 <tr key={rowKey(row)}>
-                  {columns.map((col) => (
-                    <td
-                      key={col.id}
-                      className={
-                        col.align === "right"
-                          ? "admin-ent-align-right admin-num"
-                          : col.align === "center"
-                            ? "admin-ent-align-center"
-                            : undefined
-                      }
-                    >
+                  {columns.map((col) => {
+                    const alignClass =
+                      col.align === "right"
+                        ? "admin-ent-align-right admin-num"
+                        : col.align === "center"
+                          ? "admin-ent-align-center"
+                          : undefined;
+                    const tdClass = [alignClass, col.className].filter(Boolean).join(" ") || undefined;
+                    return (
+                    <td key={col.id} className={tdClass}>
                       {col.cell(row)}
                     </td>
-                  ))}
+                    );
+                  })}
                 </tr>
               ))
             )}

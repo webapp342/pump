@@ -3033,3 +3033,625 @@
     display: none;
   }
 }
+
+/* ── Corporate density v2 (content surfaces — not just sidebar) ── */
+
+.admin-enterprise {
+  --admin-ent-gap: 1rem;
+  --admin-ent-pad-x: 1.75rem;
+  --admin-sidebar-w: 17rem;
+  --admin-surface-elev: rgb(var(--pump-card));
+  --admin-surface-border: rgb(var(--pump-border) / 0.42);
+}
+
+.admin-layout--enterprise {
+  background:
+    radial-gradient(1200px 480px at 70% -10%, rgb(var(--pump-accent) / 0.07), transparent 55%),
+    rgb(var(--pump-bg));
+}
+
+.admin-layout--enterprise .admin-sidebar {
+  border-right-color: rgb(var(--pump-border) / 0.45);
+  background: linear-gradient(180deg, rgb(var(--pump-surface)) 0%, rgb(var(--pump-bg)) 100%);
+  box-shadow: 4px 0 24px rgb(0 0 0 / 0.18);
+}
+
+.admin-layout--enterprise .admin-main {
+  background: transparent;
+}
+
+.admin-layout--enterprise .admin-topbar {
+  padding: 1.15rem var(--admin-ent-pad-x) 1.25rem;
+  border-bottom-color: rgb(var(--pump-border) / 0.35);
+  background: rgb(var(--pump-surface) / 0.78);
+}
+
+.admin-layout--enterprise .admin-topbar-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.2;
+}
+
+.admin-layout--enterprise .admin-topbar-desc {
+  margin-top: 0.35rem;
+  max-width: 44rem;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+}
+
+.admin-layout--enterprise .admin-content {
+  padding: 1.5rem var(--admin-ent-pad-x) 2.75rem;
+}
+
+.admin-content-inner {
+  gap: 1.25rem;
+  max-width: 96rem;
+}
+
+.admin-layout--enterprise .admin-panel {
+  gap: 1.25rem;
+}
+
+.admin-layout--enterprise .admin-card {
+  border: 1px solid var(--admin-surface-border);
+  border-radius: 12px;
+  background: var(--admin-surface-elev);
+  box-shadow:
+    0 1px 0 rgb(255 255 255 / 0.04) inset,
+    0 10px 28px rgb(0 0 0 / 0.22);
+}
+
+.admin-layout--enterprise .admin-card-head {
+  padding: 1rem 1.15rem;
+  border-bottom: 1px solid rgb(var(--pump-border) / 0.28);
+  background: linear-gradient(180deg, rgb(var(--pump-bg) / 0.55), rgb(var(--pump-bg) / 0.2));
+}
+
+.admin-layout--enterprise .admin-card-title {
+  font-size: 0.9375rem;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+}
+
+.admin-layout--enterprise .admin-section-desc {
+  margin-top: 0.3rem;
+  max-width: 48rem;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+}
+
+.admin-layout--enterprise .admin-card-body--padded {
+  padding: 1.15rem 1.15rem 1.25rem;
+}
+
+.admin-card-inset {
+  padding: 1rem 1.15rem;
+}
+
+/* KPI strip — readable corporate metrics */
+.admin-layout--enterprise .admin-kpi-grid {
+  gap: 0.875rem;
+}
+
+.admin-layout--enterprise .admin-kpi-card,
+.admin-kpi-card--compact {
+  gap: 0.4rem;
+  min-height: 6.75rem;
+  padding: 1rem 1.1rem 1.05rem;
+  border: 1px solid var(--admin-surface-border);
+  border-top: 2px solid rgb(var(--pump-accent) / 0.85);
+  border-radius: 12px;
+  background: var(--admin-surface-elev);
+  box-shadow: 0 8px 22px rgb(0 0 0 / 0.18);
+  transform: none;
+}
+
+.admin-layout--enterprise .admin-kpi-card:hover,
+.admin-kpi-card--compact:hover {
+  transform: translateY(-1px);
+  border-color: rgb(var(--pump-border) / 0.55);
+  box-shadow: 0 12px 28px rgb(0 0 0 / 0.28);
+}
+
+.admin-layout--enterprise .admin-kpi-label,
+.admin-kpi-card--compact .admin-kpi-label {
+  margin: 0;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgb(var(--pump-muted));
+}
+
+.admin-layout--enterprise .admin-kpi-value,
+.admin-kpi-card--compact .admin-kpi-value {
+  margin: 0;
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 1.375rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+  font-variant-numeric: tabular-nums;
+}
+
+.admin-layout--enterprise .admin-kpi-trend,
+.admin-kpi-trend {
+  margin: 0.15rem 0 0;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  color: rgb(var(--pump-muted));
+}
+
+@media (max-width: 1280px) {
+  .admin-layout--enterprise .admin-kpi-grid--6 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .admin-layout--enterprise .admin-kpi-grid--6,
+  .admin-layout--enterprise .admin-kpi-grid--5,
+  .admin-layout--enterprise .admin-kpi-grid--4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Tables — clearer rows & hierarchy */
+.admin-layout--enterprise .admin-grid th,
+.admin-layout--enterprise .admin-grid td,
+.admin-enterprise .admin-page .admin-grid th,
+.admin-enterprise .admin-page .admin-grid td {
+  padding: 0.85rem 1.1rem;
+}
+
+.admin-layout--enterprise .admin-grid thead th,
+.admin-layout--enterprise .admin-grid th {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  background: rgb(var(--pump-bg) / 0.55);
+}
+
+.admin-layout--enterprise .admin-grid tbody tr:hover td,
+.admin-layout--enterprise .admin-grid tbody tr:hover th[scope="row"] {
+  background: rgb(var(--pump-accent) / 0.05);
+}
+
+.admin-layout--enterprise .admin-grid tbody th[scope="row"] {
+  width: 13rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: rgb(var(--pump-muted));
+}
+
+.admin-ent-table {
+  border: 1px solid var(--admin-surface-border);
+  border-radius: 12px;
+  background: var(--admin-surface-elev);
+  box-shadow: 0 10px 28px rgb(0 0 0 / 0.2);
+  overflow: hidden;
+}
+
+.admin-ent-table-head {
+  padding: 0.95rem 1.1rem !important;
+  border-bottom: 1px solid rgb(var(--pump-border) / 0.28);
+  background: linear-gradient(180deg, rgb(var(--pump-bg) / 0.55), rgb(var(--pump-bg) / 0.2));
+}
+
+/* Forms */
+.admin-form-grid--constrained {
+  max-width: 40rem;
+}
+
+.admin-form-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding-top: 0.25rem;
+}
+
+.admin-split-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.admin-layout--enterprise .admin-input,
+.admin-layout--enterprise .admin-btn {
+  min-height: 2.35rem;
+}
+
+.admin-layout--enterprise .admin-btn-sm {
+  min-height: 2rem;
+}
+
+.admin-layout--enterprise .admin-compact-form {
+  padding: 1.15rem !important;
+}
+
+/* Empty states — fill the card, stop looking abandoned */
+.admin-empty--panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  min-height: 12rem;
+  padding: 2rem 1.5rem;
+  text-align: center;
+}
+
+.admin-empty-icon {
+  display: grid;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 999px;
+  border: 1px solid rgb(var(--pump-border) / 0.4);
+  background: rgb(var(--pump-bg) / 0.65);
+}
+
+.admin-empty-icon span {
+  width: 0.65rem;
+  height: 0.65rem;
+  border-radius: 999px;
+  background: rgb(var(--pump-muted) / 0.55);
+}
+
+.admin-empty-copy {
+  margin: 0;
+  max-width: 28rem;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: rgb(var(--pump-muted));
+}
+
+/* Contract registry cards */
+.admin-registry-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+@media (min-width: 1100px) {
+  .admin-registry-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 700px) {
+  .admin-registry-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.admin-registry-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  min-height: 9.5rem;
+  padding: 1.1rem 1.15rem;
+  border: 1px solid var(--admin-surface-border);
+  border-radius: 12px;
+  background: var(--admin-surface-elev);
+  box-shadow: 0 10px 28px rgb(0 0 0 / 0.2);
+}
+
+.admin-registry-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.admin-registry-label {
+  margin: 0;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: rgb(var(--pump-text));
+}
+
+.admin-registry-badge {
+  flex-shrink: 0;
+  padding: 0.15rem 0.45rem;
+  border: 1px solid rgb(var(--pump-accent) / 0.35);
+  border-radius: 999px;
+  background: rgb(var(--pump-accent) / 0.1);
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgb(var(--pump-accent));
+}
+
+.admin-registry-short {
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.admin-registry-full {
+  margin: 0;
+  word-break: break-all;
+  font-size: 0.6875rem;
+  line-height: 1.45;
+  color: rgb(var(--pump-muted));
+}
+
+.admin-registry-footnote {
+  margin: 0.25rem 0 0;
+}
+
+/* Todos nest cleanly inside card */
+.admin-todos-shell {
+  background: transparent;
+}
+
+.admin-todos-shell-bar {
+  background: rgb(var(--pump-bg) / 0.35);
+  border-bottom-color: rgb(var(--pump-border) / 0.28);
+}
+
+/* Content grid breathing room */
+.admin-layout--enterprise .admin-content-grid--2 {
+  gap: 1rem;
+}
+
+.admin-layout--enterprise .admin-ent-grid {
+  gap: 1rem;
+}
+
+.admin-ent-sync-line {
+  padding: 0.15rem 0.15rem 0;
+  font-size: 0.75rem;
+}
+
+/* Withdraw segment looks admin-native */
+.admin-layout--enterprise .segment-control--compact {
+  display: inline-flex;
+  gap: 0.25rem;
+  padding: 0.2rem;
+  border: 1px solid rgb(var(--pump-border) / 0.35);
+  border-radius: 8px;
+  background: rgb(var(--pump-bg) / 0.55);
+}
+
+.admin-layout--enterprise .segment-control--compact .chip-button {
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: rgb(var(--pump-muted));
+}
+
+.admin-layout--enterprise .segment-control--compact .chip-button-active {
+  background: rgb(var(--pump-accent) / 0.16);
+  color: rgb(var(--pump-text));
+  font-weight: 650;
+}
+
+/* ── Table system polish ───────────────────────────────────── */
+
+.admin-table-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.admin-table-stack--end {
+  align-items: flex-end;
+  text-align: right;
+}
+
+.admin-table-stack-primary {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1.25;
+  color: rgb(var(--pump-text));
+  white-space: nowrap;
+}
+
+.admin-table-stack-meta {
+  font-size: 0.6875rem;
+  line-height: 1.3;
+  color: rgb(var(--pump-muted));
+  white-space: nowrap;
+}
+
+.admin-table-unit {
+  font-weight: 500;
+  color: rgb(var(--pump-muted));
+}
+
+.admin-table-truncate {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-table-strong {
+  font-weight: 600;
+  color: rgb(var(--pump-text));
+}
+
+.admin-table-datetime {
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.admin-table-col--action {
+  white-space: nowrap;
+}
+
+.admin-ent-table {
+  width: 100%;
+}
+
+.admin-ent-table-scroll {
+  overflow: auto;
+  max-height: min(70vh, 760px);
+}
+
+.admin-ent-grid {
+  width: 100%;
+  min-width: 52rem;
+  table-layout: auto;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 0.8125rem;
+  line-height: 1.35;
+}
+
+.admin-ent-grid thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  padding: 0.7rem 0.9rem;
+  border-bottom: 1px solid rgb(var(--pump-border) / 0.35);
+  background: rgb(var(--pump-surface) / 0.98);
+  backdrop-filter: blur(8px);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: rgb(var(--pump-muted));
+  text-align: left;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.admin-ent-grid tbody td {
+  padding: 0.75rem 0.9rem;
+  border-bottom: 1px solid rgb(var(--pump-border) / 0.16);
+  vertical-align: middle;
+}
+
+.admin-ent-grid tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.admin-ent-grid--zebra tbody tr:nth-child(even) td {
+  background: rgb(var(--pump-border) / 0.035);
+}
+
+.admin-ent-grid tbody tr:hover td {
+  background: rgb(var(--pump-accent) / 0.05);
+}
+
+.admin-ent-align-right {
+  text-align: right;
+}
+
+.admin-ent-align-right .admin-ent-sort-btn {
+  justify-content: flex-end;
+  width: 100%;
+}
+
+.admin-ent-align-center {
+  text-align: center;
+}
+
+.admin-ent-table .admin-status-badge {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.admin-ent-table-head {
+  align-items: center;
+  padding: 0.9rem 1.05rem !important;
+}
+
+.admin-ent-table-title {
+  font-size: 0.9375rem !important;
+  font-weight: 700 !important;
+}
+
+.admin-ent-table-foot {
+  padding: 0.7rem 1.05rem !important;
+}
+
+/* Nested enterprise table inside AdminBlock — remove double chrome */
+.admin-card-body > .admin-ent-table {
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+}
+
+.admin-card-body > .admin-ent-table .admin-ent-table-head {
+  display: none;
+}
+
+.admin-card-body > .admin-ent-table .admin-ent-table-foot {
+  border-top: 1px solid rgb(var(--pump-border) / 0.22);
+  background: rgb(var(--pump-bg) / 0.25);
+}
+
+/* Data grids (portfolio etc.) */
+.admin-grid--data {
+  width: 100%;
+  min-width: 36rem;
+  table-layout: fixed;
+}
+
+.admin-grid--data thead th {
+  padding: 0.7rem 1rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: rgb(var(--pump-muted));
+  background: rgb(var(--pump-bg) / 0.45);
+  border-bottom: 1px solid rgb(var(--pump-border) / 0.28);
+  white-space: nowrap;
+}
+
+.admin-grid--data tbody td {
+  padding: 0.8rem 1rem;
+  border-bottom: 1px solid rgb(var(--pump-border) / 0.16);
+  vertical-align: middle;
+}
+
+.admin-grid--data tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.admin-grid--data tbody tr:hover td {
+  background: rgb(var(--pump-accent) / 0.05);
+}
+
+/* KV settings tables — aligned label | value | action */
+.admin-grid--kv {
+  width: 100%;
+  table-layout: fixed;
+}
+
+.admin-grid--kv th[scope="row"] {
+  width: 12.5rem;
+  padding: 0.85rem 1.1rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: rgb(var(--pump-muted));
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.admin-grid--kv td {
+  padding: 0.85rem 1.1rem;
+  vertical-align: middle;
+}
+
+.admin-grid--kv td.admin-kv-action {
+  width: 3rem;
+  text-align: right;
+  padding-right: 0.85rem;
+}
+
+.admin-data-table-wrap {
+  overflow-x: auto;
+}

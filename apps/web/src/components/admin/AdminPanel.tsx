@@ -28,6 +28,7 @@ import {
 } from "@/lib/airdrop-board-format";
 import { AdminAirdropCreateFeeModal } from "@/components/admin/AdminAirdropCreateFeeModal";
 import { AdminAirdropSweepTable, type SweepRow } from "@/components/admin/AdminAirdropSweepTable";
+import { AdminEnterpriseTable } from "@/components/admin/AdminEnterpriseTable";
 import { AdminCreatorShareModal } from "@/components/admin/AdminCreatorShareModal";
 import { AdminReferrerShareModal } from "@/components/admin/AdminReferrerShareModal";
 import { AdminMemeCreateFeeModal } from "@/components/admin/AdminMemeCreateFeeModal";
@@ -48,7 +49,6 @@ import {
   AdminDataTable,
   AdminEmptyState,
   AdminField,
-  AdminGridTable,
   AdminKpiCard,
   AdminKpiGrid,
   AdminKpiSkeleton,
@@ -1339,7 +1339,7 @@ export function AdminPanel() {
             </AdminBtn>
           }
         >
-          <div className="admin-form-grid">
+          <div className="admin-form-grid admin-form-grid--constrained">
             <AdminField label={ADMIN_COPY.promo.create.titleField}>
               <input
                 type="text"
@@ -1379,7 +1379,7 @@ export function AdminPanel() {
                 />
               </AdminField>
             </div>
-            <div>
+            <div className="admin-form-actions">
               <AdminBtn
                 primary
                 onClick={() => void onCreatePromoTask()}
@@ -1398,98 +1398,143 @@ export function AdminPanel() {
           description={ADMIN_COPY.promo.list.description}
         >
           {promoLoading ? (
-            <p className="admin-empty">{ADMIN_COPY.empty.loading}</p>
+            <div className="admin-empty admin-empty--panel">
+              <p className="admin-empty-copy">{ADMIN_COPY.empty.loading}</p>
+            </div>
           ) : promoTasks.length === 0 ? (
             <AdminEmptyState title={ADMIN_COPY.promo.list.empty} />
           ) : (
-            <AdminGridTable>
-              <thead>
-                <tr>
-                  <th>Title</th>
-                  <th>Description</th>
-                  <th>URL</th>
-                  <th>Points</th>
-                  <th>Completions</th>
-                  <th>Active</th>
-                  <th>Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {promoTasks.map((task) => (
-                  <tr key={task.taskKey}>
-                    <td>{task.title}</td>
-                    <td>{task.description ?? "—"}</td>
-                    <td>
-                      <a
-                        href={task.targetUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="admin-link"
-                      >
-                        {task.targetUrl}
-                      </a>
-                    </td>
-                    <td className="admin-num">{task.rewardPoints}</td>
-                    <td className="admin-num">{task.completionCount}</td>
-                    <td>
-                      <AdminStatusBadge tone={task.isActive ? "ok" : "neutral"}>
-                        {task.isActive ? "Active" : "Inactive"}
-                      </AdminStatusBadge>
-                    </td>
-                    <td>
-                      <AdminBtn
-                        size="sm"
-                        onClick={() => void onDeletePromoTask(task.taskKey, task.title)}
-                        disabled={deletingKey === task.taskKey}
-                      >
-                        {deletingKey === task.taskKey
-                          ? ADMIN_COPY.actions.refreshing
-                          : ADMIN_COPY.actions.delete}
-                      </AdminBtn>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </AdminGridTable>
+            <AdminEnterpriseTable
+              rows={promoTasks}
+              rowKey={(t) => t.taskKey}
+              emptyMessage={ADMIN_COPY.promo.list.empty}
+              columns={[
+                {
+                  id: "title",
+                  header: "Title",
+                  minWidth: "10rem",
+                  cell: (t) => <span className="admin-table-truncate admin-table-strong">{t.title}</span>,
+                },
+                {
+                  id: "description",
+                  header: "Description",
+                  minWidth: "12rem",
+                  cell: (t) => (
+                    <span className="admin-table-truncate admin-meta">{t.description ?? "—"}</span>
+                  ),
+                },
+                {
+                  id: "url",
+                  header: "URL",
+                  minWidth: "10rem",
+                  cell: (t) => (
+                    <a
+                      href={t.targetUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="admin-link admin-table-truncate"
+                      title={t.targetUrl}
+                    >
+                      {t.targetUrl.replace(/^https?:\/\//, "")}
+                    </a>
+                  ),
+                },
+                {
+                  id: "points",
+                  header: "Points",
+                  align: "right",
+                  width: "5.5rem",
+                  cell: (t) => t.rewardPoints,
+                },
+                {
+                  id: "completions",
+                  header: "Completions",
+                  align: "right",
+                  width: "6.5rem",
+                  cell: (t) => t.completionCount,
+                },
+                {
+                  id: "active",
+                  header: "Active",
+                  width: "6.5rem",
+                  cell: (t) => (
+                    <AdminStatusBadge tone={t.isActive ? "ok" : "neutral"}>
+                      {t.isActive ? "Active" : "Inactive"}
+                    </AdminStatusBadge>
+                  ),
+                },
+                {
+                  id: "action",
+                  header: "Action",
+                  align: "right",
+                  width: "6.5rem",
+                  className: "admin-table-col--action",
+                  cell: (t) => (
+                    <AdminBtn
+                      size="sm"
+                      onClick={() => void onDeletePromoTask(t.taskKey, t.title)}
+                      disabled={deletingKey === t.taskKey}
+                    >
+                      {deletingKey === t.taskKey
+                        ? ADMIN_COPY.actions.refreshing
+                        : ADMIN_COPY.actions.delete}
+                    </AdminBtn>
+                  ),
+                },
+              ]}
+            />
           )}
         </AdminBlock>
       </AdminTabPanel>
 
       <AdminTabPanel id="contracts" active={activeTab}>
-        <AdminBlock
-          title={ADMIN_COPY.contracts.tableTitle}
-          description={ADMIN_COPY.contracts.tableDescription}
-        >
-          <AdminDataTable>
-            {[
-              [ADMIN_COPY.contracts.labels.memeFactory, protocol?.memeFactory.address ?? contracts.memeFactory],
+        <div className="admin-registry-grid">
+          {(
+            [
+              [
+                ADMIN_COPY.contracts.labels.memeFactory,
+                protocol?.memeFactory.address ?? contracts.memeFactory,
+              ],
               [
                 ADMIN_COPY.contracts.labels.bonding,
                 protocol?.bondingCurveManager.address ?? contracts.bondingCurveManager,
               ],
               [
                 ADMIN_COPY.contracts.labels.airdrop,
-                protocol?.airdropManager?.address ?? contracts.airdropManager ?? "—",
+                protocol?.airdropManager?.address ?? contracts.airdropManager ?? null,
               ],
-              [ADMIN_COPY.contracts.labels.treasury, protocol?.treasury.address ?? treasuryContract ?? "—"],
-            ].map(([label, addr]) => (
-              <AdminDataRow key={label} label={String(label)}>
-                {addr && addr !== "—" ? (
+              [
+                ADMIN_COPY.contracts.labels.treasury,
+                protocol?.treasury.address ?? treasuryContract ?? null,
+              ],
+            ] as const
+          ).map(([label, addr]) => (
+            <article key={label} className="admin-registry-card">
+              <div className="admin-registry-card-head">
+                <p className="admin-registry-label">{label}</p>
+                <span className="admin-registry-badge">UUPS</span>
+              </div>
+              {addr ? (
+                <>
                   <a
-                    href={explorerAddressUrl(String(addr))}
+                    href={explorerAddressUrl(addr)}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="admin-link admin-num"
+                    className="admin-registry-short admin-link admin-num"
                   >
-                    {shortAddress(String(addr))}
+                    {shortAddress(addr)}
                   </a>
-                ) : (
-                  "—"
-                )}
-              </AdminDataRow>
-            ))}
-          </AdminDataTable>
-        </AdminBlock>
+                  <p className="admin-registry-full admin-num">{addr}</p>
+                </>
+              ) : (
+                <p className="admin-meta">Not configured</p>
+              )}
+            </article>
+          ))}
+        </div>
+        <p className="admin-section-desc admin-registry-footnote">
+          {ADMIN_COPY.contracts.tableDescription}
+        </p>
       </AdminTabPanel>
 
       <AdminTabPanel id="environment" active={activeTab}>
