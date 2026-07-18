@@ -26,12 +26,51 @@ sudo -u postgres psql -d pump_db -f db/refresh/backfill_stats_rollups.sql
 | `GET /api/kol-market/stats?address=` | User rollup stats only |
 | `GET /api/referrals/stats?address=` | Referral stats (rollup-first) |
 
-## Phase C1 — Contracts (partial)
+## Phase C1 — Contracts
 
-- `contracts/src/KolMarketEscrow.sol` — sponsor `lock`, relayer `release`, sponsor `refund`
-- `BondingCurveManager.sol` — `verifiedKol`, `verifiedReferrerShareBps` (25% default)
+### KolMarketEscrow (deployed Base Sepolia)
 
-**Remaining:** deploy escrow, set env, regen ABIs, contract tests, on-chain `setVerifiedKol` job.
+- Address: `0x7233D1a93a13772De23068070fb0b88614715915`
+- Owner / relayer: `0x11Ea71d1BEb04Aece4d06a585D9dbc6F58836880`
+- JSON: `contracts/deployments/base-sepolia-kol-escrow.json`
+
+```env
+NEXT_PUBLIC_KOL_MARKET_ESCROW=0x7233D1a93a13772De23068070fb0b88614715915
+KOL_ESCROW_RELAYER_PRIVATE_KEY=0x…   # owner private key
+```
+
+### BondingCurveManager — verified KOL fee (storage-safe upgrade)
+
+New vars are **appended after `emergencyHalt`** (not inserted mid-layout). `__gap` reduced 39 → 37.
+
+```bash
+cd contracts
+
+export RPC_URL="https://base-sepolia.g.alchemy.com/v2/YOUR_KEY"
+export DEPLOYER_PRIVATE_KEY="0x..."   # must be LAUNCHPAD_OWNER
+export PROXY_ADDRESS="0x0f8b0052F7750e6d481DBb447FD4b7b45ac3b615"
+
+forge script script/UpgradeCore.s.sol:UpgradeBondingCurve \
+  --rpc-url "$RPC_URL" \
+  --broadcast \
+  -vvv
+```
+
+Post-upgrade (initialize does not re-run on existing proxy):
+
+```bash
+cast send "$PROXY_ADDRESS" "setVerifiedReferrerShareBps(uint256)" 2500 \
+  --rpc-url "$RPC_URL" --private-key "$DEPLOYER_PRIVATE_KEY"
+
+cast call "$PROXY_ADDRESS" "verifiedReferrerShareBps()(uint256)" --rpc-url "$RPC_URL"
+# expect 2500
+
+# Per KOL (when DB tier = verified):
+cast send "$PROXY_ADDRESS" "setVerifiedKol(address,bool)" 0xKOL_ADDRESS true \
+  --rpc-url "$RPC_URL" --private-key "$DEPLOYER_PRIVATE_KEY"
+```
+
+**Remaining:** deploy escrow ✅ · BCM upgrade (run above) · web env · ABI sync optional.
 
 ## Phase C2 — Sponsored callout flow (done in code)
 

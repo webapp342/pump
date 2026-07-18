@@ -120,6 +120,35 @@ contract LaunchpadUnitTest is Test {
         assertEq(referrer.balance, referrerBalanceBefore + claimed);
     }
 
+    function testVerifiedKolUsesHigherReferrerShare() public {
+        vm.prank(creator);
+        address token = factory.createMeme("Verified Ref", "VREF", "ipfs://v-ref", 0);
+
+        // Standard referrer fee on 1 ETH buy (1% protocol fee → 0.01 ETH fee pool).
+        vm.prank(trader);
+        bonding.setReferrer(referrer);
+        vm.prank(trader);
+        bonding.buy{value: 1 ether}(token, 1);
+        uint256 standardRefFee = bonding.pendingReferrerFees(referrer);
+
+        address verifiedRef = address(0xBEEF);
+        address trader2 = address(0xCAFE);
+        vm.deal(trader2, 10 ether);
+
+        vm.prank(owner);
+        bonding.setVerifiedKol(verifiedRef, true);
+        assertEq(bonding.verifiedReferrerShareBps(), 2_500);
+
+        vm.prank(trader2);
+        bonding.setReferrer(verifiedRef);
+        vm.prank(trader2);
+        bonding.buy{value: 1 ether}(token, 1);
+        uint256 verifiedRefFee = bonding.pendingReferrerFees(verifiedRef);
+
+        // 2500 bps vs 500 bps → verified earns 5x standard (same fee pool size).
+        assertEq(verifiedRefFee, standardRefFee * 5);
+    }
+
     function testSetReferrerDuplicateRevert() public {
         vm.prank(trader);
         bonding.setReferrer(referrer);

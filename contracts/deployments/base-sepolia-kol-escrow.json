@@ -1,0 +1,10 @@
+{
+  "chainId": 84532,
+  "rpcUrl": "https://sepolia.base.org",
+  "abiVersion": "kol-market-escrow-v1",
+  "proxyPattern": "none",
+  "owner": "0x11Ea71d1BEb04Aece4d06a585D9dbc6F58836880",
+  "deployer": "0x11Ea71d1BEb04Aece4d06a585D9dbc6F58836880",
+  "kolMarketEscrow": "0x7233D1a93a13772De23068070fb0b88614715915",
+  "deployTx": "0x955f086865c3c9b9055adce08bf2325b21c7844162687a79aeea0380a2db1518"
+}

@@ -45,8 +45,6 @@ contract BondingCurveManager is Initializable, UUPSUpgradeable, OwnableUpgradeab
     uint256 public protocolFeeBps;
     uint256 public creatorFeeShareBps;
     uint256 public referrerShareBps;
-    uint256 public verifiedReferrerShareBps;
-    mapping(address => bool) public verifiedKol;
     uint256 public constant BPS = 10_000;
     uint256 public constant MAX_SELL_BATCH = 10;
     uint256 internal constant PERMIT_ALLOWANCE_MAX = type(uint256).max;
@@ -57,6 +55,10 @@ contract BondingCurveManager is Initializable, UUPSUpgradeable, OwnableUpgradeab
     mapping(address => address) public traderReferrer;
     mapping(address => bool) public hasTraded;
     bool public emergencyHalt;
+
+    /// @dev Appended for UUPS-safe upgrade (do not insert above existing slots).
+    uint256 public verifiedReferrerShareBps;
+    mapping(address => bool) public verifiedKol;
 
     event TokenRegistered(
         address indexed token,
@@ -487,5 +489,6 @@ contract BondingCurveManager is Initializable, UUPSUpgradeable, OwnableUpgradeab
         emit FeeSplit(token, creator, trader, creatorFee, referrerFee, treasuryFee);
     }
 
-    uint256[39] private __gap;
+    /// @dev Was 39; reduced by 2 for verifiedReferrerShareBps + verifiedKol.
+    uint256[37] private __gap;
 }
