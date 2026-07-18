@@ -18,6 +18,7 @@ const SCROLL_CONTAINER_SELECTOR = [
   ".missions-body:not(:has(.missions-list))",
   ".points-hub-panel",
   ".points-hub__body",
+  ".kol-market-hub",
   ".portfolio-holdings-mobile__body",
   ".portfolio-tab-scroll",
   ".portfolio-fees-tab",

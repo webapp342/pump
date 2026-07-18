@@ -215,6 +215,28 @@ export async function upsertKolProfile(input: {
   );
 }
 
+/** Sponsored callouts are only for tokens the sponsor launched. */
+export async function assertSponsorOwnsToken(
+  sponsorAddress: string,
+  tokenAddress: string
+): Promise<void> {
+  const db = getLaunchpadReadPool();
+  const result = await db.query(
+    `
+    SELECT 1
+    FROM tokens
+    WHERE address = $1
+      AND creator_address = $2
+      AND is_hidden = false
+    LIMIT 1
+    `,
+    [tokenAddress.toLowerCase(), sponsorAddress.toLowerCase()]
+  );
+  if (!result.rows[0]) {
+    throw new Error("You can only request callouts for tokens you launched");
+  }
+}
+
 export async function getKolUserStats(address: string): Promise<KolUserStats> {
   const db = getLaunchpadReadPool();
   const normalized = address.toLowerCase();

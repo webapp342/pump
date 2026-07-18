@@ -3,6 +3,7 @@ import {
   faAirdropParachute,
   faBaseWallet,
   faHurricane,
+  faPlanet,
   faTokenLaunchRocket,
 } from "@/lib/pump-icons";
 
@@ -16,6 +17,7 @@ export type AppNavItem = {
 export const APP_NAV_ITEMS: AppNavItem[] = [
   { href: "/arena", label: "Arena", icon: faTokenLaunchRocket },
   { href: "/airdrops", label: "Airdrops", icon: faAirdropParachute },
+  { href: "/kol-market", label: "KOL", icon: faPlanet },
   { href: "/missions", label: "Rewards", icon: faHurricane },
   { href: "/portfolio", label: "Portfolio", icon: faBaseWallet },
 ];
@@ -26,6 +28,7 @@ export const BOTTOM_NAV_CENTER_HREF = "/airdrops";
 export const APP_BOTTOM_TAB_ITEMS: AppNavItem[] = [
   { href: "/arena", label: "Arena", icon: faTokenLaunchRocket },
   { href: BOTTOM_NAV_CENTER_HREF, label: "Airdrops", icon: faAirdropParachute },
+  { href: "/kol-market", label: "KOL Market", icon: faPlanet },
   { href: "/missions", label: "Rewards", icon: faHurricane },
   { href: "/portfolio", label: "Portfolio", icon: faBaseWallet },
 ];

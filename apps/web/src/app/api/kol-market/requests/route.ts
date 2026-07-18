@@ -5,12 +5,14 @@ import { ensureDynamicRoute, searchParam } from "@/lib/api/route-dynamic";
 import { fetchNativeUsdPrice } from "@/lib/native-usd-price";
 import { usdToNativeHuman } from "@/lib/kol-market-escrow";
 import {
+  assertSponsorOwnsToken,
   confirmKolCalloutRequestEscrow,
   createKolCalloutRequest,
   createKolCalloutRequestDraft,
   getKolProfileDetail,
   listKolRequestsForKol,
 } from "@/lib/db/kol-market";
+import { KOL_MARKET_COPY } from "@/lib/kol-market-copy";
 
 /** GET /api/kol-market/requests?address=&status= */
 export async function GET(request: NextRequest) {
@@ -63,6 +65,14 @@ export async function POST(request: NextRequest) {
 
     if (sponsorAddress === kolAddress) {
       return NextResponse.json({ error: "Cannot sponsor yourself" }, { status: 400 });
+    }
+
+    try {
+      await assertSponsorOwnsToken(sponsorAddress, tokenAddress);
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : KOL_MARKET_COPY.notTokenCreatorError;
+      return NextResponse.json({ error: message }, { status: 403 });
     }
 
     const kolProfile = await getKolProfileDetail(kolAddress);

@@ -7,6 +7,7 @@ import { parseEther } from "viem";
 import { UserAvatarForAddress } from "@/components/user/UserAvatarForAddress";
 import { UserDisplayName } from "@/components/user/UserDisplayName";
 import { ModalPortal } from "@/components/ui/ModalPortal";
+import { KolSponsorTokenSelect } from "@/components/kol-market/KolSponsorTokenSelect";
 import { contracts, NATIVE_SYMBOL } from "@/config/chain";
 import { formatUsdReadable } from "@/lib/format-usd";
 import { kolMarketEscrowAbi } from "@/lib/abis/kol-market-escrow";
@@ -22,6 +23,7 @@ import type {
 } from "@/lib/db/kol-market";
 import { PumpIcon, faCheck } from "@/lib/icons";
 import { usePumpWallet } from "@/components/wallet/PumpWalletProvider";
+import { HubDiscoveryScrollLock } from "@/components/layout/HubDiscoveryScrollLock";
 
 function formatPct(value: number): string {
   if (!Number.isFinite(value) || value <= 0) return "—";
@@ -266,6 +268,7 @@ export function KolMarketPanel() {
   if (!isConnected || !address) {
     return (
       <div className="kol-market-page">
+        <HubDiscoveryScrollLock />
         <header className="kol-market-page__header">
           <p className="page-kicker">{KOL_MARKET_COPY.pageKicker}</p>
           <h1 className="page-title">{KOL_MARKET_COPY.pageTitle}</h1>
@@ -284,32 +287,55 @@ export function KolMarketPanel() {
 
   return (
     <div className="kol-market-page">
+      <HubDiscoveryScrollLock />
       <header className="kol-market-page__header">
         <p className="page-kicker">{KOL_MARKET_COPY.pageKicker}</p>
         <h1 className="page-title">{KOL_MARKET_COPY.pageTitle}</h1>
         <p className="text-body-sm text-pump-muted">{KOL_MARKET_COPY.pageDescription}</p>
       </header>
 
+      <div className="kol-market-hub">
       {valueProps}
 
-      <nav className="sheet-tabs kol-market-tabs" aria-label="KOL market sections">
-        {(
-          [
-            ["explore", KOL_MARKET_COPY.exploreTab],
-            ["inbox", `${KOL_MARKET_COPY.inboxTab}${inboxCount ? ` (${inboxCount})` : ""}`],
-            ["settings", KOL_MARKET_COPY.settingsTab],
-          ] as const
-        ).map(([id, label]) => (
-          <button
-            key={id}
-            type="button"
-            className={`sheet-tabs__item${tab === id ? " sheet-tabs__item--active" : ""}`}
-            onClick={() => setTab(id)}
-          >
-            {label}
-          </button>
-        ))}
-      </nav>
+      <div className="kol-market-tabs">
+        <nav className="kol-market-tabs__nav" aria-label="KOL market sections">
+          <div className="kol-market-tabs__track" role="tablist">
+            {(
+              [
+                { id: "explore" as const, label: KOL_MARKET_COPY.exploreTab },
+                {
+                  id: "inbox" as const,
+                  label: KOL_MARKET_COPY.inboxTab,
+                  count: inboxCount,
+                },
+                { id: "settings" as const, label: KOL_MARKET_COPY.settingsTab },
+              ] as const
+            ).map(({ id, label, ...rest }) => {
+              const isActive = tab === id;
+              const count = "count" in rest ? rest.count : undefined;
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  role="tab"
+                  aria-selected={isActive}
+                  className={
+                    isActive
+                      ? "kol-market-tabs__item kol-market-tabs__item--active"
+                      : "kol-market-tabs__item"
+                  }
+                  onClick={() => setTab(id)}
+                >
+                  {label}
+                  {typeof count === "number" && count > 0 ? (
+                    <span className="kol-market-tabs__count">{count}</span>
+                  ) : null}
+                </button>
+              );
+            })}
+          </div>
+        </nav>
+      </div>
 
       {error ? <div className="notice-error">{error}</div> : null}
 
@@ -325,69 +351,73 @@ export function KolMarketPanel() {
             {kols.map((kol) => (
               <li key={kol.address} className="panel-surface kol-market-card">
                 <div className="kol-market-card__head">
-                  <UserAvatarForAddress address={kol.address} size="lg" />
-                  <div className="kol-market-card__identity">
-                    <UserDisplayName address={kol.address} />
-                    <span
-                      className={`kol-market-card__tier${
-                        kol.kolTier === "verified" ? " kol-market-card__tier--verified" : ""
-                      }`}
-                    >
-                      {kol.kolTier === "verified"
-                        ? KOL_MARKET_COPY.verifiedBadge
-                        : KOL_MARKET_COPY.standardBadge}
-                    </span>
+                  <div className="kol-market-card__identity-row">
+                    <UserAvatarForAddress address={kol.address} size="lg" />
+                    <div className="kol-market-card__identity">
+                      <UserDisplayName address={kol.address} />
+                      <span
+                        className={`kol-market-card__tier${
+                          kol.kolTier === "verified" ? " kol-market-card__tier--verified" : ""
+                        }`}
+                      >
+                        {kol.kolTier === "verified"
+                          ? KOL_MARKET_COPY.verifiedBadge
+                          : KOL_MARKET_COPY.standardBadge}
+                      </span>
+                    </div>
                   </div>
                   <button
                     type="button"
                     className="secondary-button kol-market-card__cta"
-                    onClick={() =>
+                    onClick={() => {
+                      setTokenAddress("");
+                      setRequestError(null);
                       setSponsorTarget({
                         address: kol.address,
                         displayUsername: kol.displayUsername,
                         minPriceUsd: kol.minPriceUsd,
-                      })
-                    }
+                      });
+                    }}
                   >
                     {KOL_MARKET_COPY.requestCta}
                   </button>
                 </div>
                 <dl className="kol-market-card__stats">
-                  <div>
+                  <div className="kol-market-card__stat">
                     <dt>{KOL_MARKET_COPY.minPriceLabel}</dt>
                     <dd className="financial-value">
                       {formatUsdReadable(kol.minPriceUsd, { compact: true })}
                     </dd>
                   </div>
-                  <div>
+                  <div className="kol-market-card__stat">
                     <dt>{KOL_MARKET_COPY.followersLabel}</dt>
                     <dd className="financial-value">{kol.followerCount.toLocaleString()}</dd>
                   </div>
-                  <div>
+                  <div className="kol-market-card__stat">
                     <dt>{KOL_MARKET_COPY.medianXLabel}</dt>
                     <dd className="financial-value">
                       {formatMultiplierX(kol.medianCalloutMultiplier)}
                     </dd>
                   </div>
-                  <div>
+                  <div className="kol-market-card__stat">
                     <dt>{KOL_MARKET_COPY.hitRateLabel}</dt>
                     <dd className="financial-value">{formatPct(kol.calloutHitRate)}</dd>
                   </div>
-                  <div>
+                  <div className="kol-market-card__stat">
                     <dt>{KOL_MARKET_COPY.networkVolLabel}</dt>
                     <dd className="financial-value">
                       {kol.networkVolumeBnb.toFixed(2)} {NATIVE_SYMBOL}
                     </dd>
                   </div>
-                  <div>
+                  <div className="kol-market-card__stat">
                     <dt>{KOL_MARKET_COPY.repeatRateLabel}</dt>
                     <dd className="financial-value">{formatPct(kol.repeatTraderRate)}</dd>
                   </div>
-                  <div>
+                  <div className="kol-market-card__stat">
                     <dt>{KOL_MARKET_COPY.avgHoldLabel}</dt>
                     <dd className="financial-value">{formatHold(kol.avgHoldSeconds)}</dd>
                   </div>
-                  <div>
+                  <div className="kol-market-card__stat">
                     <dt>{KOL_MARKET_COPY.acceptRateLabel}</dt>
                     <dd className="financial-value">{formatPct(kol.acceptRate)}</dd>
                   </div>
@@ -525,15 +555,11 @@ export function KolMarketPanel() {
               to <UserDisplayName address={sponsorTarget.address} compact /> — escrowed until they
               accept.
             </p>
-            <label className="field-label" htmlFor="sponsor-token">
-              {KOL_MARKET_COPY.tokenAddressLabel}
-            </label>
-            <input
-              id="sponsor-token"
-              className="field-input"
-              placeholder="0x…"
+            <KolSponsorTokenSelect
+              walletAddress={address}
               value={tokenAddress}
-              onChange={(e) => setTokenAddress(e.target.value)}
+              onChange={setTokenAddress}
+              disabled={txPending || requestBusy}
             />
             {requestError ? <p className="notice-error">{requestError}</p> : null}
             {!escrowConfigured ? (
@@ -565,6 +591,7 @@ export function KolMarketPanel() {
           </div>
         </ModalPortal>
       ) : null}
+      </div>
     </div>
   );
 }
