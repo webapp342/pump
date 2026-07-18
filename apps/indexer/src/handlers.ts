@@ -19,6 +19,11 @@ import {
   seedBoardStatsOnTokenCreated,
   upsertBoardStatsAfterTrade,
 } from "./board-stats.js";
+import {
+  applyTradeStatsRollups,
+  refreshReferrerNetworkOnBind,
+  seedBoardStatsLaunchMcap,
+} from "./stats-rollups.js";
 import { upsertCandlesAfterTrade } from "./candles.js";
 import { fetchIndexerNativeUsdRate } from "./native-usd.js";
 import { invalidateArenaCaches } from "./redis-cache.js";
@@ -172,11 +177,13 @@ export class LaunchpadEventHandlers {
     });
 
     if (incrementalBoardStatsEnabled()) {
+      const launchMcap = startingMarketCapZug(virtualEthReserve);
       await seedBoardStatsOnTokenCreated(this.context.launchpadPool, {
         tokenAddress: token,
-        marketCapZug: startingMarketCapZug(virtualEthReserve),
+        marketCapZug: launchMcap,
         spotPriceZug: startingSpotPriceZug(virtualEthReserve),
       });
+      await seedBoardStatsLaunchMcap(this.context.launchpadPool, token, launchMcap);
     }
     // KOTH only after trades — create has no real price discovery yet.
   }
@@ -427,6 +434,30 @@ export class LaunchpadEventHandlers {
         tradeNetZug,
         blockTime,
         traderAddress: trader,
+      });
+
+      const newBalanceRow = await client.query<{ token_balance: string }>(
+        `
+          SELECT token_balance::text
+          FROM user_positions
+          WHERE token_address = $1 AND address = $2
+        `,
+        [token, trader]
+      );
+      const newBalance = Number(newBalanceRow.rows[0]?.token_balance ?? 0);
+      const tradeMcap = marketCapZugFromSpot(markPrice);
+
+      await applyTradeStatsRollups(client, {
+        traderAddress: trader,
+        tokenAddress: token,
+        isBuy,
+        zugAmount: weiToDecimal(zugAmount),
+        referrerFeeZug: weiToDecimal(feeSplit.referrerFee),
+        blockTime,
+        marketCapZug: tradeMcap,
+        launchMcapZug: null,
+        oldBalance,
+        newBalance,
       });
 
       const candleUpdates = await upsertCandlesAfterTrade(client, {
@@ -778,6 +809,8 @@ export class LaunchpadEventHandlers {
       `,
       [invitee, referrer, txHash.toLowerCase()]
     );
+
+    await refreshReferrerNetworkOnBind(this.context.launchpadPool, referrer);
   }
 
   private async handleReferrerFeeClaimed(log: ParsedLaunchpadLog): Promise<void> {

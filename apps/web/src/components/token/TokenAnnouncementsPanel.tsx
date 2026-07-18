@@ -91,10 +91,16 @@ export function TokenAnnouncementsPanel({
                   <span className="token-announcements-panel__name">
                     <UserDisplayName address={item.announcerAddress} compact />
                   </span>
-                  <CalloutHoldingsSnapshot
-                    balance={item.tokenBalanceAtAnnounce}
-                    balanceUsd={item.tokenBalanceUsdAtAnnounce}
-                  />
+                  {item.isSponsored ? (
+                    <span className="token-announcements-panel__sponsored text-caption text-pump-muted">
+                      Sponsored callout
+                    </span>
+                  ) : (
+                    <CalloutHoldingsSnapshot
+                      balance={item.tokenBalanceAtAnnounce}
+                      balanceUsd={item.tokenBalanceUsdAtAnnounce}
+                    />
+                  )}
                 </span>
               </>
             );

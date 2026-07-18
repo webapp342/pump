@@ -9,6 +9,7 @@ import {
 } from "@/lib/optimistic-activity";
 import { MissionsGuestPanel } from "@/components/missions/MissionsGuestPanel";
 import { ReferralInviteShareModal } from "@/components/missions/ReferralInviteShareModal";
+import { KolMarketPromoCard } from "@/components/kol-market/KolMarketPromoCard";
 import { MissionsPanelSkeleton } from "@/components/missions/MissionsPanelSkeleton";
 import { PointsHubBody } from "@/components/missions/PointsHubBody";
 import { PointsHubTabs } from "@/components/missions/PointsHubTabs";
@@ -327,6 +328,7 @@ export function MissionsPanel() {
                 level={level}
                 spendablePoints={data.totalPoints}
               />
+              <KolMarketPromoCard />
             </div>
           ) : null}
 

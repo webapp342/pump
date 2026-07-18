@@ -39,6 +39,8 @@ type AnnouncementDbRow = {
   multiplier_x: string;
   token_balance_at_announce: string | null;
   token_balance_usd_at_announce: string | null;
+  is_sponsored?: boolean | null;
+  sponsor_address?: string | null;
   created_at: Date;
 };
 
@@ -60,6 +62,8 @@ function mapAnnouncement(
     multiplierX: Number(row.multiplier_x),
     tokenBalanceAtAnnounce: parseOptionalNumber(row.token_balance_at_announce),
     tokenBalanceUsdAtAnnounce: parseOptionalNumber(row.token_balance_usd_at_announce),
+    isSponsored: Boolean(row.is_sponsored),
+    sponsorAddress: row.sponsor_address ?? null,
     createdAt: row.created_at.toISOString(),
   };
 }
@@ -216,6 +220,8 @@ const ANNOUNCEMENT_SELECT_COLS = `
   multiplier_x::text,
   token_balance_at_announce::text,
   token_balance_usd_at_announce::text,
+  is_sponsored,
+  sponsor_address,
   created_at
 `;
 
@@ -280,6 +286,8 @@ export async function listAnnouncementsByUser(
       a.multiplier_x::text,
       a.token_balance_at_announce::text,
       a.token_balance_usd_at_announce::text,
+      a.is_sponsored,
+      a.sponsor_address,
       a.created_at,
       t.symbol,
       t.name,

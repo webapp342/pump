@@ -86,6 +86,7 @@ export const contracts = {
   memeFactory: process.env.NEXT_PUBLIC_MEME_FACTORY as `0x${string}`,
   bondingCurveManager: process.env.NEXT_PUBLIC_BONDING_CURVE_MANAGER as `0x${string}`,
   airdropManager: process.env.NEXT_PUBLIC_AIRDROP_MANAGER as `0x${string}` | undefined,
+  kolMarketEscrow: process.env.NEXT_PUBLIC_KOL_MARKET_ESCROW as `0x${string}` | undefined,
 };
 
 export function shortAddress(address: string, compact = false): string {

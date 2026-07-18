@@ -19,6 +19,9 @@ export type TokenAnnouncementRow = {
   tokenBalanceAtAnnounce: number | null;
   /** USD value of that balance at announce time (null if FX missing / legacy). */
   tokenBalanceUsdAtAnnounce: number | null;
+  /** Paid sponsor path — no holdings snapshot shown. */
+  isSponsored?: boolean;
+  sponsorAddress?: string | null;
   createdAt: string;
 };
 

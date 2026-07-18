@@ -45,6 +45,8 @@ contract BondingCurveManager is Initializable, UUPSUpgradeable, OwnableUpgradeab
     uint256 public protocolFeeBps;
     uint256 public creatorFeeShareBps;
     uint256 public referrerShareBps;
+    uint256 public verifiedReferrerShareBps;
+    mapping(address => bool) public verifiedKol;
     uint256 public constant BPS = 10_000;
     uint256 public constant MAX_SELL_BATCH = 10;
     uint256 internal constant PERMIT_ALLOWANCE_MAX = type(uint256).max;
@@ -85,6 +87,8 @@ contract BondingCurveManager is Initializable, UUPSUpgradeable, OwnableUpgradeab
     event CreatorFeeClaimed(address indexed creator, uint256 amount);
     event ReferrerSet(address indexed trader, address indexed referrer);
     event ReferrerFeeClaimed(address indexed referrer, uint256 amount);
+    event VerifiedKolSet(address indexed kol, bool verified);
+    event VerifiedReferrerShareUpdated(uint256 shareBps);
     event EmergencyHaltSet(bool halted);
     event EmergencyEthSwept(address indexed to, uint256 amount);
 
@@ -123,6 +127,7 @@ contract BondingCurveManager is Initializable, UUPSUpgradeable, OwnableUpgradeab
         protocolFeeBps = 100;
         creatorFeeShareBps = 2_000;
         referrerShareBps = 500;
+        verifiedReferrerShareBps = 2_500;
     }
 
     function _authorizeUpgrade(address) internal override onlyOwner {}
@@ -151,6 +156,18 @@ contract BondingCurveManager is Initializable, UUPSUpgradeable, OwnableUpgradeab
     function setReferrerShareBps(uint256 shareBps) external onlyOwner {
         if (creatorFeeShareBps + shareBps > BPS) revert InvalidConfig();
         referrerShareBps = shareBps;
+    }
+
+    function setVerifiedReferrerShareBps(uint256 shareBps) external onlyOwner {
+        if (creatorFeeShareBps + shareBps > BPS) revert InvalidConfig();
+        verifiedReferrerShareBps = shareBps;
+        emit VerifiedReferrerShareUpdated(shareBps);
+    }
+
+    function setVerifiedKol(address kol, bool verified) external onlyOwner {
+        if (kol == address(0)) revert ZeroAddress();
+        verifiedKol[kol] = verified;
+        emit VerifiedKolSet(kol, verified);
     }
 
     function setReferrer(address referrer) external {
@@ -455,7 +472,10 @@ contract BondingCurveManager is Initializable, UUPSUpgradeable, OwnableUpgradeab
 
         uint256 creatorFee = (feeEth * creatorFeeShareBps) / BPS;
         address referrer = traderReferrer[trader];
-        uint256 referrerFee = referrer != address(0) ? (feeEth * referrerShareBps) / BPS : 0;
+        uint256 refShareBps = referrer != address(0) && verifiedKol[referrer]
+            ? verifiedReferrerShareBps
+            : referrerShareBps;
+        uint256 referrerFee = referrer != address(0) ? (feeEth * refShareBps) / BPS : 0;
         uint256 treasuryFee = feeEth - creatorFee - referrerFee;
 
         pendingCreatorFees[creator] += creatorFee;

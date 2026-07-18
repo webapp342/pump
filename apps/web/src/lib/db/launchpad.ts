@@ -1788,6 +1788,41 @@ export async function getReferralStats(address: string): Promise<ReferralStats> 
   const db = getLaunchpadReadPool();
   const normalized = address.toLowerCase();
 
+  const rollup = await db.query<{
+    qualified_invite_count: number;
+    network_volume_zug: string;
+    network_fee_earned_zug: string;
+  }>(
+    `
+    SELECT
+      qualified_invite_count,
+      network_volume_zug::text,
+      network_fee_earned_zug::text
+    FROM referrer_network_stats
+    WHERE referrer_address = $1
+    `,
+    [normalized]
+  );
+
+  const claimed = await db.query<{ claimed_bnb: string }>(
+    `
+      SELECT COALESCE(SUM(amount_bnb), 0)::text AS claimed_bnb
+      FROM referrer_fee_claims
+      WHERE referrer_address = $1
+    `,
+    [normalized]
+  );
+
+  const rollupRow = rollup.rows[0];
+  if (rollupRow) {
+    return {
+      inviteCount: rollupRow.qualified_invite_count,
+      referralVolumeBnb: Number(rollupRow.network_volume_zug ?? 0),
+      referralFeesEarnedBnb: Number(rollupRow.network_fee_earned_zug ?? 0),
+      claimedBnb: Number(claimed.rows[0]?.claimed_bnb ?? 0),
+    };
+  }
+
   const result = await db.query<{
     invite_count: string;
     referral_volume_bnb: string;
