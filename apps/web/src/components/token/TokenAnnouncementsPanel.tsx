@@ -2,14 +2,17 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { CalloutHoldingsSnapshot } from "@/components/token/CalloutHoldingsSnapshot";
 import { UserAvatarForAddress } from "@/components/user/UserAvatarForAddress";
 import { UserDisplayName } from "@/components/user/UserDisplayName";
-import type { TokenAnnouncementRow } from "@/lib/token-announcements-shared";
+import {
+  liveCalloutMultiplierX,
+  type TokenAnnouncementRow,
+} from "@/lib/token-announcements-shared";
 import { formatAge } from "@/lib/arena-board-format";
+import { bnbToUsd, formatUsdReadable } from "@/lib/format-usd";
 
-function formatMultiplierX(value: number): string {
-  if (!Number.isFinite(value) || value <= 0) return "—";
+function formatMultiplierX(value: number | null | undefined): string {
+  if (value == null || !Number.isFinite(value) || value <= 0) return "—";
   if (value >= 100) return `${value.toFixed(0)}x`;
   if (value >= 10) return `${value.toFixed(1)}x`;
   return `${value.toFixed(2)}x`;
@@ -21,6 +24,9 @@ type TokenAnnouncementsPanelProps = {
   onOpenProfile?: (address: string) => void;
   /** aside = desktop callout card; tape = Social / About feed (no nested panel). */
   variant?: "aside" | "tape";
+  /** Live token mcap (BNB/ETH units) — already on the page; no extra fetch. */
+  currentMarketCapBnb?: number | string | null;
+  bnbUsd?: number | null;
 };
 
 export function TokenAnnouncementsPanel({
@@ -28,6 +34,8 @@ export function TokenAnnouncementsPanel({
   refreshKey = 0,
   onOpenProfile,
   variant = "aside",
+  currentMarketCapBnb = null,
+  bnbUsd = null,
 }: TokenAnnouncementsPanelProps) {
   const [items, setItems] = useState<TokenAnnouncementRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -53,6 +61,8 @@ export function TokenAnnouncementsPanel({
   useEffect(() => {
     void load();
   }, [load, refreshKey]);
+
+  const currentMcap = Number(currentMarketCapBnb);
 
   const shellClass =
     variant === "tape"
@@ -84,23 +94,34 @@ export function TokenAnnouncementsPanel({
           }
         >
           {items.map((item) => {
+            const liveX = liveCalloutMultiplierX(currentMcap, item.marketCapZugAtAnnounce);
+            const calledUsd = bnbToUsd(Number(item.marketCapZugAtAnnounce), bnbUsd);
             const identity = (
               <>
                 <UserAvatarForAddress address={item.announcerAddress} size="md" />
                 <span className="token-announcements-panel__identity-copy">
-                  <span className="token-announcements-panel__name">
-                    <UserDisplayName address={item.announcerAddress} compact />
-                  </span>
-                  {item.isSponsored ? (
-                    <span className="token-announcements-panel__sponsored text-caption text-pump-muted">
-                      Sponsored callout
+                  <span className="token-announcements-panel__name-row">
+                    <span className="token-announcements-panel__name">
+                      <UserDisplayName address={item.announcerAddress} compact />
                     </span>
-                  ) : (
-                    <CalloutHoldingsSnapshot
-                      balance={item.tokenBalanceAtAnnounce}
-                      balanceUsd={item.tokenBalanceUsdAtAnnounce}
-                    />
-                  )}
+                    <span
+                      className={`token-announcements-panel__badge${
+                        item.isSponsored ? " token-announcements-panel__badge--sponsored" : ""
+                      }`}
+                    >
+                      {item.isSponsored ? "Sponsored" : "Callout"}
+                    </span>
+                  </span>
+                  <span className="token-announcements-panel__called text-caption text-pump-muted">
+                    Called at{" "}
+                    <span className="financial-value">
+                      {formatUsdReadable(calledUsd, { compact: true })}
+                    </span>{" "}
+                    MC
+                  </span>
+                  {item.message ? (
+                    <span className="token-announcements-panel__message">{item.message}</span>
+                  ) : null}
                 </span>
               </>
             );
@@ -124,9 +145,15 @@ export function TokenAnnouncementsPanel({
                   </Link>
                 )}
                 <div className="token-announcements-panel__meta">
-                  <span className="token-announcements-panel__x financial-value">
-                    {formatMultiplierX(item.multiplierX)}
-                  </span>
+                  {liveX != null ? (
+                    <span className="token-announcements-panel__x token-announcements-panel__x--live financial-value">
+                      {formatMultiplierX(liveX)}
+                    </span>
+                  ) : (
+                    <span className="token-announcements-panel__x financial-value">
+                      {formatMultiplierX(item.multiplierX)}
+                    </span>
+                  )}
                   <span className="token-announcements-panel__time">
                     {formatAge(item.createdAt)}
                   </span>

@@ -425,11 +425,12 @@ export async function acceptKolCalloutRequest(input: {
       market_cap_zug_at_announce,
       launch_mcap_zug,
       multiplier_x,
+      message,
       token_balance_at_announce,
       token_balance_usd_at_announce,
       is_sponsored,
       sponsor_address
-    ) VALUES ($1, $2, $3, $4, $5, NULL, NULL, true, $6)
+    ) VALUES ($1, $2, $3, $4, $5, NULL, NULL, NULL, true, $6)
     RETURNING id::text
     `,
     [token, kol, String(mcap), String(launch), String(multiplier), sponsor]
@@ -485,8 +486,7 @@ export async function acceptKolCalloutRequest(input: {
     marketCapZugAtAnnounce: String(mcap),
     launchMcapZug: String(launch),
     multiplierX: multiplier,
-    tokenBalanceAtAnnounce: null,
-    tokenBalanceUsdAtAnnounce: null,
+    message: null,
     isSponsored: true,
     sponsorAddress: sponsor,
     createdAt: acceptedAt.toISOString(),

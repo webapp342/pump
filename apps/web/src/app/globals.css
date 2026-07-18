@@ -2873,7 +2873,7 @@ code,
 
   .token-announcements-panel__row {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: space-between;
     gap: 0.75rem;
     min-height: 2.75rem;
@@ -2887,7 +2887,7 @@ code,
 
   .token-announcements-panel__identity {
     display: inline-flex;
-    align-items: center;
+    align-items: flex-start;
     gap: 0.5rem;
     min-width: 0;
     flex: 1 1 auto;
@@ -2922,27 +2922,45 @@ code,
     color: rgb(var(--pump-text));
   }
 
-  .callout-holdings-snapshot {
+  .token-announcements-panel__name-row {
     display: inline-flex;
     align-items: center;
-    gap: 0.25rem;
+    gap: 0.375rem;
     min-width: 0;
     max-width: 100%;
   }
 
-  .callout-holdings-snapshot__amount,
-  .callout-holdings-snapshot__usd {
+  .token-announcements-panel__badge {
+    flex-shrink: 0;
+    padding: 0.0625rem 0.375rem;
+    border-radius: var(--radius-sm);
+    font-size: var(--type-legal-size);
+    font-weight: var(--type-label1-weight);
+    line-height: var(--type-legal-leading);
+    letter-spacing: 0.02em;
+    background: rgb(var(--pump-accent) / 0.12);
+    color: rgb(var(--pump-accent));
+  }
+
+  .token-announcements-panel__badge--sponsored {
+    background: rgb(var(--pump-warning) / 0.12);
+    color: rgb(var(--pump-warning));
+  }
+
+  .token-announcements-panel__called {
+    display: block;
+    min-width: 0;
+  }
+
+  .token-announcements-panel__message {
+    display: -webkit-box;
     overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
     font-size: var(--type-legal-size);
     font-weight: var(--type-legal-weight);
     line-height: var(--type-legal-leading);
-    color: rgb(var(--pump-muted));
-  }
-
-  .callout-holdings-snapshot__amount {
-    color: rgb(var(--pump-muted));
+    color: rgb(var(--pump-text) / 0.85);
   }
 
   .announce-callout-sheet {
@@ -2987,6 +3005,17 @@ code,
     font-weight: var(--type-legal-weight);
     line-height: var(--type-legal-leading);
     color: rgb(var(--pump-muted));
+  }
+
+  .announce-callout-sheet__message {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+  }
+
+  .announce-callout-sheet__textarea {
+    min-height: 4.5rem;
+    resize: vertical;
   }
 
   .announce-callout-sheet__rules {
@@ -3044,6 +3073,10 @@ code,
     font-variant-numeric: tabular-nums;
   }
 
+  .token-announcements-panel__x--live {
+    color: rgb(var(--pump-success));
+  }
+
   .token-announcements-panel__time {
     font-size: var(--type-legal-size);
     font-weight: var(--type-legal-weight);
@@ -3090,6 +3123,17 @@ code,
     white-space: nowrap;
     font-size: var(--text-body-sm);
     font-weight: 600;
+  }
+
+  .portfolio-callouts__message {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    font-size: var(--type-legal-size);
+    font-weight: var(--type-legal-weight);
+    line-height: var(--type-legal-leading);
+    color: rgb(var(--pump-muted));
   }
 
   .portfolio-callouts__balance {
@@ -8825,6 +8869,17 @@ code,
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    font-size: var(--type-legal-size);
+    font-weight: var(--type-legal-weight);
+    line-height: var(--type-legal-leading);
+    color: rgb(var(--pump-muted));
+  }
+
+  .creator-profile-sheet__callout-message {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
     font-size: var(--type-legal-size);
     font-weight: var(--type-legal-weight);
     line-height: var(--type-legal-leading);

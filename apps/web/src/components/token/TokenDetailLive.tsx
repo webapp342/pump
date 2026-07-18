@@ -12,7 +12,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouter, useSearchParams } from "next/navigation";
-import { createPublicClient, http, parseUnits, type Address } from "viem";
+import { createPublicClient, http, type Address } from "viem";
 import { useReadContract, useAccount } from "wagmi";
 import type { TokenHolderSnapshot, TokenDetail, TradeItem } from "@/lib/db/launchpad";
 import {
@@ -48,8 +48,6 @@ import {
   removeOptimisticActivities,
 } from "@/lib/optimistic-activity";
 import { contracts, explorerAddressUrl, pumpChain, shortAddress } from "@/config/chain";
-import { erc20Abi } from "@/lib/abis/erc20";
-import { ANNOUNCE_MIN_TOKEN_BALANCE } from "@/lib/token-announcements-shared";
 import { copyToClipboard } from "@/lib/copy-to-clipboard";
 import { TradePanel, type TradeConfirmedPayload, type TradeOptimisticPayload, type TradeSubmittedPayload } from "@/components/token/TradePanel";
 import { QuickTradeConfirmModal } from "@/components/token/QuickTradeConfirmModal";
@@ -297,20 +295,9 @@ export function TokenDetailLive({
   const [announcePhase, setAnnouncePhase] = useState<AnnounceCalloutPhase>("confirm");
   const [announceError, setAnnounceError] = useState<string | null>(null);
   const [announceSuccessX, setAnnounceSuccessX] = useState<number | null>(null);
+  const [announceMessage, setAnnounceMessage] = useState("");
   const [announcementsRefreshKey, setAnnouncementsRefreshKey] = useState(0);
 
-  const { data: announceTokenBalance, isFetching: announceHoldingsLoading } = useReadContract({
-    address: streamAddress as Address,
-    abi: erc20Abi,
-    functionName: "balanceOf",
-    args: address ? [address] : undefined,
-    chainId: pumpChain.id,
-    query: { enabled: Boolean(address) },
-  });
-
-  const canAnnounceHoldings =
-    announceTokenBalance != null &&
-    announceTokenBalance >= parseUnits(String(ANNOUNCE_MIN_TOKEN_BALANCE), 18);
   const burstUntilRef = useRef(0);
   const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const optimisticRef = useRef<TradeItem[]>([]);
@@ -799,6 +786,7 @@ export function TokenDetailLive({
     if (tradeLocked) return;
     setAnnounceError(null);
     setAnnounceSuccessX(null);
+    setAnnounceMessage("");
     setAnnouncePhase("confirm");
     setAnnounceSheetOpen(true);
   }, [address, isConnected, openConnectModal, tradeLocked]);
@@ -809,6 +797,7 @@ export function TokenDetailLive({
     setAnnouncePhase("confirm");
     setAnnounceError(null);
     setAnnounceSuccessX(null);
+    setAnnounceMessage("");
   }, [announceBusy]);
 
   const confirmAnnounce = useCallback(async () => {
@@ -816,7 +805,7 @@ export function TokenDetailLive({
       openConnectModal();
       return;
     }
-    if (announceBusy || tradeLocked || !canAnnounceHoldings) return;
+    if (announceBusy || tradeLocked) return;
 
     setAnnounceBusy(true);
     setAnnouncePhase("submitting");
@@ -825,7 +814,11 @@ export function TokenDetailLive({
       const response = await fetch("/api/tokens/announce", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ address, tokenAddress: streamAddress }),
+        body: JSON.stringify({
+          address,
+          tokenAddress: streamAddress,
+          message: announceMessage,
+        }),
       });
       const body = (await response.json()) as {
         error?: string;
@@ -837,9 +830,7 @@ export function TokenDetailLive({
         return;
       }
       const x = body.data?.announcement?.multiplierX;
-      setAnnounceSuccessX(
-        x != null && Number.isFinite(x) ? x : null
-      );
+      setAnnounceSuccessX(x != null && Number.isFinite(x) ? x : null);
       setAnnouncePhase("success");
       setAnnouncementsRefreshKey((key) => key + 1);
     } catch {
@@ -851,7 +842,7 @@ export function TokenDetailLive({
   }, [
     address,
     announceBusy,
-    canAnnounceHoldings,
+    announceMessage,
     isConnected,
     openConnectModal,
     streamAddress,
@@ -873,6 +864,7 @@ export function TokenDetailLive({
     holdersRefreshKey,
     initialHolders,
     currentPriceBnb: displayPrice,
+    currentMarketCapBnb: liveToken.marketCapBnb,
     bnbUsd,
     onAddressClick: setProfileAddress,
     creatorDisplayUsername: liveToken.creatorDisplayUsername,
@@ -1272,6 +1264,8 @@ export function TokenDetailLive({
             tokenAddress={streamAddress}
             refreshKey={announcementsRefreshKey}
             onOpenProfile={setProfileAddress}
+            currentMarketCapBnb={liveToken.marketCapBnb}
+            bnbUsd={bnbUsd}
           />
         </aside>
       </div>
@@ -1319,10 +1313,10 @@ export function TokenDetailLive({
         tokenSymbol={liveToken.symbol}
         tokenName={liveToken.name}
         tokenLogoUrl={liveToken.logoUrl}
-        canAnnounceHoldings={canAnnounceHoldings}
-        holdingsLoading={Boolean(address) && announceHoldingsLoading && announceTokenBalance == null}
         errorMessage={announceError}
         successMultiplierX={announceSuccessX}
+        message={announceMessage}
+        onMessageChange={setAnnounceMessage}
         onConfirm={() => void confirmAnnounce()}
       />
 

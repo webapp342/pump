@@ -1,12 +1,9 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { TokenAvatar } from "@/components/token/TokenAvatar";
 import { AppBottomSheet } from "@/components/ui/AppBottomSheet";
-import {
-  ANNOUNCE_HOLDINGS_ERROR,
-  ANNOUNCE_MIN_TOKEN_BALANCE,
-} from "@/lib/token-announcements-shared";
+import { ANNOUNCE_MESSAGE_MAX_LEN } from "@/lib/token-announcements-shared";
 
 export type AnnounceCalloutPhase = "confirm" | "submitting" | "success" | "error";
 
@@ -18,10 +15,10 @@ type AnnounceCalloutSheetProps = {
   tokenSymbol: string;
   tokenName: string;
   tokenLogoUrl?: string | null;
-  canAnnounceHoldings: boolean;
-  holdingsLoading: boolean;
   errorMessage: string | null;
   successMultiplierX: number | null;
+  message: string;
+  onMessageChange: (value: string) => void;
   onConfirm: () => void;
 };
 
@@ -40,12 +37,18 @@ export function AnnounceCalloutSheet({
   tokenSymbol,
   tokenName,
   tokenLogoUrl = null,
-  canAnnounceHoldings,
-  holdingsLoading,
   errorMessage,
   successMultiplierX,
+  message,
+  onMessageChange,
   onConfirm,
 }: AnnounceCalloutSheetProps) {
+  const [localMessage, setLocalMessage] = useState(message);
+
+  useEffect(() => {
+    if (open) setLocalMessage(message);
+  }, [open, message]);
+
   useEffect(() => {
     if (!open || phase !== "success") return;
     const timer = window.setTimeout(() => onClose(), 2200);
@@ -68,7 +71,13 @@ export function AnnounceCalloutSheet({
         : "Added to your Callouts."
       : phase === "error"
         ? errorMessage ?? "Could not announce this token."
-        : "Notify followers and record a snapshot on this token.";
+        : "Add a short note and notify your followers.";
+
+  function commitMessage(value: string) {
+    const next = value.slice(0, ANNOUNCE_MESSAGE_MAX_LEN);
+    setLocalMessage(next);
+    onMessageChange(next);
+  }
 
   const footer =
     phase === "success" ? (
@@ -84,7 +93,7 @@ export function AnnounceCalloutSheet({
           type="button"
           className="primary-button min-w-0 flex-1"
           onClick={onConfirm}
-          disabled={busy || !canAnnounceHoldings}
+          disabled={busy}
         >
           Try again
         </button>
@@ -94,7 +103,7 @@ export function AnnounceCalloutSheet({
         type="button"
         className={`primary-button w-full${busy ? " form-submit-button--loading" : ""}`}
         onClick={onConfirm}
-        disabled={busy || holdingsLoading || !canAnnounceHoldings}
+        disabled={busy}
         aria-busy={busy}
       >
         {busy ? (
@@ -134,30 +143,32 @@ export function AnnounceCalloutSheet({
           </div>
         </div>
 
-        {phase === "confirm" || phase === "submitting" ? (
-          <ul className="announce-callout-sheet__rules">
-            <li>
-              Hold at least {ANNOUNCE_MIN_TOKEN_BALANCE} {tokenSymbol} to announce.
-            </li>
-            <li>Your balance and USD value are saved as a snapshot with the callout.</li>
-            <li>Followers with callout alerts on will get a notification.</li>
-          </ul>
+        {phase === "confirm" || phase === "submitting" || phase === "error" ? (
+          <div className="announce-callout-sheet__message">
+            <label className="field-label" htmlFor="announce-callout-message">
+              Description
+            </label>
+            <textarea
+              id="announce-callout-message"
+              className="field-textarea announce-callout-sheet__textarea"
+              rows={3}
+              maxLength={ANNOUNCE_MESSAGE_MAX_LEN}
+              placeholder="Optional note for followers…"
+              value={localMessage}
+              disabled={busy}
+              onChange={(e) => commitMessage(e.target.value)}
+            />
+            <p className="field-hint">
+              {localMessage.length}/{ANNOUNCE_MESSAGE_MAX_LEN}
+            </p>
+          </div>
         ) : null}
 
-        {phase === "confirm" || phase === "submitting" || phase === "error" ? (
-          <p
-            className={`announce-callout-sheet__status${
-              canAnnounceHoldings
-                ? " announce-callout-sheet__status--ok"
-                : " announce-callout-sheet__status--blocked"
-            }`}
-          >
-            {holdingsLoading
-              ? "Checking your balance…"
-              : canAnnounceHoldings
-                ? `You're eligible — balance is at least ${ANNOUNCE_MIN_TOKEN_BALANCE} ${tokenSymbol}.`
-                : ANNOUNCE_HOLDINGS_ERROR}
-          </p>
+        {phase === "confirm" || phase === "submitting" ? (
+          <ul className="announce-callout-sheet__rules">
+            <li>Market cap at announce is saved for the live X badge.</li>
+            <li>Followers with callout alerts on will get a notification.</li>
+          </ul>
         ) : null}
 
         {phase === "error" && errorMessage ? (

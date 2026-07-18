@@ -288,6 +288,7 @@ export function TradeTape({
   holdersRefreshKey = 0,
   initialHolders,
   currentPriceBnb,
+  currentMarketCapBnb = null,
   bnbUsd,
   onAddressClick,
   activeTab: activeTabProp,
@@ -311,6 +312,8 @@ export function TradeTape({
   holdersRefreshKey?: number;
   initialHolders?: TokenHolderSnapshot[];
   currentPriceBnb: number;
+  /** Live mcap already on token page — drives callout X badge client-side. */
+  currentMarketCapBnb?: number | string | null;
   bnbUsd: number | null;
   onAddressClick: (address: string) => void;
   /** Parent-controlled tab (mobile main tabs). */
@@ -539,6 +542,8 @@ export function TradeTape({
             refreshKey={announcementsRefreshKey}
             onOpenProfile={onAddressClick}
             variant="tape"
+            currentMarketCapBnb={currentMarketCapBnb}
+            bnbUsd={bnbUsd}
           />
         ) : tab === "about" ? (
           <div className="token-tape-about-panel">

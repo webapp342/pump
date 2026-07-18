@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { CalloutHoldingsSnapshot } from "@/components/token/CalloutHoldingsSnapshot";
 import { TokenAvatar } from "@/components/token/TokenAvatar";
 import type { PortfolioAnnouncementRow } from "@/lib/token-announcements-shared";
 import { formatAge } from "@/lib/arena-board-format";
@@ -83,11 +82,9 @@ export function PortfolioCalloutsSection({ address }: { address: string }) {
               />
               <div className="portfolio-callouts__token">
                 <span className="portfolio-callouts__symbol">{item.tokenSymbol}</span>
-                <CalloutHoldingsSnapshot
-                  balance={item.tokenBalanceAtAnnounce}
-                  balanceUsd={item.tokenBalanceUsdAtAnnounce}
-                  className="portfolio-callouts__balance"
-                />
+                {item.message ? (
+                  <span className="portfolio-callouts__message">{item.message}</span>
+                ) : null}
               </div>
               <div className="portfolio-callouts__meta">
                 <span className="portfolio-callouts__x financial-value">

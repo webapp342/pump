@@ -3,13 +3,10 @@ import {
   BONDING_TOKEN_SUPPLY_HUMAN,
   BONDING_VIRTUAL_BNB_HUMAN,
 } from "@/lib/bonding-curve";
-import { fetchLiveTokenBalance } from "@/lib/airdrop-onchain";
-import { bnbToUsd } from "@/lib/format-usd";
-import { fetchNativeUsdPrice } from "@/lib/native-usd-price";
 import {
   ANNOUNCE_COOLDOWN_MS,
-  ANNOUNCE_HOLDINGS_ERROR,
-  ANNOUNCE_MIN_TOKEN_BALANCE,
+  ANNOUNCE_MESSAGE_MAX_LEN,
+  sanitizeAnnounceMessage,
   type PortfolioAnnouncementRow,
   type TokenAnnouncementRow,
 } from "@/lib/token-announcements-shared";
@@ -18,9 +15,9 @@ import { resolveDisplayUsername } from "@/lib/username";
 
 export {
   ANNOUNCE_COOLDOWN_MS,
-  ANNOUNCE_HOLDINGS_ERROR,
-  ANNOUNCE_MIN_TOKEN_BALANCE,
-  formatAnnounceBalance,
+  ANNOUNCE_MESSAGE_MAX_LEN,
+  sanitizeAnnounceMessage,
+  liveCalloutMultiplierX,
   type PortfolioAnnouncementRow,
   type TokenAnnouncementRow,
 } from "@/lib/token-announcements-shared";
@@ -37,18 +34,11 @@ type AnnouncementDbRow = {
   market_cap_zug_at_announce: string;
   launch_mcap_zug: string;
   multiplier_x: string;
-  token_balance_at_announce: string | null;
-  token_balance_usd_at_announce: string | null;
+  message: string | null;
   is_sponsored?: boolean | null;
   sponsor_address?: string | null;
   created_at: Date;
 };
-
-function parseOptionalNumber(value: string | null | undefined): number | null {
-  if (value == null || value === "") return null;
-  const n = Number(value);
-  return Number.isFinite(n) ? n : null;
-}
 
 function mapAnnouncement(
   row: AnnouncementDbRow
@@ -60,8 +50,7 @@ function mapAnnouncement(
     marketCapZugAtAnnounce: row.market_cap_zug_at_announce,
     launchMcapZug: row.launch_mcap_zug,
     multiplierX: Number(row.multiplier_x),
-    tokenBalanceAtAnnounce: parseOptionalNumber(row.token_balance_at_announce),
-    tokenBalanceUsdAtAnnounce: parseOptionalNumber(row.token_balance_usd_at_announce),
+    message: row.message != null && row.message.trim() ? row.message.trim() : null,
     isSponsored: Boolean(row.is_sponsored),
     sponsorAddress: row.sponsor_address ?? null,
     createdAt: row.created_at.toISOString(),
@@ -109,21 +98,15 @@ export async function fetchTokenMcapSnapshot(tokenAddress: string): Promise<Snap
   return row;
 }
 
-function holdingsUsdAtAnnounce(balanceHuman: number, marketCapZug: number, nativeUsd: number | null): number | null {
-  if (!Number.isFinite(balanceHuman) || balanceHuman <= 0) return null;
-  if (!Number.isFinite(marketCapZug) || marketCapZug <= 0) return null;
-  const priceBnb = marketCapZug / BONDING_TOKEN_SUPPLY_HUMAN;
-  if (!Number.isFinite(priceBnb) || priceBnb <= 0) return null;
-  return bnbToUsd(balanceHuman * priceBnb, nativeUsd);
-}
-
 export async function createTokenAnnouncement(
   announcerAddress: string,
-  tokenAddress: string
+  tokenAddress: string,
+  message?: string | null
 ): Promise<TokenAnnouncementRow> {
   const db = getLaunchpadWritePool();
   const announcer = announcerAddress.toLowerCase();
   const token = tokenAddress.toLowerCase();
+  const note = sanitizeAnnounceMessage(message);
 
   const snapshot = await fetchTokenMcapSnapshot(token);
   if (!snapshot) {
@@ -137,11 +120,6 @@ export async function createTokenAnnouncement(
   }
   if (!Number.isFinite(launch) || launch <= 0) {
     throw new Error("Launch market cap unavailable");
-  }
-
-  const balanceHuman = Number(await fetchLiveTokenBalance(token, announcer));
-  if (!Number.isFinite(balanceHuman) || balanceHuman < ANNOUNCE_MIN_TOKEN_BALANCE) {
-    throw new Error(ANNOUNCE_HOLDINGS_ERROR);
   }
 
   const recent = await db.query<{ created_at: Date }>(
@@ -159,9 +137,6 @@ export async function createTokenAnnouncement(
     throw new Error("Please wait a few minutes before announcing again");
   }
 
-  const nativePrice = await fetchNativeUsdPrice();
-  const balanceUsd = holdingsUsdAtAnnounce(balanceHuman, mcap, nativePrice.nativeUsd);
-
   const multiplier = mcap / launch;
   const inserted = await db.query<AnnouncementDbRow>(
     `
@@ -171,10 +146,11 @@ export async function createTokenAnnouncement(
       market_cap_zug_at_announce,
       launch_mcap_zug,
       multiplier_x,
+      message,
       token_balance_at_announce,
       token_balance_usd_at_announce
     )
-    VALUES ($1, $2, $3::numeric, $4::numeric, $5::numeric, $6::numeric, $7::numeric)
+    VALUES ($1, $2, $3::numeric, $4::numeric, $5::numeric, $6, NULL, NULL)
     RETURNING
       id::text,
       token_address,
@@ -182,19 +158,12 @@ export async function createTokenAnnouncement(
       market_cap_zug_at_announce::text,
       launch_mcap_zug::text,
       multiplier_x::text,
-      token_balance_at_announce::text,
-      token_balance_usd_at_announce::text,
+      message,
+      is_sponsored,
+      sponsor_address,
       created_at
     `,
-    [
-      token,
-      announcer,
-      String(mcap),
-      String(launch),
-      String(multiplier),
-      String(balanceHuman),
-      balanceUsd != null ? String(balanceUsd) : null,
-    ]
+    [token, announcer, String(mcap), String(launch), String(multiplier), note]
   );
 
   const row = inserted.rows[0];
@@ -218,8 +187,7 @@ const ANNOUNCEMENT_SELECT_COLS = `
   market_cap_zug_at_announce::text,
   launch_mcap_zug::text,
   multiplier_x::text,
-  token_balance_at_announce::text,
-  token_balance_usd_at_announce::text,
+  message,
   is_sponsored,
   sponsor_address,
   created_at
@@ -284,8 +252,7 @@ export async function listAnnouncementsByUser(
       a.market_cap_zug_at_announce::text,
       a.launch_mcap_zug::text,
       a.multiplier_x::text,
-      a.token_balance_at_announce::text,
-      a.token_balance_usd_at_announce::text,
+      a.message,
       a.is_sponsored,
       a.sponsor_address,
       a.created_at,

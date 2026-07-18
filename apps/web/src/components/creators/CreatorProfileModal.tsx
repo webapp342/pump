@@ -9,8 +9,8 @@ import type {
 } from "@/lib/db/launchpad";
 import { UserDisplayName } from "@/components/user/UserDisplayName";
 import { TokenAvatar } from "@/components/token/TokenAvatar";
-import { CalloutHoldingsSnapshot } from "@/components/token/CalloutHoldingsSnapshot";
 import { UserAvatarForAddress } from "@/components/user/UserAvatarForAddress";
+import type { PortfolioAnnouncementRow } from "@/lib/token-announcements-shared";
 import { useCreatorFollows } from "@/components/creators/CreatorFollowsProvider";
 import { AppBottomSheet } from "@/components/ui/AppBottomSheet";
 import { explorerAddressUrl, pumpChain } from "@/config/chain";
@@ -42,18 +42,6 @@ type CreatorFollowNetworkResponse = {
   followerCount: number;
   following: CreatorFollowNetworkEntry[];
   followers: CreatorFollowNetworkEntry[];
-};
-
-type PortfolioAnnouncementRow = {
-  id: string;
-  tokenAddress: string;
-  tokenSymbol: string;
-  tokenName: string;
-  tokenLogoUrl: string | null;
-  multiplierX: number;
-  tokenBalanceAtAnnounce: number | null;
-  tokenBalanceUsdAtAnnounce: number | null;
-  createdAt: string;
 };
 
 type CreatorProfileTab = "holdings" | "launched" | "callouts" | "following";
@@ -137,10 +125,9 @@ function CalloutRow({ row }: { row: PortfolioAnnouncementRow }) {
           <span className="creator-profile-sheet__coin-copy min-w-0">
             <span className="creator-profile-sheet__coin-name">{row.tokenName}</span>
             <span className="creator-profile-sheet__coin-symbol">{row.tokenSymbol}</span>
-            <CalloutHoldingsSnapshot
-              balance={row.tokenBalanceAtAnnounce}
-              balanceUsd={row.tokenBalanceUsdAtAnnounce}
-            />
+            {row.message ? (
+              <span className="creator-profile-sheet__callout-message">{row.message}</span>
+            ) : null}
           </span>
         </Link>
       </td>

@@ -2,10 +2,8 @@
 
 /** Soft anti-spam while still allowing announcement history. */
 export const ANNOUNCE_COOLDOWN_MS = 5 * 60 * 1000;
-/** Minimum token balance (human units) required to create a callout. */
-export const ANNOUNCE_MIN_TOKEN_BALANCE = 1;
-export const ANNOUNCE_HOLDINGS_ERROR =
-  "Hold at least 1 of this token to announce";
+/** Max length for callout description (UI + API). */
+export const ANNOUNCE_MESSAGE_MAX_LEN = 280;
 
 export type TokenAnnouncementRow = {
   id: string;
@@ -14,12 +12,11 @@ export type TokenAnnouncementRow = {
   announcerDisplayUsername: string;
   marketCapZugAtAnnounce: string;
   launchMcapZug: string;
+  /** Snapshot at announce: mcap / launch (KOL stats). UI live X uses current/call mcap. */
   multiplierX: number;
-  /** Human-unit balance at announce time (null = legacy row). */
-  tokenBalanceAtAnnounce: number | null;
-  /** USD value of that balance at announce time (null if FX missing / legacy). */
-  tokenBalanceUsdAtAnnounce: number | null;
-  /** Paid sponsor path — no holdings snapshot shown. */
+  /** Optional user note. */
+  message: string | null;
+  /** Paid sponsor path. */
   isSponsored?: boolean;
   sponsorAddress?: string | null;
   createdAt: string;
@@ -31,13 +28,22 @@ export type PortfolioAnnouncementRow = TokenAnnouncementRow & {
   tokenLogoUrl: string | null;
 };
 
-/** Compact human balance for callout snapshots (1.2K / 3.4M). */
-export function formatAnnounceBalance(amount: number | null | undefined): string {
-  if (amount == null || !Number.isFinite(amount) || amount <= 0) return "—";
-  if (amount >= 1_000_000_000) return `${(amount / 1_000_000_000).toFixed(2)}B`;
-  if (amount >= 1_000_000) return `${(amount / 1_000_000).toFixed(2)}M`;
-  if (amount >= 1_000) return `${(amount / 1_000).toFixed(2)}K`;
-  if (amount >= 100) return amount.toFixed(0);
-  if (amount >= 1) return amount.toFixed(2);
-  return amount.toFixed(4);
+export function sanitizeAnnounceMessage(raw: string | null | undefined): string | null {
+  if (raw == null) return null;
+  const trimmed = raw.replace(/\s+/g, " ").trim();
+  if (!trimmed) return null;
+  return trimmed.slice(0, ANNOUNCE_MESSAGE_MAX_LEN);
+}
+
+/** Live performance vs call mcap — pure client math, no extra DB. */
+export function liveCalloutMultiplierX(
+  currentMarketCapZug: number | null | undefined,
+  marketCapZugAtAnnounce: string | number | null | undefined
+): number | null {
+  const current = Number(currentMarketCapZug);
+  const atCall = Number(marketCapZugAtAnnounce);
+  if (!Number.isFinite(current) || current <= 0) return null;
+  if (!Number.isFinite(atCall) || atCall <= 0) return null;
+  const x = current / atCall;
+  return Number.isFinite(x) && x > 0 ? x : null;
 }
