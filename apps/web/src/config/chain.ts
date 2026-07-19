@@ -1,4 +1,12 @@
 import { defineChain } from "viem";
+import { isSolanaChainFamily } from "./chain-family";
+import { NATIVE_SYMBOL as SOL_NATIVE_SYMBOL } from "@pump/solana-sdk";
+import { SOLANA_CLUSTER } from "./solana";
+import {
+  explorerAddressUrl as solanaExplorerAddressUrl,
+  explorerTxUrl as solanaExplorerTxUrl,
+} from "./solana-explorer";
+import { shortSolanaAddress } from "@pump/solana-sdk";
 
 const BASE_MAINNET_CHAIN_ID = 8453;
 const BASE_SEPOLIA_CHAIN_ID = 84532;
@@ -52,9 +60,17 @@ function chainMeta(chainId: number): {
 
 const meta = chainMeta(CHAIN_ID);
 
-export const NATIVE_SYMBOL = meta.nativeSymbol;
-export const NATIVE_NAME = meta.nativeName;
-export const CHAIN_DISPLAY_NAME = meta.name;
+function solanaChainDisplayName(): string {
+  if (SOLANA_CLUSTER === "mainnet-beta") return "Solana";
+  if (SOLANA_CLUSTER === "devnet") return "Solana Devnet";
+  if (SOLANA_CLUSTER === "localnet") return "Solana Localnet";
+  return "Solana";
+}
+
+/** Chain-native ticker for UI (SOL on Solana cutover, ETH/BNB on EVM). */
+export const NATIVE_SYMBOL = isSolanaChainFamily ? SOL_NATIVE_SYMBOL : meta.nativeSymbol;
+export const NATIVE_NAME = isSolanaChainFamily ? "Solana" : meta.nativeName;
+export const CHAIN_DISPLAY_NAME = isSolanaChainFamily ? solanaChainDisplayName() : meta.name;
 
 export const pumpChain = defineChain({
   id: CHAIN_ID,
@@ -90,15 +106,18 @@ export const contracts = {
 };
 
 export function shortAddress(address: string, compact = false): string {
+  if (isSolanaChainFamily) return shortSolanaAddress(address, compact);
   if (compact) return `${address.slice(0, 4)}…${address.slice(-3)}`;
   return `${address.slice(0, 6)}…${address.slice(-4)}`;
 }
 
 export function explorerTxUrl(txHash: string): string {
+  if (isSolanaChainFamily) return solanaExplorerTxUrl(txHash);
   return `${pumpChain.blockExplorers.default.url}/tx/${txHash}`;
 }
 
 export function explorerAddressUrl(address: string): string {
+  if (isSolanaChainFamily) return solanaExplorerAddressUrl(address);
   return `${pumpChain.blockExplorers.default.url}/address/${address}`;
 }
 

@@ -1,6 +1,7 @@
 import Image from "next/image";
-import { NATIVE_SYMBOL } from "@/config/chain";
+import { NATIVE_SYMBOL, isSolanaChainFamily } from "@/config/chain";
 import ethLogoSrc from "@/app/logos/eth-diamond-(white).svg";
+import solLogoSrc from "@/app/logos/solana.svg";
 import { TOKEN_LOGO_SIZE, type TokenLogoSizeRole } from "@/lib/ui-sizes";
 
 function resolveLogoPx(size: number | TokenLogoSizeRole | undefined): number {
@@ -18,9 +19,11 @@ export function NativeLogo({
   className?: string;
 }) {
   const px = resolveLogoPx(size);
+  const src = isSolanaChainFamily ? solLogoSrc : ethLogoSrc;
+
   return (
     <Image
-      src={ethLogoSrc}
+      src={src}
       alt={NATIVE_SYMBOL}
       width={px}
       height={px}

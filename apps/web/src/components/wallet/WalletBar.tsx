@@ -11,6 +11,13 @@ import { PumpIcon, faChevronDown } from "@/lib/icons";
 import { AccountSheet } from "@/components/wallet/AccountSheet";
 import { WalletAccountPanel } from "@/components/wallet/WalletAccountPanel";
 
+function walletAvatarFallback(address: string): string {
+  if (address.startsWith("0x") && address.length >= 4) {
+    return address.slice(2, 4).toUpperCase();
+  }
+  return address.slice(0, 2).toUpperCase();
+}
+
 function formatHeaderBalanceUsd(usd: number | null): string {
   if (usd == null || !Number.isFinite(usd)) return "$0.00";
   return `$${usd.toFixed(2)}`;
@@ -37,7 +44,7 @@ function ConnectedWalletButton({ address }: { address: string }) {
   const [open, setOpen] = useState(false);
   const [showBnb, setShowBnb] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
-  const { nativeBnb, nativeUsd } = useWalletTotalBalance(address as `0x${string}`);
+  const { nativeBnb, nativeUsd } = useWalletTotalBalance(address);
 
   const balanceLabel = formatHeaderBalanceUsd(nativeUsd);
 
@@ -83,7 +90,7 @@ function ConnectedWalletButton({ address }: { address: string }) {
             />
           ) : (
             <span className="app-header-account-btn__fallback" aria-hidden>
-              {address.slice(2, 4).toUpperCase()}
+              {walletAvatarFallback(address)}
             </span>
           )}
         </button>
@@ -112,7 +119,7 @@ function ConnectedWalletButton({ address }: { address: string }) {
           />
         ) : (
           <span className="app-header-account-chip__avatar-fallback" aria-hidden>
-            {address.slice(2, 4).toUpperCase()}
+            {walletAvatarFallback(address)}
           </span>
         )}
         <span className="app-header-account-chip__balance financial-value">{balanceLabel}</span>

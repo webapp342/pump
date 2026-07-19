@@ -1,4 +1,5 @@
 import { CHAIN_ID } from "@/config/chain";
+import { isSolanaChainFamily } from "@/config/chain-family";
 
 const BASE_MAINNET_CHAIN_ID = 8453;
 const BASE_SEPOLIA_CHAIN_ID = 84532;
@@ -29,6 +30,7 @@ let cache: CachedNativeUsd | null = null;
 const COINGECKO_IDS: Record<string, string> = {
   ETH: "ethereum",
   BNB: "binancecoin",
+  SOL: "solana",
 };
 
 async function fetchFromBinance(pair: string): Promise<number | null> {
@@ -72,18 +74,21 @@ function staleCachedQuote(pair: string, symbol: string): NativeUsdQuote | null {
   };
 }
 
-/** Resolve Binance spot pair for the configured chain's native currency. */
+/** Resolve Binance spot pair for the active chain family's native currency. */
 export function nativeUsdPairForChain(chainId = CHAIN_ID): {
   pair: string;
   symbol: string;
 } {
+  if (isSolanaChainFamily) {
+    return { pair: "SOLUSDT", symbol: "SOL" };
+  }
   if (chainId === BASE_MAINNET_CHAIN_ID || chainId === BASE_SEPOLIA_CHAIN_ID) {
     return { pair: "ETHUSDT", symbol: "ETH" };
   }
   return { pair: "BNBUSDT", symbol: "BNB" };
 }
 
-/** Live native/USD from Binance (BNBUSDT on BSC, ETHUSDT on Base). */
+/** Live native/USD (SOLUSDT on Solana, ETHUSDT on Base, BNBUSDT on BSC). */
 export async function fetchNativeUsdPrice(
   chainId = CHAIN_ID
 ): Promise<NativeUsdQuote> {
@@ -132,6 +137,7 @@ export function isPlausibleNativeUsdForChain(
 ): boolean {
   if (!Number.isFinite(nativeUsd) || nativeUsd <= 0) return false;
   const { symbol } = nativeUsdPairForChain(chainId);
+  if (symbol === "SOL") return nativeUsd >= 5 && nativeUsd <= 2_000;
   if (symbol === "ETH") return nativeUsd >= 900;
   return nativeUsd <= 1_200;
 }

@@ -126,9 +126,9 @@ export function PortfolioMobileHero({
   const [createOpen, setCreateOpen] = useState(false);
   const [showBnb, setShowBnb] = useState(false);
   const { openDeposit, openWithdraw } = useWalletFunding();
-  const { scwAddress, logout } = usePumpWallet();
-  const accountAddress = (scwAddress ?? walletAddress) as `0x${string}`;
-  const { nativeBnb, nativeUsd } = useWalletTotalBalance(accountAddress);
+  const { walletAddress: sessionWalletAddress, logout } = usePumpWallet();
+  const balanceWalletAddress = sessionWalletAddress ?? walletAddress;
+  const { nativeBnb, nativeUsd } = useWalletTotalBalance(balanceWalletAddress);
 
   const sharePayload = useMemo(
     () =>

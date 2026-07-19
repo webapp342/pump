@@ -5,8 +5,11 @@ import { useQuery } from "@tanstack/react-query";
 import { formatEther, type Address } from "viem";
 import { useBnbUsdPrice } from "@/hooks/useBnbUsdPrice";
 import { useScwBalance } from "@/hooks/useScwBalance";
+import { useSolanaNativeBalance } from "@/hooks/useSolanaNativeBalance";
 import { usePortfolioQuery } from "@/hooks/usePortfolioQuery";
 import { bnbToUsd } from "@/lib/format-usd";
+import { addressCacheKey } from "@/lib/address";
+import { isSolanaChainFamily } from "@/config/chain-family";
 import { sumVerifiedHoldingsBnb } from "@/lib/onchain-balance";
 import { PORTFOLIO_LAUNCHED_INITIAL } from "@/lib/portfolio-limits";
 import { fetchOnChainBalancesForTokens } from "@/lib/portfolio-onchain-client";
@@ -21,10 +24,17 @@ function onChainBalancesQueryKey(walletAddress: string, tokenAddresses: string[]
   return ["portfolio-onchain-balances", walletAddress, tokenAddresses.join(",")] as const;
 }
 
-export function useWalletTotalBalance(address?: Address) {
-  const normalized = address?.toLowerCase() ?? "";
+export function useWalletTotalBalance(address?: string) {
+  const normalized = isSolanaChainFamily
+    ? (addressCacheKey(address) ?? "")
+    : (address?.toLowerCase() ?? "");
   const { bnbUsd } = useBnbUsdPrice();
-  const { data: balance } = useScwBalance(address);
+  const { data: evmBalance } = useScwBalance(
+    isSolanaChainFamily ? undefined : (address as Address | undefined)
+  );
+  const { data: solLamports } = useSolanaNativeBalance(
+    isSolanaChainFamily ? normalized || undefined : undefined
+  );
   const [published, setPublished] = useState<WalletTotalSnapshot | null>(() =>
     normalized ? getCachedWalletTotal(normalized) : null
   );
@@ -54,13 +64,22 @@ export function useWalletTotalBalance(address?: Address) {
     }
     setPublished(getCachedWalletTotal(normalized));
     return subscribeWalletTotal((snapshot) => {
-      if (snapshot.address.toLowerCase() === normalized) {
+      const snapshotKey = isSolanaChainFamily
+        ? (addressCacheKey(snapshot.address) ?? snapshot.address)
+        : snapshot.address.toLowerCase();
+      if (snapshotKey === normalized) {
         setPublished(snapshot);
       }
     });
   }, [normalized]);
 
-  const nativeBnb = balance ? Number(formatEther(balance.value)) : 0;
+  const nativeBnb = isSolanaChainFamily
+    ? solLamports != null
+      ? Number(solLamports) / 1e9
+      : 0
+    : evmBalance
+      ? Number(formatEther(evmBalance.value))
+      : 0;
   const nativeUsd = bnbToUsd(nativeBnb, bnbUsd) ?? 0;
 
   const indexedHoldingsBnb = useMemo(() => {
@@ -83,14 +102,24 @@ export function useWalletTotalBalance(address?: Address) {
   const holdingsUsd = bnbToUsd(holdingsBnb, bnbUsd) ?? 0;
 
   const publishedHoldingsUsd =
-    published?.address.toLowerCase() === normalized ? published.holdingsUsd : null;
+    (isSolanaChainFamily
+      ? addressCacheKey(published?.address) === normalized
+      : published?.address.toLowerCase() === normalized)
+      ? published?.holdingsUsd ?? null
+      : null;
 
   const resolvedHoldingsUsd = publishedHoldingsUsd ?? holdingsUsd;
   const totalUsd = resolvedHoldingsUsd + nativeUsd;
 
   useEffect(() => {
     if (!normalized || verifiedHoldingsBnb == null) return;
-    if (published?.address.toLowerCase() === normalized) return;
+    if (
+      isSolanaChainFamily
+        ? addressCacheKey(published?.address) === normalized
+        : published?.address.toLowerCase() === normalized
+    ) {
+      return;
+    }
 
     publishWalletTotal({
       address: normalized,
@@ -107,6 +136,8 @@ export function useWalletTotalBalance(address?: Address) {
     holdingsUsd: resolvedHoldingsUsd,
     totalUsd,
     isPortfolioEnriched:
-      published?.address.toLowerCase() === normalized || verifiedHoldingsBnb != null,
+      (isSolanaChainFamily
+        ? addressCacheKey(published?.address) === normalized
+        : published?.address.toLowerCase() === normalized) || verifiedHoldingsBnb != null,
   };
 }
