@@ -1,16 +1,17 @@
 #!/usr/bin/env bash
-# Sync Solana indexer from monorepo, rebuild, restart systemd.
+# Build @pump/indexer-sol from monorepo (workspace deps need root package-lock).
 set -euo pipefail
 
 TMA_DIR="${TMA_DIR:-/var/www/pump/tma}"
-INDEXER_SRC="${TMA_DIR}/apps/indexer-sol"
-INDEXER_DIR="${INDEXER_SOL_DIR:-/var/www/pump/indexer-sol}"
+INDEXER_APP="${TMA_DIR}/apps/indexer-sol"
+LEGACY_ENV_DIR="${INDEXER_SOL_DIR:-/var/www/pump/indexer-sol}"
 SERVICE="${INDEXER_SOL_SERVICE:-pump-indexer-sol}"
+ENV_FILE="${INDEXER_APP}/.env"
 
 log() { echo "[indexer-sol-deploy] $*"; }
 
-if [[ ! -d "$INDEXER_SRC/src" ]]; then
-  log "Missing $INDEXER_SRC/src — skip Solana indexer"
+if [[ ! -d "$INDEXER_APP/src" ]]; then
+  log "Missing $INDEXER_APP/src — skip Solana indexer"
   exit 0
 fi
 
@@ -22,13 +23,14 @@ if [[ -f "$TMA_ENV" ]]; then
   set +a
 fi
 
-log "Sync indexer-sol (preserve $INDEXER_DIR/.env)"
-mkdir -p "$INDEXER_DIR"
-rsync -a --exclude '.env' --exclude 'node_modules' --exclude 'dist' "$INDEXER_SRC/" "$INDEXER_DIR/"
+# Migrate legacy .env from /var/www/pump/indexer-sol if present
+if [[ ! -f "$ENV_FILE" && -f "$LEGACY_ENV_DIR/.env" ]]; then
+  log "Migrating $LEGACY_ENV_DIR/.env → $ENV_FILE"
+  cp "$LEGACY_ENV_DIR/.env" "$ENV_FILE"
+fi
 
-# Seed .env from tma root if missing
-if [[ ! -f "$INDEXER_DIR/.env" ]]; then
-  log "Creating $INDEXER_DIR/.env from tma .env"
+if [[ ! -f "$ENV_FILE" ]]; then
+  log "Creating $ENV_FILE from tma .env"
   {
     echo "LAUNCHPAD_DATABASE_URL=${LAUNCHPAD_DATABASE_URL:-${DATABASE_URL:-}}"
     echo "SOLANA_RPC_URL=${SOLANA_RPC_URL:-${NEXT_PUBLIC_SOLANA_RPC_URL:-https://api.devnet.solana.com}}"
@@ -39,34 +41,46 @@ if [[ ! -f "$INDEXER_DIR/.env" ]]; then
     echo "SOLANA_TREASURY_PROGRAM_ID=${NEXT_PUBLIC_SOLANA_TREASURY_PROGRAM_ID:-Hwv85kSodkR34rBTE1J67aSzixnAkXdAX6HzZnKDCvus}"
     echo "SOLANA_INDEXER_SOURCE=rpc"
     echo "SOLANA_INDEXER_POLL_MS=2000"
-  } > "$INDEXER_DIR/.env"
+    echo "INCREMENTAL_BOARD_STATS=true"
+    echo "INCREMENTAL_CANDLES=true"
+    echo "REDIS_PUBLISH_ENABLED=true"
+    echo "REDIS_URL=${REDIS_URL:-redis://127.0.0.1:6379}"
+  } > "$ENV_FILE"
 fi
 
-log "Installing dependencies"
-cd "$INDEXER_DIR"
-npm ci
-
-log "Building indexer-sol"
-npm run build
-
-if [[ ! -f "$INDEXER_DIR/dist/indexer.js" ]]; then
-  log "Build failed: dist/indexer.js missing"
+log "Building indexer-sol from monorepo (requires root npm ci from tma-deploy)"
+cd "$TMA_DIR"
+if [[ ! -f package-lock.json ]]; then
+  log "ERROR: $TMA_DIR/package-lock.json missing — run npm ci at repo root first"
   exit 1
+fi
+npm run build -w @pump/indexer-sol
+
+if [[ ! -f "$INDEXER_APP/dist/indexer.js" ]]; then
+  log "Build failed: $INDEXER_APP/dist/indexer.js missing"
+  exit 1
+fi
+
+# Refresh systemd unit (WorkingDirectory = monorepo app path)
+if [[ -f "$TMA_DIR/deploy/pump-indexer-sol.service" ]]; then
+  cp "$TMA_DIR/deploy/pump-indexer-sol.service" /etc/systemd/system/
+  systemctl daemon-reload
 fi
 
 if systemctl list-unit-files | grep -q "^${SERVICE}.service"; then
   log "Restarting $SERVICE"
   systemctl restart "$SERVICE"
   sleep 2
-  if journalctl -u "$SERVICE" -n 20 --no-pager 2>/dev/null | grep -qi 'ready\|listening\|started'; then
+  if journalctl -u "$SERVICE" -n 20 --no-pager 2>/dev/null | grep -qi 'ready\|solana indexer'; then
     log "Indexer-sol restarted"
   else
     log "WARN: check journalctl -u $SERVICE"
     journalctl -u "$SERVICE" -n 15 --no-pager || true
   fi
 else
-  log "WARN: systemd unit $SERVICE not installed — run deploy/pump-indexer-sol.service once"
-  log "  Manual: cd $INDEXER_DIR && npm run indexer"
+  log "WARN: systemd unit $SERVICE not installed — run:"
+  log "  cp deploy/pump-indexer-sol.service /etc/systemd/system/"
+  log "  systemctl daemon-reload && systemctl enable --now pump-indexer-sol"
 fi
 
-log "Indexer-sol deploy finished"
+log "Indexer-sol deploy finished (app=$INDEXER_APP)"

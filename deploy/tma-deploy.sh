@@ -141,6 +141,7 @@ if [[ "${SKIP_INDEXER_DEPLOY:-}" != "1" ]] && [[ -f "$REPO_ROOT/deploy/vm/indexe
     log "WARN: indexer-sol deploy failed — one-time on VM:"
     log "  cp deploy/pump-indexer-sol.service /etc/systemd/system/"
     log "  systemctl daemon-reload && systemctl enable --now pump-indexer-sol"
+    log "  Ensure apps/indexer-sol/.env exists (see apps/indexer-sol/.env.example)"
   }
 elif [[ "${SKIP_EVM_INDEXER:-}" != "1" ]] && [[ "${SKIP_INDEXER_DEPLOY:-}" != "1" ]] && [[ -f "$REPO_ROOT/deploy/vm/indexer-deploy.sh" ]]; then
   log "Deploying EVM indexer"

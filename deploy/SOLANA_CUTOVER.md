@@ -22,6 +22,9 @@ sudo cp deploy/pump-indexer-sol.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable --now pump-indexer-sol
 
+# Indexer env lives at apps/indexer-sol/.env (not /var/www/pump/indexer-sol)
+nano apps/indexer-sol/.env
+
 # 3) Optional: stop EVM indexer (no longer used)
 sudo systemctl stop pump-indexer pump-airdrop-keeper || true
 sudo systemctl disable pump-indexer pump-airdrop-keeper || true
