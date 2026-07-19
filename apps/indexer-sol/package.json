@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "prebuild": "npm run build -w @pump/solana-sdk",
     "build": "tsc -p tsconfig.json",
     "indexer": "node dist/indexer.js",
     "indexer:dev": "tsx src/indexer.ts",

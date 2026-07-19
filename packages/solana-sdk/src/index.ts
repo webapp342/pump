@@ -156,13 +156,13 @@ export {
   CURVE_EVENTS,
   TREASURY_EVENTS,
   EVENT_TO_HANDLER,
-} from "./events";
+} from "./events.js";
 export type {
   FactoryEventName,
   CurveEventName,
   TreasuryEventName,
   SolanaHandlerName,
-} from "./events";
+} from "./events.js";
 
 export function shortSolanaAddress(address: string, compact = false): string {
   if (address.length < 8) return address;

@@ -5,6 +5,8 @@
   "scripts": {
     "dev": "next dev -H 0.0.0.0 -p 3012",
     "dev:local": "next dev -H 0.0.0.0 -p 80",
+    "predev": "npm run build -w @pump/solana-sdk",
+    "prebuild": "npm run build -w @pump/solana-sdk",
     "build": "npm run pwa:icons && next build",
     "pwa:icons": "node scripts/generate-pwa-icons.mjs",
     "push:vapid": "node scripts/generate-vapid-keys.mjs",

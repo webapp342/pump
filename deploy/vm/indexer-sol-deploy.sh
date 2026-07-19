@@ -54,6 +54,7 @@ if [[ ! -f package-lock.json ]]; then
   log "ERROR: $TMA_DIR/package-lock.json missing — run npm ci at repo root first"
   exit 1
 fi
+npm run build -w @pump/solana-sdk
 npm run build -w @pump/indexer-sol
 
 if [[ ! -f "$INDEXER_APP/dist/indexer.js" ]]; then
