@@ -73,14 +73,24 @@ export function useWalletTotalBalance(address?: string) {
     });
   }, [normalized]);
 
-  const nativeBnb = isSolanaChainFamily
+  const nativeBnbFromChain = isSolanaChainFamily
     ? solLamports != null
       ? Number(solLamports) / 1e9
-      : 0
+      : null
     : evmBalance
       ? Number(formatEther(evmBalance.value))
-      : 0;
-  const nativeUsd = bnbToUsd(nativeBnb, bnbUsd) ?? 0;
+      : null;
+  const publishedMatches =
+    (isSolanaChainFamily
+      ? addressCacheKey(published?.address) === normalized
+      : published?.address.toLowerCase() === normalized) && Boolean(published);
+
+  const nativeBnb =
+    nativeBnbFromChain ?? (publishedMatches ? published!.nativeBnb : null) ?? 0;
+  const nativeUsd =
+    bnbToUsd(nativeBnb, bnbUsd) ??
+    (publishedMatches ? published!.nativeUsd : null) ??
+    0;
 
   const indexedHoldingsBnb = useMemo(() => {
     if (!positions.length) return 0;

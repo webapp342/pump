@@ -90,10 +90,13 @@ import {
 import { usePumpWallet } from "@/components/wallet/PumpWalletProvider";
 import { contracts, NATIVE_SYMBOL, pumpChain } from "@/config/chain";
 import { isSolanaChainFamily } from "@/config/chain-family";
+import { PUMP_FEEL_DEFAULTS } from "@/config/solana";
 import { useSolanaTradeMarket } from "@/hooks/useSolanaTradeMarket";
+import { useSolanaNativeBalance } from "@/hooks/useSolanaNativeBalance";
 import { silentBuy, silentSell } from "@/lib/solana/silent-trade";
 import {
   SOLANA_FEE_RESERVE_WEI,
+  lamportsToWei,
   weiToLamports,
   weiToTokenRaw,
 } from "@/lib/solana/amount-scale";
@@ -421,7 +424,7 @@ export function TradePanel({
       openPumpLogin();
       return;
     }
-    openConnectOrLogin();
+    openConnectModal();
   };
   const { openDeposit } = useWalletFunding();
   const [tradeConfirmOpen, setTradeConfirmOpen] = useState(false);
@@ -546,6 +549,9 @@ export function TradePanel({
     isSolanaTrade ? solanaAddress : undefined,
     isSolanaTrade
   );
+  const { data: solLamports, refetch: refetchSolBalance } = useSolanaNativeBalance(
+    isSolanaTrade ? solanaAddress : undefined
+  );
 
   const { data: localCurveState } = useReadContract({
     address: contracts.bondingCurveManager,
@@ -572,7 +578,14 @@ export function TradePanel({
 
   const bondingCurve = useMemo(() => {
     if (isSolanaTrade) {
-      return solanaMarket.bondingCurve ?? null;
+      if (solanaMarket.bondingCurve) return solanaMarket.bondingCurve;
+      if (chainCurveSnapshot && !isEmptyCurveSnapshot(chainCurveSnapshot)) {
+        return bondingCurveFromSnapshot(chainCurveSnapshot);
+      }
+      if (dbCurveSnapshot) {
+        return bondingCurveFromSnapshot(dbCurveSnapshot);
+      }
+      return null;
     }
     if (chainCurveSnapshot && !isEmptyCurveSnapshot(chainCurveSnapshot)) {
       return bondingCurveFromSnapshot(chainCurveSnapshot);
@@ -600,7 +613,7 @@ export function TradePanel({
     query: { enabled: !isSolanaTrade },
   });
   const protocolFeeBps = isSolanaTrade
-    ? solanaMarket.protocolFeeBps
+    ? (solanaMarket.protocolFeeBps ?? BigInt(PUMP_FEEL_DEFAULTS.protocolFeeBps))
     : evmProtocolFeeBps;
 
   const sellTokenWei = useMemo(() => {
@@ -667,12 +680,14 @@ export function TradePanel({
   });
 
   const bnbBalance = isSolanaTrade
-    ? solanaMarket.solBalanceWei !== undefined
-      ? { value: solanaMarket.solBalanceWei }
+    ? solLamports != null
+      ? { value: lamportsToWei(solLamports) }
       : undefined
     : evmBnbBalance;
   const refetchBnbBalance = isSolanaTrade
-    ? solanaMarket.refetchBalances
+    ? async () => {
+        await Promise.all([refetchSolBalance(), solanaMarket.refetchBalances()]);
+      }
     : refetchEvmBnbBalance;
 
   const { data: evmTokenBalance, refetch: refetchEvmTokenBalance } = useReadContract({

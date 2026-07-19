@@ -6,7 +6,8 @@
  */
 
 import { useCallback } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { addressCacheKey } from "@/lib/address";
 import { PublicKey } from "@solana/web3.js";
 import {
   TOKEN_PROGRAM_ID,
@@ -63,8 +64,19 @@ async function fetchMarket(mintAddress: string, ownerAddress?: string) {
       : Promise.resolve(null),
   ]);
 
-  const global = globalInfo?.data ? decodeGlobalConfig(globalInfo.data) : null;
-  const curve = curveInfo?.data ? decodeCurveAccount(curveInfo.data) : null;
+  let global = null;
+  try {
+    global = globalInfo?.data ? decodeGlobalConfig(globalInfo.data) : null;
+  } catch {
+    global = null;
+  }
+
+  let curve = null;
+  try {
+    curve = curveInfo?.data ? decodeCurveAccount(curveInfo.data) : null;
+  } catch {
+    curve = null;
+  }
 
   const bondingCurve: BondingCurveState | undefined = curve
     ? {
@@ -95,12 +107,16 @@ export function useSolanaTradeMarket(
   ownerAddress: string | undefined,
   enabled: boolean
 ): SolanaTradeMarket {
+  const mintKey = addressCacheKey(mintAddress) ?? mintAddress;
+  const ownerKey = addressCacheKey(ownerAddress) ?? ownerAddress;
+
   const query = useQuery({
-    queryKey: ["solana-trade-market", mintAddress, ownerAddress ?? ""],
-    queryFn: () => fetchMarket(mintAddress!, ownerAddress),
-    enabled: enabled && Boolean(mintAddress),
+    queryKey: ["solana-trade-market", mintKey, ownerKey ?? ""],
+    queryFn: () => fetchMarket(mintKey!, ownerKey),
+    enabled: enabled && Boolean(mintKey),
     refetchInterval: POLL_MS,
     staleTime: 1_500,
+    placeholderData: keepPreviousData,
   });
 
   const refetchBalances = useCallback(async () => {

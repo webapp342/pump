@@ -1,3 +1,6 @@
+import { addressCacheKey } from "@/lib/address";
+import { isSolanaChainFamily } from "@/config/chain-family";
+
 export type WalletTotalSnapshot = {
   address: string;
   holdingsUsd: number;
@@ -10,16 +13,24 @@ export const WALLET_TOTAL_EVENT = "pump:wallet-total";
 
 const cache = new Map<string, WalletTotalSnapshot>();
 
+function walletTotalCacheKey(address: string): string {
+  if (isSolanaChainFamily) {
+    return addressCacheKey(address) ?? address;
+  }
+  return address.toLowerCase();
+}
+
 export function publishWalletTotal(snapshot: WalletTotalSnapshot): void {
-  const key = snapshot.address.toLowerCase();
-  cache.set(key, snapshot);
+  const key = walletTotalCacheKey(snapshot.address);
+  const normalized: WalletTotalSnapshot = { ...snapshot, address: key };
+  cache.set(key, normalized);
   if (typeof window !== "undefined") {
-    window.dispatchEvent(new CustomEvent(WALLET_TOTAL_EVENT, { detail: snapshot }));
+    window.dispatchEvent(new CustomEvent(WALLET_TOTAL_EVENT, { detail: normalized }));
   }
 }
 
 export function getCachedWalletTotal(address: string): WalletTotalSnapshot | null {
-  return cache.get(address.toLowerCase()) ?? null;
+  return cache.get(walletTotalCacheKey(address)) ?? null;
 }
 
 export function subscribeWalletTotal(

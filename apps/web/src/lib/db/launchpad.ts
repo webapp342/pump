@@ -1084,6 +1084,8 @@ export async function upsertTokenMetadata(input: {
       social_links
     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb)
     ON CONFLICT (address) DO UPDATE SET
+      name = COALESCE(NULLIF(EXCLUDED.name, ''), tokens.name),
+      symbol = COALESCE(NULLIF(EXCLUDED.symbol, ''), tokens.symbol),
       description = COALESCE(EXCLUDED.description, tokens.description),
       social_links = CASE
         WHEN EXCLUDED.social_links = '{}'::jsonb THEN tokens.social_links

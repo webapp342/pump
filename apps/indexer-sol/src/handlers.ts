@@ -120,9 +120,9 @@ export class SolanaEventHandlers {
         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'BONDING', $9, now())
         ON CONFLICT (address) DO UPDATE
         SET creator_address = EXCLUDED.creator_address,
-            name = EXCLUDED.name,
-            symbol = EXCLUDED.symbol,
-            metadata_uri = EXCLUDED.metadata_uri,
+            name = COALESCE(NULLIF(EXCLUDED.name, ''), tokens.name),
+            symbol = COALESCE(NULLIF(EXCLUDED.symbol, ''), tokens.symbol),
+            metadata_uri = COALESCE(NULLIF(EXCLUDED.metadata_uri, ''), tokens.metadata_uri),
             updated_at = now()
       `,
       [

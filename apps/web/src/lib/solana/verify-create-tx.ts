@@ -17,24 +17,33 @@ export async function verifySolanaCreateTx(
     rpcUrl: process.env.NEXT_PUBLIC_SOLANA_RPC_URL ?? process.env.SOLANA_RPC_URL,
   });
   const conn = new Connection(rpc, "confirmed");
-  const tx = await conn.getTransaction(signature, {
-    commitment: "confirmed",
-    maxSupportedTransactionVersion: 0,
-  });
-  if (!tx?.meta?.logMessages?.length) return null;
 
-  const events = extractEventsFromLogs({
-    logs: tx.meta.logMessages,
-    signature,
-    slot: tx.slot,
-    programId: PROGRAM_IDS.launchpad,
-  });
-  const created = events.find((e) => e.name === FACTORY_EVENTS.TokenCreated && e.fields);
-  if (!created?.fields) return null;
-  if (String(created.fields.mint) !== mint) return null;
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const tx = await conn.getTransaction(signature, {
+      commitment: "confirmed",
+      maxSupportedTransactionVersion: 0,
+    });
+    if (tx?.meta?.logMessages?.length) {
+      const events = extractEventsFromLogs({
+        logs: tx.meta.logMessages,
+        signature,
+        slot: tx.slot,
+        programId: PROGRAM_IDS.launchpad,
+      });
+      const created = events.find((e) => e.name === FACTORY_EVENTS.TokenCreated && e.fields);
+      if (!created?.fields) return null;
+      if (String(created.fields.mint) !== mint) return null;
 
-  return {
-    creator: String(created.fields.creator),
-    slot: tx.slot,
-  };
+      return {
+        creator: String(created.fields.creator),
+        slot: tx.slot,
+      };
+    }
+
+    if (attempt < 4) {
+      await new Promise((resolve) => setTimeout(resolve, 400 * (attempt + 1)));
+    }
+  }
+
+  return null;
 }
