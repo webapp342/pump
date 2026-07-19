@@ -22,9 +22,38 @@ export function formatTradeError(err: unknown): string {
   if (lower.includes("user rejected") || lower.includes("user denied")) {
     return "Transaction cancelled in wallet.";
   }
-  if (lower.includes("insufficient funds")) {
+
+  // Prefer our live preflight message (already human-readable).
+  if (lower.startsWith("insufficient funds: wallet has")) {
+    return raw.length > 220 ? `${raw.slice(0, 220)}…` : raw;
+  }
+
+  if (lower.includes("token vault is empty")) {
+    return raw;
+  }
+
+  // SPL token "insufficient funds" is NOT a SOL balance problem (vault/ATA).
+  if (
+    lower.includes("insufficient funds") &&
+    (lower.includes("token") || lower.includes("custom program error: 0x1"))
+  ) {
+    return "Token transfer failed — vault or token account has no balance. Refresh and try again.";
+  }
+
+  if (
+    lower.includes("insufficient funds for rent") ||
+    lower.includes("insufficientfundsforrent")
+  ) {
+    return `Not enough ${NATIVE_SYMBOL} left for rent after this trade. Lower the amount slightly.`;
+  }
+
+  if (
+    lower.includes("insufficient funds") ||
+    (lower.includes("insufficient") && lower.includes(NATIVE_SYMBOL.toLowerCase()))
+  ) {
     return `Not enough ${NATIVE_SYMBOL} for this trade (amount + network fee).`;
   }
+
   if (
     lower.includes("smart account does not have sufficient funds") ||
     lower.includes("required prefund")

@@ -189,6 +189,9 @@ export function CreateMemeFormSolana() {
         const cost = await estimateSolanaCreateCostLamports({
           connection: conn,
           initialBuyLamports,
+          feePayer: solanaAddress ?? undefined,
+          name: name.trim() || undefined,
+          symbol: symbol.trim() || undefined,
         });
         if (!cancelled) setCreateCostLamports(cost);
       } catch {
@@ -198,7 +201,7 @@ export function CreateMemeFormSolana() {
     return () => {
       cancelled = true;
     };
-  }, [initialBuyLamports]);
+  }, [initialBuyLamports, solanaAddress, name, symbol]);
 
   const estimatedTokensWei = useMemo(() => {
     if (initialBuyLamports <= 0n) return 0n;

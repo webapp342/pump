@@ -19,9 +19,9 @@ Official pump.fun reference (May 2026): [pump.fun/docs/fees](https://pump.fun/do
 
 | Action | Typical cost | Notes |
 |--------|--------------|--------|
-| Create (no buy) | ~0.011 SOL | Mint + curve PDA + vault ATA + Metaplex metadata rent + tx |
+| Create (no buy) | ~0.007 SOL | SPL mint + vault ATA + Metaplex metadata (MPL `byteSize`) + curve program rent + live tx fee |
 | Create + initial buy | ~0.013 SOL + buy amount | Adds trader ATA rent |
-| Buy / sell | ~0.000005 SOL tx | Optional priority tip (0.003–0.01 SOL) is user-set on pump.fun; we use base fee only |
+| Buy / sell | ~0.000005 SOL tx | Quoted live via RPC `getFeeForMessage` (no priority tip) |
 | Jito bundle tip | **Not required** | pump.fun optional for snipers; normal trades use standard RPC |
 
 After deploy, re-run `npm run solana:initialize` to write fee defaults to the global PDA.

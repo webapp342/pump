@@ -14,12 +14,14 @@ import {
   ASSOCIATED_TOKEN_PROGRAM_ID,
   TOKEN_PROGRAM_ID,
   MINT_SIZE,
+  ACCOUNT_SIZE,
   createAssociatedTokenAccountIdempotentInstruction,
   createInitializeMint2Instruction,
   getAssociatedTokenAddressSync,
 } from "@solana/spl-token";
-import { encodeBuyIx, encodeCreateMemeIx, LAUNCHPAD_ACCOUNT_LEN, PUMP_FEEL_DEFAULTS, SOLANA_BASE_TX_FEE_LAMPORTS } from "@pump/solana-sdk";
+import { encodeBuyIx, encodeCreateMemeIx, LAUNCHPAD_PROGRAM_RENT_LAMPORTS, PUMP_FEEL_DEFAULTS } from "@pump/solana-sdk";
 import { getSolanaConnection } from "@/lib/solana/transfer";
+import { getLiveTransactionFeeLamports } from "@/lib/solana/tx-fee";
 import { sendSolanaSilentTransaction } from "@/lib/solana/send-silent-transaction";
 import {
   hydrateSolanaSilentSession,
@@ -28,6 +30,7 @@ import {
 import {
   buildTokenMetaplexJsonUrl,
   createSplTokenMetadataInstruction,
+  estimateMetaplexMetadataRentLamports,
 } from "@/lib/solana/metaplex-metadata";
 import {
   decodeGlobalConfig,
@@ -64,6 +67,125 @@ function referrerAccounts(trader: PublicKey, referrerAddress?: string | null) {
   return { referrerBinding, referrerWallet };
 }
 
+async function buildCreateMemeInstructions(input: {
+  creator: PublicKey;
+  mint: PublicKey;
+  name: string;
+  symbol: string;
+  uri: string;
+  tokenDecimals: number;
+  initialBuyLamports?: bigint;
+  minTokenOut?: bigint;
+  referrerAddress?: string | null;
+}): Promise<TransactionInstruction[]> {
+  const programId = launchpadProgramId();
+  const [globalPda] = pdaGlobal(programId);
+  const [factorySigner] = pdaFactorySigner(programId);
+  const [treasury] = pdaTreasuryVault(programId);
+  const [curvePda] = pdaCurve(input.mint, programId);
+  const vault = getAssociatedTokenAddressSync(input.mint, curvePda, true, TOKEN_PROGRAM_ID);
+  const conn = getSolanaConnection();
+  const mintRent = await conn.getMinimumBalanceForRentExemption(MINT_SIZE);
+
+  const ixs: TransactionInstruction[] = [
+    SystemProgram.createAccount({
+      fromPubkey: input.creator,
+      newAccountPubkey: input.mint,
+      space: MINT_SIZE,
+      lamports: mintRent,
+      programId: TOKEN_PROGRAM_ID,
+    }),
+    createInitializeMint2Instruction(
+      input.mint,
+      input.tokenDecimals,
+      input.creator,
+      null,
+      TOKEN_PROGRAM_ID
+    ),
+    createAssociatedTokenAccountIdempotentInstruction(
+      input.creator,
+      vault,
+      curvePda,
+      input.mint,
+      TOKEN_PROGRAM_ID,
+      ASSOCIATED_TOKEN_PROGRAM_ID
+    ),
+    createSplTokenMetadataInstruction({
+      mint: input.mint,
+      mintAuthority: input.creator,
+      payer: input.creator,
+      updateAuthority: input.creator,
+      name: input.name,
+      symbol: input.symbol,
+      uri: input.uri,
+    }),
+    new TransactionInstruction({
+      programId,
+      keys: [
+        { pubkey: input.creator, isSigner: true, isWritable: true },
+        { pubkey: input.mint, isSigner: true, isWritable: true },
+        { pubkey: curvePda, isSigner: false, isWritable: true },
+        { pubkey: vault, isSigner: false, isWritable: true },
+        { pubkey: factorySigner, isSigner: false, isWritable: false },
+        { pubkey: globalPda, isSigner: false, isWritable: false },
+        { pubkey: treasury, isSigner: false, isWritable: true },
+        { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+        { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+      ],
+      data: encodeCreateMemeIx({
+        name: input.name,
+        symbol: input.symbol,
+        uri: input.uri,
+      }),
+    }),
+  ];
+
+  const initialBuy = input.initialBuyLamports ?? 0n;
+  if (initialBuy > 0n) {
+    const traderAta = getAssociatedTokenAddressSync(
+      input.mint,
+      input.creator,
+      false,
+      TOKEN_PROGRAM_ID
+    );
+    const minOut = input.minTokenOut ?? 1n;
+    const { referrerBinding, referrerWallet } = referrerAccounts(
+      input.creator,
+      input.referrerAddress
+    );
+    ixs.push(
+      createAssociatedTokenAccountIdempotentInstruction(
+        input.creator,
+        traderAta,
+        input.creator,
+        input.mint,
+        TOKEN_PROGRAM_ID,
+        ASSOCIATED_TOKEN_PROGRAM_ID
+      ),
+      new TransactionInstruction({
+        programId,
+        keys: [
+          { pubkey: input.creator, isSigner: true, isWritable: true },
+          { pubkey: globalPda, isSigner: false, isWritable: false },
+          { pubkey: curvePda, isSigner: false, isWritable: true },
+          { pubkey: treasury, isSigner: false, isWritable: true },
+          { pubkey: input.creator, isSigner: false, isWritable: true },
+          { pubkey: input.mint, isSigner: false, isWritable: false },
+          { pubkey: vault, isSigner: false, isWritable: true },
+          { pubkey: traderAta, isSigner: false, isWritable: true },
+          { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+          { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+          { pubkey: referrerBinding, isSigner: false, isWritable: false },
+          { pubkey: referrerWallet, isSigner: false, isWritable: true },
+        ],
+        data: encodeBuyIx(initialBuy, minOut),
+      })
+    );
+  }
+
+  return ixs;
+}
+
 export async function silentCreateMeme(input: {
   name: string;
   symbol: string;
@@ -79,115 +201,27 @@ export async function silentCreateMeme(input: {
   }
 
   const creator = await creatorPubkey();
-  const programId = launchpadProgramId();
   const mintKp = Keypair.generate();
   const mint = mintKp.publicKey;
   const metadataUri =
     input.uri?.trim() || buildTokenMetaplexJsonUrl(mint.toBase58());
 
-  const [globalPda] = pdaGlobal(programId);
-  const [factorySigner] = pdaFactorySigner(programId);
-  const [treasury] = pdaTreasuryVault(programId);
-  const [curvePda] = pdaCurve(mint, programId);
-  const vault = getAssociatedTokenAddressSync(mint, curvePda, true, TOKEN_PROGRAM_ID);
-
   const conn = getSolanaConnection();
-  const globalInfo = await conn.getAccountInfo(globalPda, "confirmed");
+  const globalInfo = await conn.getAccountInfo(pdaGlobal()[0], "confirmed");
   if (!globalInfo?.data) throw new Error("Launchpad not initialized on-chain");
   const global = decodeGlobalConfig(globalInfo.data);
 
-  const mintRent = await conn.getMinimumBalanceForRentExemption(MINT_SIZE);
-
-  const ixs: TransactionInstruction[] = [
-    SystemProgram.createAccount({
-      fromPubkey: creator,
-      newAccountPubkey: mint,
-      space: MINT_SIZE,
-      lamports: mintRent,
-      programId: TOKEN_PROGRAM_ID,
-    }),
-    createInitializeMint2Instruction(
-      mint,
-      global.tokenDecimals,
-      creator,
-      null,
-      TOKEN_PROGRAM_ID
-    ),
-    createAssociatedTokenAccountIdempotentInstruction(
-      creator,
-      vault,
-      curvePda,
-      mint,
-      TOKEN_PROGRAM_ID,
-      ASSOCIATED_TOKEN_PROGRAM_ID
-    ),
-    createSplTokenMetadataInstruction({
-      mint,
-      mintAuthority: creator,
-      payer: creator,
-      updateAuthority: creator,
-      name: trimmedName,
-      symbol: trimmedSymbol,
-      uri: metadataUri,
-    }),
-    new TransactionInstruction({
-      programId,
-      keys: [
-        { pubkey: creator, isSigner: true, isWritable: true },
-        { pubkey: mint, isSigner: true, isWritable: true },
-        { pubkey: curvePda, isSigner: false, isWritable: true },
-        { pubkey: vault, isSigner: false, isWritable: true },
-        { pubkey: factorySigner, isSigner: false, isWritable: false },
-        { pubkey: globalPda, isSigner: false, isWritable: false },
-        { pubkey: treasury, isSigner: false, isWritable: true },
-        { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
-        { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
-      ],
-      data: encodeCreateMemeIx({
-        name: trimmedName,
-        symbol: trimmedSymbol,
-        uri: metadataUri,
-      }),
-    }),
-  ];
-
-  const initialBuy = input.initialBuyLamports ?? 0n;
-  if (initialBuy > 0n) {
-    const traderAta = getAssociatedTokenAddressSync(mint, creator, false, TOKEN_PROGRAM_ID);
-    const minOut = input.minTokenOut ?? 1n;
-    const { referrerBinding, referrerWallet } = referrerAccounts(
-      creator,
-      input.referrerAddress
-    );
-    ixs.push(
-      createAssociatedTokenAccountIdempotentInstruction(
-        creator,
-        traderAta,
-        creator,
-        mint,
-        TOKEN_PROGRAM_ID,
-        ASSOCIATED_TOKEN_PROGRAM_ID
-      ),
-      new TransactionInstruction({
-        programId,
-        keys: [
-          { pubkey: creator, isSigner: true, isWritable: true },
-          { pubkey: globalPda, isSigner: false, isWritable: false },
-          { pubkey: curvePda, isSigner: false, isWritable: true },
-          { pubkey: treasury, isSigner: false, isWritable: true },
-          { pubkey: creator, isSigner: false, isWritable: true },
-          { pubkey: mint, isSigner: false, isWritable: false },
-          { pubkey: vault, isSigner: false, isWritable: true },
-          { pubkey: traderAta, isSigner: false, isWritable: true },
-          { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
-          { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
-          { pubkey: referrerBinding, isSigner: false, isWritable: false },
-          { pubkey: referrerWallet, isSigner: false, isWritable: true },
-        ],
-        data: encodeBuyIx(initialBuy, minOut),
-      })
-    );
-  }
+  const ixs = await buildCreateMemeInstructions({
+    creator,
+    mint,
+    name: trimmedName,
+    symbol: trimmedSymbol,
+    uri: metadataUri,
+    tokenDecimals: global.tokenDecimals,
+    initialBuyLamports: input.initialBuyLamports,
+    minTokenOut: input.minTokenOut,
+    referrerAddress: input.referrerAddress,
+  });
 
   const { signature } = await sendSolanaSilentTransaction(ixs, {
     extraSigners: [mintKp],
@@ -200,7 +234,7 @@ export async function silentCreateMeme(input: {
   };
 }
 
-const TOKEN_ACCOUNT_LEN = 165;
+const TOKEN_ACCOUNT_LEN = ACCOUNT_SIZE;
 
 /**
  * Pump.fun-style create cost: platform fee (usually 0) + Solana rent + tx fee.
@@ -209,6 +243,9 @@ const TOKEN_ACCOUNT_LEN = 165;
 export async function estimateSolanaCreateCostLamports(options?: {
   initialBuyLamports?: bigint;
   connection?: Connection;
+  feePayer?: PublicKey | string;
+  name?: string;
+  symbol?: string;
 }): Promise<bigint> {
   const conn = options?.connection ?? getSolanaConnection();
   const [globalPda] = pdaGlobal();
@@ -216,17 +253,44 @@ export async function estimateSolanaCreateCostLamports(options?: {
   const createFeeLamports = globalInfo?.data
     ? decodeGlobalConfig(globalInfo.data).createFeeLamports
     : PUMP_FEEL_DEFAULTS.createFeeLamports;
+  const tokenDecimals = globalInfo?.data
+    ? decodeGlobalConfig(globalInfo.data).tokenDecimals
+    : PUMP_FEEL_DEFAULTS.tokenDecimals;
 
-  const [mintRent, vaultRent, curveRent, metadataRent] = await Promise.all([
+  const estimateMint = Keypair.generate();
+  const feePayer = new PublicKey(
+    options?.feePayer ?? estimateMint.publicKey
+  );
+  const placeholderName = options?.name?.trim() || "Estimate";
+  const placeholderSymbol = options?.symbol?.trim().toUpperCase() || "EST";
+  const metadataUri = buildTokenMetaplexJsonUrl(estimateMint.publicKey.toBase58());
+
+  const [mintRent, vaultRent, metadataRent, txFeeLamports] = await Promise.all([
     conn.getMinimumBalanceForRentExemption(MINT_SIZE),
     conn.getMinimumBalanceForRentExemption(TOKEN_ACCOUNT_LEN),
-    conn.getMinimumBalanceForRentExemption(LAUNCHPAD_ACCOUNT_LEN.curve),
-    conn.getMinimumBalanceForRentExemption(LAUNCHPAD_ACCOUNT_LEN.metadata),
+    estimateMetaplexMetadataRentLamports(conn, {
+      mint: estimateMint.publicKey,
+      updateAuthority: feePayer,
+      name: placeholderName,
+      symbol: placeholderSymbol,
+      uri: metadataUri,
+    }),
+    buildCreateMemeInstructions({
+      creator: feePayer,
+      mint: estimateMint.publicKey,
+      name: placeholderName,
+      symbol: placeholderSymbol,
+      uri: metadataUri,
+      tokenDecimals,
+      initialBuyLamports: options?.initialBuyLamports,
+      minTokenOut: 1n,
+    }).then((ixs) => getLiveTransactionFeeLamports(conn, ixs, feePayer)),
   ]);
 
   let total =
-    BigInt(mintRent + vaultRent + curveRent + metadataRent) +
-    SOLANA_BASE_TX_FEE_LAMPORTS +
+    BigInt(mintRent + vaultRent + metadataRent) +
+    LAUNCHPAD_PROGRAM_RENT_LAMPORTS.curve +
+    txFeeLamports +
     createFeeLamports;
 
   const initialBuy = options?.initialBuyLamports ?? 0n;
@@ -238,12 +302,7 @@ export async function estimateSolanaCreateCostLamports(options?: {
   return total;
 }
 
-/** @deprecated Use estimateSolanaCreateCostLamports — kept for callers during migration. */
-export function solanaCreateFeeCushionLamports(): bigint {
-  // Sync fallback only; UI should call estimateSolanaCreateCostLamports.
-  return (
-    BigInt(1_461_600 + 2_039_280 + 1_893_120 + 5_616_720) +
-    SOLANA_BASE_TX_FEE_LAMPORTS +
-    PUMP_FEEL_DEFAULTS.createFeeLamports
-  );
+/** @deprecated Use estimateSolanaCreateCostLamports. */
+export async function solanaCreateFeeCushionLamports(): Promise<bigint> {
+  return estimateSolanaCreateCostLamports();
 }

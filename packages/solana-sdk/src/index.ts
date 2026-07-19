@@ -100,15 +100,20 @@ export const PUMP_FEEL_DEFAULTS = {
   verifiedReferrerShareBps: 2_000,
 } as const;
 
-/** On-chain account sizes for rent estimates (must match pump-launchpad layouts). */
+/** On-chain account sizes — program layout (must match pump-launchpad Rust). */
 export const LAUNCHPAD_ACCOUNT_LEN = {
+  /** `Curve` Pod in programs/pump-launchpad/src/lib.rs */
   curve: 144,
   global: 160,
-  metadata: 679,
 } as const;
 
-/** Base Solana tx fee: 2 signatures on create (payer + mint), 1 on buy/sell. */
-export const SOLANA_BASE_TX_FEE_LAMPORTS = 10_000n;
+/**
+ * Lamports the launchpad program allocates on create_meme (not byte-size derived on client).
+ * Keep in sync with `CURVE_RENT_LAMPORTS` in programs/pump-launchpad/src/lib.rs.
+ */
+export const LAUNCHPAD_PROGRAM_RENT_LAMPORTS = {
+  curve: 1_893_120n,
+} as const;
 
 export type PumpFeelDefaults = typeof PUMP_FEEL_DEFAULTS;
 

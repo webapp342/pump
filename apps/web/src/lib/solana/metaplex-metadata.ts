@@ -6,9 +6,12 @@ import {
   PublicKey,
   SystemProgram,
   TransactionInstruction,
+  type Connection,
 } from "@solana/web3.js";
 import {
   createCreateMetadataAccountV3Instruction,
+  Key,
+  Metadata,
   PROGRAM_ID as TOKEN_METADATA_PROGRAM_ID,
 } from "@metaplex-foundation/mpl-token-metadata";
 
@@ -42,6 +45,53 @@ export function buildTokenMetaplexJsonUrl(mintAddress: string, origin?: string):
     origin?.replace(/\/$/, "") ??
     (typeof window !== "undefined" ? window.location.origin : "https://pump.zugchain.org");
   return `${base}/api/tokens/${encodeURIComponent(mintAddress)}/metaplex.json`;
+}
+
+/** Metadata account rent from MPL layout + name/symbol/uri (not a fixed byte guess). */
+export function metaplexMetadataRentArgs(input: {
+  mint: PublicKey;
+  updateAuthority: PublicKey;
+  name: string;
+  symbol: string;
+  uri: string;
+}) {
+  return {
+    key: Key.MetadataV1,
+    updateAuthority: input.updateAuthority,
+    mint: input.mint,
+    data: {
+      name: clampMetaplexName(input.name),
+      symbol: clampMetaplexSymbol(input.symbol),
+      uri: clampMetaplexUri(input.uri),
+      sellerFeeBasisPoints: 0,
+      creators: null,
+    },
+    primarySaleHappened: false,
+    isMutable: true,
+    editionNonce: null,
+    tokenStandard: null,
+    collection: null,
+    uses: null,
+    collectionDetails: null,
+    programmableConfig: null,
+  };
+}
+
+export async function estimateMetaplexMetadataRentLamports(
+  connection: Connection,
+  input: {
+    mint: PublicKey;
+    updateAuthority: PublicKey;
+    name: string;
+    symbol: string;
+    uri: string;
+  }
+): Promise<number> {
+  return Metadata.getMinimumBalanceForRentExemption(
+    metaplexMetadataRentArgs(input),
+    connection,
+    "confirmed"
+  );
 }
 
 export function createSplTokenMetadataInstruction(input: {

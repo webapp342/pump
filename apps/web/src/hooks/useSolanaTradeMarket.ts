@@ -23,6 +23,11 @@ import {
   pdaGlobal,
 } from "@/lib/solana/launchpad-pdas";
 import {
+  buildSolanaBuyInstructions,
+  buildSolanaSellInstructions,
+} from "@/lib/solana/trade-instructions";
+import { getLiveTransactionFeeLamports } from "@/lib/solana/tx-fee";
+import {
   lamportsToWei,
   tokenRawToWei,
 } from "@/lib/solana/amount-scale";
@@ -37,6 +42,9 @@ export type SolanaTradeMarket = {
   tokenBalanceWei: bigint | undefined;
   /** False when first buy must create the trader ATA (~0.002 SOL rent). */
   traderAtaExists: boolean | undefined;
+  /** Base tx fee from RPC getFeeForMessage (no priority tip). */
+  buyTxFeeLamports: bigint | undefined;
+  sellTxFeeLamports: bigint | undefined;
   refetchBalances: () => Promise<void>;
 };
 
@@ -99,6 +107,39 @@ async function fetchMarket(mintAddress: string, ownerAddress?: string) {
     (curve?.paused ?? 0) !== 0 || (global?.emergencyHalt ?? 0) !== 0
   );
 
+  let buyTxFeeLamports: bigint | undefined;
+  let sellTxFeeLamports: bigint | undefined;
+  if (ownerAddress && curve) {
+    const trader = new PublicKey(ownerAddress);
+    const includeAtaCreate = tokenSnapshot?.traderAtaExists !== true;
+    try {
+      const buyIxs = buildSolanaBuyInstructions({
+        trader,
+        mint,
+        curvePda,
+        curve,
+        solInLamports: 1_000_000n,
+        minTokenOut: 1n,
+        includeAtaCreate,
+      });
+      const sellIxs = buildSolanaSellInstructions({
+        trader,
+        mint,
+        curvePda,
+        curve,
+        tokenIn: 1_000_000n,
+        minSolOut: 1n,
+      });
+      [buyTxFeeLamports, sellTxFeeLamports] = await Promise.all([
+        getLiveTransactionFeeLamports(conn, buyIxs, trader),
+        getLiveTransactionFeeLamports(conn, sellIxs, trader),
+      ]);
+    } catch {
+      buyTxFeeLamports = undefined;
+      sellTxFeeLamports = undefined;
+    }
+  }
+
   return {
     bondingCurve,
     protocolFeeBps:
@@ -109,6 +150,8 @@ async function fetchMarket(mintAddress: string, ownerAddress?: string) {
     tokenBalanceWei:
       tokenSnapshot != null ? tokenRawToWei(tokenSnapshot.tokenRaw) : undefined,
     traderAtaExists: tokenSnapshot?.traderAtaExists,
+    buyTxFeeLamports,
+    sellTxFeeLamports,
   };
 }
 
@@ -140,6 +183,8 @@ export function useSolanaTradeMarket(
     solBalanceWei: query.data?.solBalanceWei,
     tokenBalanceWei: query.data?.tokenBalanceWei,
     traderAtaExists: query.data?.traderAtaExists,
+    buyTxFeeLamports: query.data?.buyTxFeeLamports,
+    sellTxFeeLamports: query.data?.sellTxFeeLamports,
     refetchBalances,
   };
 }

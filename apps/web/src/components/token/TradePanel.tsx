@@ -95,9 +95,9 @@ import { useSolanaTradeMarket } from "@/hooks/useSolanaTradeMarket";
 import { useSolanaNativeBalance } from "@/hooks/useSolanaNativeBalance";
 import { silentBuy, silentSell } from "@/lib/solana/silent-trade";
 import {
-  SOLANA_FEE_RESERVE_WEI,
   lamportsToWei,
   solanaBuyPrefundWei,
+  solanaSellPrefundWei,
   weiToLamports,
   weiToTokenRaw,
 } from "@/lib/solana/amount-scale";
@@ -1017,12 +1017,15 @@ export function TradePanel({
 
   const userOpPrefundWei = useMemo(() => {
     if (isSolanaTrade) {
+      // Fallback ~1 sig fee when live quote not ready — still reserve ATA + wallet rent.
+      const fallbackTxFee = 5_000n;
       if (side === "buy") {
-        // Until ATA status is known, reserve rent so Avail matches what the chain accepts.
+        const txFee = solanaMarket.buyTxFeeLamports ?? fallbackTxFee;
         const needsTraderAta = solanaMarket.traderAtaExists !== true;
-        return solanaBuyPrefundWei(needsTraderAta);
+        return solanaBuyPrefundWei(needsTraderAta, txFee);
       }
-      return SOLANA_FEE_RESERVE_WEI;
+      const txFee = solanaMarket.sellTxFeeLamports ?? fallbackTxFee;
+      return solanaSellPrefundWei(txFee);
     }
     if (gasCostWei != null && gasCostWei > 0n) return gasCostWei;
     if (gasPrice != null && gasPrice > 0n) {
@@ -1037,6 +1040,8 @@ export function TradePanel({
     isSolanaTrade,
     side,
     solanaMarket.traderAtaExists,
+    solanaMarket.buyTxFeeLamports,
+    solanaMarket.sellTxFeeLamports,
     gasCostWei,
     gasPrice,
     needsLegacyApproval,
@@ -1894,17 +1899,29 @@ export function TradePanel({
     userOpPrefundWei: bigint,
     sellAmountWei?: bigint
   ) {
-    if (!address || bnbBalance === undefined) {
+    if (!address) {
       throw new Error("Wallet balance not ready.");
     }
     if (isSolanaTrade) {
+      // Always re-read signer balance from RPC — cached Avail can be stale after create.
+      const { data: freshLamports } = await refetchSolBalance();
+      const liveWei =
+        freshLamports != null
+          ? lamportsToWei(BigInt(freshLamports as bigint | number | string))
+          : bnbBalance?.value;
+      if (liveWei === undefined) {
+        throw new Error("Wallet balance not ready.");
+      }
       const bnbWei = availableNativeExcluding(
         pendingLedgerRef.current,
-        bnbBalance.value,
+        liveWei,
         pendingId
       );
       if (tradeSide === "buy" && callValueWei + userOpPrefundWei > bnbWei) {
-        throw new Error(`Insufficient ${NATIVE_SYMBOL} for trade and network fee.`);
+        throw new Error(
+          `Insufficient funds: need trade + network reserve, ` +
+            `available ${Number(formatEther(bnbWei)).toFixed(6)} ${NATIVE_SYMBOL}.`
+        );
       }
       if (tradeSide === "sell") {
         if (bnbWei < userOpPrefundWei) {
@@ -1927,6 +1944,9 @@ export function TradePanel({
         }
       }
       return;
+    }
+    if (bnbBalance === undefined) {
+      throw new Error("Wallet balance not ready.");
     }
     const bnbWei = availableNativeExcluding(
       pendingLedgerRef.current,
@@ -2052,7 +2072,7 @@ export function TradePanel({
   ) {
     if (!address || !bondingCurve) return;
     const pendingId = createOptimisticPendingId();
-    const sellPrefund = isSolanaTrade ? SOLANA_FEE_RESERVE_WEI : sellGasReserveWei;
+    const sellPrefund = sellGasReserveWei;
     commitPendingReservation(
       pendingId,
       "sell",
@@ -2079,7 +2099,7 @@ export function TradePanel({
               pendingId,
               "sell",
               0n,
-              SOLANA_FEE_RESERVE_WEI,
+              sellGasReserveWei,
               sellParams.amountWei
             );
             await submitSolanaSilentSell(pendingId, sellParams);

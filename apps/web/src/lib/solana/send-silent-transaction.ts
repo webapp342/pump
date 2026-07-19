@@ -50,9 +50,19 @@ export async function sendSolanaSilentTransaction(
   tx.lastValidBlockHeight = lastValidBlockHeight;
 
   const signers = [payer, ...(options?.extraSigners ?? [])];
-  const signature = await sendAndConfirmTransaction(conn, tx, signers, {
-    commitment: "confirmed",
-    skipPreflight: false,
-  });
-  return { signature };
+  try {
+    const signature = await sendAndConfirmTransaction(conn, tx, signers, {
+      commitment: "confirmed",
+      skipPreflight: false,
+    });
+    return { signature };
+  } catch (err) {
+    const logs =
+      err && typeof err === "object" && "logs" in err && Array.isArray((err as { logs?: string[] }).logs)
+        ? (err as { logs: string[] }).logs.join("\n")
+        : "";
+    const msg = err instanceof Error ? err.message : String(err);
+    const combined = `${msg}${logs ? `\n${logs}` : ""}`;
+    throw new Error(combined);
+  }
 }
