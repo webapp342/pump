@@ -125,8 +125,12 @@ function writeBorshBytes(out: Uint8Array, offset: number, bytes: Uint8Array): nu
   return o;
 }
 
+function instructionData(bytes: Uint8Array): Buffer {
+  return Buffer.from(bytes);
+}
+
 /** Encode Pinocchio `initialize` instruction data (tag + 8×u64 + u8). */
-export function encodeInitializeIx(defaults: PumpFeelDefaults = PUMP_FEEL_DEFAULTS): Uint8Array {
+export function encodeInitializeIx(defaults: PumpFeelDefaults = PUMP_FEEL_DEFAULTS): Buffer {
   const out = new Uint8Array(1 + 64 + 1);
   let o = writeU8(out, 0, IX.initialize);
   o = writeU64Le(out, o, BigInt(defaults.protocolFeeBps));
@@ -138,30 +142,30 @@ export function encodeInitializeIx(defaults: PumpFeelDefaults = PUMP_FEEL_DEFAUL
   o = writeU64Le(out, o, defaults.totalSupply);
   o = writeU64Le(out, o, defaults.totalSupply);
   writeU8(out, o, defaults.tokenDecimals);
-  return out;
+  return instructionData(out);
 }
 
-export function encodeBuyIx(solInLamports: bigint, minTokenOut: bigint): Uint8Array {
+export function encodeBuyIx(solInLamports: bigint, minTokenOut: bigint): Buffer {
   const out = new Uint8Array(17);
   let o = writeU8(out, 0, IX.buy);
   o = writeU64Le(out, o, solInLamports);
   writeU64Le(out, o, minTokenOut);
-  return out;
+  return instructionData(out);
 }
 
-export function encodeSellIx(tokenIn: bigint, minSolOut: bigint): Uint8Array {
+export function encodeSellIx(tokenIn: bigint, minSolOut: bigint): Buffer {
   const out = new Uint8Array(17);
   let o = writeU8(out, 0, IX.sell);
   o = writeU64Le(out, o, tokenIn);
   writeU64Le(out, o, minSolOut);
-  return out;
+  return instructionData(out);
 }
 
 export function encodeCreateMemeIx(input: {
   name: string;
   symbol: string;
   uri?: string;
-}): Uint8Array {
+}): Buffer {
   const name = input.name.trim();
   const symbol = input.symbol.trim().toUpperCase();
   const uri = (input.uri ?? "").trim();
@@ -186,18 +190,18 @@ export function encodeCreateMemeIx(input: {
   o = writeBorshBytes(out, o, nameBytes);
   o = writeBorshBytes(out, o, symbolBytes);
   writeBorshBytes(out, o, uriBytes);
-  return out;
+  return instructionData(out);
 }
 
-export function encodeWithdrawIx(amount: bigint): Uint8Array {
+export function encodeWithdrawIx(amount: bigint): Buffer {
   const out = new Uint8Array(9);
   let o = writeU8(out, 0, IX.withdrawTreasury);
   writeU64Le(out, o, amount);
-  return out;
+  return instructionData(out);
 }
 
-export function encodeSetReferrerIx(): Uint8Array {
-  return new Uint8Array([IX.setReferrer]);
+export function encodeSetReferrerIx(): Buffer {
+  return instructionData(new Uint8Array([IX.setReferrer]));
 }
 
 export {
