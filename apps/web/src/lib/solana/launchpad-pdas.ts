@@ -40,6 +40,16 @@ export function pdaCurve(
   );
 }
 
+export function pdaReferrerBinding(
+  trader: PublicKey,
+  programId = launchpadProgramId()
+): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from(PDA_SEEDS.referrer), trader.toBuffer()],
+    programId
+  );
+}
+
 /** On-chain Curve account layout (bytemuck Pod). */
 export type OnchainCurve = {
   mint: PublicKey;

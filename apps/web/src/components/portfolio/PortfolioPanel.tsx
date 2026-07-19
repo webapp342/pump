@@ -9,6 +9,7 @@ import { useAccount } from "wagmi";
 import { usePumpWallet } from "@/components/wallet/PumpWalletProvider";
 import { useReadContract } from "wagmi";
 import { contracts, pumpChain, NATIVE_SYMBOL } from "@/config/chain";
+import { isSolanaChainFamily } from "@/config/chain-family";
 import { bondingCurveManagerAbi } from "@/lib/bonding-curve";
 import { ClaimCreatorFeesModal } from "@/components/portfolio/ClaimCreatorFeesModal";
 import { PortfolioGuestPanel } from "@/components/portfolio/PortfolioGuestPanel";
@@ -642,12 +643,29 @@ export function PortfolioPanel({
   const searchParams = useSearchParams();
   const activeTab = parsePortfolioTab(searchParams.get("tab") ?? initialTab);
   const hasSsrPortfolio = portfolioMatchesWallet(initialPortfolio, ssrWalletAddress);
-  const { address, isConnected, isConnecting, isReconnecting } = useAccount();
-  const { authenticated, scwAddress: sessionAddress, ready: pumpReady, login } = usePumpWallet();
+  const { address: wagmiAddress, isConnected: wagmiConnected, isConnecting, isReconnecting } =
+    useAccount();
+  const {
+    authenticated,
+    scwAddress: sessionAddress,
+    ready: pumpReady,
+    login,
+    solanaAddress,
+    solanaSessionReady,
+  } = usePumpWallet();
+  const isSolanaPortfolio = isSolanaChainFamily;
+  const address = isSolanaPortfolio ? solanaAddress : wagmiAddress;
+  const isConnected = isSolanaPortfolio
+    ? Boolean(pumpReady && authenticated && solanaAddress && solanaSessionReady)
+    : wagmiConnected;
   const walletSessionActive = pumpReady && authenticated && Boolean(sessionAddress);
   const { openConnectModal } = useOpenConnectModal();
   const { bnbUsd } = useBnbUsdPrice();
-  const scwAddress = (address ?? sessionAddress ?? ssrWalletAddress) as `0x${string}` | undefined;
+  const scwAddress = (
+    isSolanaPortfolio
+      ? solanaAddress
+      : (wagmiAddress ?? sessionAddress ?? ssrWalletAddress)
+  ) as `0x${string}` | undefined;
   const { data: scwBalance } = useScwBalance(scwAddress);
   const [data, setData] = useState<PortfolioData | null>(
     hasSsrPortfolio ? initialPortfolio : null
@@ -772,18 +790,18 @@ export function PortfolioPanel({
     address: contracts.bondingCurveManager,
     abi: bondingCurveManagerAbi,
     functionName: "pendingCreatorFees",
-    args: address ? [address] : undefined,
+    args: wagmiAddress ? [wagmiAddress] : undefined,
     chainId: pumpChain.id,
-    query: { enabled: Boolean(address), refetchInterval: 15_000 },
+    query: { enabled: Boolean(wagmiAddress) && !isSolanaPortfolio, refetchInterval: 15_000 },
   });
 
   const { data: pendingReferrerWei, refetch: refetchReferrerPending } = useReadContract({
     address: contracts.bondingCurveManager,
     abi: bondingCurveManagerAbi,
     functionName: "pendingReferrerFees",
-    args: address ? [address] : undefined,
+    args: wagmiAddress ? [wagmiAddress] : undefined,
     chainId: pumpChain.id,
-    query: { enabled: Boolean(address), refetchInterval: 15_000 },
+    query: { enabled: Boolean(wagmiAddress) && !isSolanaPortfolio, refetchInterval: 15_000 },
   });
 
   const loadPortfolio = useCallback(
@@ -956,12 +974,15 @@ export function PortfolioPanel({
       resolvedWallet != null &&
       portfolioMatchesWallet(cachedPortfolio as PortfolioSnapshot, resolvedWallet);
 
-    const walletStackBooting =
-      !pumpReady ||
-      isConnecting ||
-      isReconnecting ||
-      (walletSessionActive && !isConnected) ||
-      (isConnected && !address);
+    const walletStackBooting = isSolanaPortfolio
+      ? !pumpReady ||
+        (authenticated && !solanaSessionReady) ||
+        (isConnected && !address)
+      : !pumpReady ||
+        isConnecting ||
+        isReconnecting ||
+        (walletSessionActive && !isConnected) ||
+        (isConnected && !address);
 
     if (walletStackBooting) {
       if (hasSsrPortfolio || hasCachedPortfolio) return;
@@ -1361,29 +1382,33 @@ export function PortfolioPanel({
 
   return (
     <>
-      <ClaimCreatorFeesModal
-        open={claimOpen}
-        onClose={() => setClaimOpen(false)}
-        claimedBnb={claimedBnb}
-        onClaimed={() => {
-          void refetchPending();
-          if (address) void loadPortfolio(address);
-        }}
-      />
+      {!isSolanaPortfolio ? (
+        <>
+          <ClaimCreatorFeesModal
+            open={claimOpen}
+            onClose={() => setClaimOpen(false)}
+            claimedBnb={claimedBnb}
+            onClaimed={() => {
+              void refetchPending();
+              if (address) void loadPortfolio(address);
+            }}
+          />
 
-      <ClaimReferrerFeesModal
-        open={referrerClaimOpen}
-        onClose={() => setReferrerClaimOpen(false)}
-        claimedBnb={referralStats?.claimedBnb ?? 0}
-        inviteCount={referralStats?.inviteCount ?? 0}
-        referralVolumeBnb={referralStats?.referralVolumeBnb ?? 0}
-        onClaimed={() => {
-          void refetchReferrerPending();
-          if (address) {
-            void fetchReferralStats(address).then((stats) => setReferralStats(stats));
-          }
-        }}
-      />
+          <ClaimReferrerFeesModal
+            open={referrerClaimOpen}
+            onClose={() => setReferrerClaimOpen(false)}
+            claimedBnb={referralStats?.claimedBnb ?? 0}
+            inviteCount={referralStats?.inviteCount ?? 0}
+            referralVolumeBnb={referralStats?.referralVolumeBnb ?? 0}
+            onClaimed={() => {
+              void refetchReferrerPending();
+              if (address) {
+                void fetchReferralStats(address).then((stats) => setReferralStats(stats));
+              }
+            }}
+          />
+        </>
+      ) : null}
 
       <FollowNetworkModal
         open={followModalOpen}

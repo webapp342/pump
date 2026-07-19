@@ -100,7 +100,11 @@ export class LaserStreamSource implements EventSource {
 
 export function createEventSource(config: IndexerSolConfig): EventSource {
   if (config.source === "laserstream") {
-    return new LaserStreamSource(config);
+    if (config.laserstreamEndpoint) {
+      console.warn(
+        "[indexer-sol] LaserStream endpoint configured but client not wired — falling back to RPC logs"
+      );
+    }
   }
   return new RpcLogsSource(config);
 }

@@ -31,6 +31,7 @@ export const IX = {
   buy: 2,
   sell: 3,
   withdrawTreasury: 4,
+  setReferrer: 5,
 } as const;
 
 export type SolanaCluster = "localnet" | "devnet" | "mainnet-beta";
@@ -144,6 +145,10 @@ export function encodeWithdrawIx(amount: bigint): Buffer {
   buf.writeUInt8(IX.withdrawTreasury, 0);
   buf.writeBigUInt64LE(amount, 1);
   return buf;
+}
+
+export function encodeSetReferrerIx(): Buffer {
+  return Buffer.from([IX.setReferrer]);
 }
 
 export {

@@ -3,6 +3,13 @@ import { PUMP_FEEL_DEFAULTS } from "@pump/solana-sdk";
 import type { DecodedSolanaEvent } from "./decode.js";
 import { withTransaction } from "./db-tx.js";
 import {
+  seedBoardStatsOnTokenCreated,
+  upsertBoardStatsAfterTrade,
+  readBoardStatsForPublish,
+} from "./board-stats.js";
+import { upsertCandlesAfterTrade } from "./candles.js";
+import { publishTrade } from "./redis-publish.js";
+import {
   asBigInt,
   asBool,
   asString,
@@ -157,6 +164,15 @@ export class SolanaEventHandlers {
       ]
     );
 
+    await seedBoardStatsOnTokenCreated(this.context.launchpadPool, {
+      tokenAddress: mint,
+      marketCapZug: mcap,
+      spotPriceZug: spot,
+      reserveZug: "0",
+      tokenSold: "0",
+      progressBps: 0,
+    });
+
     console.log(
       `[indexer-sol] TokenCreated mint=${mint} symbol=${asString(f.symbol)}`
     );
@@ -273,6 +289,8 @@ export class SolanaEventHandlers {
 
         if (!tradeIns.rowCount || !tradeIns.rows[0]) return null;
 
+        const tradeId = tradeIns.rows[0].id;
+
         await client.query(
           `
             UPDATE bonding_states
@@ -304,11 +322,102 @@ export class SolanaEventHandlers {
           decimals
         );
 
-        return tradeIns.rows[0].id;
+        const bonding = await client.query<{
+          reserve_zug: string;
+          token_sold: string;
+          trade_count: number;
+          holder_count: number;
+          progress_bps: number;
+        }>(
+          `
+            SELECT
+              COALESCE(reserve_zug, 0)::text AS reserve_zug,
+              COALESCE(token_sold, 0)::text AS token_sold,
+              COALESCE(trade_count, 0) AS trade_count,
+              COALESCE(holder_count, 0) AS holder_count,
+              COALESCE(progress_bps, 0) AS progress_bps
+            FROM bonding_states
+            WHERE token_address = $1
+          `,
+          [mint]
+        );
+        const b = bonding.rows[0] ?? {
+          reserve_zug: lamportsToSol(reserveSol),
+          token_sold: tokenAmountToDecimal(soldTokens, decimals),
+          trade_count: 1,
+          holder_count: 0,
+          progress_bps: 0,
+        };
+
+        const grossSol = Number(lamportsToSol(solAmount));
+        const feeSol = Number(lamportsToSol(feeLamports));
+        const tradeNetZug = String(Math.max(0, grossSol - feeSol));
+        const spotNum = Number(markPrice);
+        const spotBefore = spotNum > 0 ? spotNum * 0.999 : spotNum;
+
+        await upsertBoardStatsAfterTrade(client, {
+          tokenAddress: mint,
+          reserveZug: b.reserve_zug,
+          tokenSold: b.token_sold,
+          spotPriceZug: markPrice,
+          marketCapZug: mcap,
+          progressBps: b.progress_bps,
+          tradeCount: b.trade_count,
+          holderCount: b.holder_count,
+          tradeNetZug,
+          blockTime,
+          traderAddress: trader,
+        });
+
+        const candleUpdates = await upsertCandlesAfterTrade(client, {
+          tokenAddress: mint,
+          blockTime,
+          isBuy,
+          spotBefore,
+          spotAfter: spotNum,
+          volumeZug: Math.max(0, grossSol - feeSol),
+          buyVolumeZug: isBuy ? Math.max(0, grossSol - feeSol) : 0,
+        });
+
+        return { tradeId, bonding: b, candleUpdates };
       }
     );
 
     if (inserted) {
+      const boardExtra = await readBoardStatsForPublish(
+        this.context.launchpadPool,
+        mint
+      );
+      await publishTrade({
+        type: "trade",
+        tokenAddress: mint,
+        candleUpdates: inserted.candleUpdates,
+        trade: {
+          id: inserted.tradeId,
+          side,
+          traderAddress: trader,
+          zugAmount: lamportsToSol(solAmount),
+          feeZug: lamportsToSol(feeLamports),
+          tokenAmount: tokenAmountToDecimal(tokenAmount, decimals),
+          priceZug: executionPrice,
+          txHash: event.signature,
+          logIndex: event.logIndex,
+          blockTime: blockTime.toISOString(),
+        },
+        bonding: {
+          reserveZug: inserted.bonding.reserve_zug,
+          tokenSold: inserted.bonding.token_sold,
+          marketCapZug: mcap,
+          spotPriceZug: markPrice,
+          lastPriceZug: markPrice,
+          progressBps: inserted.bonding.progress_bps,
+          tradeCount: inserted.bonding.trade_count,
+          holderCount: inserted.bonding.holder_count,
+          volume24hZug: boardExtra?.volume24hZug,
+          traders24h: boardExtra?.traders24h,
+        },
+      });
+
       console.log(
         `[indexer-sol] Trade ${side} mint=${mint} trader=${trader} sol=${lamportsToSol(solAmount)}`
       );
@@ -317,8 +426,18 @@ export class SolanaEventHandlers {
 
   async onReferrerSet(event: DecodedSolanaEvent): Promise<void> {
     const f = event.fields!;
+    const trader = asString(f.trader);
+    const referrer = asString(f.referrer);
+    await this.context.launchpadPool.query(
+      `
+        INSERT INTO referral_bindings (invitee_address, referrer_address, bound_tx_hash, bound_at)
+        VALUES ($1, $2, $3, now())
+        ON CONFLICT (invitee_address) DO NOTHING
+      `,
+      [trader, referrer, event.signature]
+    );
     console.log(
-      `[indexer-sol] ReferrerSet trader=${asString(f.trader)} referrer=${asString(f.referrer)}`
+      `[indexer-sol] ReferrerSet trader=${trader} referrer=${referrer}`
     );
   }
 

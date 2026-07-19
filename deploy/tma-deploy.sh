@@ -53,6 +53,16 @@ if [[ -f "$MIG_044" ]]; then
   fi
 fi
 
+MIG_045="$REPO_ROOT/db/migrations/045_solana_address_checks.sql"
+if [[ -f "$MIG_045" ]]; then
+  log "Applying migration 045_solana_address_checks.sql (idempotent)"
+  if sudo -u postgres psql -d pump_db -v ON_ERROR_STOP=1 -f "$MIG_045"; then
+    log "Migration 045 OK"
+  else
+    log "WARN: migration 045 failed — check postgres permissions"
+  fi
+fi
+
 log "Building Next.js (@pump/web)"
 npm run build -w @pump/web
 

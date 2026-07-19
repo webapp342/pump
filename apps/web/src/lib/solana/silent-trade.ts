@@ -14,7 +14,7 @@ import {
   createAssociatedTokenAccountIdempotentInstruction,
   getAssociatedTokenAddressSync,
 } from "@solana/spl-token";
-import { encodeBuyIx, encodeSellIx } from "@pump/solana-sdk";
+import { encodeBuyIx, encodeSellIx, encodeSetReferrerIx } from "@pump/solana-sdk";
 import { getSolanaConnection } from "@/lib/solana/transfer";
 import { sendSolanaSilentTransaction } from "@/lib/solana/send-silent-transaction";
 import {
@@ -26,6 +26,7 @@ import {
   launchpadProgramId,
   pdaCurve,
   pdaGlobal,
+  pdaReferrerBinding,
   pdaTreasuryVault,
 } from "@/lib/solana/launchpad-pdas";
 
@@ -52,6 +53,39 @@ async function loadCurve(mint: PublicKey) {
   };
 }
 
+async function maybeSetReferrer(
+  trader: PublicKey,
+  referrerAddress: string | null | undefined
+): Promise<TransactionInstruction | null> {
+  if (!referrerAddress || referrerAddress === trader.toBase58()) return null;
+  let referrer: PublicKey;
+  try {
+    referrer = new PublicKey(referrerAddress);
+  } catch {
+    return null;
+  }
+  if (referrer.equals(trader)) return null;
+
+  const programId = launchpadProgramId();
+  const [binding] = pdaReferrerBinding(trader);
+  const conn = getSolanaConnection();
+  const existing = await conn.getAccountInfo(binding, "confirmed");
+  if (existing && existing.data.length >= 65) {
+    return null;
+  }
+
+  return new TransactionInstruction({
+    programId,
+    keys: [
+      { pubkey: trader, isSigner: true, isWritable: true },
+      { pubkey: referrer, isSigner: false, isWritable: false },
+      { pubkey: binding, isSigner: false, isWritable: true },
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+    ],
+    data: encodeSetReferrerIx(),
+  });
+}
+
 /**
  * Buy tokens with SOL — popup-free.
  * Ensures trader ATA exists (idempotent create in same tx).
@@ -60,6 +94,7 @@ export async function silentBuy(input: {
   mintAddress: string;
   solInLamports: bigint;
   minTokenOut: bigint;
+  referrerAddress?: string | null;
 }): Promise<SolanaSilentTradeResult> {
   if (input.solInLamports <= 0n) throw new Error("Amount must be greater than zero");
   const trader = await traderPubkey();
@@ -72,8 +107,18 @@ export async function silentBuy(input: {
   if (curve.paused) throw new Error("Trading paused");
   if (!curve.mint.equals(mint)) throw new Error("Mint mismatch");
 
+  const [referrerBinding] = pdaReferrerBinding(trader);
+  const referrerWallet =
+    input.referrerAddress &&
+    input.referrerAddress !== trader.toBase58()
+      ? new PublicKey(input.referrerAddress)
+      : trader;
+
   const traderAta = getAssociatedTokenAddressSync(mint, trader, false, TOKEN_PROGRAM_ID);
-  const ixs: TransactionInstruction[] = [
+  const setRefIx = await maybeSetReferrer(trader, input.referrerAddress);
+  const ixs: TransactionInstruction[] = [];
+  if (setRefIx) ixs.push(setRefIx);
+  ixs.push(
     createAssociatedTokenAccountIdempotentInstruction(
       trader,
       traderAta,
@@ -81,7 +126,9 @@ export async function silentBuy(input: {
       mint,
       TOKEN_PROGRAM_ID,
       ASSOCIATED_TOKEN_PROGRAM_ID
-    ),
+    )
+  );
+  ixs.push(
     new TransactionInstruction({
       programId,
       keys: [
@@ -95,10 +142,12 @@ export async function silentBuy(input: {
         { pubkey: traderAta, isSigner: false, isWritable: true },
         { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
         { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+        { pubkey: referrerBinding, isSigner: false, isWritable: false },
+        { pubkey: referrerWallet, isSigner: false, isWritable: true },
       ],
       data: encodeBuyIx(input.solInLamports, input.minTokenOut),
-    }),
-  ];
+    })
+  );
 
   const { signature } = await sendSolanaSilentTransaction(ixs);
   return { signature, traderAddress: trader.toBase58() };
@@ -111,6 +160,7 @@ export async function silentSell(input: {
   mintAddress: string;
   tokenIn: bigint;
   minSolOut: bigint;
+  referrerAddress?: string | null;
 }): Promise<SolanaSilentTradeResult> {
   if (input.tokenIn <= 0n) throw new Error("Amount must be greater than zero");
   const trader = await traderPubkey();
@@ -121,6 +171,13 @@ export async function silentSell(input: {
   const { curvePda, curve } = await loadCurve(mint);
 
   if (curve.paused) throw new Error("Trading paused");
+
+  const [referrerBinding] = pdaReferrerBinding(trader);
+  const referrerWallet =
+    input.referrerAddress &&
+    input.referrerAddress !== trader.toBase58()
+      ? new PublicKey(input.referrerAddress)
+      : trader;
 
   const traderAta = getAssociatedTokenAddressSync(mint, trader, false, TOKEN_PROGRAM_ID);
 
@@ -137,6 +194,8 @@ export async function silentSell(input: {
       { pubkey: traderAta, isSigner: false, isWritable: true },
       { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+      { pubkey: referrerBinding, isSigner: false, isWritable: false },
+      { pubkey: referrerWallet, isSigner: false, isWritable: true },
     ],
     data: encodeSellIx(input.tokenIn, input.minSolOut),
   });

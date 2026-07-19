@@ -9,6 +9,7 @@ import {
   useWriteContract,
 } from "wagmi";
 import { contracts, NATIVE_SYMBOL, pumpChain, shortAddress } from "@/config/chain";
+import { isSolanaChainFamily } from "@/config/chain-family";
 import { useUserAvatar } from "@/components/user/UserAvatarProvider";
 import { useBnbUsdPrice } from "@/hooks/useBnbUsdPrice";
 import { bondingCurveManagerAbi } from "@/lib/bonding-curve";
@@ -108,6 +109,30 @@ export function ClaimReferrerFeesModal({
   }, [isSuccess, txHash, address, onClaimed, onClose, refetchPending, reset]);
 
   if (!open) return null;
+
+  if (isSolanaChainFamily) {
+    return (
+      <AppBottomSheet
+        open={open}
+        onClose={onClose}
+        ariaLabel="Referral earnings"
+        title="Referral earnings"
+        subtitle="Earnings from friends you invited"
+        zIndex={50}
+        panelClassName="max-w-md"
+        footer={
+          <button type="button" onClick={onClose} className="secondary-button w-full">
+            Close
+          </button>
+        }
+      >
+        <p className="text-body-sm text-pump-muted">
+          On Solana, referrer fees are paid automatically when invited friends trade. No manual
+          claim is required.
+        </p>
+      </AppBottomSheet>
+    );
+  }
 
   async function handleClaim() {
     if (!canClaim) return;

@@ -1,4 +1,5 @@
 import { Pool } from "pg";
+import { normalizeAddressParam } from "@/lib/address";
 import { SQL_PROMOTABLE_AIRDROP_LINKED_TOKEN_ADDRESSES } from "@/lib/airdrop-promotable-sql";
 import { getLaunchpadReadPool, getLaunchpadWritePool } from "@/lib/db/pool";
 import { parseSocialLinksFromDb, type TokenSocialLinks } from "@/lib/token-social";
@@ -11,6 +12,7 @@ import {
 } from "@/lib/user-display";
 import { resolveDisplayUsername } from "@/lib/username";
 import { getUserUsername } from "@/lib/db/users";
+import { sqlChainFilter } from "@/lib/db/launchpad-chain";
 import {
   BONDING_TOKEN_SUPPLY_HUMAN,
   BONDING_VIRTUAL_BNB_HUMAN,
@@ -729,6 +731,7 @@ const ARENA_TOKEN_BASE_INNER = `
         t.logo_url
       FROM tokens t
       WHERE t.is_hidden = false
+        ${sqlChainFilter("t")}
     `;
 
 function arenaListOrderBy(sort: ArenaListSort): string {
@@ -765,7 +768,7 @@ export async function listTopTokensByMcap(limit = 20): Promise<TokenListItem[]> 
 export async function countVisibleTokens(): Promise<number> {
   const db = getLaunchpadReadPool();
   const result = await db.query<{ count: string }>(
-    `SELECT COUNT(*)::text AS count FROM tokens WHERE is_hidden = false`
+    `SELECT COUNT(*)::text AS count FROM tokens t WHERE t.is_hidden = false ${sqlChainFilter("t")}`
   );
   return Number(result.rows[0]?.count ?? 0);
 }
@@ -1052,7 +1055,7 @@ export async function upsertTokenMetadata(input: {
   socialLinks: TokenSocialLinks;
 }): Promise<void> {
   const db = getLaunchpadWritePool();
-  const normalized = input.address.toLowerCase();
+  const normalized = normalizeAddressParam(input.address) ?? input.address;
 
   await db.query(
     `
@@ -1159,7 +1162,8 @@ export async function getTopTokenAddressByMcap(): Promise<string | null> {
 
 export async function getTokenByAddress(address: string): Promise<TokenDetail | null> {
   const db = getLaunchpadReadPool();
-  const normalized = address.toLowerCase();
+  const normalized = normalizeAddressParam(address);
+  if (!normalized) return null;
 
   const result = await db.query<{
     address: string;

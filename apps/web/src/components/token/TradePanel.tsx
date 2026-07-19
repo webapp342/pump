@@ -479,7 +479,7 @@ export function TradePanel({
   const legacyApproveChainRef = useRef(false);
   const pendingSellRef = useRef<{ amountWei: bigint; minBnbOut: bigint } | null>(null);
   const handledReceiptHashRef = useRef<`0x${string}` | null>(null);
-  const pendingTradeReferrerRef = useRef<`0x${string}` | null>(null);
+  const pendingTradeReferrerRef = useRef<string | null>(null);
   const quoteUsdAtSubmitRef = useRef<number | null>(null);
   /** Set when buy amount comes from slider/max — keeps token mode aligned with BNB/USD spend. */
   const [linkedBuySpendWei, setLinkedBuySpendWei] = useState<bigint | null>(null);
@@ -1842,7 +1842,7 @@ export function TradePanel({
       abi: bondingCurveManagerAbi,
       functionName: buyParams.referrer ? "buyWithReferrer" : "buy",
       args: buyParams.referrer
-        ? [buyParams.tokenAddress, buyParams.minTokenOut, buyParams.referrer]
+        ? [buyParams.tokenAddress, buyParams.minTokenOut, buyParams.referrer as Address]
         : [buyParams.tokenAddress, buyParams.minTokenOut],
     });
 
@@ -1933,6 +1933,7 @@ export function TradePanel({
       mintAddress: String(buyParams.tokenAddress),
       solInLamports: weiToLamports(buyParams.value),
       minTokenOut: weiToTokenRaw(buyParams.minTokenOut),
+      referrerAddress: buyParams.referrer ? String(buyParams.referrer) : null,
     });
     trackTradeOrderSubmitted(pendingId, "buy", symbol, result.signature as `0x${string}`);
     trackTradeOrderIncluded(pendingId, result.signature as `0x${string}`);
@@ -1956,6 +1957,7 @@ export function TradePanel({
       mintAddress: String(sellParams.tokenAddress),
       tokenIn: weiToTokenRaw(sellParams.amountWei),
       minSolOut: weiToLamports(sellParams.minBnbOut),
+      referrerAddress: sellParams.referrer ? String(sellParams.referrer) : null,
     });
     trackTradeOrderSubmitted(pendingId, "sell", symbol, result.signature as `0x${string}`);
     trackTradeOrderIncluded(pendingId, result.signature as `0x${string}`);
@@ -2212,7 +2214,7 @@ export function TradePanel({
       abi: bondingCurveManagerAbi,
       functionName: buyParams.referrer ? "buyWithReferrer" : "buy",
       args: buyParams.referrer
-        ? [buyParams.tokenAddress, buyParams.minTokenOut, buyParams.referrer]
+        ? [buyParams.tokenAddress, buyParams.minTokenOut, buyParams.referrer as Address]
         : [buyParams.tokenAddress, buyParams.minTokenOut],
       value: buyParams.value,
       chainId: pumpChain.id,
@@ -2242,7 +2244,7 @@ export function TradePanel({
               v,
               r,
               s,
-              params.referrer,
+              params.referrer as Address,
             ]
           : [params.tokenAddress, params.amountWei, params.minBnbOut, deadline, v, r, s],
         chainId: pumpChain.id,
@@ -2256,7 +2258,7 @@ export function TradePanel({
       abi: bondingCurveManagerAbi,
       functionName: params.referrer ? "sellWithReferrer" : "sell",
       args: params.referrer
-        ? [params.tokenAddress, params.amountWei, params.minBnbOut, params.referrer]
+        ? [params.tokenAddress, params.amountWei, params.minBnbOut, params.referrer as Address]
         : [params.tokenAddress, params.amountWei, params.minBnbOut],
       chainId: pumpChain.id,
       preflight: scwPreflightForTrade(0n),
@@ -2264,7 +2266,7 @@ export function TradePanel({
     });
   }
 
-  function resolvePendingTradeReferrer(): `0x${string}` | null {
+  function resolvePendingTradeReferrer(): string | null {
     return resolveTradeReferrer({
       storedReferrer: readStoredReferrer(),
       boundReferrer,
@@ -2445,7 +2447,7 @@ export function TradePanel({
           return;
         }
 
-        const tradeReferrer = isSolanaTrade ? null : resolvePendingTradeReferrer();
+        const tradeReferrer = resolvePendingTradeReferrer();
         pendingTradeReferrerRef.current = tradeReferrer;
         quoteUsdAtSubmitRef.current = estimatedQuotePriceUsd;
 
@@ -2465,7 +2467,7 @@ export function TradePanel({
         return;
       }
 
-      const tradeReferrer = isSolanaTrade ? null : resolvePendingTradeReferrer();
+      const tradeReferrer = resolvePendingTradeReferrer();
       const minBnbOut = minOutWithSlippage(sellQuoteOut);
       const baseSellParams: Omit<SessionSellParams, "permit"> = {
         tokenAddress,

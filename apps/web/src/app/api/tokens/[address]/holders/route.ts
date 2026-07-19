@@ -7,6 +7,7 @@ import {
   getTokenByAddress,
   listTokenHolders,
 } from "@/lib/db/launchpad";
+import { isSolanaChainFamily } from "@/config/chain-family";
 import { fetchOnChainTokenBalancesForHolders } from "@/lib/portfolio-onchain";
 import { getHoldersCache, holdersCacheKey, setHoldersCache } from "@/lib/holders-cache";
 
@@ -91,7 +92,9 @@ export async function GET(request: NextRequest, context: RouteContext) {
       remainingCostBasisBnb: holder.remainingCostBasisBnb,
       remainingCostBasisUsd: holder.remainingCostBasisUsd,
       heldSince: holder.heldSince ?? null,
-      onChainBalance: onChain.get(holder.address.toLowerCase()),
+      onChainBalance: isSolanaChainFamily
+        ? onChain.get(holder.address)
+        : onChain.get(holder.address.toLowerCase()),
     }));
 
     setHoldersCache(cacheKey, data);

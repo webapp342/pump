@@ -297,6 +297,26 @@ else
   append_check "pump_indexer" "Indexer" "down" "systemd=$idx_active" "$probe" "$indexer_info" "$query_ms" "$logs_json" "$timings_json"
 fi
 
+# --- Solana indexer (production) ---
+probe="systemctl + indexer_state solana"
+logs_json="$(logs_to_json "$(service_logs pump-indexer-sol)")"
+idx_sol_started="$(now_ms_fn)"
+idx_sol_active="$(systemctl is-active pump-indexer-sol 2>/dev/null || echo inactive)"
+systemctl_ms=$(( $(now_ms_fn) - idx_sol_started ))
+query_started="$(now_ms_fn)"
+indexer_sol_info="$(sudo -u postgres psql -d pump_db -tAc "SELECT key, last_block_number, EXTRACT(EPOCH FROM (now()-updated_at))::int FROM indexer_state WHERE key LIKE 'solana%' ORDER BY updated_at DESC LIMIT 1" 2>/dev/null | tr '|' ' ' || true)"
+query_ms=$(( $(now_ms_fn) - query_started ))
+timings_json="$(make_timings "{\"systemctl\":${systemctl_ms},\"dbQuery\":${query_ms}}")"
+if [[ "$idx_sol_active" == "active" ]]; then
+  age="$(echo "$indexer_sol_info" | awk '{print $NF}')"
+  status="healthy"; summary="active · db query ${query_ms}ms"
+  if [[ -n "$age" && "$age" -gt 600 ]]; then status="down"; summary="stale ${age}s · db ${query_ms}ms"; fi
+  if [[ -n "$age" && "$age" -gt 180 && "$age" -le 600 ]]; then status="degraded"; summary="slow ${age}s · db ${query_ms}ms"; fi
+  append_check "pump_indexer_sol" "Indexer (Solana)" "$status" "$summary" "$probe" "${indexer_sol_info:-n/a}" "$query_ms" "$logs_json" "$timings_json"
+else
+  append_check "pump_indexer_sol" "Indexer (Solana)" "down" "systemd=$idx_sol_active" "$probe" "${indexer_sol_info:-n/a}" "$query_ms" "$logs_json" "$timings_json"
+fi
+
 # --- Airdrop keeper ---
 probe="systemctl is-active pump-airdrop-keeper"
 logs_json="$(logs_to_json "$(service_logs pump-airdrop-keeper)")"

@@ -1,10 +1,19 @@
 import { isAddress } from "viem";
+import { PublicKey } from "@solana/web3.js";
+import { isSolanaChainFamily } from "@/config/chain-family";
 
 export const REFERRAL_STORAGE_KEY = "pump-referral-ref";
 
 export function normalizeReferrer(value: string | null): string | null {
   if (!value) return null;
   const trimmed = value.trim();
+  if (isSolanaChainFamily) {
+    try {
+      return new PublicKey(trimmed).toBase58();
+    } catch {
+      return null;
+    }
+  }
   if (!isAddress(trimmed)) return null;
   return trimmed.toLowerCase();
 }
@@ -50,16 +59,20 @@ export function resolveTradeReferrer(params: {
   boundReferrer: string | null | undefined;
   hasTraded: boolean | undefined;
   traderAddress: string | undefined;
-}): `0x${string}` | null {
+}): string | null {
   const { storedReferrer, boundReferrer, hasTraded, traderAddress } = params;
   if (!traderAddress || hasTraded) return null;
 
+  const zeroEvm = "0x0000000000000000000000000000000000000000";
   const bound =
-    boundReferrer && boundReferrer !== "0x0000000000000000000000000000000000000000"
-      ? boundReferrer.toLowerCase()
-      : null;
+    boundReferrer && boundReferrer !== zeroEvm ? boundReferrer : null;
   if (bound) return null;
 
-  if (!storedReferrer || storedReferrer === traderAddress.toLowerCase()) return null;
-  return storedReferrer as `0x${string}`;
+  if (!storedReferrer) return null;
+  if (isSolanaChainFamily) {
+    if (storedReferrer === traderAddress) return null;
+    return storedReferrer;
+  }
+  if (storedReferrer === traderAddress.toLowerCase()) return null;
+  return storedReferrer;
 }

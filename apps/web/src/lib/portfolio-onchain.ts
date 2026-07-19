@@ -1,6 +1,14 @@
+import { PublicKey } from "@solana/web3.js";
+import {
+  TOKEN_PROGRAM_ID,
+  getAssociatedTokenAddressSync,
+} from "@solana/spl-token";
 import { createPublicClient, formatUnits, http, type Address } from "viem";
 import { erc20Abi } from "@/lib/abis/erc20";
 import { pumpChain, rpcUrl } from "@/config/chain";
+import { isSolanaChainFamily } from "@/config/chain-family";
+import { PUMP_TOKEN_DECIMALS } from "@/lib/solana/amount-scale";
+import { getSolanaConnection } from "@/lib/solana/transfer";
 import {
   listLaunchpadTokensByCreatorForWalletBalance,
   listLaunchpadTokensForWalletBalance,
@@ -82,11 +90,53 @@ export async function fetchOnChainTokenBalancesForWallet(
   return balances;
 }
 
-/** ERC20 balanceOf(holder) for one token — used to verify indexer holder snapshots. */
+/** SPL token balances for many holders — used to verify indexer holder snapshots. */
+export async function fetchSplTokenBalancesForHolders(
+  mintAddress: string,
+  holderAddresses: string[]
+): Promise<Map<string, string>> {
+  const balances = new Map<string, string>();
+  if (holderAddresses.length === 0) return balances;
+
+  let mint: PublicKey;
+  try {
+    mint = new PublicKey(mintAddress);
+  } catch {
+    return balances;
+  }
+
+  const conn = getSolanaConnection();
+  const chunkSize = 25;
+
+  for (let i = 0; i < holderAddresses.length; i += chunkSize) {
+    const chunk = holderAddresses.slice(i, i + chunkSize);
+    await Promise.all(
+      chunk.map(async (holderAddress) => {
+        try {
+          const owner = new PublicKey(holderAddress);
+          const ata = getAssociatedTokenAddressSync(mint, owner, false, TOKEN_PROGRAM_ID);
+          const bal = await conn.getTokenAccountBalance(ata, "confirmed");
+          const raw = bal?.value?.amount ? BigInt(bal.value.amount) : 0n;
+          balances.set(holderAddress, formatUnits(raw, PUMP_TOKEN_DECIMALS));
+        } catch {
+          // Omit — UI falls back to indexer balance instead of treating as zero.
+        }
+      })
+    );
+  }
+
+  return balances;
+}
+
+/** On-chain token balance per holder — ERC20 or SPL depending on chain family. */
 export async function fetchOnChainTokenBalancesForHolders(
   tokenAddress: string,
   holderAddresses: string[]
 ): Promise<Map<string, string>> {
+  if (isSolanaChainFamily) {
+    return fetchSplTokenBalancesForHolders(tokenAddress, holderAddresses);
+  }
+
   const token = tokenAddress.toLowerCase() as Address;
   const balances = new Map<string, string>();
   if (holderAddresses.length === 0) return balances;

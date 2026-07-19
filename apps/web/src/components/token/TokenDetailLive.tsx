@@ -12,7 +12,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouter, useSearchParams } from "next/navigation";
-import { createPublicClient, http, type Address } from "viem";
+import { createPublicClient, http, parseUnits, type Address } from "viem";
 import { useReadContract, useAccount } from "wagmi";
 import type { TokenHolderSnapshot, TokenDetail, TradeItem } from "@/lib/db/launchpad";
 import {
@@ -48,6 +48,9 @@ import {
   removeOptimisticActivities,
 } from "@/lib/optimistic-activity";
 import { contracts, explorerAddressUrl, pumpChain, shortAddress } from "@/config/chain";
+import { isSolanaChainFamily } from "@/config/chain-family";
+import { usePumpWallet } from "@/components/wallet/PumpWalletProvider";
+import { useSolanaTradeMarket } from "@/hooks/useSolanaTradeMarket";
 import { copyToClipboard } from "@/lib/copy-to-clipboard";
 import { TradePanel, type TradeConfirmedPayload, type TradeOptimisticPayload, type TradeSubmittedPayload } from "@/components/token/TradePanel";
 import { QuickTradeConfirmModal } from "@/components/token/QuickTradeConfirmModal";
@@ -286,6 +289,14 @@ export function TokenDetailLive({
   const searchParams = useSearchParams();
   const router = useRouter();
   const { address, isConnected } = useAccount();
+  const { solanaAddress } = usePumpWallet();
+  const isSolanaLive = isSolanaChainFamily;
+
+  const solanaMarket = useSolanaTradeMarket(
+    isSolanaLive ? streamAddress : undefined,
+    isSolanaLive ? solanaAddress : undefined,
+    isSolanaLive
+  );
   const { openConnectModal } = useOpenConnectModal();
   const queryClient = useQueryClient();
   const { bnbUsd } = useBnbUsdPrice();
@@ -345,17 +356,52 @@ export function TokenDetailLive({
   const tradeLocked = !contentSynced;
   const announceButtonDisabled = tradeLocked || announceBusy;
 
-  const { data: chainCurve, refetch: refetchCurve } = useReadContract({
+  const { data: evmChainCurve, refetch: refetchEvmCurve } = useReadContract({
     address: contracts.bondingCurveManager,
     abi: bondingCurveManagerAbi,
     functionName: "curves",
     args: [streamAddress as `0x${string}`],
     chainId: pumpChain.id,
     query: {
+      enabled: !isSolanaLive,
       refetchInterval: hasLivePending ? BURST_POLL_MS : CHAIN_LIVE_POLL_MS,
       staleTime: 0,
     },
   });
+
+  const chainCurve = useMemo((): CurveTuple | undefined => {
+    if (isSolanaLive) {
+      const curve = solanaMarket.bondingCurve;
+      if (!curve) return undefined;
+      return [
+        streamAddress as Address,
+        (token.creatorAddress ?? streamAddress) as Address,
+        curve.reserveZug,
+        curve.soldTokens,
+        parseUnits(token.targetBnb ?? "0", 18),
+        curve.virtualZugReserve,
+        curve.virtualTokenReserve,
+        solanaMarket.paused,
+      ] as CurveTuple;
+    }
+    return evmChainCurve as CurveTuple | undefined;
+  }, [
+    isSolanaLive,
+    solanaMarket.bondingCurve,
+    solanaMarket.paused,
+    evmChainCurve,
+    streamAddress,
+    token.creatorAddress,
+    token.targetBnb,
+  ]);
+
+  const refetchCurve = useCallback(async () => {
+    if (isSolanaLive) {
+      await solanaMarket.refetchBalances();
+      return;
+    }
+    await refetchEvmCurve();
+  }, [isSolanaLive, solanaMarket, refetchEvmCurve]);
 
   const liveToken = useMemo(
     () => mergeLiveStats(token, chainCurve as CurveTuple | undefined, trades),

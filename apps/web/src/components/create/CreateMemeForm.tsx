@@ -49,6 +49,8 @@ import { FormExecutionStatus } from "@/components/ui/FormExecutionStatus";
 import { InfoTip } from "@/components/ui/InfoTip";
 import { formatCampaignAmount } from "@/lib/airdrop-board-format";
 import { useCreateGasReserve } from "@/hooks/useCreateGasReserve";
+import { isSolanaChainFamily } from "@/config/chain-family";
+import { CreateMemeFormSolana } from "./CreateMemeFormSolana";
 
 type LaunchSuccess = {
   tokenAddress: string;
@@ -67,6 +69,8 @@ async function fileToDataUrl(file: File): Promise<string> {
 }
 
 export function CreateMemeForm() {
+  if (isSolanaChainFamily) return <CreateMemeFormSolana />;
+
   const router = useRouter();
   const handledReceiptRef = useRef<string | null>(null);
   const logoFileRef = useRef<File | null>(null);

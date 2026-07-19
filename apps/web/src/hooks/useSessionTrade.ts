@@ -4,7 +4,7 @@ export type SessionBuyParams = {
   tokenAddress: Address;
   minTokenOut: bigint;
   value: bigint;
-  referrer?: Address;
+  referrer?: Address | string;
 };
 
 export type SessionSellPermit = {
@@ -18,7 +18,7 @@ export type SessionSellParams = {
   tokenAddress: Address;
   amountWei: bigint;
   minBnbOut: bigint;
-  referrer?: Address;
+  referrer?: Address | string;
   permit?: SessionSellPermit;
 };
 

@@ -89,3 +89,19 @@ pub fn quote_sell(
         gross_lamports,
     })
 }
+
+/// Lamports per 1e9 token base units (matches pump-curve + indexer SPOT_PRICE_TOKEN_UNIT).
+pub fn spot_price_lamports_per_token(
+    virtual_sol_reserve: u64,
+    virtual_token_reserve: u64,
+    reserve_sol: u64,
+    sold_tokens: u64,
+    token_unit: u64,
+) -> u64 {
+    let y = (virtual_token_reserve as u128).saturating_sub(sold_tokens as u128);
+    if y == 0 {
+        return 0;
+    }
+    let x = (virtual_sol_reserve as u128).saturating_add(reserve_sol as u128);
+    ((x.saturating_mul(token_unit as u128)) / y) as u64
+}
