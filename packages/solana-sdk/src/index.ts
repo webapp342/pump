@@ -80,16 +80,35 @@ export function programId(key: ProgramIdKey, override?: string | null): string {
   return o && o.length > 0 ? o : PROGRAM_IDS[key];
 }
 
+/**
+ * Pump.fun bonding-curve parity (no graduation on our launchpad).
+ * @see https://pump.fun/docs/fees — 1.25% total: 0.30% creator + 0.95% protocol (+ 0% LP on curve).
+ * Create: 0 SOL platform fee; user pays Solana rent + tx only.
+ */
 export const PUMP_FEEL_DEFAULTS = {
   tokenDecimals: 6,
   totalSupply: 1_000_000_000_000_000n,
   virtualSolLamports: 30_000_000_000n,
+  /** Platform create fee — 0 like pump.fun (rent is separate network cost). */
   createFeeLamports: 0n,
-  protocolFeeBps: 100,
-  creatorFeeShareBps: 5_000,
+  /** Total trade fee on bonding curve (125 bps = 1.25%). */
+  protocolFeeBps: 125,
+  /** Share of trade fee to creator: 30 bps / 125 bps = 2400 (0.30% of trade volume). */
+  creatorFeeShareBps: 2_400,
+  /** Share of trade fee to bound referrer (from fee pool, not extra on trader). */
   referrerShareBps: 1_000,
   verifiedReferrerShareBps: 2_000,
 } as const;
+
+/** On-chain account sizes for rent estimates (must match pump-launchpad layouts). */
+export const LAUNCHPAD_ACCOUNT_LEN = {
+  curve: 144,
+  global: 160,
+  metadata: 679,
+} as const;
+
+/** Base Solana tx fee: 2 signatures on create (payer + mint), 1 on buy/sell. */
+export const SOLANA_BASE_TX_FEE_LAMPORTS = 10_000n;
 
 export type PumpFeelDefaults = typeof PUMP_FEEL_DEFAULTS;
 

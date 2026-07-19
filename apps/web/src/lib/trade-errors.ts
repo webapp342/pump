@@ -23,7 +23,7 @@ export function formatTradeError(err: unknown): string {
     return "Transaction cancelled in wallet.";
   }
   if (lower.includes("insufficient funds")) {
-    return `Insufficient ${NATIVE_SYMBOL} balance for this trade.`;
+    return `Not enough ${NATIVE_SYMBOL} for this trade (amount + network fee).`;
   }
   if (
     lower.includes("smart account does not have sufficient funds") ||

@@ -8,6 +8,7 @@ import {
   PublicKey,
   SystemProgram,
   TransactionInstruction,
+  type Connection,
 } from "@solana/web3.js";
 import {
   ASSOCIATED_TOKEN_PROGRAM_ID,
@@ -17,7 +18,7 @@ import {
   createInitializeMint2Instruction,
   getAssociatedTokenAddressSync,
 } from "@solana/spl-token";
-import { encodeBuyIx, encodeCreateMemeIx, PUMP_FEEL_DEFAULTS } from "@pump/solana-sdk";
+import { encodeBuyIx, encodeCreateMemeIx, LAUNCHPAD_ACCOUNT_LEN, PUMP_FEEL_DEFAULTS, SOLANA_BASE_TX_FEE_LAMPORTS } from "@pump/solana-sdk";
 import { getSolanaConnection } from "@/lib/solana/transfer";
 import { sendSolanaSilentTransaction } from "@/lib/solana/send-silent-transaction";
 import {
@@ -199,8 +200,50 @@ export async function silentCreateMeme(input: {
   };
 }
 
-/** Rent + curve allocation cushion for create UX (matches on-chain ~3M lamports curve + mint rent). */
+const TOKEN_ACCOUNT_LEN = 165;
+
+/**
+ * Pump.fun-style create cost: platform fee (usually 0) + Solana rent + tx fee.
+ * Does not include optional initial buy amount.
+ */
+export async function estimateSolanaCreateCostLamports(options?: {
+  initialBuyLamports?: bigint;
+  connection?: Connection;
+}): Promise<bigint> {
+  const conn = options?.connection ?? getSolanaConnection();
+  const [globalPda] = pdaGlobal();
+  const globalInfo = await conn.getAccountInfo(globalPda, "confirmed");
+  const createFeeLamports = globalInfo?.data
+    ? decodeGlobalConfig(globalInfo.data).createFeeLamports
+    : PUMP_FEEL_DEFAULTS.createFeeLamports;
+
+  const [mintRent, vaultRent, curveRent, metadataRent] = await Promise.all([
+    conn.getMinimumBalanceForRentExemption(MINT_SIZE),
+    conn.getMinimumBalanceForRentExemption(TOKEN_ACCOUNT_LEN),
+    conn.getMinimumBalanceForRentExemption(LAUNCHPAD_ACCOUNT_LEN.curve),
+    conn.getMinimumBalanceForRentExemption(LAUNCHPAD_ACCOUNT_LEN.metadata),
+  ]);
+
+  let total =
+    BigInt(mintRent + vaultRent + curveRent + metadataRent) +
+    SOLANA_BASE_TX_FEE_LAMPORTS +
+    createFeeLamports;
+
+  const initialBuy = options?.initialBuyLamports ?? 0n;
+  if (initialBuy > 0n) {
+    const traderAtaRent = await conn.getMinimumBalanceForRentExemption(TOKEN_ACCOUNT_LEN);
+    total += BigInt(traderAtaRent) + initialBuy;
+  }
+
+  return total;
+}
+
+/** @deprecated Use estimateSolanaCreateCostLamports — kept for callers during migration. */
 export function solanaCreateFeeCushionLamports(): bigint {
-  // Metaplex metadata rent (~0.015 SOL) + create curve/mint cushion.
-  return PUMP_FEEL_DEFAULTS.createFeeLamports + 5_000_000n + 15_000_000n;
+  // Sync fallback only; UI should call estimateSolanaCreateCostLamports.
+  return (
+    BigInt(1_461_600 + 2_039_280 + 1_893_120 + 5_616_720) +
+    SOLANA_BASE_TX_FEE_LAMPORTS +
+    PUMP_FEEL_DEFAULTS.createFeeLamports
+  );
 }

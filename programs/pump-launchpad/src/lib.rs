@@ -47,6 +47,10 @@ const IX_SELL: u8 = 3;
 const IX_WITHDRAW: u8 = 4;
 const IX_SET_REFERRER: u8 = 5;
 
+/// Rent-exempt minimums (devnet/mainnet 2026 — match `getMinimumBalanceForRentExemption`).
+const GLOBAL_RENT_LAMPORTS: u64 = 2_004_480;
+const CURVE_RENT_LAMPORTS: u64 = 1_893_120;
+
 #[repr(C)]
 #[derive(Clone, Copy, Pod, Zeroable)]
 pub struct GlobalConfig {
@@ -261,8 +265,7 @@ fn process_initialize(
     // Allocate global PDA on first init
     if global.lamports() == 0 {
         let space = GlobalConfig::LEN as u64;
-        // rent-exempt for ~168 bytes ≈ 0.00206 SOL — leave headroom
-        let lamports = 3_000_000u64;
+        let lamports = GLOBAL_RENT_LAMPORTS;
         let bump_seed = [bump];
         let seeds = [Seed::from(GLOBAL_SEED), Seed::from(bump_seed.as_ref())];
         let signers = [Signer::from(&seeds)];
@@ -349,7 +352,7 @@ fn process_create_meme(
         CreateAccount {
             from: creator,
             to: curve,
-            lamports: 3_000_000,
+            lamports: CURVE_RENT_LAMPORTS,
             space: Curve::LEN as u64,
             owner: program_id,
         }

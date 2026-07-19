@@ -25,9 +25,7 @@ import { useWalletFunding } from "@/components/wallet/WalletFundingProvider";
 import { formatCampaignAmount } from "@/lib/airdrop-board-format";
 import {
   lamportsToWei,
-  SOLANA_FEE_RESERVE_WEI,
   tokenRawToWei,
-  weiToLamports,
   weiToTokenRaw,
 } from "@/lib/solana/amount-scale";
 import {
@@ -51,8 +49,9 @@ import {
 } from "@/lib/solana/transfer";
 import {
   silentCreateMeme,
-  solanaCreateFeeCushionLamports,
+  estimateSolanaCreateCostLamports,
 } from "@/lib/solana/silent-create";
+import { decodeGlobalConfig, pdaGlobal } from "@/lib/solana/launchpad-pdas";
 
 type LaunchSuccess = {
   tokenAddress: string;
@@ -140,6 +139,10 @@ export function CreateMemeFormSolana() {
   const [txSignature, setTxSignature] = useState<string | null>(null);
   const [solBalanceLamports, setSolBalanceLamports] = useState<bigint | undefined>();
   const [balanceLoading, setBalanceLoading] = useState(false);
+  const [createCostLamports, setCreateCostLamports] = useState<bigint | undefined>();
+  const [protocolFeeBps, setProtocolFeeBps] = useState<bigint>(
+    BigInt(PUMP_FEEL_DEFAULTS.protocolFeeBps)
+  );
 
   logoFileRef.current = logoFile;
   logoPreviewRef.current = logoPreview;
@@ -163,6 +166,8 @@ export function CreateMemeFormSolana() {
     }
   }, [solanaAddress]);
 
+  const initialBuyLamports = useMemo(() => parseInitialBuySol(initialBuySol), [initialBuySol]);
+
   useEffect(() => {
     if (!ready || !solanaAddress) return;
     void refreshBalance();
@@ -170,10 +175,30 @@ export function CreateMemeFormSolana() {
     return () => window.clearInterval(id);
   }, [ready, solanaAddress, refreshBalance]);
 
-  const initialBuyLamports = useMemo(() => parseInitialBuySol(initialBuySol), [initialBuySol]);
-
-  const createCushionLamports = useMemo(() => solanaCreateFeeCushionLamports(), []);
-  const txFeeCushionLamports = weiToLamports(SOLANA_FEE_RESERVE_WEI);
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const conn = getSolanaConnection();
+        const [globalPda] = pdaGlobal();
+        const globalInfo = await conn.getAccountInfo(globalPda, "confirmed");
+        if (globalInfo?.data && !cancelled) {
+          const global = decodeGlobalConfig(globalInfo.data);
+          setProtocolFeeBps(global.protocolFeeBps);
+        }
+        const cost = await estimateSolanaCreateCostLamports({
+          connection: conn,
+          initialBuyLamports,
+        });
+        if (!cancelled) setCreateCostLamports(cost);
+      } catch {
+        if (!cancelled) setCreateCostLamports(undefined);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [initialBuyLamports]);
 
   const estimatedTokensWei = useMemo(() => {
     if (initialBuyLamports <= 0n) return 0n;
@@ -181,9 +206,9 @@ export function CreateMemeFormSolana() {
       zugIn: lamportsToWei(initialBuyLamports),
       virtualZugReserve: lamportsToWei(PUMP_FEEL_DEFAULTS.virtualSolLamports),
       virtualTokenReserve: tokenRawToWei(PUMP_FEEL_DEFAULTS.totalSupply),
-      protocolFeeBps: BigInt(PUMP_FEEL_DEFAULTS.protocolFeeBps),
+      protocolFeeBps,
     });
-  }, [initialBuyLamports]);
+  }, [initialBuyLamports, protocolFeeBps]);
 
   const minTokenOut = useMemo(() => {
     if (initialBuyLamports <= 0n) return 0n;
@@ -191,8 +216,8 @@ export function CreateMemeFormSolana() {
   }, [initialBuyLamports, estimatedTokensWei]);
 
   const launchRequiredLamports = useMemo(
-    () => createCushionLamports + initialBuyLamports + txFeeCushionLamports,
-    [createCushionLamports, initialBuyLamports, txFeeCushionLamports]
+    () => createCostLamports ?? 0n,
+    [createCostLamports]
   );
 
   const solShortfallLamports = useMemo(() => {
@@ -642,8 +667,8 @@ export function CreateMemeFormSolana() {
                             Initial buy{" "}
                             <span className="font-normal text-pump-muted">(optional)</span>
                             <InfoTip label="About initial buy">
-                              Seed liquidity at launch. Leave blank to pay only the launch fee
-                              cushion.
+                              Seed liquidity at launch. Leave blank to pay only Solana network rent
+                              (~0.011 SOL). No platform create fee — same as pump.fun.
                             </InfoTip>
                           </label>
                           <div
@@ -688,8 +713,11 @@ export function CreateMemeFormSolana() {
 
               <div className="airdrop-create-form__actions">
                 <div className="token-create-actions__total min-w-0 flex-1">
-                  <p className="text-caption text-pump-muted">Total due</p>
-                  <SolAmountDisplay lamports={launchRequiredLamports} logoSize={16} />
+                  <p className="text-caption text-pump-muted">Total due (network + optional buy)</p>
+                  <SolAmountDisplay
+                    lamports={launchRequiredLamports}
+                    logoSize={16}
+                  />
                 </div>
                 {submitButton}
               </div>

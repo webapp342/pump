@@ -35,6 +35,8 @@ export type SolanaTradeMarket = {
   paused: boolean;
   solBalanceWei: bigint | undefined;
   tokenBalanceWei: bigint | undefined;
+  /** False when first buy must create the trader ATA (~0.002 SOL rent). */
+  traderAtaExists: boolean | undefined;
   refetchBalances: () => Promise<void>;
 };
 
@@ -44,7 +46,7 @@ async function fetchMarket(mintAddress: string, ownerAddress?: string) {
   const [globalPda] = pdaGlobal();
   const [curvePda] = pdaCurve(mint);
 
-  const [globalInfo, curveInfo, solLamports, tokenRaw] = await Promise.all([
+  const [globalInfo, curveInfo, solLamports, tokenSnapshot] = await Promise.all([
     conn.getAccountInfo(globalPda, "confirmed"),
     conn.getAccountInfo(curvePda, "confirmed"),
     ownerAddress
@@ -58,8 +60,14 @@ async function fetchMarket(mintAddress: string, ownerAddress?: string) {
             false,
             TOKEN_PROGRAM_ID
           );
-          const bal = await conn.getTokenAccountBalance(ata, "confirmed").catch(() => null);
-          return bal?.value?.amount ? BigInt(bal.value.amount) : 0n;
+          const [bal, ataInfo] = await Promise.all([
+            conn.getTokenAccountBalance(ata, "confirmed").catch(() => null),
+            conn.getAccountInfo(ata, "confirmed"),
+          ]);
+          return {
+            tokenRaw: bal?.value?.amount ? BigInt(bal.value.amount) : 0n,
+            traderAtaExists: ataInfo !== null,
+          };
         })()
       : Promise.resolve(null),
   ]);
@@ -98,7 +106,9 @@ async function fetchMarket(mintAddress: string, ownerAddress?: string) {
     paused,
     solBalanceWei:
       solLamports != null ? lamportsToWei(BigInt(solLamports)) : undefined,
-    tokenBalanceWei: tokenRaw != null ? tokenRawToWei(tokenRaw) : undefined,
+    tokenBalanceWei:
+      tokenSnapshot != null ? tokenRawToWei(tokenSnapshot.tokenRaw) : undefined,
+    traderAtaExists: tokenSnapshot?.traderAtaExists,
   };
 }
 
@@ -129,6 +139,7 @@ export function useSolanaTradeMarket(
     paused: query.data?.paused ?? false,
     solBalanceWei: query.data?.solBalanceWei,
     tokenBalanceWei: query.data?.tokenBalanceWei,
+    traderAtaExists: query.data?.traderAtaExists,
     refetchBalances,
   };
 }

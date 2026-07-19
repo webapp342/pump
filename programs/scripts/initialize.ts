@@ -36,8 +36,8 @@ const PUMP_FEEL_DEFAULTS = {
   totalSupply: new BN("1000000000000000"),
   virtualSolLamports: new BN("30000000000"),
   createFeeLamports: new BN(0),
-  protocolFeeBps: new BN(100),
-  creatorFeeShareBps: new BN(5_000),
+  protocolFeeBps: new BN(125),
+  creatorFeeShareBps: new BN(2_400),
   referrerShareBps: new BN(1_000),
   verifiedReferrerShareBps: new BN(2_000),
 };

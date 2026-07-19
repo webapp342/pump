@@ -117,6 +117,9 @@ export function decodeCurveAccount(data: Uint8Array): OnchainCurve {
 /** GlobalConfig layout — matches programs/pump-launchpad GlobalConfig. */
 export type OnchainGlobal = {
   protocolFeeBps: bigint;
+  creatorFeeShareBps: bigint;
+  referrerShareBps: bigint;
+  createFeeLamports: bigint;
   tokenDecimals: number;
   emergencyHalt: number;
 };
@@ -126,7 +129,17 @@ export function decodeGlobalConfig(data: Uint8Array): OnchainGlobal {
     throw new Error("Global account too small");
   }
   const protocolFeeBps = readBigUInt64LE(data, 96);
+  const creatorFeeShareBps = readBigUInt64LE(data, 104);
+  const referrerShareBps = readBigUInt64LE(data, 112);
+  const createFeeLamports = readBigUInt64LE(data, 128);
   const tokenDecimals = readUInt8(data, 160) || 6;
   const emergencyHalt = readUInt8(data, 161);
-  return { protocolFeeBps, tokenDecimals, emergencyHalt };
+  return {
+    protocolFeeBps,
+    creatorFeeShareBps,
+    referrerShareBps,
+    createFeeLamports,
+    tokenDecimals,
+    emergencyHalt,
+  };
 }

@@ -97,6 +97,7 @@ import { silentBuy, silentSell } from "@/lib/solana/silent-trade";
 import {
   SOLANA_FEE_RESERVE_WEI,
   lamportsToWei,
+  solanaBuyPrefundWei,
   weiToLamports,
   weiToTokenRaw,
 } from "@/lib/solana/amount-scale";
@@ -1015,7 +1016,14 @@ export function TradePanel({
   });
 
   const userOpPrefundWei = useMemo(() => {
-    if (isSolanaTrade) return SOLANA_FEE_RESERVE_WEI;
+    if (isSolanaTrade) {
+      if (side === "buy") {
+        // Until ATA status is known, reserve rent so Avail matches what the chain accepts.
+        const needsTraderAta = solanaMarket.traderAtaExists !== true;
+        return solanaBuyPrefundWei(needsTraderAta);
+      }
+      return SOLANA_FEE_RESERVE_WEI;
+    }
     if (gasCostWei != null && gasCostWei > 0n) return gasCostWei;
     if (gasPrice != null && gasPrice > 0n) {
       const callGas =
@@ -1025,7 +1033,14 @@ export function TradePanel({
       return userOpPrefundFromCallGasEstimate(callGas, gasPrice);
     }
     return 0n;
-  }, [isSolanaTrade, gasCostWei, gasPrice, side, needsLegacyApproval]);
+  }, [
+    isSolanaTrade,
+    side,
+    solanaMarket.traderAtaExists,
+    gasCostWei,
+    gasPrice,
+    needsLegacyApproval,
+  ]);
 
   const buyGasReserveWei = side === "buy" ? userOpPrefundWei : 0n;
   const sellGasReserveWei = side === "sell" ? userOpPrefundWei : 0n;
@@ -1987,7 +2002,7 @@ export function TradePanel({
     if (!address || !bondingCurve) return;
     const pendingId = createOptimisticPendingId();
     const panelPrefund = isSolanaTrade
-      ? SOLANA_FEE_RESERVE_WEI
+      ? buyGasReserveWei
       : computeConservativeBuyGasReserve(buyGasReserveWei, gasPrice);
     commitPendingReservation(
       pendingId,
@@ -2015,7 +2030,7 @@ export function TradePanel({
               pendingId,
               "buy",
               buyParams.value,
-              SOLANA_FEE_RESERVE_WEI
+              buyGasReserveWei
             );
             await submitSolanaSilentBuy(pendingId, buyParams);
             return;
