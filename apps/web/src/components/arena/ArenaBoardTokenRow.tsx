@@ -17,7 +17,7 @@ import {
   isTokenAgeUnder1h,
 } from "@/lib/arena-board-format";
 import { flashText, type FlashTone } from "@/lib/arena-explore-board-core";
-import { PumpIcon, faClock, faLayerGroup, faUserPen, faUsers } from "@/lib/icons";
+import { PumpIcon, faGreenEnergy, faLayerGroup, faUserPen, faUsers } from "@/lib/icons";
 import { hasSocialLinks, type TokenSocialLinks } from "@/lib/token-social";
 
 type RowTone = "success" | "danger" | "neutral";
@@ -146,7 +146,7 @@ export function ArenaBoardTokenRow({
               <span
                 className={`arena-mobile-token-row__age ${ageIsFresh ? rowToneClass("success") : ""}`}
               >
-                <PumpIcon icon={faClock} className="arena-mobile-token-row__age-icon" aria-hidden />
+                <PumpIcon icon={faGreenEnergy} className="arena-mobile-token-row__age-icon" aria-hidden />
                 <span className="financial-value">{formatAge(token.createdAt)}</span>
               </span>
             </span>

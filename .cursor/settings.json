@@ -2,6 +2,9 @@
   "plugins": {
     "vercel": {
       "enabled": true
+    },
+    "clickhouse-cursor-plugin": {
+      "enabled": true
     }
   }
 }

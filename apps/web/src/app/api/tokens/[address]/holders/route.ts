@@ -14,12 +14,14 @@ type RouteContext = { params: Promise<{ address: string }> };
 
 type HolderResponse = Array<{
   address: string;
+  displayUsername?: string;
   tokenBalance: string;
   totalBoughtBnb: string;
   totalSoldBnb: string;
   realizedPnlBnb: string;
   remainingCostBasisBnb: string;
   remainingCostBasisUsd?: string;
+  heldSince?: string | null;
   onChainBalance?: string;
 }>;
 
@@ -81,12 +83,14 @@ export async function GET(request: NextRequest, context: RouteContext) {
 
     const data: HolderResponse = holders.map((holder) => ({
       address: holder.address,
+      displayUsername: holder.displayUsername,
       tokenBalance: holder.tokenBalance,
       totalBoughtBnb: holder.totalBoughtBnb,
       totalSoldBnb: holder.totalSoldBnb,
       realizedPnlBnb: holder.realizedPnlBnb,
       remainingCostBasisBnb: holder.remainingCostBasisBnb,
       remainingCostBasisUsd: holder.remainingCostBasisUsd,
+      heldSince: holder.heldSince ?? null,
       onChainBalance: onChain.get(holder.address.toLowerCase()),
     }));
 

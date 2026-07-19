@@ -25,12 +25,32 @@ git fetch origin "$GIT_REF"
 git reset --hard "origin/${GIT_REF}"
 git clean -fd
 
+ENV_FILE="$REPO_ROOT/.env"
+
+# Production = Solana (push → CI/CD sets env before build)
+if [[ -f "$REPO_ROOT/deploy/vm/ensure-solana-env.sh" ]]; then
+  chmod +x "$REPO_ROOT/deploy/vm/ensure-solana-env.sh"
+  # shellcheck source=/dev/null
+  source "$REPO_ROOT/deploy/vm/ensure-solana-env.sh" "$ENV_FILE"
+fi
+
 log "Installing workspace dependencies"
 npm ci
 
-if [[ -f "$REPO_ROOT/.env" ]]; then
+if [[ -f "$ENV_FILE" ]]; then
   log "Linking root .env for Next.js build (NEXT_PUBLIC_* inlined at build time)"
-  ln -sfn "$REPO_ROOT/.env" "$WEB_DIR/.env"
+  ln -sfn "$ENV_FILE" "$WEB_DIR/.env"
+fi
+
+# solana_wallets table (custodial Ed25519 keys)
+MIG_044="$REPO_ROOT/db/migrations/044_solana_wallets.sql"
+if [[ -f "$MIG_044" ]]; then
+  log "Applying migration 044_solana_wallets.sql (idempotent)"
+  if sudo -u postgres psql -d pump_db -v ON_ERROR_STOP=1 -f "$MIG_044"; then
+    log "Migration 044 OK"
+  else
+    log "WARN: migration 044 failed — check postgres permissions"
+  fi
 fi
 
 log "Building Next.js (@pump/web)"
@@ -104,14 +124,22 @@ if [ "$realtime_ok" -ne 1 ]; then
   exit 1
 fi
 
-if [[ "${SKIP_INDEXER_DEPLOY:-}" != "1" ]] && [[ -f "$REPO_ROOT/deploy/vm/indexer-deploy.sh" ]]; then
-  log "Deploying indexer (sync + rebuild + restart)"
+if [[ "${SKIP_INDEXER_DEPLOY:-}" != "1" ]] && [[ -f "$REPO_ROOT/deploy/vm/indexer-sol-deploy.sh" ]]; then
+  log "Deploying Solana indexer (sync + rebuild + restart)"
+  chmod +x "$REPO_ROOT/deploy/vm/indexer-sol-deploy.sh"
+  bash "$REPO_ROOT/deploy/vm/indexer-sol-deploy.sh" || {
+    log "WARN: indexer-sol deploy failed — one-time on VM:"
+    log "  cp deploy/pump-indexer-sol.service /etc/systemd/system/"
+    log "  systemctl daemon-reload && systemctl enable --now pump-indexer-sol"
+  }
+elif [[ "${SKIP_EVM_INDEXER:-}" != "1" ]] && [[ "${SKIP_INDEXER_DEPLOY:-}" != "1" ]] && [[ -f "$REPO_ROOT/deploy/vm/indexer-deploy.sh" ]]; then
+  log "Deploying EVM indexer"
   chmod +x "$REPO_ROOT/deploy/vm/indexer-deploy.sh"
   bash "$REPO_ROOT/deploy/vm/indexer-deploy.sh" || {
     log "Indexer deploy failed — fix artifacts/.env/RPC and re-run: deploy/vm/indexer-deploy.sh"
   }
 else
-  log "Skipping indexer deploy (SKIP_INDEXER_DEPLOY=1 or script missing)"
+  log "Skipping indexer deploy"
 fi
 
 log "Deploy finished successfully"

@@ -20,12 +20,19 @@ git fetch origin "$GIT_REF"
 git reset --hard "origin/${GIT_REF}"
 git clean -fd
 
+ENV_FILE="$REPO_ROOT/.env"
+if [[ -f "$REPO_ROOT/deploy/vm/ensure-solana-env.sh" ]]; then
+  chmod +x "$REPO_ROOT/deploy/vm/ensure-solana-env.sh"
+  # shellcheck source=/dev/null
+  source "$REPO_ROOT/deploy/vm/ensure-solana-env.sh" "$ENV_FILE"
+fi
+
 log "Installing workspace dependencies"
 npm ci
 
-if [[ -f "$REPO_ROOT/.env" ]]; then
+if [[ -f "$ENV_FILE" ]]; then
   log "Linking root .env for Next.js build (NEXT_PUBLIC_* inlined at build time)"
-  ln -sfn "$REPO_ROOT/.env" "$WEB_DIR/.env"
+  ln -sfn "$ENV_FILE" "$WEB_DIR/.env"
 fi
 
 log "Building Next.js (@pump/web)"

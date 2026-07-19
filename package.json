@@ -3,7 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "workspaces": [
-    "apps/*"
+    "apps/*",
+    "packages/*"
   ],
   "scripts": {
     "dev": "npm run dev -w @pump/web",
@@ -12,12 +13,20 @@
     "build:admin": "npm run build -w @pump/admin",
     "build:realtime": "npm run build -w @pump/realtime",
     "build:indexer": "npm run build -w @pump/indexer",
+    "build:indexer-sol": "npm run build -w @pump/indexer-sol",
+    "indexer:sol:dev": "npm run indexer:dev -w @pump/indexer-sol",
+    "solana:deploy-init": "node scripts/solana/deploy-init.mjs",
+    "solana:build": "wsl -e bash scripts/solana/wsl-pinocchio-build.sh",
+    "solana:deploy": "wsl -e bash scripts/solana/wsl-pinocchio-deploy.sh",
+    "solana:initialize": "cd programs && npx tsx scripts/initialize-pinocchio.ts",
     "start": "npm run start -w @pump/web",
     "typecheck": "npm run typecheck -w @pump/web",
     "lint": "npm run lint -w @pump/web",
     "bulk-launch": "node --env-file=.env scripts/bulk-launch-tokens.mjs",
     "arena-sim": "node --env-file=.env scripts/arena-table-sim.mjs",
-    "21st": "21st"
+    "21st": "21st",
+    "anchor:build": "cd programs && anchor build",
+    "anchor:initialize": "cd programs && npx tsx scripts/initialize.ts"
   },
   "overrides": {
     "qr": "0.5.5"

@@ -1,0 +1,21 @@
+[package]
+name = "pump-curve"
+version = "0.1.0"
+description = "Pump bonding curve (Solana) — permanent SOL↔token curve, no graduation"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "pump_curve"
+
+[features]
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+cpi = ["no-entrypoint"]
+default = ["no-log-ix-name", "no-idl"]
+idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
+
+[dependencies]
+anchor-lang = { version = "0.31.1", features = ["init-if-needed"] }
+anchor-spl = "0.31.1"

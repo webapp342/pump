@@ -33,7 +33,7 @@ export const USER_AVATAR_SIZE = {
   lg: 32,
   /** Portfolio identity / follow list */
   xl: 36,
-  /** Sheet profile head */
+  /** Sheet profile head / callout rows (name + called-at) */
   "2xl": 40,
   /** Portfolio hero */
   "3xl": 48,

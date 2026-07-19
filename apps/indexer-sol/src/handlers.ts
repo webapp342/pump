@@ -1,0 +1,411 @@
+import type pg from "pg";
+import { PUMP_FEEL_DEFAULTS } from "@pump/solana-sdk";
+import type { DecodedSolanaEvent } from "./decode.js";
+import { withTransaction } from "./db-tx.js";
+import {
+  asBigInt,
+  asBool,
+  asString,
+  eventId,
+  executionPriceSol,
+  feeSplitKey,
+  lamportsToSol,
+  marketCapSolFromSpot,
+  spotPriceSolPerToken,
+  startingSpotFromVirtual,
+  tokenAmountToDecimal,
+} from "./units.js";
+
+type FeeSplit = {
+  creatorFee: bigint;
+  referrerFee: bigint;
+  treasuryFee: bigint;
+};
+
+export type HandlerContext = {
+  launchpadPool: pg.Pool;
+  chainId: number;
+  tokenDecimals: number;
+};
+
+/**
+ * Persist Solana Anchor events into the same Postgres shapes as the EVM indexer.
+ * Column names still say `*_zug` (legacy); values are SOL / token decimals.
+ */
+export class SolanaEventHandlers {
+  private readonly pendingFeeSplits = new Map<string, FeeSplit>();
+
+  constructor(private readonly context: HandlerContext) {}
+
+  async dispatch(event: DecodedSolanaEvent): Promise<void> {
+    if (!event.handler || !event.fields) {
+      if (!event.fields) {
+        console.log(
+          `[indexer-sol] skip undecoded name=${event.name} sig=${event.signature}`
+        );
+      }
+      return;
+    }
+
+    switch (event.handler) {
+      case "onTokenCreated":
+        await this.onTokenCreated(event);
+        break;
+      case "onTokenRegistered":
+        await this.onTokenRegistered(event);
+        break;
+      case "onTrade":
+        await this.onTrade(event);
+        break;
+      case "onFeeSplit":
+        this.onFeeSplit(event);
+        break;
+      case "onReferrerSet":
+        await this.onReferrerSet(event);
+        break;
+      case "onFeesClaimed":
+      case "onTreasuryWithdraw":
+        console.log(
+          `[indexer-sol] ${event.name} noted sig=${event.signature} (no PG yet)`
+        );
+        break;
+      default:
+        break;
+    }
+  }
+
+  private onFeeSplit(event: DecodedSolanaEvent): void {
+    const f = event.fields!;
+    const mint = asString(f.mint);
+    this.pendingFeeSplits.set(feeSplitKey(event.signature, mint), {
+      creatorFee: asBigInt(f.creatorFee),
+      referrerFee: asBigInt(f.referrerFee),
+      treasuryFee: asBigInt(f.treasuryFee),
+    });
+  }
+
+  async onTokenCreated(event: DecodedSolanaEvent): Promise<void> {
+    const f = event.fields!;
+    const mint = asString(f.mint);
+    const creator = asString(f.creator);
+    const virtualSol = asBigInt(f.virtualSolReserve);
+    const decimals =
+      typeof f.decimals === "number" ? f.decimals : this.context.tokenDecimals;
+    const virtualToken = PUMP_FEEL_DEFAULTS.totalSupply;
+    const spot = startingSpotFromVirtual(virtualSol, virtualToken, decimals);
+    const mcap = marketCapSolFromSpot(spot);
+    const blockTime = new Date();
+
+    await this.context.launchpadPool.query(
+      `
+        INSERT INTO tokens (
+          address,
+          chain_id,
+          creator_address,
+          name,
+          symbol,
+          metadata_uri,
+          launch_tx_hash,
+          launch_block_number,
+          status,
+          created_at,
+          updated_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'BONDING', $9, now())
+        ON CONFLICT (address) DO UPDATE
+        SET creator_address = EXCLUDED.creator_address,
+            name = EXCLUDED.name,
+            symbol = EXCLUDED.symbol,
+            metadata_uri = EXCLUDED.metadata_uri,
+            updated_at = now()
+      `,
+      [
+        mint,
+        this.context.chainId,
+        creator,
+        asString(f.name),
+        asString(f.symbol),
+        asString(f.uri),
+        event.signature,
+        String(event.slot),
+        blockTime,
+      ]
+    );
+
+    await this.context.launchpadPool.query(
+      `
+        INSERT INTO bonding_states (
+          token_address,
+          target_zug,
+          market_cap_zug,
+          last_price_zug,
+          virtual_zug_reserve,
+          virtual_token_reserve,
+          updated_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, now())
+        ON CONFLICT (token_address) DO UPDATE
+        SET virtual_zug_reserve = EXCLUDED.virtual_zug_reserve,
+            last_price_zug = COALESCE(NULLIF(bonding_states.last_price_zug, 0), EXCLUDED.last_price_zug),
+            updated_at = now()
+      `,
+      [
+        mint,
+        "0",
+        mcap,
+        spot,
+        lamportsToSol(virtualSol),
+        tokenAmountToDecimal(virtualToken, decimals),
+      ]
+    );
+
+    console.log(
+      `[indexer-sol] TokenCreated mint=${mint} symbol=${asString(f.symbol)}`
+    );
+  }
+
+  async onTokenRegistered(event: DecodedSolanaEvent): Promise<void> {
+    const f = event.fields!;
+    const mint = asString(f.mint);
+    const virtualSol = asBigInt(f.virtualSolReserve);
+    const virtualToken = asBigInt(f.virtualTokenReserve);
+    const decimals = this.context.tokenDecimals;
+
+    await this.context.launchpadPool.query(
+      `
+        UPDATE bonding_states
+        SET virtual_zug_reserve = $2,
+            virtual_token_reserve = $3,
+            updated_at = now()
+        WHERE token_address = $1
+      `,
+      [
+        mint,
+        lamportsToSol(virtualSol),
+        tokenAmountToDecimal(virtualToken, decimals),
+      ]
+    );
+  }
+
+  async onTrade(event: DecodedSolanaEvent): Promise<void> {
+    const f = event.fields!;
+    const mint = asString(f.mint);
+    const trader = asString(f.trader);
+    const isBuy = asBool(f.isBuy);
+    const solAmount = asBigInt(f.solAmount);
+    const tokenAmount = asBigInt(f.tokenAmount);
+    const feeLamports = asBigInt(f.feeLamports);
+    const reserveSol = asBigInt(f.reserveSol);
+    const soldTokens = asBigInt(f.soldTokens);
+    const spotRaw = asBigInt(f.spotPrice);
+    const decimals = this.context.tokenDecimals;
+
+    const exists = await this.context.launchpadPool.query(
+      `SELECT 1 FROM tokens WHERE address = $1 LIMIT 1`,
+      [mint]
+    );
+    if (!exists.rowCount) {
+      console.warn(
+        `[indexer-sol] skip Trade: token ${mint} missing (sig ${event.signature})`
+      );
+      return;
+    }
+
+    const feeSplit = this.pendingFeeSplits.get(
+      feeSplitKey(event.signature, mint)
+    ) ?? { creatorFee: 0n, referrerFee: 0n, treasuryFee: 0n };
+    this.pendingFeeSplits.delete(feeSplitKey(event.signature, mint));
+
+    const side = isBuy ? "BUY" : "SELL";
+    const executionPrice = executionPriceSol(solAmount, tokenAmount, decimals);
+    const spotFromChain = spotPriceSolPerToken(spotRaw, decimals);
+    const markPrice =
+      Number(spotFromChain) > 0 ? spotFromChain : executionPrice;
+    const tradeEventId = eventId(event.signature, event.logIndex);
+    const blockTime = new Date();
+    const mcap = marketCapSolFromSpot(markPrice);
+
+    const inserted = await withTransaction(
+      this.context.launchpadPool,
+      async (client) => {
+        const tradeIns = await client.query<{ id: string }>(
+          `
+            INSERT INTO trades (
+              event_id,
+              token_address,
+              trader_address,
+              side,
+              zug_amount,
+              token_amount,
+              price_zug,
+              spot_price_zug,
+              fee_zug,
+              creator_fee_zug,
+              treasury_fee_zug,
+              referrer_fee_zug,
+              tx_hash,
+              log_index,
+              block_number,
+              block_time,
+              native_usd_rate
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+            ON CONFLICT (tx_hash, log_index) DO NOTHING
+            RETURNING id
+          `,
+          [
+            tradeEventId,
+            mint,
+            trader,
+            side,
+            lamportsToSol(solAmount),
+            tokenAmountToDecimal(tokenAmount, decimals),
+            executionPrice,
+            markPrice,
+            lamportsToSol(feeLamports),
+            lamportsToSol(feeSplit.creatorFee),
+            lamportsToSol(feeSplit.treasuryFee),
+            lamportsToSol(feeSplit.referrerFee),
+            event.signature,
+            event.logIndex,
+            String(event.slot),
+            blockTime,
+            null,
+          ]
+        );
+
+        if (!tradeIns.rowCount || !tradeIns.rows[0]) return null;
+
+        await client.query(
+          `
+            UPDATE bonding_states
+            SET reserve_zug = $2,
+                token_sold = $3,
+                last_price_zug = $4,
+                market_cap_zug = $5,
+                trade_count = trade_count + 1,
+                updated_at = now()
+            WHERE token_address = $1
+          `,
+          [
+            mint,
+            lamportsToSol(reserveSol),
+            tokenAmountToDecimal(soldTokens, decimals),
+            markPrice,
+            mcap,
+          ]
+        );
+
+        await this.updatePosition(
+          client,
+          mint,
+          trader,
+          isBuy,
+          solAmount,
+          feeLamports,
+          tokenAmount,
+          decimals
+        );
+
+        return tradeIns.rows[0].id;
+      }
+    );
+
+    if (inserted) {
+      console.log(
+        `[indexer-sol] Trade ${side} mint=${mint} trader=${trader} sol=${lamportsToSol(solAmount)}`
+      );
+    }
+  }
+
+  async onReferrerSet(event: DecodedSolanaEvent): Promise<void> {
+    const f = event.fields!;
+    console.log(
+      `[indexer-sol] ReferrerSet trader=${asString(f.trader)} referrer=${asString(f.referrer)}`
+    );
+  }
+
+  private async updatePosition(
+    client: pg.PoolClient,
+    mint: string,
+    trader: string,
+    isBuy: boolean,
+    solAmount: bigint,
+    feeLamports: bigint,
+    tokenAmount: bigint,
+    decimals: number
+  ): Promise<void> {
+    const sol = Number(lamportsToSol(solAmount));
+    const fee = Number(lamportsToSol(feeLamports));
+    const tokens = Number(tokenAmountToDecimal(tokenAmount, decimals));
+    const netSol = Math.max(0, sol - fee);
+
+    const existing = await client.query<{
+      token_balance: string;
+      total_bought_zug: string;
+      total_sold_zug: string;
+      remaining_cost_basis_zug: string;
+      realized_pnl_zug: string;
+    }>(
+      `
+        SELECT
+          token_balance::text,
+          total_bought_zug::text,
+          total_sold_zug::text,
+          COALESCE(remaining_cost_basis_zug, 0)::text AS remaining_cost_basis_zug,
+          realized_pnl_zug::text
+        FROM user_positions
+        WHERE token_address = $1 AND address = $2
+      `,
+      [mint, trader]
+    );
+
+    const row = existing.rows[0];
+    let balance = Number(row?.token_balance ?? 0);
+    let bought = Number(row?.total_bought_zug ?? 0);
+    let sold = Number(row?.total_sold_zug ?? 0);
+    let cost = Number(row?.remaining_cost_basis_zug ?? 0);
+    let realized = Number(row?.realized_pnl_zug ?? 0);
+
+    if (isBuy) {
+      balance += tokens;
+      bought += sol;
+      cost += netSol;
+    } else {
+      const sellFrac = balance > 0 ? Math.min(1, tokens / balance) : 1;
+      const costReleased = cost * sellFrac;
+      cost = Math.max(0, cost - costReleased);
+      realized += netSol - costReleased;
+      balance = Math.max(0, balance - tokens);
+      sold += sol;
+    }
+
+    await client.query(
+      `
+        INSERT INTO user_positions (
+          token_address,
+          address,
+          token_balance,
+          total_bought_zug,
+          total_sold_zug,
+          remaining_cost_basis_zug,
+          realized_pnl_zug,
+          updated_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, now())
+        ON CONFLICT (token_address, address) DO UPDATE
+        SET token_balance = EXCLUDED.token_balance,
+            total_bought_zug = EXCLUDED.total_bought_zug,
+            total_sold_zug = EXCLUDED.total_sold_zug,
+            remaining_cost_basis_zug = EXCLUDED.remaining_cost_basis_zug,
+            realized_pnl_zug = EXCLUDED.realized_pnl_zug,
+            updated_at = now()
+      `,
+      [
+        mint,
+        trader,
+        String(balance),
+        String(bought),
+        String(sold),
+        String(cost),
+        String(realized),
+      ]
+    );
+  }
+}

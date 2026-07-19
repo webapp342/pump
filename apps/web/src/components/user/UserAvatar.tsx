@@ -27,11 +27,12 @@ function resolveAvatarPx(size: number | UserAvatarSizeRole | undefined): number 
   return USER_AVATAR_SIZE[size];
 }
 
-function framePadPx(avatarPx: number): number {
-  if (avatarPx <= 20) return 2;
+/** Ring thickness drawn *inside* the same outer box (does not grow layout). */
+function frameRingPx(avatarPx: number): number {
+  if (avatarPx <= 20) return 1.5;
   if (avatarPx <= 32) return 2;
-  if (avatarPx <= 48) return 3;
-  return 4;
+  if (avatarPx <= 48) return 2.5;
+  return 3;
 }
 
 export function UserAvatar({
@@ -45,28 +46,30 @@ export function UserAvatar({
   const variant = resolveUserAvatarId(avatarId);
   const seed = address.toLowerCase();
   const px = resolveAvatarPx(size);
-  const pad = framed ? framePadPx(px) : 0;
+  const ring = framed ? frameRingPx(px) : 0;
+  const innerPx = framed ? Math.max(px - ring * 2, 1) : px;
 
   const src = useMemo(() => {
     return createAvatar(getDiceBearStyle(variant), {
       seed,
-      size: px,
+      size: Math.round(innerPx),
       backgroundColor: USER_AVATAR_BG_COLORS,
       backgroundType: ["solid"],
     }).toDataUri();
-  }, [variant, seed, px]);
+  }, [variant, seed, innerPx]);
 
   const img = (
     <img
       src={src}
       alt=""
-      width={px}
-      height={px}
+      width={Math.round(innerPx)}
+      height={Math.round(innerPx)}
       className={`user-avatar__img inline-block shrink-0 rounded-full bg-pump-surface/40 object-cover${
         framed
           ? ""
           : ` shadow-sm ring-2 ${selected ? "ring-pump-accent" : "ring-pump-border/20"}`
       }`}
+      style={framed ? { width: innerPx, height: innerPx } : undefined}
     />
   );
 
@@ -76,10 +79,14 @@ export function UserAvatar({
 
   return (
     <span
-      className={`user-avatar user-avatar--framed inline-flex shrink-0${
+      className={`user-avatar user-avatar--framed inline-flex shrink-0 items-center justify-center${
         selected ? " user-avatar--framed-selected" : ""
       }${className ? ` ${className}` : ""}`}
-      style={{ width: px + pad * 2, height: px + pad * 2, padding: pad }}
+      style={{
+        width: px,
+        height: px,
+        ["--user-avatar-ring" as string]: `${ring}px`,
+      }}
       title="Profile frame"
       aria-label="Avatar with profile frame"
     >

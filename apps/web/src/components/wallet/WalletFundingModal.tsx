@@ -3,11 +3,16 @@
 import { useEffect, useState } from "react";
 import QRCode from "qrcode";
 import { pumpChain, shortAddress } from "@/config/chain";
+import { isSolanaChainFamily } from "@/config/chain-family";
+import { NATIVE_SYMBOL as SOL_NATIVE } from "@/config/solana";
+import { SOLANA_FUNDING_CHAIN_LABEL } from "@/config/solana-explorer";
 import { FUNDING_CHAIN_LABEL } from "@/lib/wallet-funding";
 import { copyToClipboard } from "@/lib/copy-to-clipboard";
 import { AppBottomSheet } from "@/components/ui/AppBottomSheet";
 import { usePumpWallet } from "@/components/wallet/PumpWalletProvider";
 import { WithdrawForm } from "@/components/wallet/WithdrawForm";
+import { SolanaDepositView } from "@/components/wallet/SolanaDepositView";
+import { SolanaWithdrawForm } from "@/components/wallet/SolanaWithdrawForm";
 import type { WalletFundingOptions, WalletFundingView } from "@/components/wallet/WalletFundingProvider";
 import { startScwDepositWatch } from "@/lib/scw-balance-sync";
 import { PumpIcon, faArrowLeft, faArrowUpRight, faCheck, faChevronRight, faCopy, faWallet } from "@/lib/icons";
@@ -102,18 +107,27 @@ export function WalletFundingModal({
     }
   }, [view]);
 
+  const solana = isSolanaChainFamily;
+  const nativeLabel = solana ? SOL_NATIVE : pumpChain.nativeCurrency.symbol;
+  const chainLabel = solana ? SOLANA_FUNDING_CHAIN_LABEL : FUNDING_CHAIN_LABEL;
+  const withdrawFormId = solana ? "pump-solana-withdraw-form" : "pump-withdraw-form";
+
   const title =
     view === "withdraw"
       ? "Withdraw"
       : view === "deposit"
-        ? `Deposit ${pumpChain.nativeCurrency.symbol}`
+        ? `Deposit ${nativeLabel}`
         : (options.title ?? "Add funds");
   const subtitle =
     view === "withdraw"
-      ? "Send assets to an external wallet address."
+      ? solana
+        ? "Send SOL to an external Solana address."
+        : "Send assets to an external wallet address."
       : view === "deposit"
-        ? `Smart wallet on ${FUNDING_CHAIN_LABEL}.`
-        : (options.message ?? `Fund your wallet on ${FUNDING_CHAIN_LABEL}.`);
+        ? solana
+          ? `Custodial wallet on ${chainLabel}.`
+          : `Smart wallet on ${chainLabel}.`
+        : (options.message ?? `Fund your wallet on ${chainLabel}.`);
 
   const showBack = (view === "withdraw" || view === "deposit") && canReturnToChoice;
 
@@ -130,14 +144,14 @@ export function WalletFundingModal({
         </button>
         <button
           type="submit"
-          form="pump-withdraw-form"
+          form={withdrawFormId}
           className="primary-button w-full"
           disabled={withdrawUi.pending || !withdrawUi.canSubmit}
         >
           {withdrawUi.pending ? "Sending…" : "Withdraw"}
         </button>
       </div>
-    ) : view === "deposit" && authenticated && scwAddress ? (
+    ) : view === "deposit" && authenticated && (solana || scwAddress) ? (
       <button type="button" onClick={onClose} className="primary-button w-full">
         Done
       </button>
@@ -174,7 +188,9 @@ export function WalletFundingModal({
             <span className="wallet-funding-choice__copy">
               <span className="wallet-funding-choice__label">Deposit</span>
               <span className="wallet-funding-choice__desc">
-                Receive {pumpChain.nativeCurrency.symbol} to your smart wallet.
+                {solana
+                  ? `Receive ${nativeLabel} to your Pump Solana wallet.`
+                  : `Receive ${nativeLabel} to your smart wallet.`}
               </span>
             </span>
             <PumpIcon icon={faChevronRight} className="wallet-funding-choice__chevron" aria-hidden />
@@ -185,25 +201,40 @@ export function WalletFundingModal({
             <span className="wallet-funding-choice__copy">
               <span className="wallet-funding-choice__label">Withdraw</span>
               <span className="wallet-funding-choice__desc">
-                Send {pumpChain.nativeCurrency.symbol} or tokens to an external address.
+                {solana
+                  ? `Send ${nativeLabel} to an external Solana address.`
+                  : `Send ${nativeLabel} or tokens to an external address.`}
               </span>
             </span>
             <PumpIcon icon={faChevronRight} className="wallet-funding-choice__chevron" aria-hidden />
           </button>
         </nav>
       ) : view === "deposit" ? (
-        authenticated && scwAddress ? (
+        !authenticated ? (
+          <p className="wallet-funding-sheet__notice notice-warning">Sign in to view your deposit address.</p>
+        ) : solana ? (
+          <SolanaDepositView />
+        ) : scwAddress ? (
           <DepositView address={scwAddress} />
         ) : (
           <p className="wallet-funding-sheet__notice notice-warning">Sign in to view your deposit address.</p>
         )
       ) : authenticated ? (
-        <WithdrawForm
-          onClose={onClose}
-          hideActions
-          formId="pump-withdraw-form"
-          onUiChange={setWithdrawUi}
-        />
+        solana ? (
+          <SolanaWithdrawForm
+            onClose={onClose}
+            hideActions
+            formId={withdrawFormId}
+            onUiChange={setWithdrawUi}
+          />
+        ) : (
+          <WithdrawForm
+            onClose={onClose}
+            hideActions
+            formId={withdrawFormId}
+            onUiChange={setWithdrawUi}
+          />
+        )
       ) : (
         <p className="wallet-funding-sheet__notice notice-warning">Sign in to withdraw.</p>
       )}

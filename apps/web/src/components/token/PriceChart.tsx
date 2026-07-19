@@ -953,10 +953,12 @@ export function PriceChart({
             >
               <PumpIcon
                 icon={chartDisplayStyleIcon(chartStyle)}
+                size="xs"
                 className="price-chart-style-trigger__icon"
               />
               <PumpIcon
                 icon={faChevronDown}
+                size="xs"
                 className={`price-chart-style-trigger__caret${
                   styleMenuOpen ? " price-chart-style-trigger__caret--open" : ""
                 }`}

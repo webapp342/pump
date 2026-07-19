@@ -1,0 +1,5 @@
+# Anchor / Solana build artifacts
+.anchor/
+target/
+test-ledger/
+**/*.so

@@ -7,18 +7,22 @@ pump-tma/
 ├── apps/
 │   ├── web/          @pump/web     Next.js 16 (consumer UI + API routes)
 │   ├── admin/        @pump/admin    Vite admin console (injected wallet)
-│   ├── indexer/      @pump/indexer  BSC chain indexer (systemd on VM)
+│   ├── indexer/      @pump/indexer  EVM chain indexer (systemd on VM)
 │   └── realtime/     @pump/realtime WebSocket fan-out (PM2)
-├── packages/         Future shared libs (@pump/shared, etc.)
-├── contracts/        Foundry / UUPS proxies
+├── packages/
+│   └── solana-sdk/   @pump/solana-sdk  Solana cluster / PDA / program IDs
+├── contracts/        Foundry / UUPS proxies (EVM — Base)
+├── programs/         Anchor workspace (Solana — parallel to contracts/)
 ├── db/               SQL migrations + refresh scripts
 ├── deploy/           VM deploy scripts + nginx snippets
 ├── scripts/          Dev/ops Node scripts
-├── docs/
+├── docs/             Includes solana-port.md
 ├── .env.example      Root env template (web + PM2 pump-tma)
 ├── ecosystem.config.cjs
-└── package.json      Workspace root
+└── package.json      Workspace root (apps/* + packages/*)
 ```
+
+Solana port roadmap: [`docs/solana-port.md`](solana-port.md).
 
 ## Commands (from repo root)
 
@@ -29,6 +33,7 @@ pump-tma/
 | Web build | `npm run build` |
 | Admin build | `npm run build:admin` |
 | Typecheck | `npm run typecheck` |
+| Solana programs | `cd programs && anchor build` (requires Anchor 0.30.1 + Solana CLI) |
 
 ## 21st.dev CLI (component search / publish)
 

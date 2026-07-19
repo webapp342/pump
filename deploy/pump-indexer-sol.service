@@ -1,0 +1,19 @@
+[Unit]
+Description=Pump Solana launchpad indexer (Pinocchio logs → PostgreSQL)
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/var/www/pump/indexer-sol
+EnvironmentFile=-/var/www/pump/indexer-sol/.env
+ExecStart=/usr/bin/node dist/indexer.js
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=pump-indexer-sol
+
+[Install]
+WantedBy=multi-user.target

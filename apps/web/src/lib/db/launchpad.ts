@@ -1121,6 +1121,8 @@ export type TokenHolderSnapshot = {
   remainingCostBasisBnb: string;
   remainingCostBasisUsd?: string;
   realizedPnlUsd?: string;
+  /** Open-lot start (earliest open lot); client shows “Held …”. */
+  heldSince?: string | null;
 };
 
 /** Cheap top-mcap address for trade default redirect when Redis is cold. */
@@ -1323,7 +1325,8 @@ export async function listTokenHolders(
 ): Promise<TokenHolderSnapshot[]> {
   const db = getLaunchpadReadPool();
   const normalized = tokenAddress.toLowerCase();
-  const result = await db.query<{
+
+  type HolderDbRow = {
     address: string;
     token_balance: string;
     total_bought_zug: string;
@@ -1332,38 +1335,76 @@ export async function listTokenHolders(
     remaining_cost_basis_zug: string;
     remaining_cost_basis_usd: string;
     realized_pnl_usd: string;
-  }>(
-    `
-    SELECT
-      p.address,
-      p.token_balance::text,
-      p.total_bought_zug::text,
-      p.total_sold_zug::text,
-      p.realized_pnl_zug::text,
-      COALESCE(p.remaining_cost_basis_zug, 0)::text AS remaining_cost_basis_zug,
-      COALESCE(p.remaining_cost_basis_usd, 0)::text AS remaining_cost_basis_usd,
-      COALESCE(p.realized_pnl_usd, 0)::text AS realized_pnl_usd
-    FROM user_positions p
-    WHERE p.token_address = $1
-      AND p.token_balance > 0
-    ORDER BY p.token_balance DESC
-    LIMIT $2 OFFSET $3
-    `,
-    [normalized, limit, offset]
-  );
+    held_since?: Date | null;
+  };
 
-  return attachHolderDisplayNames(
-    result.rows.map((row) => ({
-      address: row.address,
-      tokenBalance: row.token_balance,
-      totalBoughtBnb: row.total_bought_zug,
-      totalSoldBnb: row.total_sold_zug,
-      realizedPnlBnb: row.realized_pnl_zug,
-      remainingCostBasisBnb: row.remaining_cost_basis_zug,
-      remainingCostBasisUsd: row.remaining_cost_basis_usd,
-      realizedPnlUsd: row.realized_pnl_usd,
-    }))
-  );
+  const mapRows = (rows: HolderDbRow[]): Promise<TokenHolderSnapshot[]> =>
+    attachHolderDisplayNames(
+      rows.map((row) => ({
+        address: row.address,
+        tokenBalance: row.token_balance,
+        totalBoughtBnb: row.total_bought_zug,
+        totalSoldBnb: row.total_sold_zug,
+        realizedPnlBnb: row.realized_pnl_zug,
+        remainingCostBasisBnb: row.remaining_cost_basis_zug,
+        remainingCostBasisUsd: row.remaining_cost_basis_usd,
+        realizedPnlUsd: row.realized_pnl_usd,
+        heldSince: row.held_since ? row.held_since.toISOString() : null,
+      }))
+    );
+
+  try {
+    const result = await db.query<HolderDbRow>(
+      `
+      SELECT
+        p.address,
+        p.token_balance::text,
+        p.total_bought_zug::text,
+        p.total_sold_zug::text,
+        p.realized_pnl_zug::text,
+        COALESCE(p.remaining_cost_basis_zug, 0)::text AS remaining_cost_basis_zug,
+        COALESCE(p.remaining_cost_basis_usd, 0)::text AS remaining_cost_basis_usd,
+        COALESCE(p.realized_pnl_usd, 0)::text AS realized_pnl_usd,
+        lots.held_since
+      FROM user_positions p
+      LEFT JOIN LATERAL (
+        SELECT MIN(l.opened_at) AS held_since
+        FROM user_position_lots l
+        WHERE l.address = p.address
+          AND l.token_address = p.token_address
+          AND l.closed_at IS NULL
+      ) lots ON true
+      WHERE p.token_address = $1
+        AND p.token_balance > 0
+      ORDER BY p.token_balance DESC
+      LIMIT $2 OFFSET $3
+      `,
+      [normalized, limit, offset]
+    );
+    return mapRows(result.rows);
+  } catch {
+    // user_position_lots may be missing before migration 042 — still return balances.
+    const result = await db.query<HolderDbRow>(
+      `
+      SELECT
+        p.address,
+        p.token_balance::text,
+        p.total_bought_zug::text,
+        p.total_sold_zug::text,
+        p.realized_pnl_zug::text,
+        COALESCE(p.remaining_cost_basis_zug, 0)::text AS remaining_cost_basis_zug,
+        COALESCE(p.remaining_cost_basis_usd, 0)::text AS remaining_cost_basis_usd,
+        COALESCE(p.realized_pnl_usd, 0)::text AS realized_pnl_usd
+      FROM user_positions p
+      WHERE p.token_address = $1
+        AND p.token_balance > 0
+      ORDER BY p.token_balance DESC
+      LIMIT $2 OFFSET $3
+      `,
+      [normalized, limit, offset]
+    );
+    return mapRows(result.rows);
+  }
 }
 
 export async function countTokenHolders(tokenAddress: string): Promise<number> {

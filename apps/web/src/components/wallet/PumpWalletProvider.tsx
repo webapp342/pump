@@ -25,6 +25,11 @@ import {
   setPumpConnectorSession,
 } from "@/lib/wagmi";
 import { SignInModal } from "@/components/wallet/SignInModal";
+import { isSolanaChainFamily } from "@/config/chain-family";
+import {
+  clearSolanaSilentSession,
+  hydrateSolanaSilentSession,
+} from "@/lib/solana/silent-session";
 
 type PumpWalletContextValue = {
   ready: boolean;
@@ -36,11 +41,17 @@ type PumpWalletContextValue = {
   telegramUsername: string | null | undefined;
   telegramFirstName: string | null | undefined;
   scwAddress: Address | undefined;
+  /** Custodial Solana trading address (Ed25519). Populated when CHAIN_FAMILY=solana. */
+  solanaAddress: string | undefined;
+  /** True once silent Solana session (in-memory key) is ready for popup-free txs. */
+  solanaSessionReady: boolean;
   kernelClient: KernelAccountClient | null;
   login: () => void;
   logout: () => Promise<void>;
   withdraw: (to: Address, value: bigint) => Promise<`0x${string}`>;
   withdrawToken: (token: Address, to: Address, amount: bigint) => Promise<`0x${string}`>;
+  /** Ensure Solana wallet + in-memory signer (no popup). */
+  ensureSolanaSession: () => Promise<{ address: string }>;
 };
 
 const PumpWalletContext = createContext<PumpWalletContextValue | null>(null);
@@ -67,11 +78,14 @@ const stubPumpWallet: PumpWalletContextValue = {
   telegramUsername: undefined,
   telegramFirstName: undefined,
   scwAddress: undefined,
+  solanaAddress: undefined,
+  solanaSessionReady: false,
   kernelClient: null,
   login: () => {},
   logout: noopAsync,
   withdraw: noopAsync,
   withdrawToken: noopAsync,
+  ensureSolanaSession: noopAsync,
 };
 
 export function PumpWalletProviderStub({ children }: { children: ReactNode }) {
@@ -91,6 +105,8 @@ export function PumpWalletProvider({ children }: { children: ReactNode }) {
   const [telegramUsername, setTelegramUsername] = useState<string | null | undefined>();
   const [telegramFirstName, setTelegramFirstName] = useState<string | null | undefined>();
   const [scwAddress, setScwAddress] = useState<Address | undefined>();
+  const [solanaAddress, setSolanaAddress] = useState<string | undefined>();
+  const [solanaSessionReady, setSolanaSessionReady] = useState(false);
   const [kernelClient, setKernelClient] = useState<KernelAccountClient | null>(null);
   const [loginModalOpen, setLoginModalOpen] = useState(false);
 
@@ -132,6 +148,34 @@ export function PumpWalletProvider({ children }: { children: ReactNode }) {
     }
   }, [ready, authenticated]);
 
+  useEffect(() => {
+    if (!ready || !authenticated || !isSolanaChainFamily) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const s = await hydrateSolanaSilentSession();
+        if (!cancelled) {
+          setSolanaAddress(s.address);
+          setSolanaSessionReady(true);
+        }
+      } catch {
+        if (!cancelled) {
+          setSolanaSessionReady(false);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [ready, authenticated]);
+
+  const ensureSolanaSession = useCallback(async () => {
+    const s = await hydrateSolanaSilentSession();
+    setSolanaAddress(s.address);
+    setSolanaSessionReady(true);
+    return { address: s.address };
+  }, []);
+
   const login = useCallback(() => {
     setLoginModalOpen(true);
   }, []);
@@ -139,6 +183,7 @@ export function PumpWalletProvider({ children }: { children: ReactNode }) {
   const logout = useCallback(async () => {
     clearPumpConnectorSession();
     clearPumpWagmiPersistence();
+    clearSolanaSilentSession();
     setAuthProvider(undefined);
     setAccountId(undefined);
     setDisplayName(undefined);
@@ -146,6 +191,8 @@ export function PumpWalletProvider({ children }: { children: ReactNode }) {
     setTelegramUsername(undefined);
     setTelegramFirstName(undefined);
     setScwAddress(undefined);
+    setSolanaAddress(undefined);
+    setSolanaSessionReady(false);
     setKernelClient(null);
     setAuthenticated(false);
     await logoutPumpSession();
@@ -183,11 +230,14 @@ export function PumpWalletProvider({ children }: { children: ReactNode }) {
       telegramUsername,
       telegramFirstName,
       scwAddress,
+      solanaAddress,
+      solanaSessionReady,
       kernelClient,
       login,
       logout,
       withdraw,
       withdrawToken,
+      ensureSolanaSession,
     }),
     [
       ready,
@@ -199,11 +249,14 @@ export function PumpWalletProvider({ children }: { children: ReactNode }) {
       telegramUsername,
       telegramFirstName,
       scwAddress,
+      solanaAddress,
+      solanaSessionReady,
       kernelClient,
       login,
       logout,
       withdraw,
       withdrawToken,
+      ensureSolanaSession,
     ]
   );
 

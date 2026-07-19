@@ -4,9 +4,9 @@ import {
   PumpIcon,
   faCampaign,
   faCheck,
-  faClock,
   faCopy,
   faExternalLink,
+  faGreenEnergy,
   faShare,
 } from "@/lib/icons";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -1020,7 +1020,7 @@ export function TokenDetailLive({
                 isTokenAgeUnder1h(liveToken.createdAt) ? " token-detail-toolbar__age--fresh" : ""
               }`}
             >
-              <PumpIcon icon={faClock} className="token-detail-toolbar__age-icon" aria-hidden />
+              <PumpIcon icon={faGreenEnergy} className="token-detail-toolbar__age-icon" aria-hidden />
               <span className="financial-value">{formatAge(liveToken.createdAt)}</span>
             </span>
           </div>
@@ -1254,12 +1254,14 @@ export function TokenDetailLive({
               followerCount={liveToken.creatorFollowerCount}
               onAddressClick={setProfileAddress}
           />
-          <section className="panel-surface p-4">
-            <p className="section-label">Description</p>
-            <p className="mt-2 text-body-sm leading-relaxed text-pump-muted">
-              {liveToken.description?.trim() || "No description provided."}
-            </p>
-          </section>
+          {liveToken.description?.trim() ? (
+            <section className="panel-surface p-4">
+              <p className="section-label">Description</p>
+              <p className="mt-2 text-body-sm leading-relaxed text-pump-muted">
+                {liveToken.description.trim()}
+              </p>
+            </section>
+          ) : null}
           <TokenAnnouncementsPanel
             tokenAddress={streamAddress}
             refreshKey={announcementsRefreshKey}

@@ -101,3 +101,10 @@ export function explorerTxUrl(txHash: string): string {
 export function explorerAddressUrl(address: string): string {
   return `${pumpChain.blockExplorers.default.url}/address/${address}`;
 }
+
+export {
+  CHAIN_FAMILY,
+  isEvmChainFamily,
+  isSolanaChainFamily,
+  type ChainFamily,
+} from "./chain-family";

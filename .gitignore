@@ -6,6 +6,7 @@ apps/*/node_modules/
 apps/web/.next/
 apps/admin/dist/
 apps/indexer/dist/
+apps/indexer-sol/dist/
 apps/realtime/dist/
 out/
 
@@ -39,6 +40,12 @@ contracts/out/
 contracts/cache/
 contracts/broadcast/
 contracts/lib/
+
+# Anchor / Solana (build artifacts — regenerate with anchor build / cargo-build-sbf)
+programs/target/
+programs/.anchor/
+programs/*/target/
+programs/**/keys/*-keypair.json
 
 # IDE / editor
 .idea/

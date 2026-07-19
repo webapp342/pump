@@ -1,0 +1,20 @@
+[package]
+name = "pump-treasury"
+version = "0.1.0"
+description = "Pump launchpad treasury (Solana) — protocol fee vault"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "pump_treasury"
+
+[features]
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+cpi = ["no-entrypoint"]
+default = ["no-log-ix-name", "no-idl"]
+idl-build = ["anchor-lang/idl-build"]
+
+[dependencies]
+anchor-lang = "0.31.1"

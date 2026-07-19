@@ -15,21 +15,28 @@ function encryptionKey(): Buffer {
 
 /** AES-256-GCM blob: iv(12) + tag(16) + ciphertext */
 export function encryptPrivateKey(privateKey: Hex): string {
+  return encryptSecretBytes(Buffer.from(privateKey.slice(2), "hex"));
+}
+
+export function decryptPrivateKey(payload: string): Hex {
+  const plaintext = decryptSecretBytes(payload);
+  return `0x${plaintext.toString("hex")}` as Hex;
+}
+
+/** Encrypt arbitrary secret bytes (e.g. Solana 64-byte secret key). */
+export function encryptSecretBytes(plaintext: Buffer): string {
   const iv = randomBytes(12);
   const key = encryptionKey();
   const cipher = createCipheriv("aes-256-gcm", key, iv);
-  const ciphertext = Buffer.concat([
-    cipher.update(Buffer.from(privateKey.slice(2), "hex")),
-    cipher.final(),
-  ]);
+  const ciphertext = Buffer.concat([cipher.update(plaintext), cipher.final()]);
   const tag = cipher.getAuthTag();
   return Buffer.concat([iv, tag, ciphertext]).toString("base64");
 }
 
-export function decryptPrivateKey(payload: string): Hex {
+export function decryptSecretBytes(payload: string): Buffer {
   const buf = Buffer.from(payload, "base64");
   if (buf.length < 29) {
-    throw new Error("Invalid encrypted private key payload");
+    throw new Error("Invalid encrypted secret payload");
   }
   const iv = buf.subarray(0, 12);
   const tag = buf.subarray(12, 28);
@@ -37,6 +44,5 @@ export function decryptPrivateKey(payload: string): Hex {
   const key = encryptionKey();
   const decipher = createDecipheriv("aes-256-gcm", key, iv);
   decipher.setAuthTag(tag);
-  const plaintext = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
-  return `0x${plaintext.toString("hex")}` as Hex;
+  return Buffer.concat([decipher.update(ciphertext), decipher.final()]);
 }

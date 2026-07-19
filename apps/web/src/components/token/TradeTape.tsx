@@ -3,16 +3,17 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { TokenHolderSnapshot, TradeItem } from "@/lib/db/launchpad";
 import { explorerTxUrl, shortAddress } from "@/config/chain";
-import { PumpIcon, faExternalLink, faWellness } from "@/lib/icons";
+import { PumpIcon, faArrowDown, faArrowUp, faClock, faExternalLink, faWellness } from "@/lib/icons";
 import { UserAvatarForAddress } from "@/components/user/UserAvatarForAddress";
 import { PctChange } from "@/components/ui/PctChange";
 import { ACTIVITY_PAGE_SIZE } from "@/lib/activity-page-size";
 import { PumpSubscriptPrice } from "@/components/ui/PumpSubscriptPrice";
-import { formatAge } from "@/lib/arena-board-format";
+import { formatAge, formatArenaQuoteUsd } from "@/lib/arena-board-format";
 import {
   DEFAULT_TOKEN_TOTAL_SUPPLY,
+  bnbToUsd,
+  estimateFdvUsd,
   formatUsdReadable,
-  formatTradeAmountUsdFixed2,
   tradeFillPriceUsd,
   tradeNetUsdForDisplay,
   positionAvgEntryUsd,
@@ -41,6 +42,7 @@ type HolderRow = {
   remainingCostBasisBnb: number;
   remainingCostBasisUsd: number;
   avgEntryBnb: number | null;
+  heldSince?: string | null;
 };
 
 type PagedMeta = {
@@ -82,22 +84,22 @@ function formatSupplyShare(balance: number): string {
   return `${pct.toFixed(4)}%`;
 }
 
-function formatTokenAmountMobile(value: number): string {
-  if (!Number.isFinite(value)) return "—";
-  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
-  if (value >= 10_000) return `${(value / 1_000).toFixed(1)}K`;
-  if (value >= 1_000) return `${(value / 1_000).toFixed(2)}K`;
-  if (value >= 1) return value.toFixed(1);
-  if (value > 0) return value.toFixed(2);
-  return "0";
-}
-
 function formatSupplyShareMobile(balance: number): string {
   const pct = (balance / DEFAULT_TOKEN_TOTAL_SUPPLY) * 100;
   if (!Number.isFinite(pct) || pct <= 0) return "0%";
   if (pct >= 10) return `${pct.toFixed(1)}%`;
   if (pct >= 0.1) return `${pct.toFixed(2)}%`;
   return `${pct.toFixed(3)}%`;
+}
+
+/** FDV/MC at trade using spot (or fill) × supply × trade-time FX when available. */
+function tradeMarketCapUsd(trade: TradeItem, liveBnbUsd: number | null): number | null {
+  const spot = Number(trade.spotPriceBnb ?? trade.priceBnb);
+  if (!Number.isFinite(spot) || spot <= 0) return null;
+  const frozen = Number(trade.nativeUsdRate);
+  const rate =
+    Number.isFinite(frozen) && frozen > 0 ? frozen : liveBnbUsd;
+  return estimateFdvUsd(spot, rate);
 }
 
 type HolderMetrics = {
@@ -189,6 +191,7 @@ function mapApiHoldersToRows(holders: TokenHolderSnapshot[]): HolderRow[] {
         remainingCostBasisUsd,
         avgEntryBnb:
           displayBalance > 0 ? remainingCostBasisBnb / displayBalance : null,
+        heldSince: holder.heldSince ?? null,
       };
       if (holder.displayUsername) {
         row.displayUsername = holder.displayUsername;
@@ -217,6 +220,22 @@ function CreatorBadge() {
       aria-label="Creator"
     >
       <PumpIcon icon={faWellness} className="token-tape-creator-icon__glyph" aria-hidden />
+    </span>
+  );
+}
+
+function TradeSideMark({ side }: { side: string }) {
+  const isBuy = side === "BUY";
+  return (
+    <span
+      className={`token-trade-side${
+        isBuy ? " token-trade-side--buy" : " token-trade-side--sell"
+      }`}
+    >
+      <span className="token-trade-side__icon" aria-hidden>
+        <PumpIcon icon={isBuy ? faArrowUp : faArrowDown} size="xs" />
+      </span>
+      <span className="token-trade-side__label">{isBuy ? "Buy" : "Sell"}</span>
     </span>
   );
 }
@@ -555,108 +574,120 @@ export function TradeTape({
               onAddressClick={onAddressClick}
               layout="tape"
             />
-            <section className="token-tape-about-description">
-              <p className="section-label">Description</p>
-              <p className="token-tape-about-description__copy">
-                {tokenDescription?.trim() || "No description provided."}
-              </p>
-            </section>
+            {tokenDescription?.trim() ? (
+              <section className="token-tape-about-description">
+                <p className="section-label">Description</p>
+                <p className="token-tape-about-description__copy">{tokenDescription.trim()}</p>
+              </section>
+            ) : null}
           </div>
         ) : tab === "holders" ? (
           !holdersReady ? (
             <p className="token-tape-empty">Verifying holders on-chain…</p>
           ) : holderRows.length === 0 ? (
             <p className="token-tape-empty">No holders yet.</p>
+          ) : mobileStickyHead ? (
+            <div className={`${activityTableScrollClass} token-holders-mobile`}>
+              <ul className="token-holders-mobile__list" aria-label="Holders">
+                {holderRows.map((row) => {
+                  const { unrealizedPnlPct } = computeHolderMetrics(
+                    row,
+                    currentPriceBnb,
+                    bnbUsd
+                  );
+                  const balanceUsd = bnbToUsd(row.netTokens * currentPriceBnb, bnbUsd);
+                  const meta = displayNameLookup.get(row.address.toLowerCase());
+                  const label =
+                    row.displayUsername ??
+                    meta?.label ??
+                    shortAddress(row.address, true);
+                  const isCreator = row.address.toLowerCase() === creatorKey;
+
+                  return (
+                    <li key={row.address} className="token-holders-mobile__row">
+                      <button
+                        type="button"
+                        className="token-holders-mobile__identity"
+                        onClick={() => onAddressClick(row.address)}
+                        aria-label={`View profile ${label}${isCreator ? ", creator" : ""}`}
+                      >
+                        <UserAvatarForAddress
+                          address={row.address}
+                          size="2xl"
+                          framed={Boolean(meta?.hasStatusBadge)}
+                          className="token-holders-mobile__avatar"
+                        />
+                        <span className="token-holders-mobile__copy">
+                          <span className="token-holders-mobile__name-row">
+                            <span
+                              className={`token-holders-mobile__name${
+                                meta?.hasStatusBadge ? " identity-name--premium" : ""
+                              }`}
+                            >
+                              {label}
+                            </span>
+                            {isCreator ? <CreatorBadge /> : null}
+                          </span>
+                          {row.heldSince ? (
+                            <span className="token-holders-mobile__held">
+                              <PumpIcon icon={faClock} size="xs" aria-hidden />
+                              <span>Held {formatAge(row.heldSince)}</span>
+                            </span>
+                          ) : null}
+                        </span>
+                      </button>
+                      <div className="token-holders-mobile__stats">
+                        <div className="token-holders-mobile__stats-top">
+                          <span className="token-holders-mobile__share financial-value">
+                            {formatSupplyShareMobile(row.netTokens)}
+                          </span>
+                          <span className="token-holders-mobile__sep" aria-hidden />
+                          <span className="token-holders-mobile__balance financial-value">
+                            {formatUsdReadable(balanceUsd, {
+                              compact: true,
+                              twoDecimalsUnder: 10_000,
+                            })}
+                          </span>
+                        </div>
+                        <PctChange
+                          value={unrealizedPnlPct}
+                          className="token-holders-mobile__pnl"
+                          hideWhenEmpty
+                        />
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+              <div ref={holderSentinelRef}>
+                <LoadMoreSentinel loading={loadingMoreHolders} label="Loading holders…" />
+              </div>
+            </div>
           ) : (
-            <div
-              className={
-                mobileStickyHead
-                  ? `${activityTableScrollClass} token-tape-table-wrap--mobile-holders`
-                  : activityTableScrollClass
-              }
-            >
-              <table
-                className={
-                  mobileStickyHead
-                    ? "token-tape-table token-tape-table--mobile-holders"
-                    : "token-tape-table"
-                }
-              >
-                {mobileStickyHead ? (
-                  <colgroup>
-                    <col className="token-tape-table__col-h-account" />
-                    <col className="token-tape-table__col-h-balance" />
-                    <col className="token-tape-table__col-h-supply" />
-                    <col className="token-tape-table__col-h-pnl" />
-                  </colgroup>
-                ) : null}
+            <div className={activityTableScrollClass}>
+              <table className="token-tape-table token-tape-table--holders">
                 <thead>
                   <tr>
-                    {mobileStickyHead ? (
-                      <>
-                        <th className="token-tape-table__head-h-account">Account</th>
-                        <th className="token-tape-table__head-h-balance">Balance</th>
-                        <th className="token-tape-table__head-h-supply">Supply</th>
-                        <th className="token-tape-table__head-h-pnl">P/L</th>
-                      </>
-                    ) : (
-                      <>
-                        <th>Account</th>
-                        <th className="token-tape-table__col-num">Balance</th>
-                        <th className="token-tape-table__col-num">Supply</th>
-                        <th className="token-tape-table__col-num">Entry</th>
-                        <th className="token-tape-table__col-end">P/L</th>
-                      </>
-                    )}
+                    <th className="token-tape-table__col-rank">#</th>
+                    <th>Account</th>
+                    <th className="token-tape-table__col-num">Amount</th>
+                    <th className="token-tape-table__col-num">Supply</th>
+                    <th className="token-tape-table__col-num">Entry</th>
+                    <th className="token-tape-table__col-num">Value</th>
+                    <th className="token-tape-table__col-end">P/L</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {holderRows.map((row) => {
-                    const { avgEntryUsd, unrealizedPnlUsd, unrealizedPnlPct, pnlTone } =
+                  {holderRows.map((row, index) => {
+                    const { avgEntryUsd, unrealizedPnlUsd, pnlTone } =
                       computeHolderMetrics(row, currentPriceBnb, bnbUsd);
-
-                    if (mobileStickyHead) {
-                      return (
-                        <tr key={row.address}>
-                          <td className="token-tape-table__account">
-                            <IdentityPill
-                              address={row.address}
-                              displayUsername={
-                                row.displayUsername ??
-                                displayNameLookup.get(row.address.toLowerCase())?.label
-                              }
-                              hasStatusBadge={
-                                displayNameLookup.get(row.address.toLowerCase())
-                                  ?.hasStatusBadge
-                              }
-                              showCreatorBadge={row.address.toLowerCase() === creatorKey}
-                              onAddressClick={onAddressClick}
-                              compact
-                            />
-                          </td>
-                          <td className="token-tape-table__cell-h-balance token-tape-table__value financial-value token-tape-table__cell-default">
-                            {formatTokenAmountMobile(row.netTokens)}
-                          </td>
-                          <td className="token-tape-table__cell-h-supply token-tape-table__value financial-value token-tape-table__muted">
-                            {formatSupplyShareMobile(row.netTokens)}
-                          </td>
-                          <td className="token-tape-table__cell-h-pnl">
-                            <span
-                              className={`financial-value font-medium ${pnlTone}`}
-                            >
-                              {formatUsdReadable(unrealizedPnlUsd, {
-                                compact: true,
-                                signed: true,
-                                twoDecimalsUnder: 10_000,
-                              })}
-                            </span>
-                          </td>
-                        </tr>
-                      );
-                    }
+                    const valueUsd = bnbToUsd(row.netTokens * currentPriceBnb, bnbUsd);
 
                     return (
                       <tr key={row.address}>
+                        <td className="token-tape-table__col-rank financial-value">
+                          {index + 1}
+                        </td>
                         <td className="token-tape-table__account">
                           <IdentityPill
                             address={row.address}
@@ -672,7 +703,7 @@ export function TradeTape({
                             onAddressClick={onAddressClick}
                           />
                         </td>
-                        <td className="token-tape-table__col-num token-tape-table__value financial-value token-tape-table__cell-default">
+                        <td className="token-tape-table__col-num token-tape-table__value financial-value token-tape-table__cell-amount">
                           {formatTokenAmount(row.netTokens)}
                         </td>
                         <td className="token-tape-table__col-num token-tape-table__value financial-value token-tape-table__muted">
@@ -681,20 +712,19 @@ export function TradeTape({
                         <td className="token-tape-table__col-num token-tape-table__value financial-value token-tape-table__muted">
                           <PumpSubscriptPrice value={avgEntryUsd} />
                         </td>
-                        <td className="token-tape-table__col-end">
-                          <div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
-                            <span className={`financial-value font-medium ${pnlTone}`}>
-                              {formatUsdReadable(unrealizedPnlUsd, {
-                                compact: true,
-                                signed: true,
-                              })}
-                            </span>
-                            <PctChange
-                              value={unrealizedPnlPct}
-                              className="text-caption"
-                              toneClassName="text-pump-muted"
-                            />
-                          </div>
+                        <td className="token-tape-table__col-num token-tape-table__value financial-value token-tape-table__cell-value">
+                          {formatUsdReadable(valueUsd, {
+                            compact: true,
+                            twoDecimalsUnder: 10_000,
+                          })}
+                        </td>
+                        <td
+                          className={`token-tape-table__col-end token-tape-table__value financial-value font-medium ${pnlTone}`}
+                        >
+                          {formatUsdReadable(unrealizedPnlUsd, {
+                            compact: true,
+                            signed: true,
+                          })}
                         </td>
                       </tr>
                     );
@@ -709,93 +739,86 @@ export function TradeTape({
         ) : displayedTrades.length === 0 ? (
           <p className="token-tape-empty">No trades yet.</p>
         ) : mobileStickyHead && tab === "trades" ? (
-          <div className={`${activityTableScrollClass} token-tape-table-wrap--mobile-trades`}>
-            <table className="token-tape-table token-tape-table--mobile-trades">
-              <colgroup>
-                <col className="token-tape-table__col-amount" />
-                <col className="token-tape-table__col-account" />
-                <col className="token-tape-table__col-price" />
-                <col className="token-tape-table__col-time" />
-              </colgroup>
-              <thead>
-                <tr>
-                  <th className="token-tape-table__head-amount">Value</th>
-                  <th className="token-tape-table__head-account">Account</th>
-                  <th className="token-tape-table__head-price">Price</th>
-                  <th className="token-tape-table__head-time">Age</th>
-                </tr>
-              </thead>
-              <tbody>
-                {displayedTrades.map((trade) => {
-                  const isBuy = trade.side === "BUY";
-                  const isOptimistic = trade.id.startsWith("optimistic:");
-                  const tradeNetUsd = tradeNetUsdForDisplay(trade, bnbUsd);
-                  const sideTone = isBuy
-                    ? "token-tape-table__amount--buy"
-                    : "token-tape-table__amount--sell";
-                  return (
-                    <tr
-                      key={trade.id}
-                      className={tradeRowClass(trade.id, trade.side, isOptimistic)}
+          <div className={`${activityTableScrollClass} token-trades-mobile`}>
+            <ul className="token-trades-mobile__list" aria-label="Trades">
+              {displayedTrades.map((trade) => {
+                const isBuy = trade.side === "BUY";
+                const isOptimistic = trade.id.startsWith("optimistic:");
+                const tradeNetUsd = tradeNetUsdForDisplay(trade, bnbUsd);
+                const mcapUsd = tradeMarketCapUsd(trade, bnbUsd);
+                const meta = displayNameLookup.get(trade.traderAddress.toLowerCase());
+                const label =
+                  trade.traderDisplayUsername ??
+                  meta?.label ??
+                  shortAddress(trade.traderAddress, true);
+                const isCreator = trade.traderAddress.toLowerCase() === creatorKey;
+
+                return (
+                  <li
+                    key={trade.id}
+                    className={`token-trades-mobile__row${
+                      isOptimistic ? " token-trades-mobile__row--optimistic" : ""
+                    }`}
+                  >
+                    <button
+                      type="button"
+                      className="token-trades-mobile__identity"
+                      onClick={() => onAddressClick(trade.traderAddress)}
+                      aria-label={`View profile ${label}${isCreator ? ", creator" : ""}`}
                     >
-                      <td
-                        className={`token-tape-table__cell-amount token-tape-table__value financial-value font-medium ${sideTone}`}
-                      >
-                        {formatTradeAmountUsdFixed2(tradeNetUsd)}
-                      </td>
-                      <td className="token-tape-table__account">
-                        <IdentityPill
-                          address={trade.traderAddress}
-                          displayUsername={
-                            trade.traderDisplayUsername ??
-                            displayNameLookup.get(trade.traderAddress.toLowerCase())?.label
-                          }
-                          hasStatusBadge={
-                            displayNameLookup.get(trade.traderAddress.toLowerCase())
-                              ?.hasStatusBadge
-                          }
-                          showCreatorBadge={
-                            trade.traderAddress.toLowerCase() === creatorKey
-                          }
-                          onAddressClick={onAddressClick}
-                          compact
-                        />
-                      </td>
-                      <td className="token-tape-table__value financial-value token-tape-table__cell-default token-tape-table__cell-price">
-                        <PumpSubscriptPrice
-                          value={tradeFillPriceUsd(
-                            trade.nativeAmount,
-                            trade.tokenAmount,
-                            bnbUsd,
-                            trade.feeBnb,
-                            trade.netBnb,
-                            trade.priceBnb,
-                            trade.nativeUsdRate
-                          )}
-                        />
-                      </td>
-                      <td className="token-tape-table__time-cell">
-                        <div className="token-tape-time-txn">
-                          <span className="token-tape-time-txn__clock financial-value">
-                            {formatAge(trade.blockTime, ageNowMs)}
-                          </span>
-                          <a
-                            href={explorerTxUrl(trade.txHash)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="token-tape-txn-link"
-                            aria-label="View transaction on explorer"
-                            onClick={(event) => event.stopPropagation()}
+                      <UserAvatarForAddress
+                        address={trade.traderAddress}
+                        size="2xl"
+                        framed={Boolean(meta?.hasStatusBadge)}
+                        className="token-trades-mobile__avatar"
+                      />
+                      <span className="token-trades-mobile__copy">
+                        <span className="token-trades-mobile__name-row">
+                          <span
+                            className={`token-trades-mobile__name${
+                              meta?.hasStatusBadge ? " identity-name--premium" : ""
+                            }`}
                           >
-                            <PumpIcon icon={faExternalLink} className="h-3.5 w-3.5" />
-                          </a>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                            {label}
+                          </span>
+                          {isCreator ? <CreatorBadge /> : null}
+                          <TradeSideMark side={trade.side} />
+                        </span>
+                        <span className="token-trades-mobile__meta">
+                          <span
+                            className={`token-trades-mobile__value financial-value${
+                              isBuy
+                                ? " token-trades-mobile__value--buy"
+                                : " token-trades-mobile__value--sell"
+                            }`}
+                          >
+                            {formatArenaQuoteUsd(tradeNetUsd)}
+                          </span>
+                          <span className="token-trades-mobile__dot" aria-hidden>
+                            ·
+                          </span>
+                          <span className="token-trades-mobile__mcap financial-value">
+                            {formatArenaQuoteUsd(mcapUsd)} MC
+                          </span>
+                        </span>
+                      </span>
+                    </button>
+                    <a
+                      href={explorerTxUrl(trade.txHash)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="token-trades-mobile__aside"
+                      aria-label={`View transaction, ${formatAge(trade.blockTime, ageNowMs)} ago`}
+                    >
+                      <span className="token-trades-mobile__time financial-value">
+                        {formatAge(trade.blockTime, ageNowMs)}
+                      </span>
+                      <PumpIcon icon={faExternalLink} size="sm" aria-hidden />
+                    </a>
+                  </li>
+                );
+              })}
+            </ul>
             <div ref={tradeSentinelRef}>
               <LoadMoreSentinel loading={loadingMoreTrades} label="Loading trades…" />
             </div>
@@ -842,8 +865,8 @@ export function TradeTape({
                           onAddressClick={onAddressClick}
                         />
                       </td>
-                      <td className={`token-tape-table__type font-medium ${sideTone}`}>
-                        {isBuy ? "Buy" : "Sell"}
+                      <td className="token-tape-table__type">
+                        <TradeSideMark side={trade.side} />
                       </td>
                       <td className="token-tape-table__col-num token-tape-table__value financial-value token-tape-table__muted token-tape-table__cell-default">
                         <PumpSubscriptPrice

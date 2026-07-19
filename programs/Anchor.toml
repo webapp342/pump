@@ -1,0 +1,26 @@
+[toolchain]
+anchor_version = "0.32.1"
+
+[features]
+resolution = true
+skip-lint = false
+
+[programs.devnet]
+# Single unified program (factory + curve + treasury) — one rent bill.
+pump_curve = "28AYQYZW7J9gkYcDJiebYCfXKYuyFEr2xNn7xKwAsZer"
+
+[programs.localnet]
+pump_curve = "DntPETF8WMJ7NwkFWN63dLXnvwBn2K8nCiRtSpdbi5US"
+
+[registry]
+url = "https://api.apr.dev"
+
+[provider]
+cluster = "devnet"
+wallet = "~/.config/solana/id.json"
+
+[workspace]
+members = ["pump-curve"]
+
+[scripts]
+test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"

@@ -89,6 +89,14 @@ import {
 } from "@/lib/trade-timing";
 import { usePumpWallet } from "@/components/wallet/PumpWalletProvider";
 import { contracts, NATIVE_SYMBOL, pumpChain } from "@/config/chain";
+import { isSolanaChainFamily } from "@/config/chain-family";
+import { useSolanaTradeMarket } from "@/hooks/useSolanaTradeMarket";
+import { silentBuy, silentSell } from "@/lib/solana/silent-trade";
+import {
+  SOLANA_FEE_RESERVE_WEI,
+  weiToLamports,
+  weiToTokenRaw,
+} from "@/lib/solana/amount-scale";
 import { NativeLogo } from "@/components/token/NativeLogo";
 import { TokenAvatar } from "@/components/token/TokenAvatar";
 import { erc20Abi, maxUint256 } from "@/lib/abis/erc20";
@@ -389,9 +397,32 @@ export function TradePanel({
   onConfirmOnlyFundingBlocked,
 }: TradePanelProps) {
   const queryClient = useQueryClient();
-  const { address, isConnected, chain } = useAccount();
-  const { data: gasPrice } = useGasPrice({ chainId: pumpChain.id });
+  const isSolanaTrade = isSolanaChainFamily;
+  const {
+    kernelClient,
+    authenticated: pumpAuthenticated,
+    solanaAddress,
+    solanaSessionReady,
+    login: openPumpLogin,
+  } = usePumpWallet();
+  const { address: wagmiAddress, isConnected: wagmiConnected, chain } = useAccount();
+  /** Trading identity — Solana pubkey or EVM SCW. */
+  const address = (isSolanaTrade ? solanaAddress : wagmiAddress) as Address | undefined;
+  const isConnected = isSolanaTrade
+    ? Boolean(pumpAuthenticated && solanaAddress && solanaSessionReady)
+    : wagmiConnected;
+  const { data: gasPrice } = useGasPrice({
+    chainId: pumpChain.id,
+    query: { enabled: !isSolanaTrade },
+  });
   const { openConnectModal } = useOpenConnectModal();
+  const openConnectOrLogin = () => {
+    if (isSolanaTrade) {
+      openPumpLogin();
+      return;
+    }
+    openConnectOrLogin();
+  };
   const { openDeposit } = useWalletFunding();
   const [tradeConfirmOpen, setTradeConfirmOpen] = useState(false);
   const [tradeConfirmError, setTradeConfirmError] = useState<string | null>(null);
@@ -506,7 +537,15 @@ export function TradePanel({
     return parseTokenAmount(amount);
   }, [amount, side, buyInputMode]);
 
-  const wrongChain = isConnected && chain?.id !== pumpChain.id;
+  const wrongChain = isSolanaTrade
+    ? false
+    : isConnected && chain?.id !== pumpChain.id;
+
+  const solanaMarket = useSolanaTradeMarket(
+    isSolanaTrade ? (tokenAddress as string) : undefined,
+    isSolanaTrade ? solanaAddress : undefined,
+    isSolanaTrade
+  );
 
   const { data: localCurveState } = useReadContract({
     address: contracts.bondingCurveManager,
@@ -516,14 +555,15 @@ export function TradePanel({
     chainId: pumpChain.id,
     query: {
       enabled:
-        !chainCurveSnapshot ||
-        isEmptyCurveSnapshot(chainCurveSnapshot),
+        !isSolanaTrade &&
+        (!chainCurveSnapshot || isEmptyCurveSnapshot(chainCurveSnapshot)),
       refetchInterval: CURVE_POLL_MS,
     },
   });
 
-  const paused =
-    chainCurveSnapshot?.paused ?? localCurveState?.[7] ?? status === "PAUSED";
+  const paused = isSolanaTrade
+    ? solanaMarket.paused || status === "PAUSED"
+    : (chainCurveSnapshot?.paused ?? localCurveState?.[7] ?? status === "PAUSED");
 
   const dbCurveSnapshot = useMemo(() => {
     if (!reserveBnb && !tokenSold) return null;
@@ -531,6 +571,9 @@ export function TradePanel({
   }, [reserveBnb, tokenSold, paused]);
 
   const bondingCurve = useMemo(() => {
+    if (isSolanaTrade) {
+      return solanaMarket.bondingCurve ?? null;
+    }
     if (chainCurveSnapshot && !isEmptyCurveSnapshot(chainCurveSnapshot)) {
       return bondingCurveFromSnapshot(chainCurveSnapshot);
     }
@@ -541,14 +584,24 @@ export function TradePanel({
       return bondingCurveFromSnapshot(dbCurveSnapshot);
     }
     return null;
-  }, [chainCurveSnapshot, localCurveState, dbCurveSnapshot]);
+  }, [
+    isSolanaTrade,
+    solanaMarket.bondingCurve,
+    chainCurveSnapshot,
+    localCurveState,
+    dbCurveSnapshot,
+  ]);
 
-  const { data: protocolFeeBps } = useReadContract({
+  const { data: evmProtocolFeeBps } = useReadContract({
     address: contracts.bondingCurveManager,
     abi: bondingCurveManagerAbi,
     functionName: "protocolFeeBps",
     chainId: pumpChain.id,
+    query: { enabled: !isSolanaTrade },
   });
+  const protocolFeeBps = isSolanaTrade
+    ? solanaMarket.protocolFeeBps
+    : evmProtocolFeeBps;
 
   const sellTokenWei = useMemo(() => {
     if (side !== "sell") return 0n;
@@ -607,20 +660,36 @@ export function TradePanel({
     buyTargetTokenWei,
   ]);
 
-  const { data: bnbBalance, refetch: refetchBnbBalance } = useBalance({
-    address,
+  const { data: evmBnbBalance, refetch: refetchEvmBnbBalance } = useBalance({
+    address: isSolanaTrade ? undefined : wagmiAddress,
     chainId: pumpChain.id,
-    query: { enabled: Boolean(address) },
+    query: { enabled: !isSolanaTrade && Boolean(wagmiAddress) },
   });
 
-  const { data: tokenBalance, refetch: refetchBalance } = useReadContract({
+  const bnbBalance = isSolanaTrade
+    ? solanaMarket.solBalanceWei !== undefined
+      ? { value: solanaMarket.solBalanceWei }
+      : undefined
+    : evmBnbBalance;
+  const refetchBnbBalance = isSolanaTrade
+    ? solanaMarket.refetchBalances
+    : refetchEvmBnbBalance;
+
+  const { data: evmTokenBalance, refetch: refetchEvmTokenBalance } = useReadContract({
     address: tokenAddress,
     abi: erc20Abi,
     functionName: "balanceOf",
-    args: address ? [address] : undefined,
+    args: wagmiAddress ? [wagmiAddress] : undefined,
     chainId: pumpChain.id,
-    query: { enabled: Boolean(address) },
+    query: { enabled: !isSolanaTrade && Boolean(wagmiAddress) },
   });
+
+  const tokenBalance = isSolanaTrade
+    ? solanaMarket.tokenBalanceWei
+    : evmTokenBalance;
+  const refetchBalance = isSolanaTrade
+    ? solanaMarket.refetchBalances
+    : refetchEvmTokenBalance;
 
   const resolvedTokenBalanceWei = overrideTokenBalanceWei ?? tokenBalance;
 
@@ -628,59 +697,58 @@ export function TradePanel({
     address: tokenAddress,
     abi: erc20Abi,
     functionName: "allowance",
-    args: address ? [address, contracts.bondingCurveManager] : undefined,
+    args: wagmiAddress ? [wagmiAddress, contracts.bondingCurveManager] : undefined,
     chainId: pumpChain.id,
-    query: { enabled: Boolean(address) },
+    query: { enabled: !isSolanaTrade && Boolean(wagmiAddress) },
   });
 
   const { isError: permitUnsupported } = useReadContract({
     address: tokenAddress,
     abi: memeTokenAbi,
     functionName: "nonces",
-    args: address ? [address] : undefined,
+    args: wagmiAddress ? [wagmiAddress] : undefined,
     chainId: pumpChain.id,
-    query: { enabled: Boolean(address) },
+    query: { enabled: !isSolanaTrade && Boolean(wagmiAddress) },
   });
 
-  const supportsPermit = !permitUnsupported;
+  const supportsPermit = isSolanaTrade ? false : !permitUnsupported;
 
   const { data: tokenName } = useReadContract({
     address: tokenAddress,
     abi: memeTokenAbi,
     functionName: "name",
     chainId: pumpChain.id,
-    query: { enabled: supportsPermit && Boolean(address) },
+    query: { enabled: !isSolanaTrade && supportsPermit && Boolean(wagmiAddress) },
   });
 
   const { data: permitNonce } = useReadContract({
     address: tokenAddress,
     abi: memeTokenAbi,
     functionName: "nonces",
-    args: address ? [address] : undefined,
+    args: wagmiAddress ? [wagmiAddress] : undefined,
     chainId: pumpChain.id,
-    query: { enabled: supportsPermit && Boolean(address) },
+    query: { enabled: !isSolanaTrade && supportsPermit && Boolean(wagmiAddress) },
   });
 
   const { signTypedDataAsync } = useSignTypedData();
-  const { kernelClient } = usePumpWallet();
-  const isScw = Boolean(kernelClient);
+  const isScw = !isSolanaTrade && Boolean(kernelClient);
 
   const { data: boundReferrer } = useReadContract({
     address: contracts.bondingCurveManager,
     abi: bondingCurveManagerAbi,
     functionName: "traderReferrer",
-    args: address ? [address] : undefined,
+    args: wagmiAddress ? [wagmiAddress] : undefined,
     chainId: pumpChain.id,
-    query: { enabled: Boolean(address) },
+    query: { enabled: !isSolanaTrade && Boolean(wagmiAddress) },
   });
 
   const { data: hasTraded } = useReadContract({
     address: contracts.bondingCurveManager,
     abi: bondingCurveManagerAbi,
     functionName: "hasTraded",
-    args: address ? [address] : undefined,
+    args: wagmiAddress ? [wagmiAddress] : undefined,
     chainId: pumpChain.id,
-    query: { enabled: Boolean(address) },
+    query: { enabled: !isSolanaTrade && Boolean(wagmiAddress) },
   });
 
   const localBuyQuoteOut = useMemo(() => {
@@ -815,6 +883,7 @@ export function TradePanel({
     amountUsdValue != null ? formatUsdReadable(amountUsdValue) : null;
 
   const needsApproval =
+    !isSolanaTrade &&
     side === "sell" &&
     sellTokenWei > 0n &&
     allowance !== undefined &&
@@ -912,8 +981,8 @@ export function TradePanel({
   ]);
 
   const { gasCostWei, isLoading: gasLoading } = useTradeGasEstimate({
-    enabled: !paused && !wrongChain && hasTradeAmount,
-    address,
+    enabled: !isSolanaTrade && !paused && !wrongChain && hasTradeAmount,
+    address: wagmiAddress,
     side,
     buyInputMode,
     tokenAddress,
@@ -931,6 +1000,7 @@ export function TradePanel({
   });
 
   const userOpPrefundWei = useMemo(() => {
+    if (isSolanaTrade) return SOLANA_FEE_RESERVE_WEI;
     if (gasCostWei != null && gasCostWei > 0n) return gasCostWei;
     if (gasPrice != null && gasPrice > 0n) {
       const callGas =
@@ -940,7 +1010,7 @@ export function TradePanel({
       return userOpPrefundFromCallGasEstimate(callGas, gasPrice);
     }
     return 0n;
-  }, [gasCostWei, gasPrice, side, needsLegacyApproval]);
+  }, [isSolanaTrade, gasCostWei, gasPrice, side, needsLegacyApproval]);
 
   const buyGasReserveWei = side === "buy" ? userOpPrefundWei : 0n;
   const sellGasReserveWei = side === "sell" ? userOpPrefundWei : 0n;
@@ -1442,7 +1512,7 @@ export function TradePanel({
 
   function applyBuySliderPercent(pct: number) {
     if (!isConnected) {
-      openConnectModal?.();
+      openConnectOrLogin();
       return;
     }
     if (wrongChain || paused || maxBuySpendWei === 0n) {
@@ -1496,7 +1566,7 @@ export function TradePanel({
 
   function applySellSliderPercent(pct: number) {
     if (!isConnected) {
-      openConnectModal?.();
+      openConnectOrLogin();
       return;
     }
     if (wrongChain || paused || maxSellTokenWei === 0n) {
@@ -1635,7 +1705,7 @@ export function TradePanel({
         ? parseTradesFromReceipt(activeReceipt, tokenAddress)[0]
         : undefined;
 
-    if (address) {
+    if (address && !isSolanaTrade) {
       let nativeDeltaWei = 0n;
       let tokenDeltaWei = 0n;
       if (parsedFill) {
@@ -1711,7 +1781,9 @@ export function TradePanel({
     void (async () => {
       const t0 = performance.now();
       tradeTraceStep("ux.refetch_balances.start");
-      if (address) {
+      if (isSolanaTrade) {
+        await Promise.all([refetchBnbBalance(), refetchBalance()]);
+      } else if (address) {
         scheduleTradeWalletBalanceRefresh(queryClient, {
           address,
           tokenAddress,
@@ -1795,6 +1867,37 @@ export function TradePanel({
     if (!address || bnbBalance === undefined) {
       throw new Error("Wallet balance not ready.");
     }
+    if (isSolanaTrade) {
+      const bnbWei = availableNativeExcluding(
+        pendingLedgerRef.current,
+        bnbBalance.value,
+        pendingId
+      );
+      if (tradeSide === "buy" && callValueWei + userOpPrefundWei > bnbWei) {
+        throw new Error(`Insufficient ${NATIVE_SYMBOL} for trade and network fee.`);
+      }
+      if (tradeSide === "sell") {
+        if (bnbWei < userOpPrefundWei) {
+          throw new Error(`Insufficient ${NATIVE_SYMBOL} for network fee.`);
+        }
+        const tokenWei =
+          resolvedTokenBalanceWei !== undefined
+            ? availableTokenExcluding(
+                pendingLedgerRef.current,
+                resolvedTokenBalanceWei,
+                pendingId
+              )
+            : undefined;
+        if (
+          sellAmountWei != null &&
+          tokenWei != null &&
+          sellAmountWei > tokenWei
+        ) {
+          throw new Error("Insufficient token balance.");
+        }
+      }
+      return;
+    }
     const bnbWei = availableNativeExcluding(
       pendingLedgerRef.current,
       bnbBalance.value,
@@ -1817,10 +1920,58 @@ export function TradePanel({
     });
   }
 
+  async function submitSolanaSilentBuy(
+    pendingId: string,
+    buyParams: SessionBuyParams
+  ) {
+    tradeTraceStep("ux.submit_buy.solana_silent.start", {
+      value: buyParams.value.toString(),
+      minTokenOut: buyParams.minTokenOut.toString(),
+      pendingId,
+    });
+    const result = await silentBuy({
+      mintAddress: String(buyParams.tokenAddress),
+      solInLamports: weiToLamports(buyParams.value),
+      minTokenOut: weiToTokenRaw(buyParams.minTokenOut),
+    });
+    trackTradeOrderSubmitted(pendingId, "buy", symbol, result.signature as `0x${string}`);
+    trackTradeOrderIncluded(pendingId, result.signature as `0x${string}`);
+    handleBuySellConfirmed(pendingId, "buy", {
+      hash: result.signature as `0x${string}`,
+    });
+    void refetchBnbBalance();
+    void refetchBalance();
+  }
+
+  async function submitSolanaSilentSell(
+    pendingId: string,
+    sellParams: SessionSellParams
+  ) {
+    tradeTraceStep("ux.submit_sell.solana_silent.start", {
+      amountWei: sellParams.amountWei.toString(),
+      minBnbOut: sellParams.minBnbOut.toString(),
+      pendingId,
+    });
+    const result = await silentSell({
+      mintAddress: String(sellParams.tokenAddress),
+      tokenIn: weiToTokenRaw(sellParams.amountWei),
+      minSolOut: weiToLamports(sellParams.minBnbOut),
+    });
+    trackTradeOrderSubmitted(pendingId, "sell", symbol, result.signature as `0x${string}`);
+    trackTradeOrderIncluded(pendingId, result.signature as `0x${string}`);
+    handleBuySellConfirmed(pendingId, "sell", {
+      hash: result.signature as `0x${string}`,
+    });
+    void refetchBnbBalance();
+    void refetchBalance();
+  }
+
   function dispatchInstantBuy(buyParams: SessionBuyParams, gate: InstantTradeGateBuy) {
     if (!address || !bondingCurve) return;
     const pendingId = createOptimisticPendingId();
-    const panelPrefund = computeConservativeBuyGasReserve(buyGasReserveWei, gasPrice);
+    const panelPrefund = isSolanaTrade
+      ? SOLANA_FEE_RESERVE_WEI
+      : computeConservativeBuyGasReserve(buyGasReserveWei, gasPrice);
     commitPendingReservation(
       pendingId,
       "buy",
@@ -1842,6 +1993,16 @@ export function TradePanel({
     queueMicrotask(() => {
       void (async () => {
         try {
+          if (isSolanaTrade) {
+            await hardValidateBeforeSend(
+              pendingId,
+              "buy",
+              buyParams.value,
+              SOLANA_FEE_RESERVE_WEI
+            );
+            await submitSolanaSilentBuy(pendingId, buyParams);
+            return;
+          }
           const userOpPrefund = await resolveBuyUserOpPrefundWei(buyParams);
           await hardValidateBeforeSend(pendingId, "buy", buyParams.value, userOpPrefund);
           await submitBuyWriteContract(pendingId, buyParams);
@@ -1859,10 +2020,11 @@ export function TradePanel({
   ) {
     if (!address || !bondingCurve) return;
     const pendingId = createOptimisticPendingId();
+    const sellPrefund = isSolanaTrade ? SOLANA_FEE_RESERVE_WEI : sellGasReserveWei;
     commitPendingReservation(
       pendingId,
       "sell",
-      sellGasReserveWei,
+      sellPrefund,
       gate.sellTokenWei
     );
     trackTradeOrderPending(pendingId, "sell", symbol);
@@ -1880,6 +2042,17 @@ export function TradePanel({
     queueMicrotask(() => {
       void (async () => {
         try {
+          if (isSolanaTrade) {
+            await hardValidateBeforeSend(
+              pendingId,
+              "sell",
+              0n,
+              SOLANA_FEE_RESERVE_WEI,
+              sellParams.amountWei
+            );
+            await submitSolanaSilentSell(pendingId, sellParams);
+            return;
+          }
           await hardValidateBeforeSend(
             pendingId,
             "sell",
@@ -2226,7 +2399,7 @@ export function TradePanel({
     tradeTraceStep("ux.submit_trade.start", { side });
 
     if (!isConnected || !address) {
-      openConnectModal?.();
+      openConnectOrLogin();
       return;
     }
     if (showDepositCta) {
@@ -2272,7 +2445,7 @@ export function TradePanel({
           return;
         }
 
-        const tradeReferrer = resolvePendingTradeReferrer();
+        const tradeReferrer = isSolanaTrade ? null : resolvePendingTradeReferrer();
         pendingTradeReferrerRef.current = tradeReferrer;
         quoteUsdAtSubmitRef.current = estimatedQuotePriceUsd;
 
@@ -2292,7 +2465,7 @@ export function TradePanel({
         return;
       }
 
-      const tradeReferrer = resolvePendingTradeReferrer();
+      const tradeReferrer = isSolanaTrade ? null : resolvePendingTradeReferrer();
       const minBnbOut = minOutWithSlippage(sellQuoteOut);
       const baseSellParams: Omit<SessionSellParams, "permit"> = {
         tokenAddress,
@@ -2473,7 +2646,7 @@ export function TradePanel({
     if (!confirmOnly) return;
 
     if (!isConnected) {
-      openConnectModal?.();
+      openConnectOrLogin();
       dismissConfirmOnlyPrepToast();
       onConfirmOnlyClose?.();
       return;

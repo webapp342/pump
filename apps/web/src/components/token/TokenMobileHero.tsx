@@ -6,7 +6,7 @@ import { PumpSubscriptPrice } from "@/components/ui/PumpSubscriptPrice";
 import { FavoriteIcon } from "@/components/icons/FavoriteIcon";
 import { TokenAvatar } from "@/components/token/TokenAvatar";
 import { TokenSocialLinksBar } from "@/components/token/TokenSocialLinksBar";
-import { PumpIcon, faArrowLeft, faCampaign, faCheck, faClock, faCopy } from "@/lib/icons";
+import { PumpIcon, faArrowLeft, faCampaign, faCheck, faCopy, faGreenEnergy } from "@/lib/icons";
 import { shortAddress } from "@/config/chain";
 import { formatAge, isTokenAgeUnder1h } from "@/lib/arena-board-format";
 import { hapticTap } from "@/lib/haptic";
@@ -138,7 +138,7 @@ export function TokenMobileHero({
               ageIsFresh ? " token-mobile-hero__chrome-age--fresh" : ""
             }`}
           >
-            <PumpIcon icon={faClock} className="token-mobile-hero__chrome-age-icon" aria-hidden />
+            <PumpIcon icon={faGreenEnergy} className="token-mobile-hero__chrome-age-icon" aria-hidden />
             {formatAge(token.createdAt)}
           </span>
         </div>

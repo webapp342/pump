@@ -58,13 +58,10 @@ export function UserAvatarForAddress({
   }, [normalized]);
 
   if (!avatarId) {
-    const skeletonPx = resolvedFramed
-      ? px + (px <= 32 ? 4 : px <= 48 ? 6 : 8)
-      : px;
     return (
       <span
         className={`skeleton-shimmer inline-block shrink-0 rounded-full ${className}`}
-        style={{ width: skeletonPx, height: skeletonPx }}
+        style={{ width: px, height: px }}
       />
     );
   }

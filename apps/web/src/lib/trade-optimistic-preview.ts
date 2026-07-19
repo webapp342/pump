@@ -18,10 +18,21 @@ function pendingTxHashFromId(pendingId: string): string {
   return `pending:${pendingId}`;
 }
 
+/** EVM addresses are case-insensitive; Solana base58 must stay exact. */
+function normalizeTraderId(trader: string): string {
+  return trader.startsWith("0x") || trader.startsWith("0X")
+    ? trader.toLowerCase()
+    : trader;
+}
+
+function asEventAddress(trader: string): Address {
+  return trader as Address;
+}
+
 export function buildOptimisticBuyPreview(params: {
   pendingId: string;
   tokenAddress: Address;
-  traderAddress: Address;
+  traderAddress: string;
   submitValueWei: bigint;
   tokenOutWei: bigint;
   feeZug: bigint;
@@ -47,7 +58,7 @@ export function buildOptimisticBuyPreview(params: {
 
   const syntheticTrade: ParsedTradeEvent = {
     token: params.tokenAddress,
-    trader: params.traderAddress,
+    trader: asEventAddress(params.traderAddress),
     isBuy: true,
     nativeAmount: params.submitValueWei,
     tokenAmount: params.tokenOutWei,
@@ -67,7 +78,7 @@ export function buildOptimisticBuyPreview(params: {
   const tradeItem: TradeItem = {
     id: `optimistic:${pendingTxHash}`,
     side: "BUY",
-    traderAddress: params.traderAddress.toLowerCase(),
+    traderAddress: normalizeTraderId(params.traderAddress),
     nativeAmount: native,
     feeBnb: fee,
     netBnb: formatEther(params.submitValueWei - params.feeZug),
@@ -91,7 +102,7 @@ export function buildOptimisticBuyPreview(params: {
 export function buildOptimisticSellPreview(params: {
   pendingId: string;
   tokenAddress: Address;
-  traderAddress: Address;
+  traderAddress: string;
   sellTokenWei: bigint;
   zugOutWei: bigint;
   feeZug: bigint;
@@ -123,7 +134,7 @@ export function buildOptimisticSellPreview(params: {
 
   const syntheticTrade: ParsedTradeEvent = {
     token: params.tokenAddress,
-    trader: params.traderAddress,
+    trader: asEventAddress(params.traderAddress),
     isBuy: false,
     nativeAmount: grossZug,
     tokenAmount: params.sellTokenWei,
@@ -143,7 +154,7 @@ export function buildOptimisticSellPreview(params: {
   const tradeItem: TradeItem = {
     id: `optimistic:${pendingTxHash}`,
     side: "SELL",
-    traderAddress: params.traderAddress.toLowerCase(),
+    traderAddress: normalizeTraderId(params.traderAddress),
     nativeAmount: native,
     feeBnb: fee,
     netBnb: formatEther(params.zugOutWei),
