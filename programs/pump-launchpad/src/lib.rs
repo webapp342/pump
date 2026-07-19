@@ -152,6 +152,41 @@ fn read_u8(data: &[u8], off: usize) -> Result<u8, ProgramError> {
     data.get(off).copied().ok_or(ProgramError::InvalidInstructionData)
 }
 
+fn read_borsh_str<'a>(data: &'a [u8], off: &mut usize) -> Result<&'a [u8], ProgramError> {
+    if data.len() < *off + 4 {
+        return Err(ProgramError::InvalidInstructionData);
+    }
+    let len = u32::from_le_bytes(
+        data[*off..*off + 4]
+            .try_into()
+            .map_err(|_| ProgramError::InvalidInstructionData)?,
+    ) as usize;
+    *off += 4;
+    if data.len() < *off + len {
+        return Err(ProgramError::InvalidInstructionData);
+    }
+    let s = &data[*off..*off + len];
+    *off += len;
+    Ok(s)
+}
+
+fn parse_create_meme_metadata(data: &[u8]) -> Result<(&[u8], &[u8], &[u8]), ProgramError> {
+    let mut off = 0;
+    let name = read_borsh_str(data, &mut off)?;
+    if name.is_empty() || name.len() > 64 {
+        return Err(ProgramError::InvalidInstructionData);
+    }
+    let symbol = read_borsh_str(data, &mut off)?;
+    if symbol.is_empty() || symbol.len() > 16 {
+        return Err(ProgramError::InvalidInstructionData);
+    }
+    let uri = read_borsh_str(data, &mut off)?;
+    if uri.len() > 256 {
+        return Err(ProgramError::InvalidInstructionData);
+    }
+    Ok((name, symbol, uri))
+}
+
 fn write_pod<T: Pod>(ai: &AccountInfo, val: &T) -> ProgramResult {
     let dst = unsafe { ai.borrow_mut_data_unchecked() };
     let bytes = bytemuck::bytes_of(val);
@@ -270,11 +305,12 @@ fn process_initialize(
 
 /// Accounts: creator, mint, curve, curve_token_vault, factory_signer, global,
 ///           treasury_vault, token_program, system
-/// Client pre-creates mint (authority=factory_signer), curve PDA, vault ATA.
+/// Client pre-creates mint (authority=creator), Metaplex metadata, curve PDA, vault ATA.
+/// Instruction data: borsh name (≤64), symbol (≤16), uri (≤256).
 fn process_create_meme(
     program_id: &Pubkey,
     accounts: &[AccountInfo],
-    _data: &[u8],
+    data: &[u8],
 ) -> ProgramResult {
     let [creator, mint, curve, vault, factory_signer, global, treasury, _token, _system] =
         accounts
@@ -284,6 +320,7 @@ fn process_create_meme(
     if !creator.is_signer() {
         return Err(ProgramError::MissingRequiredSignature);
     }
+    let (name, symbol, uri) = parse_create_meme_metadata(data)?;
     if !owner_eq(global, program_id) {
         return Err(ProgramError::IncorrectProgramId);
     }
@@ -337,6 +374,14 @@ fn process_create_meme(
     ];
     let signers = [Signer::from(&seeds)];
 
+    SetAuthority {
+        account: mint,
+        authority: creator,
+        authority_type: AuthorityType::MintTokens,
+        new_authority: Some(factory_signer.key()),
+    }
+    .invoke()?;
+
     MintTo {
         mint,
         account: vault,
@@ -370,6 +415,9 @@ fn process_create_meme(
     events::emit_token_created(
         &c.mint,
         &c.creator,
+        name,
+        symbol,
+        uri,
         c.total_supply,
         c.virtual_sol_reserve,
         g.token_decimals,

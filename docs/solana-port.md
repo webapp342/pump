@@ -67,7 +67,7 @@ Remaining architecture (Yellowstone / Go / ClickHouse / silent sign): [`docs/sol
 - **Buy/sell:** SOL into curve account; SPL from/to curve token vault; protocol fee → treasury; creator/referrer shares paid immediately.
 - **Factory:** mint SPL → vault ATA → CPI `register_curve` (factory-signer PDA).
 - **Treasury:** `withdraw` from vault PDA.
-- **Not yet:** Metaplex metadata, initial buy in `create_meme`, verified-KOL BPS, Anchor integration tests on validator.
+- **Not yet:** ~~Metaplex metadata~~ (create tx embeds Metaplex name/symbol/uri + `/api/tokens/{mint}/metaplex.json`), verified-KOL BPS, Anchor integration tests on validator.
 
 ## Program map (EVM → Solana)
 

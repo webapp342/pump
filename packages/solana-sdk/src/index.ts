@@ -136,8 +136,43 @@ export function encodeSellIx(tokenIn: bigint, minSolOut: bigint): Buffer {
   return buf;
 }
 
-export function encodeCreateMemeIx(): Buffer {
-  return Buffer.from([IX.createMeme]);
+export function encodeCreateMemeIx(input: {
+  name: string;
+  symbol: string;
+  uri?: string;
+}): Buffer {
+  const nameBytes = Buffer.from(input.name.trim(), "utf8");
+  const symbolBytes = Buffer.from(input.symbol.trim().toUpperCase(), "utf8");
+  const uriBytes = Buffer.from((input.uri ?? "").trim(), "utf8");
+
+  if (!nameBytes.length || nameBytes.length > 64) {
+    throw new Error("Token name must be 1–64 bytes");
+  }
+  if (!symbolBytes.length || symbolBytes.length > 16) {
+    throw new Error("Token symbol must be 1–16 bytes");
+  }
+  if (uriBytes.length > 256) {
+    throw new Error("Metadata URI must be at most 256 bytes");
+  }
+
+  const buf = Buffer.alloc(
+    1 + 4 + nameBytes.length + 4 + symbolBytes.length + 4 + uriBytes.length
+  );
+  let o = 0;
+  buf.writeUInt8(IX.createMeme, o);
+  o += 1;
+
+  const writeString = (value: Buffer) => {
+    buf.writeUInt32LE(value.length, o);
+    o += 4;
+    value.copy(buf, o);
+    o += value.length;
+  };
+
+  writeString(nameBytes);
+  writeString(symbolBytes);
+  writeString(uriBytes);
+  return buf;
 }
 
 export function encodeWithdrawIx(amount: bigint): Buffer {

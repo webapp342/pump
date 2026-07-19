@@ -1,5 +1,6 @@
 /**
  * Popup-free Solana token launch (create_meme + optional initial buy).
+ * Creates Metaplex metadata (name/symbol/uri) in the same transaction for cross-platform visibility.
  */
 
 import {
@@ -23,6 +24,10 @@ import {
   hydrateSolanaSilentSession,
   getSolanaSilentSession,
 } from "@/lib/solana/silent-session";
+import {
+  buildTokenMetaplexJsonUrl,
+  createSplTokenMetadataInstruction,
+} from "@/lib/solana/metaplex-metadata";
 import {
   decodeGlobalConfig,
   launchpadProgramId,
@@ -58,15 +63,27 @@ function referrerAccounts(trader: PublicKey, referrerAddress?: string | null) {
   return { referrerBinding, referrerWallet };
 }
 
-export async function silentCreateMeme(input?: {
+export async function silentCreateMeme(input: {
+  name: string;
+  symbol: string;
+  uri?: string;
   initialBuyLamports?: bigint;
   minTokenOut?: bigint;
   referrerAddress?: string | null;
 }): Promise<SolanaSilentCreateResult> {
+  const trimmedName = input.name.trim();
+  const trimmedSymbol = input.symbol.trim().toUpperCase();
+  if (!trimmedName || !trimmedSymbol) {
+    throw new Error("Name and symbol are required.");
+  }
+
   const creator = await creatorPubkey();
   const programId = launchpadProgramId();
   const mintKp = Keypair.generate();
   const mint = mintKp.publicKey;
+  const metadataUri =
+    input.uri?.trim() || buildTokenMetaplexJsonUrl(mint.toBase58());
+
   const [globalPda] = pdaGlobal(programId);
   const [factorySigner] = pdaFactorySigner(programId);
   const [treasury] = pdaTreasuryVault(programId);
@@ -91,7 +108,7 @@ export async function silentCreateMeme(input?: {
     createInitializeMint2Instruction(
       mint,
       global.tokenDecimals,
-      factorySigner,
+      creator,
       null,
       TOKEN_PROGRAM_ID
     ),
@@ -103,6 +120,15 @@ export async function silentCreateMeme(input?: {
       TOKEN_PROGRAM_ID,
       ASSOCIATED_TOKEN_PROGRAM_ID
     ),
+    createSplTokenMetadataInstruction({
+      mint,
+      mintAuthority: creator,
+      payer: creator,
+      updateAuthority: creator,
+      name: trimmedName,
+      symbol: trimmedSymbol,
+      uri: metadataUri,
+    }),
     new TransactionInstruction({
       programId,
       keys: [
@@ -116,17 +142,21 @@ export async function silentCreateMeme(input?: {
         { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
         { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
       ],
-      data: encodeCreateMemeIx(),
+      data: encodeCreateMemeIx({
+        name: trimmedName,
+        symbol: trimmedSymbol,
+        uri: metadataUri,
+      }),
     }),
   ];
 
-  const initialBuy = input?.initialBuyLamports ?? 0n;
+  const initialBuy = input.initialBuyLamports ?? 0n;
   if (initialBuy > 0n) {
     const traderAta = getAssociatedTokenAddressSync(mint, creator, false, TOKEN_PROGRAM_ID);
-    const minOut = input?.minTokenOut ?? 1n;
+    const minOut = input.minTokenOut ?? 1n;
     const { referrerBinding, referrerWallet } = referrerAccounts(
       creator,
-      input?.referrerAddress
+      input.referrerAddress
     );
     ixs.push(
       createAssociatedTokenAccountIdempotentInstruction(
@@ -171,5 +201,6 @@ export async function silentCreateMeme(input?: {
 
 /** Rent + curve allocation cushion for create UX (matches on-chain ~3M lamports curve + mint rent). */
 export function solanaCreateFeeCushionLamports(): bigint {
-  return PUMP_FEEL_DEFAULTS.createFeeLamports + 5_000_000n;
+  // Metaplex metadata rent (~0.015 SOL) + create curve/mint cushion.
+  return PUMP_FEEL_DEFAULTS.createFeeLamports + 5_000_000n + 15_000_000n;
 }

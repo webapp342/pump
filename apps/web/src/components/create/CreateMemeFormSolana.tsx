@@ -296,6 +296,8 @@ export function CreateMemeFormSolana() {
     setSubmitting(true);
     try {
       const { signature, mintAddress, traderAddress } = await silentCreateMeme({
+        name: trimmedName,
+        symbol: trimmedSymbol,
         initialBuyLamports,
         minTokenOut: initialBuyLamports > 0n ? minTokenOut : undefined,
         referrerAddress,

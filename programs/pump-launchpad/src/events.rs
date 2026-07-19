@@ -23,9 +23,14 @@ fn write_pubkey(buf: &mut [u8], off: &mut usize, pk: &[u8; 32]) {
     *off += 32;
 }
 
-fn write_empty_string(buf: &mut [u8], off: &mut usize) {
-    buf[*off..*off + 4].copy_from_slice(&0u32.to_le_bytes());
+fn write_string(buf: &mut [u8], off: &mut usize, s: &[u8]) {
+    let len = s.len() as u32;
+    buf[*off..*off + 4].copy_from_slice(&len.to_le_bytes());
     *off += 4;
+    if !s.is_empty() {
+        buf[*off..*off + s.len()].copy_from_slice(s);
+        *off += s.len();
+    }
 }
 
 fn emit(buf: &[u8]) {
@@ -35,19 +40,22 @@ fn emit(buf: &[u8]) {
 pub fn emit_token_created(
     mint: &[u8; 32],
     creator: &[u8; 32],
+    name: &[u8],
+    symbol: &[u8],
+    uri: &[u8],
     total_supply: u64,
     virtual_sol_reserve: u64,
     decimals: u8,
 ) {
     // mint + creator + name + symbol + uri + total_supply + virtual_sol + decimals
-    let mut buf = [0u8; 8 + 32 + 32 + 4 + 4 + 4 + 8 + 8 + 1];
+    let mut buf = [0u8; 512];
     buf[..8].copy_from_slice(&DISC_TOKEN_CREATED);
     let mut off = 8;
     write_pubkey(&mut buf, &mut off, mint);
     write_pubkey(&mut buf, &mut off, creator);
-    write_empty_string(&mut buf, &mut off);
-    write_empty_string(&mut buf, &mut off);
-    write_empty_string(&mut buf, &mut off);
+    write_string(&mut buf, &mut off, name);
+    write_string(&mut buf, &mut off, symbol);
+    write_string(&mut buf, &mut off, uri);
     write_u64(&mut buf, &mut off, total_supply);
     write_u64(&mut buf, &mut off, virtual_sol_reserve);
     write_u8(&mut buf, &mut off, decimals);
