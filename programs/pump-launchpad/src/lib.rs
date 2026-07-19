@@ -284,7 +284,7 @@ fn process_create_meme(
     if !creator.is_signer() {
         return Err(ProgramError::MissingRequiredSignature);
     }
-    if !owner_eq(global, program_id) || !owner_eq(curve, program_id) {
+    if !owner_eq(global, program_id) {
         return Err(ProgramError::IncorrectProgramId);
     }
 
@@ -317,6 +317,8 @@ fn process_create_meme(
             owner: program_id,
         }
         .invoke_signed(&signers)?;
+    } else if !owner_eq(curve, program_id) {
+        return Err(ProgramError::IncorrectProgramId);
     }
 
     if g.create_fee_lamports > 0 {

@@ -4,13 +4,15 @@ set -euo pipefail
 export PATH="$HOME/.cargo/bin:$HOME/.local/share/solana/install/active_release/bin:$PATH"
 source "$HOME/.cargo/env" 2>/dev/null || true
 
-ROOT=/mnt/c/Users/DARK/Desktop/pump-tma/programs/pump-launchpad
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+ROOT="$REPO_ROOT/programs/pump-launchpad"
 SO="$ROOT/target/deploy/pump_launchpad.so"
 KEY="$ROOT/keys/pump_launchpad-keypair.json"
 URL="${SOLANA_RPC_URL:-https://api.devnet.solana.com}"
 
 if [ ! -f "$SO" ]; then
-  bash /mnt/c/Users/DARK/Desktop/pump-tma/scripts/solana/wsl-pinocchio-build.sh
+  bash "$SCRIPT_DIR/wsl-pinocchio-build.sh"
 fi
 
 PID=$(solana-keygen pubkey "$KEY")
