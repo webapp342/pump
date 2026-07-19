@@ -1,5 +1,5 @@
 import { getAddress } from "viem";
-import { normalizeTokenAddress } from "@/lib/address";
+import { normalizeAddressParam } from "@/lib/address";
 import { isSolanaChainFamily } from "@/config/chain-family";
 
 const ASSETS_BASE =
@@ -13,7 +13,7 @@ const CACHE_BUST =
 /** Filename / CDN key for token logos — canonical base58 on Solana, lowercase 0x on EVM. */
 export function tokenLogoStorageKey(address: string): string {
   if (isSolanaChainFamily) {
-    return normalizeTokenAddress(address);
+    return normalizeAddressParam(address) ?? address.trim();
   }
   return getAddress(address).toLowerCase();
 }

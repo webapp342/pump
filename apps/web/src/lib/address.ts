@@ -51,6 +51,23 @@ export function addressCacheKey(value: string | null | undefined): string | null
   return normalizeAddressParam(value);
 }
 
+/** Route/cache key — lowercase EVM, canonical base58 on Solana. */
+export function normalizeRouteAddressKey(value: string): string {
+  if (isSolanaChainFamily) {
+    return addressCacheKey(value) ?? value.trim();
+  }
+  return value.toLowerCase();
+}
+
+export function routeAddressKeysEqual(a: string, b: string): boolean {
+  if (isSolanaChainFamily) {
+    const left = addressCacheKey(a);
+    const right = addressCacheKey(b);
+    return left != null && right != null && left === right;
+  }
+  return a.toLowerCase() === b.toLowerCase();
+}
+
 /** Persist/query users row — preserve base58 case on Solana. */
 export function normalizeUserStorageAddress(value: string): string {
   const normalized = normalizeAddressParam(value);

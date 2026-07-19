@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { TokenDetail, TradeItem } from "@/lib/db/launchpad";
 import type { TokenDetailBundle, InitialChartCandles } from "@/lib/token-server";
+import { normalizeRouteAddressKey, routeAddressKeysEqual } from "@/lib/address";
 import { AppShell } from "@/components/layout/AppShell";
 import { TokenDetailLive } from "@/components/token/TokenDetailLive";
 import { TokenDetailBodySkeleton } from "@/components/token/TokenDetailBodySkeleton";
@@ -51,7 +52,7 @@ function resolveRouteBundle(
   resolved: ResolvedBundle | null,
   optimisticToken: TokenDetail | null
 ): ResolvedBundle | null {
-  if (resolved?.token.address.toLowerCase() === normalized) {
+  if (resolved && routeAddressKeysEqual(resolved.token.address, normalized)) {
     return resolved;
   }
 
@@ -60,7 +61,7 @@ function resolveRouteBundle(
     return bundleFromPayload(cached);
   }
 
-  if (optimisticToken?.address.toLowerCase() === normalized) {
+  if (optimisticToken && routeAddressKeysEqual(optimisticToken.address, normalized)) {
     return { token: optimisticToken, trades: [], holders: [] };
   }
 
@@ -71,7 +72,7 @@ export function TokenDetailShell({
   address,
   initialBundle = null,
 }: TokenDetailShellProps) {
-  const normalized = address.toLowerCase();
+  const normalized = normalizeRouteAddressKey(address);
 
   useEffect(() => {
     document.documentElement.classList.add("token-page-lock");
@@ -122,7 +123,7 @@ export function TokenDetailShell({
 
   useLayoutEffect(() => {
     if (!initialBundle) return;
-    if (initialBundle.token.address.toLowerCase() !== normalized) return;
+    if (!routeAddressKeysEqual(initialBundle.token.address, normalized)) return;
     setResolved(bundleFromPayload(initialBundle));
     layoutMountedRef.current = true;
     setFatalError(null);
@@ -130,10 +131,10 @@ export function TokenDetailShell({
 
   const routeBundle = resolveRouteBundle(normalized, resolved, optimisticToken);
   const contentSynced =
-    routeBundle != null && routeBundle.token.address.toLowerCase() === normalized;
+    routeBundle != null && routeAddressKeysEqual(routeBundle.token.address, normalized);
 
   const showRouteSkeleton =
-    !routeBundle || routeBundle.token.address.toLowerCase() !== normalized;
+    !routeBundle || !routeAddressKeysEqual(routeBundle.token.address, normalized);
 
   const load = useCallback(
     async (options: { silent?: boolean } = {}) => {
@@ -278,7 +279,7 @@ export function TokenDetailShell({
       ) : null}
 
       <TokenDetailLive
-        tokenAddress={normalized}
+        tokenAddress={routeBundle.token.address}
         symbol={routeBundle.token.symbol}
         status={routeBundle.token.status}
         initialToken={routeBundle.token}

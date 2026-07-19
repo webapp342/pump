@@ -247,7 +247,7 @@ export function TokenDetailLive({
   const [chartCurrency, setChartCurrency] = useState<"usd" | "mcap">("mcap");
   const chartTapeSplit = useTokenChartTapeSplit();
 
-  const streamAddress = contentSynced ? tokenAddress : token.address;
+  const streamAddress = token.address || tokenAddress;
 
   useEffect(() => {
     writeLastTradeTokenAddress(tokenAddress);
