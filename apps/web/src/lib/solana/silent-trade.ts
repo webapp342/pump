@@ -49,7 +49,7 @@ async function loadCurve(mint: PublicKey) {
   }
   return {
     curvePda,
-    curve: decodeCurveAccount(Buffer.from(info.data)),
+    curve: decodeCurveAccount(info.data),
   };
 }
 

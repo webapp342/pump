@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useAccount } from "wagmi";
+import { usePumpWallet } from "@/components/wallet/PumpWalletProvider";
+import { isSolanaChainFamily } from "@/config/chain-family";
 import {
   USER_AVATAR_IDS,
   USER_AVATAR_LABELS,
@@ -19,7 +21,9 @@ type AvatarPickerModalProps = {
 };
 
 export function AvatarPickerModal({ open, onClose }: AvatarPickerModalProps) {
-  const { address } = useAccount();
+  const { address: wagmiAddress } = useAccount();
+  const { walletAddress: solanaWalletAddress } = usePumpWallet();
+  const address = isSolanaChainFamily ? solanaWalletAddress : wagmiAddress;
   const { avatarId, username, updateProfile } = useUserAvatar();
   const [selectedId, setSelectedId] = useState<UserAvatarId>(USER_AVATAR_IDS[0]);
   const [usernameInput, setUsernameInput] = useState("");

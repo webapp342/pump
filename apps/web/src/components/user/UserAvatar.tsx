@@ -7,6 +7,7 @@ import {
   USER_AVATAR_BG_COLORS,
   resolveUserAvatarId,
 } from "@/lib/user-avatars";
+import { addressCacheKey } from "@/lib/address";
 
 import { USER_AVATAR_SIZE, type UserAvatarSizeRole } from "@/lib/ui-sizes";
 
@@ -44,7 +45,7 @@ export function UserAvatar({
   framed = false,
 }: UserAvatarProps) {
   const variant = resolveUserAvatarId(avatarId);
-  const seed = address.toLowerCase();
+  const seed = addressCacheKey(address) ?? address;
   const px = resolveAvatarPx(size);
   const ring = framed ? frameRingPx(px) : 0;
   const innerPx = framed ? Math.max(px - ring * 2, 1) : px;

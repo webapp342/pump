@@ -1,3 +1,5 @@
+import { isSolanaChainFamily } from "@/config/chain-family";
+
 /** DiceBear style keys stored in users.avatar_id */
 export const USER_AVATAR_IDS = [
   "avataaars",
@@ -53,9 +55,9 @@ export function isValidUserAvatarId(value: string): value is UserAvatarId {
 
 export function defaultAvatarIdForAddress(address: string): UserAvatarId {
   let hash = 0;
-  const normalized = address.toLowerCase();
-  for (let i = 0; i < normalized.length; i += 1) {
-    hash = (hash * 31 + normalized.charCodeAt(i)) >>> 0;
+  const seed = isSolanaChainFamily ? address : address.toLowerCase();
+  for (let i = 0; i < seed.length; i += 1) {
+    hash = (hash * 31 + seed.charCodeAt(i)) >>> 0;
   }
   return USER_AVATAR_IDS[hash % USER_AVATAR_IDS.length];
 }

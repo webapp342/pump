@@ -63,12 +63,8 @@ async function fetchMarket(mintAddress: string, ownerAddress?: string) {
       : Promise.resolve(null),
   ]);
 
-  const global = globalInfo?.data
-    ? decodeGlobalConfig(Buffer.from(globalInfo.data))
-    : null;
-  const curve = curveInfo?.data
-    ? decodeCurveAccount(Buffer.from(curveInfo.data))
-    : null;
+  const global = globalInfo?.data ? decodeGlobalConfig(globalInfo.data) : null;
+  const curve = curveInfo?.data ? decodeCurveAccount(curveInfo.data) : null;
 
   const bondingCurve: BondingCurveState | undefined = curve
     ? {

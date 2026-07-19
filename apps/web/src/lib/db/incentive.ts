@@ -8,6 +8,7 @@ import {
   type ActiveLaunchPin,
 } from "@/lib/points-perk-effects";
 import type { ActivatePerkResult, PointsInventoryItem } from "@/lib/points-inventory-types";
+import { normalizeUserStorageAddress } from "@/lib/address";
 
 let pool: Pool | null = null;
 
@@ -1178,6 +1179,12 @@ export async function hasActiveMarketItem(
   itemId: string
 ): Promise<boolean> {
   const db = getIncentivePool();
+  let normalized: string;
+  try {
+    normalized = normalizeUserStorageAddress(address);
+  } catch {
+    return false;
+  }
   try {
     const result = await db.query<{ ok: number }>(
       `
@@ -1189,7 +1196,7 @@ export async function hasActiveMarketItem(
           AND (expires_at IS NULL OR expires_at > now())
         LIMIT 1
       `,
-      [address.toLowerCase(), itemId]
+      [normalized, itemId]
     );
     return result.rows.length > 0;
   } catch {

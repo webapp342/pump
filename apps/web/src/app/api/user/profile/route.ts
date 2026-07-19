@@ -2,6 +2,7 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { normalizeAddressParam } from "@/lib/address";
 import { loadWalletSessionFromRequest } from "@/lib/auth/wallet-session";
+import { sessionOwnsWalletAddress } from "@/lib/auth/session-wallet-address";
 import { hasActiveMarketItem } from "@/lib/db/incentive";
 import {
   getUserProfile,
@@ -78,7 +79,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Valid address is required" }, { status: 400 });
     }
 
-    if (session.scwAddress.toLowerCase() !== address) {
+    if (!(await sessionOwnsWalletAddress(request, body.address))) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 

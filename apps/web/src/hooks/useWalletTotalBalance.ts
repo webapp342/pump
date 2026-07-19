@@ -40,7 +40,7 @@ export function useWalletTotalBalance(address?: string) {
   );
 
   const portfolioQuery = usePortfolioQuery(normalized, PORTFOLIO_LAUNCHED_INITIAL, {
-    enabled: Boolean(normalized),
+    enabled: Boolean(normalized) && (!isSolanaChainFamily || Boolean(address)),
   });
 
   const positions = portfolioQuery.data?.positions ?? [];

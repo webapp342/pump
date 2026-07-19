@@ -76,7 +76,7 @@ export async function silentCreateMeme(input?: {
   const conn = getSolanaConnection();
   const globalInfo = await conn.getAccountInfo(globalPda, "confirmed");
   if (!globalInfo?.data) throw new Error("Launchpad not initialized on-chain");
-  const global = decodeGlobalConfig(Buffer.from(globalInfo.data));
+  const global = decodeGlobalConfig(globalInfo.data);
 
   const mintRent = await conn.getMinimumBalanceForRentExemption(MINT_SIZE);
 

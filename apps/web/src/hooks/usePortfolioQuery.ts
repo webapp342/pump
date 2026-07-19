@@ -1,7 +1,6 @@
-"use client";
-
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import type { PortfolioSnapshot } from "@/lib/db/launchpad";
+import { addressCacheKey } from "@/lib/address";
 import { PORTFOLIO_LAUNCHED_INITIAL } from "@/lib/portfolio-limits";
 
 async function fetchPortfolioSnapshot(
@@ -20,7 +19,7 @@ async function fetchPortfolioSnapshot(
 }
 
 export function portfolioQueryKey(walletAddress: string, createdLimit: number) {
-  return ["portfolio", walletAddress.toLowerCase(), createdLimit] as const;
+  return ["portfolio", walletAddress, createdLimit] as const;
 }
 
 export function usePortfolioQuery(
@@ -28,7 +27,7 @@ export function usePortfolioQuery(
   createdLimit = PORTFOLIO_LAUNCHED_INITIAL,
   options?: { enabled?: boolean; initialData?: PortfolioSnapshot | null }
 ) {
-  const normalized = walletAddress?.toLowerCase() ?? "";
+  const normalized = addressCacheKey(walletAddress) ?? "";
 
   return useQuery({
     queryKey: portfolioQueryKey(normalized, createdLimit),

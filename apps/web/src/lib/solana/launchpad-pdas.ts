@@ -1,5 +1,6 @@
 /**
  * Launchpad PDAs + account layouts matching programs/pump-launchpad.
+ * Decoders use Uint8Array/DataView — safe in browser (no Node Buffer.read*).
  */
 
 import { PublicKey } from "@solana/web3.js";
@@ -50,6 +51,15 @@ export function pdaReferrerBinding(
   );
 }
 
+function readBigUInt64LE(data: Uint8Array, offset: number): bigint {
+  const view = new DataView(data.buffer, data.byteOffset + offset, 8);
+  return view.getBigUint64(0, true);
+}
+
+function readUInt8(data: Uint8Array, offset: number): number {
+  return data[offset] ?? 0;
+}
+
 /** On-chain Curve account layout (bytemuck Pod). */
 export type OnchainCurve = {
   mint: PublicKey;
@@ -64,7 +74,7 @@ export type OnchainCurve = {
   bump: number;
 };
 
-export function decodeCurveAccount(data: Buffer): OnchainCurve {
+export function decodeCurveAccount(data: Uint8Array): OnchainCurve {
   if (data.length < 144) {
     throw new Error("Curve account too small");
   }
@@ -75,7 +85,7 @@ export function decodeCurveAccount(data: Buffer): OnchainCurve {
     return pk;
   };
   const readU64 = () => {
-    const v = data.readBigUInt64LE(o);
+    const v = readBigUInt64LE(data, o);
     o += 8;
     return v;
   };
@@ -87,8 +97,9 @@ export function decodeCurveAccount(data: Buffer): OnchainCurve {
   const virtualSolReserve = readU64();
   const virtualTokenReserve = readU64();
   const totalSupply = readU64();
-  const paused = data[o++];
-  const bump = data[o++];
+  const paused = readUInt8(data, o);
+  o += 1;
+  const bump = readUInt8(data, o);
   return {
     mint,
     creator,
@@ -110,13 +121,12 @@ export type OnchainGlobal = {
   emergencyHalt: number;
 };
 
-export function decodeGlobalConfig(data: Buffer): OnchainGlobal {
+export function decodeGlobalConfig(data: Uint8Array): OnchainGlobal {
   if (data.length < 162) {
     throw new Error("Global account too small");
   }
-  // 3×pubkey (96) + protocol_fee_bps at 96
-  const protocolFeeBps = data.readBigUInt64LE(96);
-  const tokenDecimals = data[160] ?? 6;
-  const emergencyHalt = data[161] ?? 0;
+  const protocolFeeBps = readBigUInt64LE(data, 96);
+  const tokenDecimals = readUInt8(data, 160) || 6;
+  const emergencyHalt = readUInt8(data, 161);
   return { protocolFeeBps, tokenDecimals, emergencyHalt };
 }
