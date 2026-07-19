@@ -11,7 +11,7 @@ import {
 } from "react";
 import { subscribeUserBootstrap } from "@/lib/user-bootstrap";
 import { useOpenConnectModal } from "@/hooks/useOpenConnectModal";
-import { useAccount } from "wagmi";
+import { useActiveWalletAddress } from "@/hooks/useActiveWalletAddress";
 
 type AirdropSavesContextValue = {
   saves: Set<string>;
@@ -23,7 +23,7 @@ type AirdropSavesContextValue = {
 const AirdropSavesContext = createContext<AirdropSavesContextValue | null>(null);
 
 export function AirdropSavesProvider({ children }: { children: React.ReactNode }) {
-  const { address, isConnected } = useAccount();
+  const { address, isConnected } = useActiveWalletAddress();
   const { openConnectModal } = useOpenConnectModal();
   const [saves, setSaves] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);

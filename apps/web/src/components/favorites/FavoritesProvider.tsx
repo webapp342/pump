@@ -19,7 +19,7 @@ import {
   setLocalFavorites,
 } from "@/lib/local-first/user-local-store";
 import { useOpenConnectModal } from "@/hooks/useOpenConnectModal";
-import { useAccount } from "wagmi";
+import { useActiveWalletAddress } from "@/hooks/useActiveWalletAddress";
 
 type FavoritesContextValue = {
   favorites: Set<string>;
@@ -62,7 +62,7 @@ function persistFavoriteTokens(address: string, favorites: Set<string>, byAddres
 }
 
 export function FavoritesProvider({ children }: { children: React.ReactNode }) {
-  const { address, isConnected } = useAccount();
+  const { address, isConnected } = useActiveWalletAddress();
   const { openConnectModal } = useOpenConnectModal();
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
   const [favoriteTokensByAddress, setFavoriteTokensByAddress] = useState<

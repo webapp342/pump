@@ -26,6 +26,15 @@ function isUniqueViolation(error: unknown): boolean {
   );
 }
 
+function isCheckViolation(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as { code?: string }).code === "23514"
+  );
+}
+
 async function ensureUserRow(address: string, avatarId: UserAvatarId): Promise<void> {
   const db = getLaunchpadPool();
   await db.query(
@@ -169,10 +178,15 @@ export async function getOrAssignUserAvatar(address: string): Promise<UserAvatar
   );
 
   if (existing.rows.length === 0) {
-    await db.query(
-      `INSERT INTO users (address, last_active, avatar_id) VALUES ($1, now(), $2)`,
-      [normalized, fallback]
-    );
+    try {
+      await db.query(
+        `INSERT INTO users (address, last_active, avatar_id) VALUES ($1, now(), $2)`,
+        [normalized, fallback]
+      );
+    } catch (error) {
+      if (isCheckViolation(error)) return fallback;
+      throw error;
+    }
     return fallback;
   }
 
@@ -181,10 +195,15 @@ export async function getOrAssignUserAvatar(address: string): Promise<UserAvatar
     return saved;
   }
 
-  await db.query(
-    `UPDATE users SET avatar_id = $2, last_active = now() WHERE address = $1`,
-    [normalized, fallback]
-  );
+  try {
+    await db.query(
+      `UPDATE users SET avatar_id = $2, last_active = now() WHERE address = $1`,
+      [normalized, fallback]
+    );
+  } catch (error) {
+    if (isCheckViolation(error)) return fallback;
+    throw error;
+  }
   return fallback;
 }
 

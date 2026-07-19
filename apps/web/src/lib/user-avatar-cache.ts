@@ -1,4 +1,5 @@
 import type { UserAvatarId } from "@/lib/user-avatars";
+import { defaultAvatarIdForAddress } from "@/lib/user-avatars";
 import { addressCacheKey } from "@/lib/address";
 
 const avatarIdCache = new Map<string, UserAvatarId>();
@@ -31,9 +32,13 @@ export function fetchUserAvatarId(address: string): Promise<UserAvatarId | null>
         avatarIdCache.set(key, body.data.avatarId);
         return body.data.avatarId;
       }
-      return null;
+      const fallback = defaultAvatarIdForAddress(key);
+      avatarIdCache.set(key, fallback);
+      return fallback;
     } catch {
-      return null;
+      const fallback = defaultAvatarIdForAddress(key);
+      avatarIdCache.set(key, fallback);
+      return fallback;
     } finally {
       inflight.delete(key);
     }

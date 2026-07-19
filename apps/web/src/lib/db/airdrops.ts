@@ -1,4 +1,5 @@
 import type { AirdropRules, AirdropSocialTaskInput } from "@/lib/airdrop-rules";
+import { normalizeUserStorageAddress } from "@/lib/address";
 import { airdropRewardUsd } from "@/lib/airdrop-board-format";
 import { fetchLiveTokenBalance, fetchLiveTokenBalances } from "@/lib/airdrop-onchain";
 import {
@@ -1149,7 +1150,7 @@ export async function listMyAirdropParticipations(
 
 export async function listSavedAirdropIds(userAddress: string): Promise<string[]> {
   const pool = getLaunchpadPool();
-  const normalized = userAddress.toLowerCase();
+  const normalized = normalizeUserStorageAddress(userAddress);
   const result = await pool.query<{ airdrop_id: string }>(
     `
       SELECT airdrop_id::text
@@ -1167,7 +1168,7 @@ export async function toggleAirdropSave(
   airdropId: string
 ): Promise<boolean> {
   const pool = getLaunchpadPool();
-  const user = userAddress.toLowerCase();
+  const user = normalizeUserStorageAddress(userAddress);
 
   const existing = await pool.query(
     `SELECT 1 FROM airdrop_saves WHERE user_address = $1 AND airdrop_id = $2::bigint`,

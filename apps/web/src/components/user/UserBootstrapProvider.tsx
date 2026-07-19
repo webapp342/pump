@@ -1,9 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { useAccount } from "wagmi";
-import { usePumpWallet } from "@/components/wallet/PumpWalletProvider";
-import { isSolanaChainFamily } from "@/config/chain-family";
+import { useActiveWalletAddress } from "@/hooks/useActiveWalletAddress";
 import {
   clearUserBootstrap,
   setUserBootstrap,
@@ -13,9 +11,7 @@ import type { UserAvatarId } from "@/lib/user-avatars";
 
 /** One round-trip for favorites, airdrop saves, follows, and avatar on wallet connect. */
 export function UserBootstrapProvider({ children }: { children: React.ReactNode }) {
-  const { address: wagmiAddress } = useAccount();
-  const { walletAddress: solanaWalletAddress } = usePumpWallet();
-  const address = isSolanaChainFamily ? solanaWalletAddress : wagmiAddress;
+  const { address } = useActiveWalletAddress();
 
   useEffect(() => {
     if (!address) {

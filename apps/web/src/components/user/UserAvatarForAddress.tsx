@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { UserAvatarId } from "@/lib/user-avatars";
+import { defaultAvatarIdForAddress } from "@/lib/user-avatars";
 import { UserAvatar } from "@/components/user/UserAvatar";
 import { fetchUserAvatarId, getCachedUserAvatarId } from "@/lib/user-avatar-cache";
 import { addressCacheKey } from "@/lib/address";
@@ -34,7 +35,7 @@ export function UserAvatarForAddress({
   const cacheKey = addressCacheKey(address) ?? address;
   const px = resolveAvatarPx(size);
   const [avatarId, setAvatarId] = useState<UserAvatarId | null>(
-    () => getCachedUserAvatarId(cacheKey)
+    () => getCachedUserAvatarId(cacheKey) ?? defaultAvatarIdForAddress(cacheKey)
   );
 
   const badgeLookup = useUserDisplayNames(framed === undefined ? [address] : [], true);

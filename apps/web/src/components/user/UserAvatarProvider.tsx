@@ -8,13 +8,11 @@ import {
   useMemo,
   useState,
 } from "react";
-import { useAccount } from "wagmi";
+import { useActiveWalletAddress } from "@/hooks/useActiveWalletAddress";
 import { subscribeUserBootstrap } from "@/lib/user-bootstrap";
 import type { UserAvatarId } from "@/lib/user-avatars";
 import { resolveDisplayUsername } from "@/lib/username";
 import { invalidateDisplayNameCache } from "@/hooks/useUserDisplayNames";
-import { usePumpWallet } from "@/components/wallet/PumpWalletProvider";
-import { isSolanaChainFamily } from "@/config/chain-family";
 
 type UserAvatarContextValue = {
   avatarId: UserAvatarId | null;
@@ -35,9 +33,7 @@ type UserAvatarContextValue = {
 const UserAvatarContext = createContext<UserAvatarContextValue | null>(null);
 
 export function UserAvatarProvider({ children }: { children: React.ReactNode }) {
-  const { address: wagmiAddress } = useAccount();
-  const { walletAddress: solanaWalletAddress } = usePumpWallet();
-  const address = isSolanaChainFamily ? solanaWalletAddress : wagmiAddress;
+  const { address } = useActiveWalletAddress();
   const [avatarId, setAvatarId] = useState<UserAvatarId | null>(null);
   const [username, setUsername] = useState<string | null>(null);
   const [hasStatusBadge, setHasStatusBadge] = useState(false);

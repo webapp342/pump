@@ -1,5 +1,10 @@
 import { Pool } from "pg";
-import { normalizeAddressParam } from "@/lib/address";
+import {
+  normalizeAddressParam,
+  normalizeTokenAddress,
+  normalizeUserStorageAddress,
+} from "@/lib/address";
+import { isSolanaChainFamily } from "@/config/chain-family";
 import { SQL_PROMOTABLE_AIRDROP_LINKED_TOKEN_ADDRESSES } from "@/lib/airdrop-promotable-sql";
 import { getLaunchpadReadPool, getLaunchpadWritePool } from "@/lib/db/pool";
 import { parseSocialLinksFromDb, type TokenSocialLinks } from "@/lib/token-social";
@@ -2284,7 +2289,7 @@ export async function getCreatorFollowNetwork(
 
 export async function listFavoriteTokenAddresses(userAddress: string): Promise<string[]> {
   const db = getLaunchpadReadPool();
-  const normalized = userAddress.toLowerCase();
+  const normalized = normalizeUserStorageAddress(userAddress);
   const result = await db.query<{ token_address: string }>(
     `
     SELECT token_address
@@ -2303,8 +2308,10 @@ export async function toggleTokenFavorite(
   tokenAddress: string
 ): Promise<boolean> {
   const db = getLaunchpadWritePool();
-  const user = userAddress.toLowerCase();
-  const token = tokenAddress.toLowerCase();
+  const user = normalizeUserStorageAddress(userAddress);
+  const token = isSolanaChainFamily
+    ? normalizeTokenAddress(tokenAddress)
+    : tokenAddress.toLowerCase();
 
   const existing = await db.query(
     `SELECT 1 FROM token_favorites WHERE user_address = $1 AND token_address = $2`,
@@ -2342,7 +2349,7 @@ export type CreatorCardData = {
 
 export async function listFollowedCreatorAddresses(userAddress: string): Promise<string[]> {
   const db = getLaunchpadReadPool();
-  const normalized = userAddress.toLowerCase();
+  const normalized = normalizeUserStorageAddress(userAddress);
   const result = await db.query<{ creator_address: string }>(
     `
     SELECT creator_address
@@ -2361,8 +2368,8 @@ export async function toggleCreatorFollow(
   followeeAddress: string
 ): Promise<boolean> {
   const db = getLaunchpadWritePool();
-  const follower = followerAddress.toLowerCase();
-  const followee = followeeAddress.toLowerCase();
+  const follower = normalizeUserStorageAddress(followerAddress);
+  const followee = normalizeUserStorageAddress(followeeAddress);
 
   if (follower === followee) {
     throw new Error("Cannot follow yourself");

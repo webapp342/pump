@@ -12,7 +12,7 @@ import {
 import { subscribeUserBootstrap } from "@/lib/user-bootstrap";
 import { normalizeAddressParam } from "@/lib/address";
 import { useOpenConnectModal } from "@/hooks/useOpenConnectModal";
-import { useAccount } from "wagmi";
+import { useActiveWalletAddress } from "@/hooks/useActiveWalletAddress";
 
 type CreatorFollowsContextValue = {
   follows: Set<string>;
@@ -24,7 +24,7 @@ type CreatorFollowsContextValue = {
 const CreatorFollowsContext = createContext<CreatorFollowsContextValue | null>(null);
 
 export function CreatorFollowsProvider({ children }: { children: React.ReactNode }) {
-  const { address, isConnected } = useAccount();
+  const { address, isConnected } = useActiveWalletAddress();
   const { openConnectModal } = useOpenConnectModal();
   const [follows, setFollows] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
