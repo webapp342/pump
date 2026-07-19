@@ -1013,7 +1013,9 @@ export async function getKothSummary(limit = 5): Promise<KothSummary | null> {
 /** Persist logo URL after R2 upload (no-op if token row not indexed yet). */
 export async function setTokenLogoUrl(address: string, logoUrl: string): Promise<void> {
   const db = getLaunchpadWritePool();
-  const normalized = address.toLowerCase();
+  const normalized = isSolanaChainFamily
+    ? normalizeTokenAddress(address)
+    : address.toLowerCase();
   const storedUrl = logoUrl.split("?")[0];
 
   const updated = await db.query(
@@ -1061,6 +1063,12 @@ export async function upsertTokenMetadata(input: {
 }): Promise<void> {
   const db = getLaunchpadWritePool();
   const normalized = normalizeAddressParam(input.address) ?? input.address;
+  const creatorAddress = isSolanaChainFamily
+    ? normalizeUserStorageAddress(input.creatorAddress)
+    : input.creatorAddress.toLowerCase();
+  const launchTxHash = isSolanaChainFamily
+    ? input.launchTxHash.trim()
+    : input.launchTxHash.toLowerCase();
 
   await db.query(
     `
@@ -1086,10 +1094,10 @@ export async function upsertTokenMetadata(input: {
     [
       normalized,
       input.chainId,
-      input.creatorAddress.toLowerCase(),
+      creatorAddress,
       input.name,
       input.symbol,
-      input.launchTxHash.toLowerCase(),
+      launchTxHash,
       input.launchBlockNumber,
       input.description,
       JSON.stringify(input.socialLinks),

@@ -1,3 +1,5 @@
+import { normalizeTokenAddress } from "@/lib/address";
+
 /** Client-side upload after token create tx confirms. */
 export async function uploadTokenLogo(params: {
   tokenAddress: string;
@@ -5,8 +7,8 @@ export async function uploadTokenLogo(params: {
   file: File;
 }): Promise<string> {
   const form = new FormData();
-  form.append("tokenAddress", params.tokenAddress.toLowerCase());
-  form.append("txHash", params.txHash);
+  form.append("tokenAddress", normalizeTokenAddress(params.tokenAddress));
+  form.append("txHash", params.txHash.trim());
   form.append("file", params.file);
 
   const res = await fetch("/api/upload/token-logo", {

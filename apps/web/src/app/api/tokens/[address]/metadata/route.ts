@@ -1,15 +1,14 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
-import { Connection, PublicKey } from "@solana/web3.js";
 import { createPublicClient, http, parseEventLogs, type Hash } from "viem";
 import { isSolanaChainFamily } from "@/config/chain-family";
 import { contracts, pumpChain } from "@/config/chain";
-import { resolveSolanaRpcUrl, SOLANA_DB_CHAIN_ID, resolveSolanaCluster, PROGRAM_IDS } from "@pump/solana-sdk";
+import { resolveSolanaCluster, SOLANA_DB_CHAIN_ID } from "@pump/solana-sdk";
 import { memeFactoryAbi } from "@/lib/abis/meme-factory";
 import { upsertTokenMetadata } from "@/lib/db/launchpad";
 import { normalizeAddressParam, normalizeTokenAddress } from "@/lib/address";
 import { normalizeSocialLinks, type TokenSocialLinks } from "@/lib/token-social";
-import { extractEventsFromLogs } from "@/lib/solana/decode-events";
+import { verifySolanaCreateTx } from "@/lib/solana/verify-create-tx";
 
 type RouteContext = { params: Promise<{ address: string }> };
 
@@ -30,37 +29,6 @@ function parseSocialLinksInput(value: unknown): TokenSocialLinks {
     telegram: typeof raw.telegram === "string" ? raw.telegram : undefined,
     discord: typeof raw.discord === "string" ? raw.discord : undefined,
   });
-}
-
-async function verifySolanaCreateTx(
-  mintAddress: string,
-  txSignature: string
-): Promise<{ creator: string; slot: number } | null> {
-  const rpc = resolveSolanaRpcUrl({
-    cluster: process.env.NEXT_PUBLIC_SOLANA_CLUSTER,
-    rpcUrl: process.env.NEXT_PUBLIC_SOLANA_RPC_URL ?? process.env.SOLANA_RPC_URL,
-  });
-  const conn = new Connection(rpc, "confirmed");
-  const tx = await conn.getTransaction(txSignature, {
-    commitment: "confirmed",
-    maxSupportedTransactionVersion: 0,
-  });
-  if (!tx?.meta?.logMessages?.length) return null;
-
-  const events = extractEventsFromLogs({
-    logs: tx.meta.logMessages,
-    signature: txSignature,
-    slot: tx.slot,
-    programId: PROGRAM_IDS.launchpad,
-  });
-  const created = events.find((e) => e.name === "TokenCreated" && e.fields);
-  if (!created?.fields) return null;
-  if (String(created.fields.mint) !== mintAddress) return null;
-
-  return {
-    creator: String(created.fields.creator),
-    slot: tx.slot,
-  };
 }
 
 /** POST /api/tokens/[address]/metadata — off-chain profile after create tx. */

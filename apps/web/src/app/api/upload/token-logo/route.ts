@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createPublicClient, http, parseEventLogs, type Hash } from "viem";
+import { isSolanaChainFamily } from "@/config/chain-family";
 import { contracts, pumpChain } from "@/config/chain";
 import { memeFactoryAbi } from "@/lib/abis/meme-factory";
+import { normalizeAddressParam, normalizeTokenAddress } from "@/lib/address";
 import { getLaunchpadPool, setTokenLogoUrl } from "@/lib/db/launchpad";
 import { isR2Configured, uploadTokenLogoToLocal } from "@/lib/local-asset-upload";
 import { isSshAssetsConfigured, uploadTokenLogoViaSsh } from "@/lib/remote-asset-upload";
 import { uploadTokenLogoToR2 } from "@/lib/r2-client";
+import { verifySolanaCreateTx } from "@/lib/solana/verify-create-tx";
 
 async function persistLogo(tokenAddress: string, file: File): Promise<string> {
   if (isR2Configured()) {
@@ -22,7 +25,7 @@ const publicClient = createPublicClient({
   transport: http(pumpChain.rpcUrls.default.http[0]),
 });
 
-async function verifyCreateTx(txHash: string, tokenAddress: string): Promise<boolean> {
+async function verifyEvmCreateTx(txHash: string, tokenAddress: string): Promise<boolean> {
   const factory = contracts.memeFactory.toLowerCase();
   const normalized = tokenAddress.toLowerCase();
 
@@ -50,18 +53,33 @@ async function verifyCreateTx(txHash: string, tokenAddress: string): Promise<boo
 export async function POST(req: NextRequest) {
   try {
     const form = await req.formData();
-    const tokenAddress = (form.get("tokenAddress") as string | null)?.toLowerCase()?.trim();
-    const txHash = (form.get("txHash") as string | null)?.trim()?.toLowerCase();
+    const rawAddress = (form.get("tokenAddress") as string | null)?.trim();
+    const rawTxHash = (form.get("txHash") as string | null)?.trim();
     const file = form.get("file");
 
-    if (!tokenAddress || !/^0x[a-f0-9]{40}$/.test(tokenAddress)) {
-      return NextResponse.json({ error: "Valid tokenAddress required" }, { status: 400 });
-    }
-    if (!txHash) {
-      return NextResponse.json({ error: "txHash required" }, { status: 400 });
+    if (!rawAddress || !rawTxHash) {
+      return NextResponse.json({ error: "tokenAddress and txHash required" }, { status: 400 });
     }
     if (!(file instanceof File)) {
       return NextResponse.json({ error: "file required" }, { status: 400 });
+    }
+
+    let tokenAddress: string;
+    let txHash: string;
+
+    if (isSolanaChainFamily) {
+      try {
+        tokenAddress = normalizeTokenAddress(rawAddress);
+      } catch {
+        return NextResponse.json({ error: "Valid Solana mint address required" }, { status: 400 });
+      }
+      txHash = rawTxHash;
+    } else {
+      tokenAddress = rawAddress.toLowerCase();
+      if (!/^0x[a-f0-9]{40}$/.test(tokenAddress)) {
+        return NextResponse.json({ error: "Valid tokenAddress required" }, { status: 400 });
+      }
+      txHash = rawTxHash.toLowerCase();
     }
 
     let authorized = false;
@@ -80,7 +98,11 @@ export async function POST(req: NextRequest) {
     }
 
     if (!authorized) {
-      authorized = await verifyCreateTx(txHash, tokenAddress);
+      if (isSolanaChainFamily) {
+        authorized = (await verifySolanaCreateTx(tokenAddress, txHash)) != null;
+      } else {
+        authorized = await verifyEvmCreateTx(txHash, tokenAddress);
+      }
       if (!authorized) {
         return NextResponse.json({ error: "Could not verify create transaction" }, { status: 403 });
       }

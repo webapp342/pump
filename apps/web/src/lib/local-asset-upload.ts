@@ -1,6 +1,6 @@
 import { mkdir, writeFile } from "fs/promises";
 import path from "path";
-import { getLaunchpadTokenLogoUrl, stripLogoCacheBust } from "@/lib/assets";
+import { getLaunchpadTokenLogoUrl, stripLogoCacheBust, tokenLogoStorageKey } from "@/lib/assets";
 
 const ALLOWED_TYPES = new Set(["image/png", "image/jpeg", "image/webp", "image/gif"]);
 const MAX_BYTES = 2 * 1024 * 1024;
@@ -27,7 +27,7 @@ export async function uploadTokenLogoToLocal(address: string, file: File): Promi
   const validationError = validateLogoFile(file);
   if (validationError) throw new Error(validationError);
 
-  const normalized = address.toLowerCase();
+  const normalized = tokenLogoStorageKey(address);
   const dir = path.join(resolveAssetsRoot(), "icons", "tokens");
   await mkdir(dir, { recursive: true });
 

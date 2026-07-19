@@ -3,7 +3,7 @@ import { unlink, writeFile } from "fs/promises";
 import { tmpdir } from "os";
 import path from "path";
 import { promisify } from "util";
-import { getLaunchpadTokenLogoUrl, stripLogoCacheBust } from "@/lib/assets";
+import { getLaunchpadTokenLogoUrl, stripLogoCacheBust, tokenLogoStorageKey } from "@/lib/assets";
 import { validateLogoFile } from "@/lib/local-asset-upload";
 
 const execFileAsync = promisify(execFile);
@@ -24,7 +24,7 @@ export async function uploadTokenLogoViaSsh(address: string, file: File): Promis
   const port = process.env.ASSETS_SSH_PORT?.trim() || "22";
   const user = process.env.ASSETS_SSH_USER?.trim() || "root";
   const remoteDir = process.env.ASSETS_REMOTE_DIR?.trim() || "/var/pump/assets";
-  const normalized = address.toLowerCase();
+  const normalized = tokenLogoStorageKey(address);
   const filename = `${normalized}.png`;
   const remotePath = `${remoteDir}/icons/tokens/${filename}`;
 

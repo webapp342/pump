@@ -1,3 +1,7 @@
+import { getAddress } from "viem";
+import { normalizeTokenAddress } from "@/lib/address";
+import { isSolanaChainFamily } from "@/config/chain-family";
+
 const ASSETS_BASE =
   (typeof process !== "undefined" && process.env?.NEXT_PUBLIC_ASSETS_BASE_URL) ||
   (typeof process !== "undefined" && process.env?.NEXT_PUBLIC_ASSETS_CDN) ||
@@ -6,8 +10,16 @@ const ASSETS_BASE =
 const CACHE_BUST =
   (typeof process !== "undefined" && process.env?.NEXT_PUBLIC_ASSETS_CACHE_BUST) || "v=1";
 
+/** Filename / CDN key for token logos — canonical base58 on Solana, lowercase 0x on EVM. */
+export function tokenLogoStorageKey(address: string): string {
+  if (isSolanaChainFamily) {
+    return normalizeTokenAddress(address);
+  }
+  return getAddress(address).toLowerCase();
+}
+
 export function getLaunchpadTokenLogoUrl(address: string): string {
-  const path = `/icons/tokens/${address.toLowerCase()}.png?${CACHE_BUST}`;
+  const path = `/icons/tokens/${tokenLogoStorageKey(address)}.png?${CACHE_BUST}`;
   if (ASSETS_BASE) {
     return `${ASSETS_BASE.replace(/\/$/, "")}${path}`;
   }

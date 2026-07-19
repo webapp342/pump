@@ -1,5 +1,5 @@
 import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
-import { getLaunchpadTokenLogoUrl, stripLogoCacheBust } from "@/lib/assets";
+import { getLaunchpadTokenLogoUrl, stripLogoCacheBust, tokenLogoStorageKey } from "@/lib/assets";
 
 const ALLOWED_TYPES = new Set(["image/png", "image/jpeg", "image/webp", "image/gif"]);
 const MAX_BYTES = 2 * 1024 * 1024;
@@ -27,7 +27,7 @@ function getR2Client(): S3Client {
 }
 
 export function getTokenLogoObjectKey(address: string): string {
-  return `icons/tokens/${address.toLowerCase()}.png`;
+  return `icons/tokens/${tokenLogoStorageKey(address)}.png`;
 }
 
 export function validateLogoFile(file: File): string | null {
