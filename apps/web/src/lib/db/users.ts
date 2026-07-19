@@ -3,6 +3,7 @@ import {
   isValidUserAvatarId,
   type UserAvatarId,
 } from "@/lib/user-avatars";
+import { normalizeAddressParam, normalizeUserStorageAddress } from "@/lib/address";
 import { getLaunchpadPool } from "@/lib/db/launchpad";
 import {
   InvalidUsernameError,
@@ -37,9 +38,13 @@ async function ensureUserRow(address: string, avatarId: UserAvatarId): Promise<v
   );
 }
 
+function storageAddress(address: string): string {
+  return normalizeUserStorageAddress(address);
+}
+
 export async function getUserUsername(address: string): Promise<string | null> {
   const db = getLaunchpadPool();
-  const normalized = address.toLowerCase();
+  const normalized = storageAddress(address);
   const result = await db.query<{ username: string | null }>(
     `SELECT username FROM users WHERE address = $1`,
     [normalized]
@@ -53,8 +58,8 @@ export async function getUsernamesMap(
   const normalized = [
     ...new Set(
       addresses
-        .map((address) => address.toLowerCase())
-        .filter((address) => /^0x[a-f0-9]{40}$/.test(address))
+        .map((address) => normalizeAddressParam(address))
+        .filter((address): address is string => address != null)
     ),
   ];
   const map = new Map<string, string | null>();
@@ -71,7 +76,7 @@ export async function getUsernamesMap(
   );
 
   for (const row of result.rows) {
-    map.set(row.address.toLowerCase(), row.username);
+    map.set(row.address, row.username);
   }
 
   return map;
@@ -94,7 +99,7 @@ export async function isUsernameAvailable(
   const params: string[] = [validation.username];
   let excludeClause = "";
   if (excludeAddress) {
-    params.push(excludeAddress.toLowerCase());
+    params.push(storageAddress(excludeAddress));
     excludeClause = `AND address <> $2`;
   }
 
@@ -117,7 +122,7 @@ export async function setUserUsername(
   rawInput: string | null
 ): Promise<string | null> {
   const db = getLaunchpadPool();
-  const normalized = address.toLowerCase();
+  const normalized = storageAddress(address);
   const fallback = defaultAvatarIdForAddress(normalized);
   await ensureUserRow(normalized, fallback);
 
@@ -155,7 +160,7 @@ export async function setUserUsername(
 
 export async function getOrAssignUserAvatar(address: string): Promise<UserAvatarId> {
   const db = getLaunchpadPool();
-  const normalized = address.toLowerCase();
+  const normalized = storageAddress(address);
   const fallback = defaultAvatarIdForAddress(normalized);
 
   const existing = await db.query<{ avatar_id: string | null }>(
@@ -189,7 +194,7 @@ export async function setUserAvatar(address: string, avatarId: string): Promise<
   }
 
   const db = getLaunchpadPool();
-  const normalized = address.toLowerCase();
+  const normalized = storageAddress(address);
 
   await db.query(
     `
@@ -209,7 +214,7 @@ export async function updateUserProfile(
   address: string,
   input: { avatarId?: string; username?: string | null }
 ): Promise<UserProfile> {
-  const normalized = address.toLowerCase();
+  const normalized = storageAddress(address);
   let avatarId = await getOrAssignUserAvatar(normalized);
   let username = await getUserUsername(normalized);
 

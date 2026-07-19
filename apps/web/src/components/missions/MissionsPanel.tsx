@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useAccount } from "wagmi";
 import {
   listPendingMissionKeys,
   type OptimisticActivity,
@@ -35,8 +34,7 @@ const BURST_POLL_MS = 1_500;
 const BURST_DURATION_MS = 60_000;
 
 export function MissionsPanel() {
-  const { address, isConnected } = useAccount();
-  const { login } = usePumpWallet();
+  const { walletAddress: address, isWalletReady, login } = usePumpWallet();
   const { refresh: refreshProfile, setHasStatusBadge } = useUserAvatar();
   const router = useRouter();
   const pathname = usePathname();
@@ -106,7 +104,7 @@ export function MissionsPanel() {
   }, []);
 
   useEffect(() => {
-    if (!isConnected || !address) {
+    if (!isWalletReady || !address) {
       setData(null);
       setError(null);
       setLoading(false);
@@ -115,10 +113,10 @@ export function MissionsPanel() {
 
     setLoading(true);
     void loadMissions(address);
-  }, [address, isConnected, loadMissions]);
+  }, [address, isWalletReady, loadMissions]);
 
   useEffect(() => {
-    if (!isConnected || !address) return;
+    if (!isWalletReady || !address) return;
 
     let burstUntil = 0;
     let timer: ReturnType<typeof setTimeout> | null = null;
@@ -149,7 +147,7 @@ export function MissionsPanel() {
       window.removeEventListener("pump:activity", onActivity);
       if (timer) clearTimeout(timer);
     };
-  }, [address, isConnected, loadMissions]);
+  }, [address, isWalletReady, loadMissions]);
 
   const onAdminLinkClick = useCallback(
     async (mission: Pick<Mission, "taskKey" | "completed" | "targetUrl">) => {
@@ -303,7 +301,7 @@ export function MissionsPanel() {
     });
   }, [data, activeFilter]);
 
-  if (!isConnected || !address) {
+  if (!isWalletReady || !address) {
     return (
       <MissionsGuestPanel
         onSignIn={() => {

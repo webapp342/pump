@@ -131,20 +131,19 @@ function ConnectedWalletButton({ address }: { address: string }) {
 }
 
 export function WalletBar() {
-  const { ready, authenticated, scwAddress, login } = usePumpWallet();
-  const { isConnected, isConnecting, isReconnecting } = useAccount();
+  const { ready, authenticated, walletAddress, isWalletReady, login } = usePumpWallet();
+  const { isConnecting, isReconnecting } = useAccount();
 
-  const sessionActive = ready && authenticated && Boolean(scwAddress);
-  const wagmiBooting = isConnecting || isReconnecting || (sessionActive && !isConnected);
-  const walletReady = sessionActive && (isConnected || wagmiBooting);
+  const wagmiBooting = isConnecting || isReconnecting;
+  const walletReady = isWalletReady || (ready && authenticated && wagmiBooting && Boolean(walletAddress));
 
   if (!isPumpAuthConfigured()) {
     return <span className="text-caption text-pump-muted">Configure sign-in to continue</span>;
   }
 
-  if (!ready || wagmiBooting) {
-    if (sessionActive && scwAddress) {
-      return <ConnectedWalletButton address={scwAddress} />;
+  if (!ready || (!isWalletReady && wagmiBooting && !walletAddress)) {
+    if (walletAddress) {
+      return <ConnectedWalletButton address={walletAddress} />;
     }
 
     return (
@@ -167,8 +166,8 @@ export function WalletBar() {
         <button type="button" onClick={login} className="app-header-sign-in-btn">
           Sign in
         </button>
-      ) : scwAddress ? (
-        <ConnectedWalletButton address={scwAddress} />
+      ) : walletAddress ? (
+        <ConnectedWalletButton address={walletAddress} />
       ) : null}
     </div>
   );

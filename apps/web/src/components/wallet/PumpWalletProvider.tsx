@@ -45,6 +45,10 @@ type PumpWalletContextValue = {
   solanaAddress: string | undefined;
   /** True once silent Solana session (in-memory key) is ready for popup-free txs. */
   solanaSessionReady: boolean;
+  /** Active chain wallet for API calls (base58 on Solana, SCW on EVM). */
+  walletAddress: string | undefined;
+  /** Session + wallet ready for the active chain family. */
+  isWalletReady: boolean;
   kernelClient: KernelAccountClient | null;
   login: () => void;
   logout: () => Promise<void>;
@@ -80,6 +84,8 @@ const stubPumpWallet: PumpWalletContextValue = {
   scwAddress: undefined,
   solanaAddress: undefined,
   solanaSessionReady: false,
+  walletAddress: undefined,
+  isWalletReady: false,
   kernelClient: null,
   login: () => {},
   logout: noopAsync,
@@ -220,7 +226,13 @@ export function PumpWalletProvider({ children }: { children: ReactNode }) {
   );
 
   const value = useMemo(
-    () => ({
+    () => {
+      const walletAddress = isSolanaChainFamily ? solanaAddress : scwAddress;
+      const isWalletReady = isSolanaChainFamily
+        ? Boolean(ready && authenticated && solanaAddress && solanaSessionReady)
+        : Boolean(ready && authenticated && scwAddress);
+
+      return {
       ready,
       authenticated,
       authProvider,
@@ -232,13 +244,16 @@ export function PumpWalletProvider({ children }: { children: ReactNode }) {
       scwAddress,
       solanaAddress,
       solanaSessionReady,
+      walletAddress,
+      isWalletReady,
       kernelClient,
       login,
       logout,
       withdraw,
       withdrawToken,
       ensureSolanaSession,
-    }),
+    };
+    },
     [
       ready,
       authenticated,

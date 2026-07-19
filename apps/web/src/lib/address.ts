@@ -45,3 +45,15 @@ export function normalizeTokenAddress(value: string): string {
 export function isValidAddressParam(value: string | null | undefined): boolean {
   return normalizeAddressParam(value) != null;
 }
+
+/** Cache keys — never lowercase Solana base58. */
+export function addressCacheKey(value: string | null | undefined): string | null {
+  return normalizeAddressParam(value);
+}
+
+/** Persist/query users row — preserve base58 case on Solana. */
+export function normalizeUserStorageAddress(value: string): string {
+  const normalized = normalizeAddressParam(value);
+  if (!normalized) throw new Error("Invalid address");
+  return normalized;
+}

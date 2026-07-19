@@ -45,6 +45,7 @@ import { PortfolioMaxTradeConfirmModal } from "@/components/portfolio/PortfolioM
 import type { PortfolioSnapshot, TokenListItem } from "@/lib/db/launchpad";
 import { useBnbUsdPrice } from "@/hooks/useBnbUsdPrice";
 import { useScwBalance } from "@/hooks/useScwBalance";
+import { useSolanaNativeBalance } from "@/hooks/useSolanaNativeBalance";
 import { bnbToUsd, formatPortfolioHoldingValueUsd, formatUsdReadable, positionAvgEntryUsd, positionUnrealizedUsd, positionUnrealizedPct, scaleCostBasisUsdForBalance } from "@/lib/format-usd";
 import { formatCapForBoard } from "@/lib/arena-board-format";
 import {
@@ -666,7 +667,16 @@ export function PortfolioPanel({
       ? solanaAddress
       : (wagmiAddress ?? sessionAddress ?? ssrWalletAddress)
   ) as `0x${string}` | undefined;
-  const { data: scwBalance } = useScwBalance(scwAddress);
+  const { data: scwBalance } = useScwBalance(isSolanaPortfolio ? undefined : scwAddress);
+  const { data: solLamports } = useSolanaNativeBalance(
+    isSolanaPortfolio ? solanaAddress : undefined
+  );
+  const nativeCashBalance = useMemo(() => {
+    if (isSolanaPortfolio) {
+      return solLamports != null ? Number(solLamports) / 1e9 : 0;
+    }
+    return scwBalance ? Number(formatEther(scwBalance.value)) : 0;
+  }, [isSolanaPortfolio, scwBalance, solLamports]);
   const [data, setData] = useState<PortfolioData | null>(
     hasSsrPortfolio ? initialPortfolio : null
   );
@@ -1132,7 +1142,7 @@ export function PortfolioPanel({
       totalValue += val;
     }
 
-    const nativeBnbVal = scwBalance ? Number(formatEther(scwBalance.value)) : 0;
+    const nativeBnbVal = nativeCashBalance;
     values.__native__ = nativeBnbVal;
     totalValue += nativeBnbVal;
 
@@ -1172,7 +1182,7 @@ export function PortfolioPanel({
     }
 
     metricsPrevRef.current = { values, total: totalValue, pnl: totalPnl };
-  }, [data, onChainBalances, walletHoldings, scwBalance]);
+  }, [data, onChainBalances, walletHoldings, nativeCashBalance]);
 
   useEffect(() => {
     if (!data) return;
@@ -1189,7 +1199,7 @@ export function PortfolioPanel({
     );
     const holdingsBnb = displayRows.reduce((sum, row) => sum + row.estimatedValueBnb, 0);
     const holdingsOnlyUsd = bnbToUsd(holdingsBnb, bnbUsd) ?? 0;
-    const nativeBnbVal = scwBalance ? Number(formatEther(scwBalance.value)) : 0;
+    const nativeBnbVal = nativeCashBalance;
     const nativeUsdVal = bnbToUsd(nativeBnbVal, bnbUsd) ?? 0;
 
     publishWalletTotal({
@@ -1203,7 +1213,7 @@ export function PortfolioPanel({
     address,
     ssrWalletAddress,
     data,
-    scwBalance,
+    nativeCashBalance,
     bnbUsd,
     onChainBalances,
     walletHoldings,
@@ -1338,7 +1348,7 @@ export function PortfolioPanel({
     0
   );
   const totalNetPnlUsd = totalUnrealizedPnlUsd + totalRealizedPnlUsd;
-  const nativeBnb = scwBalance ? Number(formatEther(scwBalance.value)) : 0;
+  const nativeBnb = nativeCashBalance;
   const nativeUsd = bnbToUsd(nativeBnb, bnbUsd) ?? 0;
   const holdingsOnlyUsd = bnbToUsd(holdingsBnbTotal, bnbUsd) ?? 0;
   const totalEstimatedUsd = holdingsOnlyUsd + nativeUsd;

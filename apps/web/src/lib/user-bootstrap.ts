@@ -1,4 +1,5 @@
 import type { UserAvatarId } from "@/lib/user-avatars";
+import { addressCacheKey } from "@/lib/address";
 
 export type UserBootstrapData = {
   address: string;
@@ -15,7 +16,7 @@ export const USER_BOOTSTRAP_EVENT = "pump:user-bootstrap";
 const cache = new Map<string, UserBootstrapData>();
 
 function key(address: string): string {
-  return address.toLowerCase();
+  return addressCacheKey(address) ?? address;
 }
 
 export function setUserBootstrap(data: UserBootstrapData): void {
@@ -50,7 +51,7 @@ export function subscribeUserBootstrap(
 
   const handler = (event: Event) => {
     const detail = (event as CustomEvent<UserBootstrapData>).detail;
-    if (detail.address.toLowerCase() !== address.toLowerCase()) return;
+    if (key(detail.address) !== key(address)) return;
     onData(detail);
   };
 

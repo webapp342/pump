@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import type { UserAvatarId } from "@/lib/user-avatars";
 import { UserAvatar } from "@/components/user/UserAvatar";
 import { fetchUserAvatarId, getCachedUserAvatarId } from "@/lib/user-avatar-cache";
+import { addressCacheKey } from "@/lib/address";
 import { USER_AVATAR_SIZE, type UserAvatarSizeRole } from "@/lib/ui-sizes";
 import { useUserDisplayNames } from "@/hooks/useUserDisplayNames";
 
@@ -30,32 +31,32 @@ export function UserAvatarForAddress({
   className = "",
   framed,
 }: UserAvatarForAddressProps) {
-  const normalized = address.toLowerCase();
+  const cacheKey = addressCacheKey(address) ?? address;
   const px = resolveAvatarPx(size);
   const [avatarId, setAvatarId] = useState<UserAvatarId | null>(
-    () => getCachedUserAvatarId(normalized)
+    () => getCachedUserAvatarId(cacheKey)
   );
 
   const badgeLookup = useUserDisplayNames(framed === undefined ? [address] : [], true);
   const resolvedFramed =
-    framed ?? Boolean(badgeLookup.get(normalized)?.hasStatusBadge);
+    framed ?? Boolean(badgeLookup.get(cacheKey)?.hasStatusBadge);
 
   useEffect(() => {
-    const cached = getCachedUserAvatarId(normalized);
+    const cached = getCachedUserAvatarId(cacheKey);
     if (cached) {
       setAvatarId(cached);
       return;
     }
 
     let cancelled = false;
-    void fetchUserAvatarId(normalized).then((next) => {
+    void fetchUserAvatarId(cacheKey).then((next) => {
       if (!cancelled && next) setAvatarId(next);
     });
 
     return () => {
       cancelled = true;
     };
-  }, [normalized]);
+  }, [cacheKey]);
 
   if (!avatarId) {
     return (
