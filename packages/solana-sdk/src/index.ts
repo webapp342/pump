@@ -99,51 +99,75 @@ export function pumpFeelVirtualTokenReserve(
   return defaults.totalSupply;
 }
 
+function writeU8(out: Uint8Array, offset: number, value: number): number {
+  out[offset] = value & 0xff;
+  return offset + 1;
+}
+
+function writeU32Le(out: Uint8Array, offset: number, value: number): number {
+  new DataView(out.buffer, out.byteOffset, out.byteLength).setUint32(offset, value, true);
+  return offset + 4;
+}
+
+function writeU64Le(out: Uint8Array, offset: number, value: bigint): number {
+  new DataView(out.buffer, out.byteOffset, out.byteLength).setBigUint64(offset, value, true);
+  return offset + 8;
+}
+
+function writeBytes(out: Uint8Array, offset: number, chunk: Uint8Array): number {
+  out.set(chunk, offset);
+  return offset + chunk.length;
+}
+
+function writeBorshBytes(out: Uint8Array, offset: number, bytes: Uint8Array): number {
+  let o = writeU32Le(out, offset, bytes.length);
+  o = writeBytes(out, o, bytes);
+  return o;
+}
+
 /** Encode Pinocchio `initialize` instruction data (tag + 8×u64 + u8). */
-export function encodeInitializeIx(defaults: PumpFeelDefaults = PUMP_FEEL_DEFAULTS): Buffer {
-  const buf = Buffer.alloc(1 + 64 + 1);
-  buf.writeUInt8(IX.initialize, 0);
-  let o = 1;
-  const writeU64 = (v: number | bigint) => {
-    buf.writeBigUInt64LE(BigInt(v), o);
-    o += 8;
-  };
-  writeU64(defaults.protocolFeeBps);
-  writeU64(defaults.creatorFeeShareBps);
-  writeU64(defaults.referrerShareBps);
-  writeU64(defaults.verifiedReferrerShareBps);
-  writeU64(defaults.createFeeLamports);
-  writeU64(defaults.virtualSolLamports);
-  writeU64(defaults.totalSupply); // virtual token = supply
-  writeU64(defaults.totalSupply);
-  buf.writeUInt8(defaults.tokenDecimals, o);
-  return buf;
+export function encodeInitializeIx(defaults: PumpFeelDefaults = PUMP_FEEL_DEFAULTS): Uint8Array {
+  const out = new Uint8Array(1 + 64 + 1);
+  let o = writeU8(out, 0, IX.initialize);
+  o = writeU64Le(out, o, BigInt(defaults.protocolFeeBps));
+  o = writeU64Le(out, o, BigInt(defaults.creatorFeeShareBps));
+  o = writeU64Le(out, o, BigInt(defaults.referrerShareBps));
+  o = writeU64Le(out, o, BigInt(defaults.verifiedReferrerShareBps));
+  o = writeU64Le(out, o, defaults.createFeeLamports);
+  o = writeU64Le(out, o, defaults.virtualSolLamports);
+  o = writeU64Le(out, o, defaults.totalSupply);
+  o = writeU64Le(out, o, defaults.totalSupply);
+  writeU8(out, o, defaults.tokenDecimals);
+  return out;
 }
 
-export function encodeBuyIx(solInLamports: bigint, minTokenOut: bigint): Buffer {
-  const buf = Buffer.alloc(17);
-  buf.writeUInt8(IX.buy, 0);
-  buf.writeBigUInt64LE(solInLamports, 1);
-  buf.writeBigUInt64LE(minTokenOut, 9);
-  return buf;
+export function encodeBuyIx(solInLamports: bigint, minTokenOut: bigint): Uint8Array {
+  const out = new Uint8Array(17);
+  let o = writeU8(out, 0, IX.buy);
+  o = writeU64Le(out, o, solInLamports);
+  writeU64Le(out, o, minTokenOut);
+  return out;
 }
 
-export function encodeSellIx(tokenIn: bigint, minSolOut: bigint): Buffer {
-  const buf = Buffer.alloc(17);
-  buf.writeUInt8(IX.sell, 0);
-  buf.writeBigUInt64LE(tokenIn, 1);
-  buf.writeBigUInt64LE(minSolOut, 9);
-  return buf;
+export function encodeSellIx(tokenIn: bigint, minSolOut: bigint): Uint8Array {
+  const out = new Uint8Array(17);
+  let o = writeU8(out, 0, IX.sell);
+  o = writeU64Le(out, o, tokenIn);
+  writeU64Le(out, o, minSolOut);
+  return out;
 }
 
 export function encodeCreateMemeIx(input: {
   name: string;
   symbol: string;
   uri?: string;
-}): Buffer {
-  const nameBytes = Buffer.from(input.name.trim(), "utf8");
-  const symbolBytes = Buffer.from(input.symbol.trim().toUpperCase(), "utf8");
-  const uriBytes = Buffer.from((input.uri ?? "").trim(), "utf8");
+}): Uint8Array {
+  const name = input.name.trim();
+  const symbol = input.symbol.trim().toUpperCase();
+  const uri = (input.uri ?? "").trim();
+  const nameBytes = new TextEncoder().encode(name);
+  const symbolBytes = new TextEncoder().encode(symbol);
+  const uriBytes = new TextEncoder().encode(uri);
 
   if (!nameBytes.length || nameBytes.length > 64) {
     throw new Error("Token name must be 1–64 bytes");
@@ -155,35 +179,25 @@ export function encodeCreateMemeIx(input: {
     throw new Error("Metadata URI must be at most 256 bytes");
   }
 
-  const buf = Buffer.alloc(
+  const out = new Uint8Array(
     1 + 4 + nameBytes.length + 4 + symbolBytes.length + 4 + uriBytes.length
   );
-  let o = 0;
-  buf.writeUInt8(IX.createMeme, o);
-  o += 1;
-
-  const writeString = (value: Buffer) => {
-    buf.writeUInt32LE(value.length, o);
-    o += 4;
-    value.copy(buf, o);
-    o += value.length;
-  };
-
-  writeString(nameBytes);
-  writeString(symbolBytes);
-  writeString(uriBytes);
-  return buf;
+  let o = writeU8(out, 0, IX.createMeme);
+  o = writeBorshBytes(out, o, nameBytes);
+  o = writeBorshBytes(out, o, symbolBytes);
+  writeBorshBytes(out, o, uriBytes);
+  return out;
 }
 
-export function encodeWithdrawIx(amount: bigint): Buffer {
-  const buf = Buffer.alloc(9);
-  buf.writeUInt8(IX.withdrawTreasury, 0);
-  buf.writeBigUInt64LE(amount, 1);
-  return buf;
+export function encodeWithdrawIx(amount: bigint): Uint8Array {
+  const out = new Uint8Array(9);
+  let o = writeU8(out, 0, IX.withdrawTreasury);
+  writeU64Le(out, o, amount);
+  return out;
 }
 
-export function encodeSetReferrerIx(): Buffer {
-  return Buffer.from([IX.setReferrer]);
+export function encodeSetReferrerIx(): Uint8Array {
+  return new Uint8Array([IX.setReferrer]);
 }
 
 export {
