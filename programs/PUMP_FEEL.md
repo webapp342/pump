@@ -69,6 +69,7 @@ Old tokens / Global from before this layout **will not decode** — create new c
 - **Withdraw** → `withdraw_protocol_treasury` (server-signed with Global.authority keypair).
 - **Emergency pending fees** → `emergency_claim_pending_fees` (IX 9) zeros a creator/referrer PendingFees PDA and pays SOL from the **liquidity vault** to a recipient (not protocol treasury). Requires program upgrade that includes IX 9.
 - **Emergency sweep** → `emergency_sweep` → drains entire liquidity vault + halts trading; recipient defaults to **Global.authority** (deployer). Do not use this for pending-fee recovery.
+- **Resume trading** → `set_emergency_halt(false)` (IX 10). Required after an emergency sweep — sweep alone leaves trading paused.
 - Env on the API host (required; do not rely on missing `~/.config/solana/id.json`):
   1. `SOLANA_AUTHORITY_SECRET_BASE64` — preferred, or
   2. `SOLANA_AUTHORITY_KEYPAIR` / `ANCHOR_WALLET` — path to keygen JSON matching `GlobalConfig.authority`

@@ -15,6 +15,7 @@
 //!   4 withdraw_protocol_treasury | 5 set_referrer
 //!   6 claim_creator_fees | 7 claim_referrer_fees | 8 emergency_sweep
 //!   9 emergency_claim_pending_fees (authority sweeps creator/referrer pending)
+//!  10 set_emergency_halt (authority clear/set Global.emergency_halt)
 
 pub mod events;
 pub mod math;
@@ -64,6 +65,7 @@ const IX_CLAIM_CREATOR: u8 = 6;
 const IX_CLAIM_REFERRER: u8 = 7;
 const IX_EMERGENCY_SWEEP: u8 = 8;
 const IX_EMERGENCY_CLAIM_PENDING: u8 = 9;
+const IX_SET_EMERGENCY_HALT: u8 = 10;
 
 const LIQUIDITY_RENT_LAMPORTS: u64 = 890_880;
 const PROTOCOL_TREASURY_RENT_LAMPORTS: u64 = 890_880;
@@ -173,6 +175,7 @@ fn process_instruction(
         IX_CLAIM_REFERRER => process_claim_fees(program_id, accounts, false),
         IX_EMERGENCY_SWEEP => process_emergency_sweep(program_id, accounts),
         IX_EMERGENCY_CLAIM_PENDING => process_emergency_claim_pending(program_id, accounts),
+        IX_SET_EMERGENCY_HALT => process_set_emergency_halt(program_id, accounts, rest),
         _ => Err(ProgramError::InvalidInstructionData),
     }
 }
@@ -1155,5 +1158,35 @@ fn process_emergency_claim_pending(
 
     events::emit_emergency_pending_claimed(&pending.owner, &pubkey_bytes(to), amount, is_creator);
     log!("pump:emergency_claim_pending");
+    Ok(())
+}
+
+/// Authority sets or clears Global.emergency_halt (Base setEmergencyHalt parity).
+fn process_set_emergency_halt(
+    program_id: &Pubkey,
+    accounts: &[AccountInfo],
+    data: &[u8],
+) -> ProgramResult {
+    let [authority, global] = accounts else {
+        return Err(ProgramError::NotEnoughAccountKeys);
+    };
+    if !authority.is_signer() {
+        return Err(ProgramError::MissingRequiredSignature);
+    }
+    if !owner_eq(global, program_id) {
+        return Err(ProgramError::IncorrectProgramId);
+    }
+    let halt = *data.first().ok_or(ProgramError::InvalidInstructionData)?;
+    if halt > 1 {
+        return Err(ProgramError::InvalidInstructionData);
+    }
+
+    let mut g = load_pod::<GlobalConfig>(global)?;
+    if !keys_eq(&g.authority, authority.key()) {
+        return Err(ProgramError::InvalidAccountData);
+    }
+    g.emergency_halt = halt;
+    write_pod(global, &g)?;
+    log!("pump:set_emergency_halt");
     Ok(())
 }

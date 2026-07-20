@@ -19,6 +19,7 @@ import {
 import {
   encodeEmergencyClaimPendingFeesIx,
   encodeEmergencySweepIx,
+  encodeSetEmergencyHaltIx,
   encodeWithdrawIx,
   NATIVE_DECIMALS,
 } from "@pump/solana-sdk";
@@ -173,6 +174,35 @@ export async function adminEmergencySweepLiquidity(input: {
     commitment: "confirmed",
   });
   return { signature: sig, to: to.toBase58() };
+}
+
+/** Clear or set Global.emergency_halt (Base setEmergencyHalt). */
+export async function adminSetEmergencyHalt(input: {
+  halt: boolean;
+}): Promise<{ signature: string; halt: boolean }> {
+  const authority = loadSolanaAuthorityKeypair();
+  const conn = new Connection(SOLANA_RPC_URL, "confirmed");
+  const { programId, globalPda, global } = await loadGlobal(conn);
+  assertAuthority(global.authority, authority);
+
+  const currentlyHalted = global.emergencyHalt !== 0;
+  if (input.halt === currentlyHalted) {
+    throw new Error(input.halt ? "Trading is already halted" : "Trading is already active");
+  }
+
+  const ix = new TransactionInstruction({
+    programId,
+    keys: [
+      { pubkey: authority.publicKey, isSigner: true, isWritable: false },
+      { pubkey: globalPda, isSigner: false, isWritable: true },
+    ],
+    data: encodeSetEmergencyHaltIx(input.halt),
+  });
+
+  const sig = await sendAndConfirmTransaction(conn, new Transaction().add(ix), [authority], {
+    commitment: "confirmed",
+  });
+  return { signature: sig, halt: input.halt };
 }
 
 const PENDING_FEES_ACCOUNT_LEN = 48;

@@ -292,6 +292,13 @@ export function AdminPanel() {
     return wallets.every((w) => w === wallets[0]);
   }, [treasuryOwner, bondingOwner, airdropAdmin]);
 
+  /** Solana: rent-floor is not recoverable; EVM uses full contract balance. */
+  const curveEscrowWithdrawable = Number(
+    isSolanaChainFamily
+      ? (protocol?.bondingCurveManager.withdrawableLiquiditySol ?? "0")
+      : (protocol?.bondingCurveManager.contractBalanceBnb ?? "0")
+  );
+
   const { data: treasuryLiveBalance, refetch: refetchTreasuryBalance } = useBalance({
     address: !isSolanaChainFamily && treasuryContract ? (treasuryContract as `0x${string}`) : undefined,
     chainId: pumpChain.id,
@@ -555,28 +562,48 @@ export function AdminPanel() {
     try {
       if (isSolanaChainFamily) {
         if (options.sweepEscrow) {
-          setCurveRecoverPhase("wallet-sweep");
-          setSolanaTxPending(true);
-          const res = await adminFetch("/api/admin/solana/emergency-sweep", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ to }),
-          });
-          const json = await readAdminJson<{
-            error?: string;
-            data?: { signature?: string };
-          }>(res);
-          if (!res.ok) throw new Error(json.error ?? "Emergency sweep failed");
-          setSolanaTxHash(json.data?.signature ?? null);
-          setCurveRecoverPhase("chain-sweep");
+          const withdrawable = Number(
+            protocol?.bondingCurveManager.withdrawableLiquiditySol ?? "0"
+          );
+          if (withdrawable > 0) {
+            setCurveRecoverPhase("wallet-sweep");
+            setSolanaTxPending(true);
+            const res = await adminFetch("/api/admin/solana/emergency-sweep", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ to }),
+            });
+            const json = await readAdminJson<{
+              error?: string;
+              data?: { signature?: string };
+            }>(res);
+            if (!res.ok) throw new Error(json.error ?? "Emergency sweep failed");
+            setSolanaTxHash(json.data?.signature ?? null);
+            setCurveRecoverPhase("chain-sweep");
+          }
         } else if (!protocol?.bondingCurveManager.emergencyHalt) {
           setError("Curve trading is already active.");
           return;
-        } else {
-          setError(
-            "Solana has no resume-halt instruction yet. Redeploy/re-initialize clears halt only via new Global."
-          );
-          return;
+        }
+
+        // emergency_sweep sets halt=1; always clear halt to resume (EVM setEmergencyHalt false).
+        if (protocol?.bondingCurveManager.emergencyHalt || options.sweepEscrow) {
+          setCurveRecoverPhase("wallet-resume");
+          setSolanaTxPending(true);
+          const resumeRes = await adminFetch("/api/admin/solana/set-emergency-halt", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ halt: false }),
+          });
+          const resumeJson = await readAdminJson<{
+            error?: string;
+            data?: { signature?: string };
+          }>(resumeRes);
+          if (!resumeRes.ok) {
+            throw new Error(resumeJson.error ?? "Resume trading failed");
+          }
+          setSolanaTxHash(resumeJson.data?.signature ?? null);
+          setCurveRecoverPhase("chain-resume");
         }
 
         setCurveRecoverPhase(curveRecoverResetDb ? "wipe" : "idle");
@@ -643,7 +670,9 @@ export function AdminPanel() {
       return;
     }
 
-    const balanceBnb = protocol?.bondingCurveManager.contractBalanceBnb ?? "0";
+    const balanceBnb = isSolanaChainFamily
+      ? (protocol?.bondingCurveManager.withdrawableLiquiditySol ?? "0")
+      : (protocol?.bondingCurveManager.contractBalanceBnb ?? "0");
     const balanceNum = Number(balanceBnb);
     const halted = protocol?.bondingCurveManager.emergencyHalt ?? false;
 
@@ -669,9 +698,15 @@ export function AdminPanel() {
   function onResumeCurveTradingOnly() {
     if (!canEmergencySweepBonding) return;
     if (isSolanaChainFamily) {
-      setError(
-        "Solana has no resume-halt instruction yet. Halt clears only with a new Global initialize."
-      );
+      if (!protocol?.bondingCurveManager.emergencyHalt) {
+        setError("Curve trading is already active.");
+        return;
+      }
+      const confirmTemplate = curveRecoverResetDb
+        ? ADMIN_COPY.treasury.curveRecovery.confirmResumeWithWipe
+        : ADMIN_COPY.treasury.curveRecovery.confirmResume;
+      if (!window.confirm(confirmTemplate)) return;
+      void runCurveRecovery({ sweepEscrow: false });
       return;
     }
     if (!contracts.bondingCurveManager) return;
@@ -1429,7 +1464,7 @@ export function AdminPanel() {
                 <p className="admin-curve-recovery-status admin-curve-recovery-status--halted">
                   {ADMIN_COPY.treasury.curveRecovery.halted}
                 </p>
-              ) : Number(protocol?.bondingCurveManager.contractBalanceBnb ?? "0") <= 0 ? (
+              ) : curveEscrowWithdrawable <= 0 ? (
                 <p className="admin-curve-recovery-status">
                   {ADMIN_COPY.treasury.curveRecovery.ready}
                 </p>
@@ -1444,7 +1479,7 @@ export function AdminPanel() {
                 <span>{ADMIN_COPY.treasury.curveRecovery.resetDb}</span>
               </label>
 
-              {Number(protocol?.bondingCurveManager.contractBalanceBnb ?? "0") > 0 ? (
+              {curveEscrowWithdrawable > 0 ? (
                 <label className="admin-curve-recovery-field">
                   <span className="admin-field-label">
                     {ADMIN_COPY.treasury.curveRecovery.recipient}
@@ -1461,7 +1496,7 @@ export function AdminPanel() {
               ) : null}
 
               <div className="admin-curve-recovery-actions">
-                {Number(protocol?.bondingCurveManager.contractBalanceBnb ?? "0") > 0 ? (
+                {curveEscrowWithdrawable > 0 ? (
                   <AdminBtn
                     size="sm"
                     onClick={() => void onRecoverCurveEscrow()}
