@@ -672,6 +672,11 @@ export function PortfolioPanel({
   const walletSessionActive = pumpReady && authenticated && Boolean(sessionAddress);
   const { openConnectModal } = useOpenConnectModal();
   const { bnbUsd } = useBnbUsdPrice();
+  const bnbUsdForDustRef = useRef<number | null>(null);
+  if (bnbUsd != null) {
+    bnbUsdForDustRef.current = bnbUsd;
+  }
+  const effectiveBnbUsd = bnbUsd ?? bnbUsdForDustRef.current;
   const scwAddress = (
     isSolanaPortfolio
       ? solanaAddress
@@ -731,7 +736,6 @@ export function PortfolioPanel({
   const lastEnrichFingerprintRef = useRef(
     hasSsrPortfolio && initialPortfolio ? portfolioFingerprint(initialPortfolio) : ""
   );
-  const bnbUsdForDustRef = useRef<number | null>(null);
   const loadPortfolioRef = useRef<
     (wallet: string, limit?: number, options?: { silent?: boolean }) => Promise<void>
   >(async () => {});
@@ -1227,14 +1231,13 @@ export function PortfolioPanel({
       .map((position) => buildVerifiedPositionView(position, onChainBalances))
       .filter((view): view is VerifiedPositionView => view != null);
     const allRows = buildPortfolioHoldingRows(views, walletHoldings);
-    const bnbUsdForDust = bnbUsd ?? bnbUsdForDustRef.current;
     const displayRows = allRows.filter(
-      (row) => !isPortfolioDustHolding(row.estimatedValueBnb, bnbUsdForDust)
+      (row) => !isPortfolioDustHolding(row.estimatedValueBnb, effectiveBnbUsd)
     );
     const holdingsBnb = displayRows.reduce((sum, row) => sum + row.estimatedValueBnb, 0);
-    const holdingsOnlyUsd = bnbToUsd(holdingsBnb, bnbUsd) ?? 0;
+    const holdingsOnlyUsd = bnbToUsd(holdingsBnb, effectiveBnbUsd) ?? 0;
     const nativeBnbVal = nativeCashBalance;
-    const nativeUsdVal = bnbToUsd(nativeBnbVal, bnbUsd) ?? 0;
+    const nativeUsdVal = bnbToUsd(nativeBnbVal, effectiveBnbUsd) ?? 0;
 
     publishWalletTotal({
       address: publishAddress,
@@ -1248,15 +1251,10 @@ export function PortfolioPanel({
     ssrWalletAddress,
     data,
     nativeCashBalance,
-    bnbUsd,
+    effectiveBnbUsd,
     onChainBalances,
     walletHoldings,
   ]);
-
-  if (bnbUsd != null) {
-    bnbUsdForDustRef.current = bnbUsd;
-  }
-  const bnbUsdForDust = bnbUsd ?? bnbUsdForDustRef.current;
 
   const portfolioDerived = useMemo(() => {
     if (!data) {
@@ -1275,7 +1273,7 @@ export function PortfolioPanel({
 
     const allHoldingsRows = buildPortfolioHoldingRows(verifiedPositionViews, walletHoldings);
     const displayHoldingsRows = allHoldingsRows.filter(
-      (row) => !isPortfolioDustHolding(row.estimatedValueBnb, bnbUsdForDust)
+      (row) => !isPortfolioDustHolding(row.estimatedValueBnb, effectiveBnbUsd)
     );
     const sortedHoldingsRows = sortPortfolioHoldingRows(
       displayHoldingsRows.map((row) => ({
@@ -1287,7 +1285,7 @@ export function PortfolioPanel({
     );
     const launchedHoldingMetricsByAddress = buildLaunchedHoldingMetricsByAddress(
       allHoldingsRows,
-      bnbUsd
+      effectiveBnbUsd
     );
 
     return {
@@ -1301,8 +1299,7 @@ export function PortfolioPanel({
     data,
     onChainBalances,
     walletHoldings,
-    bnbUsdForDust,
-    bnbUsd,
+    effectiveBnbUsd,
     holdingsSortKey,
     holdingsSortDir,
   ]);
@@ -1365,7 +1362,7 @@ export function PortfolioPanel({
     (view) =>
       !isPortfolioDustHolding(
         view.balance * Number(view.position.lastPriceBnb),
-        bnbUsdForDust
+        effectiveBnbUsd
       )
   );
 
@@ -1374,24 +1371,24 @@ export function PortfolioPanel({
     0
   );
   const totalUnrealizedPnlUsd = metricViews.reduce(
-    (sum, view) => sum + (holdingOpenPnlUsd(view, bnbUsd) ?? 0),
+    (sum, view) => sum + (holdingOpenPnlUsd(view, effectiveBnbUsd) ?? 0),
     0
   );
   const nativeBnb = nativeCashBalance;
-  const nativeUsd = bnbToUsd(nativeBnb, bnbUsd) ?? 0;
-  const holdingsOnlyUsd = bnbToUsd(holdingsBnbTotal, bnbUsd) ?? 0;
+  const nativeUsd = bnbToUsd(nativeBnb, effectiveBnbUsd) ?? 0;
+  const holdingsOnlyUsd = bnbToUsd(holdingsBnbTotal, effectiveBnbUsd) ?? 0;
   const totalEstimatedUsd = holdingsOnlyUsd + nativeUsd;
   const totalCostBasisUsd = metricViews.reduce((sum, view) => {
     const cost = resolveOpenLotCostUsd(
       view.remainingCostBasisUsd,
       view.remainingCostBasis,
-      bnbUsd
+      effectiveBnbUsd
     );
     return sum + (cost ?? 0);
   }, 0);
   const portfolioValuePct =
     totalCostBasisUsd > 0 ? (totalUnrealizedPnlUsd / totalCostBasisUsd) * 100 : null;
-  const topHolding = resolveTopHoldingSummary(displayHoldingsRows, nativeBnb, bnbUsd);
+  const topHolding = resolveTopHoldingSummary(displayHoldingsRows, nativeBnb, effectiveBnbUsd);
   const claimedBnb = data.creatorFeesClaimedBnb ?? 0;
   const pendingBnb = isSolanaPortfolio
     ? Number(solPendingCreatorLamports) / 1e9
@@ -1572,14 +1569,14 @@ export function PortfolioPanel({
                       onSort={onHoldingsSort}
                     />
                     <div className="portfolio-holdings-mobile__body">
-                    <NativeCashMobileRow nativeBnb={nativeBnb} bnbUsd={bnbUsd} />
+                    <NativeCashMobileRow nativeBnb={nativeBnb} bnbUsd={effectiveBnbUsd} />
                     {visibleHoldingsRows.map((row, index) => {
                       if (row.kind === "wallet") {
                         return (
                           <WalletHoldingMobileRow
                             key={row.holding.tokenAddress}
                             holding={row.holding}
-                            bnbUsd={bnbUsd}
+                            bnbUsd={effectiveBnbUsd}
                             peekOnMount={index === 0}
                             onBuyMax={() =>
                               openQuickTrade(row.holding.tokenAddress, row.holding.symbol, "buy")
@@ -1598,9 +1595,9 @@ export function PortfolioPanel({
                       const { position, balance } = row.view;
                       const positionValueUsd = bnbToUsd(
                         balance * Number(position.lastPriceBnb),
-                        bnbUsd
+                        effectiveBnbUsd
                       );
-                      const openPnlUsd = holdingOpenPnlUsd(row.view, bnbUsd);
+                      const openPnlUsd = holdingOpenPnlUsd(row.view, effectiveBnbUsd);
 
                       return (
                         <HoldingSwipeRow
@@ -1657,14 +1654,14 @@ export function PortfolioPanel({
                         />
                       </thead>
                       <tbody>
-                        <NativeCashDesktopRow nativeBnb={nativeBnb} bnbUsd={bnbUsd} />
+                        <NativeCashDesktopRow nativeBnb={nativeBnb} bnbUsd={effectiveBnbUsd} />
                         {visibleHoldingsRows.map((row) => {
                           if (row.kind === "wallet") {
                             return (
                               <WalletHoldingDesktopRow
                                 key={row.holding.tokenAddress}
                                 holding={row.holding}
-                                bnbUsd={bnbUsd}
+                                bnbUsd={effectiveBnbUsd}
                                 onBuyMax={() =>
                                   openQuickTrade(row.holding.tokenAddress, row.holding.symbol, "buy")
                                 }
@@ -1684,18 +1681,18 @@ export function PortfolioPanel({
                             balance,
                             remainingCostBasisUsd,
                             remainingCostBasis,
-                            bnbUsd
+                            effectiveBnbUsd
                           );
                           const positionValueUsd = bnbToUsd(
                             balance * Number(position.lastPriceBnb),
-                            bnbUsd
+                            effectiveBnbUsd
                           );
-                          const openPnlUsd = holdingOpenPnlUsd(row.view, bnbUsd);
+                          const openPnlUsd = holdingOpenPnlUsd(row.view, effectiveBnbUsd);
                           const openPnlPct = positionUnrealizedPct(
                             openPnlUsd,
                             remainingCostBasisUsd,
                             remainingCostBasis,
-                            bnbUsd
+                            effectiveBnbUsd
                           );
 
                           return (
@@ -1787,7 +1784,7 @@ export function PortfolioPanel({
                 <section className="panel-surface portfolio-section-surface portfolio-tab-panel__surface">
                   <PortfolioLaunchedList
                     tokens={data.createdTokens}
-                    bnbUsd={bnbUsd}
+                    bnbUsd={effectiveBnbUsd}
                     holdingMetricsByAddress={launchedHoldingMetricsByAddress}
                     walletAddress={isOwnPortfolio ? address : null}
                   />
@@ -1816,7 +1813,7 @@ export function PortfolioPanel({
             walletAddress={walletAddress}
             creatorClaimedBnb={claimedBnb}
             creatorPendingBnb={pendingBnb}
-            bnbUsd={bnbUsd}
+            bnbUsd={effectiveBnbUsd}
             onOpenCreatorClaim={() => setClaimOpen(true)}
             referralClaimedBnb={referralStats?.claimedBnb ?? 0}
             referralPendingBnb={referralPendingBnb}

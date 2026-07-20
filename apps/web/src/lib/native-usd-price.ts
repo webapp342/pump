@@ -142,6 +142,17 @@ export function isPlausibleNativeUsdForChain(
   return nativeUsd <= 1_200;
 }
 
+/** Last trade-time native/USD snapshot — stabilizes USD columns when live oracle blips. */
+export function latestNativeUsdFromTrades(
+  trades: ReadonlyArray<{ nativeUsdRate?: string | null }>
+): number | null {
+  for (const trade of trades) {
+    const rate = Number(trade.nativeUsdRate);
+    if (Number.isFinite(rate) && rate > 0) return rate;
+  }
+  return null;
+}
+
 /** Client display: prefer live hook oracle; fall back to SSR/API seed only when live is unavailable. */
 export function resolveDisplayNativeUsd(
   liveNativeUsd: number | null | undefined,

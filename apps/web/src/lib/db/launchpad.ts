@@ -22,7 +22,6 @@ import { sqlChainFilter } from "@/lib/db/launchpad-chain";
 import {
   BONDING_TOKEN_SUPPLY_HUMAN,
   BONDING_VIRTUAL_BNB_HUMAN,
-  spotPriceBnbFromBondingDecimals,
 } from "@/lib/bonding-curve";
 
 /** SQL: marginal spot from bonding_state reserves (human units). */
@@ -37,16 +36,6 @@ const SQL_BONDING_MARK_PRICE_ZUG = `
 
 /** SQL: FDV / market cap from bonding mark price أ— 1B supply. */
 const SQL_BONDING_MARK_CAP_ZUG = `((${SQL_BONDING_MARK_PRICE_ZUG}) * ${BONDING_TOKEN_SUPPLY_HUMAN})`;
-
-function resolvePositionMarkPriceBnb(
-  reserveZug: string | null | undefined,
-  tokenSold: string | null | undefined,
-  fallbackLastPrice: string
-): string {
-  const spot = spotPriceBnbFromBondingDecimals(reserveZug, tokenSold);
-  if (spot > 0) return String(spot);
-  return fallbackLastPrice;
-}
 
 export function getLaunchpadPool(): Pool {
   return getLaunchpadWritePool();
@@ -2140,7 +2129,7 @@ export async function getPortfolioForAddress(
           COALESCE(p.realized_pnl_usd, 0)::text AS realized_pnl_usd,
           COALESCE(b.reserve_zug, 0)::text AS reserve_zug,
           COALESCE(b.token_sold, 0)::text AS token_sold,
-          COALESCE(b.last_price_zug, 0)::text AS last_price_zug,
+          COALESCE((${SQL_BONDING_MARK_PRICE_ZUG}), 0)::text AS last_price_zug,
           COALESCE(b.progress_bps, 0) AS progress_bps
         FROM user_positions p
         JOIN tokens t ON t.address = p.token_address
@@ -2181,12 +2170,7 @@ export async function getPortfolioForAddress(
 
   const positions: PortfolioPosition[] = positionsResult.rows.map((row) => {
     const balance = Number(row.token_balance);
-    const markPrice = resolvePositionMarkPriceBnb(
-      row.reserve_zug,
-      row.token_sold,
-      row.last_price_zug
-    );
-    const price = Number(markPrice);
+    const price = Number(row.last_price_zug);
     return {
       tokenAddress: row.token_address,
       symbol: row.symbol,
@@ -2200,7 +2184,7 @@ export async function getPortfolioForAddress(
       remainingCostBasisBnb: row.remaining_cost_basis_zug,
       remainingCostBasisUsd: row.remaining_cost_basis_usd,
       realizedPnlUsd: row.realized_pnl_usd,
-      lastPriceBnb: markPrice,
+      lastPriceBnb: row.last_price_zug,
       progressBps: row.progress_bps,
       estimatedValueBnb: balance * price,
     };
@@ -2596,8 +2580,8 @@ export async function getCreatorProfile(address: string): Promise<CreatorProfile
           t.status,
           t.created_at,
           COALESCE(b.progress_bps, 0) AS progress_bps,
-          COALESCE(b.market_cap_zug, 0)::text AS market_cap_zug,
-          COALESCE(b.last_price_zug, 0)::text AS last_price_zug,
+          COALESCE((${SQL_BONDING_MARK_CAP_ZUG}), b.market_cap_zug, 0)::text AS market_cap_zug,
+          COALESCE((${SQL_BONDING_MARK_PRICE_ZUG}), b.last_price_zug, 0)::text AS last_price_zug,
           COALESCE(b.trade_count, 0) AS trade_count,
           COALESCE(p.token_balance, 0)::text AS creator_token_balance
         FROM tokens t
@@ -2626,7 +2610,7 @@ export async function getCreatorProfile(address: string): Promise<CreatorProfile
           t.name,
           t.logo_url,
           p.token_balance::text,
-          COALESCE(b.last_price_zug, 0)::text AS last_price_zug
+          COALESCE((${SQL_BONDING_MARK_PRICE_ZUG}), b.last_price_zug, 0)::text AS last_price_zug
         FROM user_positions p
         JOIN tokens t ON t.address = p.token_address
         LEFT JOIN bonding_states b ON b.token_address = p.token_address
@@ -2634,7 +2618,7 @@ export async function getCreatorProfile(address: string): Promise<CreatorProfile
           AND p.token_balance > 0
           AND t.creator_address <> $1
           AND t.is_hidden = false
-        ORDER BY (p.token_balance * COALESCE(b.last_price_zug, 0)) DESC
+        ORDER BY (p.token_balance * (${SQL_BONDING_MARK_PRICE_ZUG})) DESC
         `,
         [normalized]
       ),

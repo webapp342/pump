@@ -9,7 +9,7 @@ import type { CurveTuple } from "@/lib/launchpad-events";
 
 /**
  * Single native mark price for chart, header, holders P/L, portfolio.
- * Priority: trade-replay spot → on-chain curve → DB bonding reserves → stored last price.
+ * Priority: trade-replay spot → on-chain curve → DB mark (virtual-aware SQL) → reserve fallback.
  * USD display = native × nativeUsd (oracle); never mix USD into OHLC storage.
  */
 export function resolveMarkPriceBnb(
@@ -30,11 +30,11 @@ export function resolveMarkPriceBnb(
     if (fromChain > 0) return fromChain;
   }
 
-  const fromBonding = spotPriceBnbFromBondingDecimals(token.reserveBnb, token.tokenSold);
-  if (fromBonding > 0) return fromBonding;
-
   const fromDb = Number(token.lastPriceBnb);
   if (fromDb > 0) return fromDb;
+
+  const fromBonding = spotPriceBnbFromBondingDecimals(token.reserveBnb, token.tokenSold);
+  if (fromBonding > 0) return fromBonding;
 
   return displayTokenPriceBnb(token.lastPriceBnb, token.tradeCount);
 }

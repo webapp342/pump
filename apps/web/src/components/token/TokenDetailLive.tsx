@@ -32,6 +32,7 @@ import {
   tokenPriceUsd,
 } from "@/lib/format-usd";
 import { useBnbUsdPrice } from "@/hooks/useBnbUsdPrice";
+import { resolveDisplayNativeUsd, latestNativeUsdFromTrades } from "@/lib/native-usd-price";
 import {
   applyTradeToToken,
   blockTimeIsoFromUnixSeconds,
@@ -54,6 +55,7 @@ import {
   txHashKey,
 } from "@/lib/address";
 import { isSolanaChainFamily } from "@/config/chain-family";
+import { PUMP_FEEL_DEFAULTS } from "@/config/solana";
 import { usePumpWallet } from "@/components/wallet/PumpWalletProvider";
 import { useSolanaTradeMarket } from "@/hooks/useSolanaTradeMarket";
 import { copyToClipboard } from "@/lib/copy-to-clipboard";
@@ -835,8 +837,14 @@ export function TokenDetailLive({
     })();
   }, [bnbUsd, fetchLive, initialTrades, refetchCurve, streamAddress]);
 
-  const priceUsd = tokenPriceUsd(displayPrice, bnbUsd);
-  const fdvUsd = bnbToUsd(liveMarketCapNative, bnbUsd);
+  const seededNativeUsd = useMemo(
+    () => latestNativeUsdFromTrades(trades),
+    [trades]
+  );
+  const effectiveBnbUsd = resolveDisplayNativeUsd(bnbUsd, seededNativeUsd);
+
+  const priceUsd = tokenPriceUsd(displayPrice, effectiveBnbUsd);
+  const fdvUsd = bnbToUsd(liveMarketCapNative, effectiveBnbUsd);
 
   useEffect(() => {
     if (!contentSynced) return;
@@ -850,7 +858,7 @@ export function TokenDetailLive({
   }, [trades, liveToken.volume24hBnb]);
 
   const change24h = useMemo(() => {
-    const computed = compute24hPriceChange(trades, displayPrice, bnbUsd);
+    const computed = compute24hPriceChange(trades, displayPrice, effectiveBnbUsd);
     if (computed) return computed;
     const pct = liveToken.change24hPct;
     if (pct == null || !Number.isFinite(pct)) return null;
@@ -861,11 +869,11 @@ export function TokenDetailLive({
     return {
       changeBnb,
       changePct: pct,
-      changeUsd: bnbUsd != null ? changeBnb * bnbUsd : null,
+      changeUsd: effectiveBnbUsd != null ? changeBnb * effectiveBnbUsd : null,
     };
-  }, [trades, displayPrice, bnbUsd, liveToken.change24hPct]);
+  }, [trades, displayPrice, effectiveBnbUsd, liveToken.change24hPct]);
 
-  const volume24hUsd = bnbToUsd(volume24hBnb, bnbUsd);
+  const volume24hUsd = bnbToUsd(volume24hBnb, effectiveBnbUsd);
   const changeTone = change24h?.changePct ?? null;
   const showSocialLinks = hasSocialLinks(liveToken.socialLinks);
 
@@ -970,7 +978,9 @@ export function TokenDetailLive({
     initialHolders,
     currentPriceBnb: displayPrice,
     currentMarketCapBnb: liveMarketCapNative,
-    bnbUsd,
+    bnbUsd: effectiveBnbUsd,
+    curveSnapshot: tradeCurveSnapshot ?? null,
+    protocolFeeBps: BigInt(PUMP_FEEL_DEFAULTS.protocolFeeBps),
     onAddressClick: setProfileAddress,
     creatorDisplayUsername: liveToken.creatorDisplayUsername,
     launchTxHash: liveToken.launchTxHash,
@@ -1310,7 +1320,7 @@ export function TokenDetailLive({
                 liveCandleUpdates={liveCandleUpdates}
                 fallbackTrades={chartFallbackTrades}
                 wsConnected={wsConnected}
-                bnbUsd={bnbUsd}
+                bnbUsd={effectiveBnbUsd}
   liveOnChainSpotBnb={displayPrice > 0 ? displayPrice : null}
                 currency={chartCurrency}
                 onCurrencyChange={setChartCurrency}
@@ -1373,7 +1383,7 @@ export function TokenDetailLive({
             refreshKey={announcementsRefreshKey}
             onOpenProfile={setProfileAddress}
             currentMarketCapBnb={liveMarketCapNative}
-            bnbUsd={bnbUsd}
+            bnbUsd={effectiveBnbUsd}
           />
         </aside>
       </div>

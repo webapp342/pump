@@ -23,6 +23,12 @@ import {
   scaleCostBasisUsdForBalance,
 } from "@/lib/format-usd";
 import {
+  positionExitValueBnb,
+  positionUnrealizedPctFromExit,
+  positionUnrealizedUsdFromExit,
+} from "@/lib/position-exit-value";
+import type { BondingCurveSnapshot } from "@/lib/bonding-curve";
+import {
   resolveVerifiedTokenBalance,
   scaleCostBasisForBalance,
 } from "@/lib/onchain-balance";
@@ -105,6 +111,7 @@ function tradeMarketCapUsd(trade: TradeItem, liveBnbUsd: number | null): number 
 
 type HolderMetrics = {
   avgEntryUsd: number | null;
+  holderValueUsd: number | null;
   unrealizedPnlUsd: number | null;
   unrealizedPnlPct: number | null;
   pnlTone: string;
@@ -113,7 +120,9 @@ type HolderMetrics = {
 function computeHolderMetrics(
   row: HolderRow,
   currentPriceBnb: number,
-  bnbUsd: number | null
+  bnbUsd: number | null,
+  curveSnapshot?: BondingCurveSnapshot | null,
+  protocolFeeBps?: bigint
 ): HolderMetrics {
   const avgEntryUsd = positionAvgEntryUsd(
     row.netTokens,
@@ -121,19 +130,47 @@ function computeHolderMetrics(
     row.remainingCostBasisBnb,
     bnbUsd
   );
-  const unrealizedPnlUsd = positionUnrealizedUsd(
-    row.netTokens,
-    currentPriceBnb,
-    row.remainingCostBasisUsd,
-    row.remainingCostBasisBnb,
-    bnbUsd
-  );
-  const unrealizedPnlPct = positionUnrealizedPct(
-    unrealizedPnlUsd,
-    row.remainingCostBasisUsd,
-    row.remainingCostBasisBnb,
-    bnbUsd
-  );
+
+  let holderValueUsd: number | null;
+  let unrealizedPnlUsd: number | null;
+  if (curveSnapshot && protocolFeeBps != null) {
+    const exitBnb = positionExitValueBnb(
+      row.netTokens,
+      curveSnapshot,
+      protocolFeeBps
+    );
+    holderValueUsd = bnbToUsd(exitBnb, bnbUsd);
+    unrealizedPnlUsd = positionUnrealizedUsdFromExit(
+      exitBnb,
+      row.remainingCostBasisUsd,
+      row.remainingCostBasisBnb,
+      bnbUsd
+    );
+  } else {
+    holderValueUsd = bnbToUsd(row.netTokens * currentPriceBnb, bnbUsd);
+    unrealizedPnlUsd = positionUnrealizedUsd(
+      row.netTokens,
+      currentPriceBnb,
+      row.remainingCostBasisUsd,
+      row.remainingCostBasisBnb,
+      bnbUsd
+    );
+  }
+
+  const unrealizedPnlPct =
+    curveSnapshot && protocolFeeBps != null
+      ? positionUnrealizedPctFromExit(
+          unrealizedPnlUsd,
+          row.remainingCostBasisUsd,
+          row.remainingCostBasisBnb,
+          bnbUsd
+        )
+      : positionUnrealizedPct(
+          unrealizedPnlUsd,
+          row.remainingCostBasisUsd,
+          row.remainingCostBasisBnb,
+          bnbUsd
+        );
   const pnlTone =
     unrealizedPnlUsd == null
       ? "text-pump-muted"
@@ -141,7 +178,7 @@ function computeHolderMetrics(
         ? "text-pump-success"
         : "text-pump-danger";
 
-  return { avgEntryUsd, unrealizedPnlUsd, unrealizedPnlPct, pnlTone };
+  return { avgEntryUsd, holderValueUsd, unrealizedPnlUsd, unrealizedPnlPct, pnlTone };
 }
 
 function mergeTradesByTxHash(...groups: TradeItem[][]): TradeItem[] {
@@ -321,6 +358,8 @@ export function TradeTape({
   followerCount = 0,
   tokenDescription,
   announcementsRefreshKey = 0,
+  curveSnapshot = null,
+  protocolFeeBps,
 }: {
   tokenAddress: string;
   creatorAddress: string;
@@ -349,6 +388,9 @@ export function TradeTape({
   followerCount?: number;
   tokenDescription?: string | null;
   announcementsRefreshKey?: number;
+  /** Bonding curve for honest holder exit value / P/L (sell-all quote). */
+  curveSnapshot?: BondingCurveSnapshot | null;
+  protocolFeeBps?: bigint;
 }) {
   const creatorKey = creatorAddress.toLowerCase();
   const [internalTab, setInternalTab] = useState<ActivityTab>("trades");
@@ -605,12 +647,14 @@ export function TradeTape({
             <div className={`${activityTableScrollClass} token-holders-mobile`}>
               <ul className="token-holders-mobile__list" aria-label="Holders">
                 {holderRows.map((row) => {
-                  const { unrealizedPnlPct } = computeHolderMetrics(
+                  const { holderValueUsd, unrealizedPnlPct } = computeHolderMetrics(
                     row,
                     currentPriceBnb,
-                    bnbUsd
+                    bnbUsd,
+                    curveSnapshot,
+                    protocolFeeBps
                   );
-                  const balanceUsd = bnbToUsd(row.netTokens * currentPriceBnb, bnbUsd);
+                  const balanceUsd = holderValueUsd;
                   const meta = displayNameLookup.get(row.address.toLowerCase());
                   const label =
                     row.displayUsername ??
@@ -688,15 +732,25 @@ export function TradeTape({
                     <th className="token-tape-table__col-num">Amount</th>
                     <th className="token-tape-table__col-num">Supply</th>
                     <th className="token-tape-table__col-num">Entry</th>
-                    <th className="token-tape-table__col-num">Value</th>
-                    <th className="token-tape-table__col-end">P/L</th>
+                    <th className="token-tape-table__col-num" title="Est. USD if sold now on curve">
+                      Exit value
+                    </th>
+                    <th className="token-tape-table__col-end" title="Vs cost basis; sell-all quote">
+                      Exit P/L
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {holderRows.map((row, index) => {
-                    const { avgEntryUsd, unrealizedPnlUsd, pnlTone } =
-                      computeHolderMetrics(row, currentPriceBnb, bnbUsd);
-                    const valueUsd = bnbToUsd(row.netTokens * currentPriceBnb, bnbUsd);
+                    const { avgEntryUsd, holderValueUsd, unrealizedPnlUsd, pnlTone } =
+                      computeHolderMetrics(
+                        row,
+                        currentPriceBnb,
+                        bnbUsd,
+                        curveSnapshot,
+                        protocolFeeBps
+                      );
+                    const valueUsd = holderValueUsd;
 
                     return (
                       <tr key={row.address}>
