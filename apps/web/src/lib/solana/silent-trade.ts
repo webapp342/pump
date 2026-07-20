@@ -13,6 +13,7 @@ import {
   ASSOCIATED_TOKEN_PROGRAM_ID,
   TOKEN_PROGRAM_ID,
   createAssociatedTokenAccountIdempotentInstruction,
+  createCloseAccountInstruction,
   getAssociatedTokenAddressSync,
 } from "@solana/spl-token";
 import { encodeBuyIx, encodeSellIx, encodeSetReferrerIx } from "@pump/solana-sdk";
@@ -28,6 +29,7 @@ import {
   launchpadProgramId,
   pdaCreatorFees,
   pdaCurve,
+  pdaProtocolTreasury,
   pdaReferrerBinding,
   pdaReferrerFees,
 } from "@/lib/solana/launchpad-pdas";
@@ -250,6 +252,7 @@ export async function silentBuy(input: {
 
 /**
  * Sell tokens for SOL — popup-free (no separate approve; token authority = trader).
+ * Full sell closes the trader ATA and sends rent (~0.002 SOL) to protocol_treasury PDA.
  */
 export async function silentSell(input: {
   mintAddress: string;
@@ -271,20 +274,42 @@ export async function silentSell(input: {
       : trader;
 
   const traderAta = getAssociatedTokenAddressSync(mint, trader, false, TOKEN_PROGRAM_ID);
+  const conn = getSolanaConnection();
+  const ataBal = await conn.getTokenAccountBalance(traderAta, "confirmed").catch(() => null);
+  const rawBal = ataBal?.value?.amount != null ? BigInt(ataBal.value.amount) : 0n;
+  if (rawBal > 0n && input.tokenIn > rawBal) {
+    throw new Error("Insufficient token balance");
+  }
 
-  const ix = new TransactionInstruction({
-    programId: launchpadProgramId(),
-    keys: solanaTradeAccountMetas({
-      trader,
-      mint,
-      curvePda,
-      curve,
-      traderAta,
-      referrerWallet,
+  const ixs: TransactionInstruction[] = [
+    new TransactionInstruction({
+      programId: launchpadProgramId(),
+      keys: solanaTradeAccountMetas({
+        trader,
+        mint,
+        curvePda,
+        curve,
+        traderAta,
+        referrerWallet,
+      }),
+      data: encodeSellIx(input.tokenIn, input.minSolOut),
     }),
-    data: encodeSellIx(input.tokenIn, input.minSolOut),
-  });
+  ];
 
-  const { signature } = await sendSolanaSilentTransaction([ix]);
+  // Empty ATA after full sell → reclaim rent to protocol treasury (not the trader).
+  if (rawBal > 0n && input.tokenIn >= rawBal) {
+    const [protocolTreasury] = pdaProtocolTreasury();
+    ixs.push(
+      createCloseAccountInstruction(
+        traderAta,
+        protocolTreasury,
+        trader,
+        [],
+        TOKEN_PROGRAM_ID
+      )
+    );
+  }
+
+  const { signature } = await sendSolanaSilentTransaction(ixs);
   return { signature, traderAddress: trader.toBase58() };
 }

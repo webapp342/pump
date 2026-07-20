@@ -14,6 +14,7 @@
 //!   0 initialize | 1 create_meme | 2 buy | 3 sell
 //!   4 withdraw_protocol_treasury | 5 set_referrer
 //!   6 claim_creator_fees | 7 claim_referrer_fees | 8 emergency_sweep
+//!   9 emergency_claim_pending_fees (authority sweeps creator/referrer pending)
 
 pub mod events;
 pub mod math;
@@ -62,6 +63,7 @@ const IX_SET_REFERRER: u8 = 5;
 const IX_CLAIM_CREATOR: u8 = 6;
 const IX_CLAIM_REFERRER: u8 = 7;
 const IX_EMERGENCY_SWEEP: u8 = 8;
+const IX_EMERGENCY_CLAIM_PENDING: u8 = 9;
 
 const LIQUIDITY_RENT_LAMPORTS: u64 = 890_880;
 const PROTOCOL_TREASURY_RENT_LAMPORTS: u64 = 890_880;
@@ -170,6 +172,7 @@ fn process_instruction(
         IX_CLAIM_CREATOR => process_claim_fees(program_id, accounts, true),
         IX_CLAIM_REFERRER => process_claim_fees(program_id, accounts, false),
         IX_EMERGENCY_SWEEP => process_emergency_sweep(program_id, accounts),
+        IX_EMERGENCY_CLAIM_PENDING => process_emergency_claim_pending(program_id, accounts),
         _ => Err(ProgramError::InvalidInstructionData),
     }
 }
@@ -1102,5 +1105,55 @@ fn process_emergency_sweep(program_id: &Pubkey, accounts: &[AccountInfo]) -> Pro
 
     events::emit_emergency_swept(&pubkey_bytes(to), amount);
     log!("pump:emergency_sweep");
+    Ok(())
+}
+
+/// Authority sweeps unclaimed creator/referrer pending fees from liquidity → `to`.
+/// PendingFees PDA is accounting only; SOL moves out of the shared liquidity vault.
+fn process_emergency_claim_pending(
+    program_id: &Pubkey,
+    accounts: &[AccountInfo],
+) -> ProgramResult {
+    let [authority, global, liquidity, pending_fees, to] = accounts else {
+        return Err(ProgramError::NotEnoughAccountKeys);
+    };
+    if !authority.is_signer() {
+        return Err(ProgramError::MissingRequiredSignature);
+    }
+    if !owner_eq(global, program_id) || !owner_eq(pending_fees, program_id) {
+        return Err(ProgramError::IncorrectProgramId);
+    }
+    let g = load_pod::<GlobalConfig>(global)?;
+    if !keys_eq(&g.authority, authority.key()) || !keys_eq(&g.liquidity, liquidity.key()) {
+        return Err(ProgramError::InvalidAccountData);
+    }
+
+    let mut pending = load_pod::<PendingFees>(pending_fees)?;
+    let (creator_pda, _) =
+        find_program_address(&[CREATOR_FEES_SEED, pending.owner.as_ref()], program_id);
+    let (referrer_pda, _) =
+        find_program_address(&[REFERRER_FEES_SEED, pending.owner.as_ref()], program_id);
+    let is_creator = pending_fees.key() == &creator_pda;
+    let is_referrer = pending_fees.key() == &referrer_pda;
+    if !is_creator && !is_referrer {
+        return Err(ProgramError::InvalidSeeds);
+    }
+
+    let amount = pending.pending_lamports;
+    if amount == 0 {
+        return Err(ProgramError::Custom(1));
+    }
+    if liquidity.lamports() < amount.saturating_add(LIQUIDITY_RENT_LAMPORTS) {
+        return Err(ProgramError::InsufficientFunds);
+    }
+
+    pending.pending_lamports = 0;
+    write_pod(pending_fees, &pending)?;
+
+    *liquidity.try_borrow_mut_lamports()? -= amount;
+    *to.try_borrow_mut_lamports()? += amount;
+
+    events::emit_emergency_pending_claimed(&pending.owner, &pubkey_bytes(to), amount, is_creator);
+    log!("pump:emergency_claim_pending");
     Ok(())
 }

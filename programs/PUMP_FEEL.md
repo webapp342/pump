@@ -67,6 +67,16 @@ Old tokens / Global from before this layout **will not decode** — create new c
 
 - Overview / Treasury / Contracts read **on-chain Solana** balances (liquidity vault + protocol treasury PDAs).
 - **Withdraw** → `withdraw_protocol_treasury` (server-signed with Global.authority keypair).
-- **Emergency sweep** → `emergency_sweep` → recipient defaults to **Global.authority** (deployer).
-- Env on the API host: `SOLANA_AUTHORITY_KEYPAIR` or `ANCHOR_WALLET` or `SOLANA_AUTHORITY_SECRET_BASE64`.
+- **Emergency pending fees** → `emergency_claim_pending_fees` (IX 9) zeros a creator/referrer PendingFees PDA and pays SOL from the **liquidity vault** to a recipient (not protocol treasury). Requires program upgrade that includes IX 9.
+- **Emergency sweep** → `emergency_sweep` → drains entire liquidity vault + halts trading; recipient defaults to **Global.authority** (deployer). Do not use this for pending-fee recovery.
+- Env on the API host (required; do not rely on missing `~/.config/solana/id.json`):
+  1. `SOLANA_AUTHORITY_SECRET_BASE64` — preferred, or
+  2. `SOLANA_AUTHORITY_KEYPAIR` / `ANCHOR_WALLET` — path to keygen JSON matching `GlobalConfig.authority`
 - Login gate remains MetaMask `NEXT_PUBLIC_ADMIN_ADDRESS` (ops SIWE); on-chain txs use the Solana authority key.
+
+### Ops checklist (emergency pending fees)
+
+1. Build + upgrade program (`wsl-pinocchio-build.sh` / `wsl-pinocchio-deploy.sh`) so IX 9 is live.
+2. Deploy web (API routes + Treasury UI).
+3. Confirm authority env on the VM (see above).
+4. Smoke: small pending on a creator/referrer PDA → Admin Treasury → Sweep → pending drops, recipient balance rises.

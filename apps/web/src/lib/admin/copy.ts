@@ -154,6 +154,8 @@ export const ADMIN_COPY = {
     withdraw: {
       title: "Withdrawal",
       description: `Send ${NATIVE_SYMBOL} or ERC-20 from LaunchpadTreasury to a recipient address.`,
+      descriptionSolana:
+        "Withdraw protocol fees from the protocol-treasury PDA. Creator and referrer fees live in separate claim PDAs — users claim those themselves.",
       typeBnb: NATIVE_SYMBOL,
       typeToken: "Token",
       recipient: "Recipient address",
@@ -161,7 +163,26 @@ export const ADMIN_COPY = {
       amountToken: "Amount (tokens)",
       tokenContract: "Token contract",
       available: "Available balance",
+      availableSolana: "Withdrawable (protocol − rent)",
+      treasuryBalanceSolana: "Protocol treasury balance",
+      withdrawAvailable: "Withdraw all available",
+      withdrawCustom: "Send custom amount",
       ownerRequired: "Withdrawals require the treasury owner wallet.",
+    },
+    pendingFees: {
+      title: "Emergency pending fees",
+      description:
+        "Creator/referrer claim balances are accounting PDAs only — claimable SOL sits in the liquidity vault. Sweep moves that SOL to the recipient and zeros the PDA so the owner cannot claim.",
+      empty: "No unclaimed creator or referrer fees.",
+      owner: "Owner",
+      kind: "Kind",
+      pending: `Pending (${NATIVE_SYMBOL})`,
+      sweep: "Sweep",
+      sweeping: "Sweeping…",
+      refresh: "Refresh list",
+      confirm:
+        "Sweep this owner’s unclaimed {kind} fees ({amount} {symbol}) to {to}? The owner will no longer be able to claim them.",
+      recipientHint: "Uses the withdrawal recipient above.",
     },
     emergency: {
       recipientPlaceholder: "Recipient",

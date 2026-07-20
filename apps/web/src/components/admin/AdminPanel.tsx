@@ -114,6 +114,14 @@ type ProtocolSnapshot = {
 
 type TreasuryWithdrawMode = "bnb" | "token";
 
+type PendingFeeAdminRow = {
+  kind: "creator" | "referrer";
+  owner: string;
+  pda: string;
+  pendingLamports: string;
+  pendingSol: string;
+};
+
 type AdminLinkTask = {
   taskKey: string;
   title: string;
@@ -213,6 +221,9 @@ export function AdminPanel() {
   const [withdrawMode, setWithdrawMode] = useState<TreasuryWithdrawMode>("bnb");
   const [solanaTxHash, setSolanaTxHash] = useState<string | null>(null);
   const [solanaTxPending, setSolanaTxPending] = useState(false);
+  const [pendingFees, setPendingFees] = useState<PendingFeeAdminRow[]>([]);
+  const [pendingFeesLoading, setPendingFeesLoading] = useState(false);
+  const [sweepingPendingKey, setSweepingPendingKey] = useState<string | null>(null);
   const [promoTasks, setPromoTasks] = useState<AdminLinkTask[]>([]);
   const [promoLoading, setPromoLoading] = useState(true);
   const [promoSaving, setPromoSaving] = useState(false);
@@ -352,6 +363,27 @@ export function AdminPanel() {
     }
   }, [address]);
 
+  const loadPendingFees = useCallback(async () => {
+    if (!address || !isSolanaChainFamily) {
+      setPendingFees([]);
+      return;
+    }
+    setPendingFeesLoading(true);
+    try {
+      const res = await adminFetch("/api/admin/solana/pending-fees", { cache: "no-store" });
+      const json = await readAdminJson<{
+        error?: string;
+        data?: { rows?: PendingFeeAdminRow[] };
+      }>(res);
+      if (!res.ok) throw new Error(json.error ?? "Failed to load pending fees");
+      setPendingFees(json.data?.rows ?? []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load pending fees");
+    } finally {
+      setPendingFeesLoading(false);
+    }
+  }, [address]);
+
   const load = useCallback(async () => {
     setError(null);
     setLoading(true);
@@ -376,16 +408,17 @@ export function AdminPanel() {
   }, [address]);
 
   const refreshAll = useCallback(async () => {
-    await Promise.all([load(), loadStats(), loadPromoTasks()]);
+    await Promise.all([load(), loadStats(), loadPromoTasks(), loadPendingFees()]);
     setLastRefreshedAt(new Date());
-  }, [load, loadStats, loadPromoTasks]);
+  }, [load, loadStats, loadPromoTasks, loadPendingFees]);
 
   useEffect(() => {
     void load();
     void loadStats();
     void loadPromoTasks();
+    void loadPendingFees();
     setLastRefreshedAt(new Date());
-  }, [load, loadStats, loadPromoTasks]);
+  }, [load, loadStats, loadPromoTasks, loadPendingFees]);
 
   useEffect(() => {
     const id = window.setInterval(() => {
@@ -654,7 +687,7 @@ export function AdminPanel() {
     void runCurveRecovery({ sweepEscrow: false });
   }
 
-  async function onWithdrawTreasuryBnb() {
+  async function onWithdrawTreasuryBnb(opts?: { maxAvailable?: boolean }) {
     if (!canWithdrawTreasury || !treasuryContract) return;
     const to = withdrawTo.trim();
     if (isSolanaChainFamily ? !isValidSolanaAddress(to) : !isAddress(to)) {
@@ -663,8 +696,9 @@ export function AdminPanel() {
     }
 
     if (isSolanaChainFamily) {
+      const useMax = opts?.maxAvailable === true;
       const amountSol = withdrawAmount.trim();
-      if (!amountSol || Number(amountSol) <= 0) {
+      if (!useMax && (!amountSol || Number(amountSol) <= 0)) {
         setError("Amount must be greater than 0");
         return;
       }
@@ -675,7 +709,9 @@ export function AdminPanel() {
         const res = await adminFetch("/api/admin/solana/withdraw-protocol", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ to, amountSol }),
+          body: JSON.stringify(
+            useMax ? { to } : { to, amountSol }
+          ),
         });
         const json = await readAdminJson<{
           error?: string;
@@ -685,6 +721,7 @@ export function AdminPanel() {
         setSolanaTxHash(json.data?.signature ?? null);
         void load();
         void loadStats();
+        void loadPendingFees();
       } catch (err) {
         setError(err instanceof Error ? err.message : "Withdraw failed");
       } finally {
@@ -712,6 +749,48 @@ export function AdminPanel() {
       args: [to as `0x${string}`, amount],
       chainId: pumpChain.id,
     });
+  }
+
+  async function onSweepPendingFee(row: PendingFeeAdminRow) {
+    if (!canWithdrawTreasury || !isSolanaChainFamily) return;
+    const to = withdrawTo.trim();
+    if (!isValidSolanaAddress(to)) {
+      setError("Enter a valid recipient address in Withdrawal first");
+      return;
+    }
+    const confirmMsg = ADMIN_COPY.treasury.pendingFees.confirm
+      .replace("{kind}", row.kind)
+      .replace("{amount}", row.pendingSol)
+      .replace("{symbol}", NATIVE_SYMBOL)
+      .replace("{to}", shortAddress(to));
+    if (!window.confirm(confirmMsg)) return;
+
+    const sweepKey = `${row.kind}:${row.owner}`;
+    setError(null);
+    setSolanaTxHash(null);
+    setSweepingPendingKey(sweepKey);
+    setSolanaTxPending(true);
+    try {
+      const res = await adminFetch("/api/admin/solana/emergency-claim-fees", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ owner: row.owner, kind: row.kind, to }),
+      });
+      const json = await readAdminJson<{
+        error?: string;
+        data?: { signature?: string };
+      }>(res);
+      if (!res.ok) throw new Error(json.error ?? "Emergency claim failed");
+      setSolanaTxHash(json.data?.signature ?? null);
+      void load();
+      void loadStats();
+      void loadPendingFees();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Emergency claim failed");
+    } finally {
+      setSweepingPendingKey(null);
+      setSolanaTxPending(false);
+    }
   }
 
   function onWithdrawTreasuryToken() {
@@ -1352,7 +1431,11 @@ export function AdminPanel() {
         {canWithdrawTreasury ? (
           <AdminBlock
             title={ADMIN_COPY.treasury.withdraw.title}
-            description={ADMIN_COPY.treasury.withdraw.description}
+            description={
+              isSolanaChainFamily
+                ? ADMIN_COPY.treasury.withdraw.descriptionSolana
+                : ADMIN_COPY.treasury.withdraw.description
+            }
             padded
           >
             <div className="admin-compact-form admin-compact-form--withdraw">
@@ -1395,14 +1478,48 @@ export function AdminPanel() {
                 />
               </AdminField>
 
-              {withdrawMode === "bnb" ? (
+              {isSolanaChainFamily ? (
+                <>
+                  <p className="admin-note admin-card-note">
+                    <span className="admin-num">
+                      {formatBnb(treasuryBnb)} {NATIVE_SYMBOL}
+                    </span>{" "}
+                    protocol treasury
+                    {" · "}
+                    <span className="admin-num">
+                      {formatBnb(withdrawableProtocolDisplay)} {NATIVE_SYMBOL}
+                    </span>{" "}
+                    withdrawable (rent kept on PDA)
+                  </p>
+                  <AdminField
+                    label={ADMIN_COPY.treasury.withdraw.amountBnb}
+                    hint="Optional for custom amount — or use Withdraw all available"
+                  >
+                    <div className="admin-input-with-action">
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        value={withdrawAmount}
+                        onChange={(e) => setWithdrawAmount(e.target.value)}
+                        className="admin-input admin-num"
+                      />
+                      <AdminBtn
+                        size="sm"
+                        onClick={fillMaxTreasuryBnb}
+                        disabled={Number(withdrawableProtocolDisplay) <= 0}
+                      >
+                        Max
+                      </AdminBtn>
+                    </div>
+                  </AdminField>
+                </>
+              ) : withdrawMode === "bnb" ? (
                 <>
                   <AdminField
                     label={ADMIN_COPY.treasury.withdraw.amountBnb}
                     hint={
                       <span className="admin-num">
                         {formatBnb(withdrawableProtocolDisplay)} {NATIVE_SYMBOL} available
-                        {isSolanaChainFamily ? " (protocol − rent)" : ""}
                       </span>
                     }
                   >
@@ -1417,11 +1534,7 @@ export function AdminPanel() {
                       <AdminBtn
                         size="sm"
                         onClick={fillMaxTreasuryBnb}
-                        disabled={
-                          isSolanaChainFamily
-                            ? Number(withdrawableProtocolDisplay) <= 0
-                            : !treasuryLiveBalance?.value
-                        }
+                        disabled={!treasuryLiveBalance?.value}
                       >
                         Max
                       </AdminBtn>
@@ -1460,17 +1573,43 @@ export function AdminPanel() {
               )}
 
               <div className="admin-compact-actions">
-                <AdminBtn
-                  primary
-                onClick={
-                  isSolanaChainFamily || withdrawMode === "bnb"
-                    ? () => void onWithdrawTreasuryBnb()
-                    : onWithdrawTreasuryToken
-                }
-                  disabled={adminTxPending}
-                >
-                  {adminTxPending ? ADMIN_COPY.actions.withdrawing : ADMIN_COPY.actions.withdraw}
-                </AdminBtn>
+                {isSolanaChainFamily ? (
+                  <>
+                    <AdminBtn
+                      primary
+                      onClick={() => void onWithdrawTreasuryBnb({ maxAvailable: true })}
+                      disabled={
+                        adminTxPending || Number(withdrawableProtocolDisplay) <= 0
+                      }
+                    >
+                      {adminTxPending
+                        ? ADMIN_COPY.actions.withdrawing
+                        : ADMIN_COPY.treasury.withdraw.withdrawAvailable}
+                    </AdminBtn>
+                    <AdminBtn
+                      onClick={() => void onWithdrawTreasuryBnb()}
+                      disabled={adminTxPending}
+                    >
+                      {adminTxPending
+                        ? ADMIN_COPY.actions.withdrawing
+                        : ADMIN_COPY.treasury.withdraw.withdrawCustom}
+                    </AdminBtn>
+                  </>
+                ) : (
+                  <AdminBtn
+                    primary
+                    onClick={
+                      withdrawMode === "bnb"
+                        ? () => void onWithdrawTreasuryBnb()
+                        : onWithdrawTreasuryToken
+                    }
+                    disabled={adminTxPending}
+                  >
+                    {adminTxPending
+                      ? ADMIN_COPY.actions.withdrawing
+                      : ADMIN_COPY.actions.withdraw}
+                  </AdminBtn>
+                )}
               </div>
             </div>
             {displayTxHash && !sweepingId ? (
@@ -1494,6 +1633,89 @@ export function AdminPanel() {
               : ADMIN_COPY.treasury.withdraw.ownerRequired}
           </p>
         )}
+
+        {isSolanaChainFamily && canWithdrawTreasury ? (
+          <AdminBlock
+            title={ADMIN_COPY.treasury.pendingFees.title}
+            description={ADMIN_COPY.treasury.pendingFees.description}
+            actions={
+              <AdminBtn size="sm" onClick={() => void loadPendingFees()} disabled={pendingFeesLoading}>
+                {pendingFeesLoading
+                  ? ADMIN_COPY.actions.refreshing
+                  : ADMIN_COPY.treasury.pendingFees.refresh}
+              </AdminBtn>
+            }
+          >
+            <p className="admin-compact-hint">{ADMIN_COPY.treasury.pendingFees.recipientHint}</p>
+            {pendingFeesLoading && pendingFees.length === 0 ? (
+              <div className="admin-empty admin-empty--panel">
+                <p className="admin-empty-copy">{ADMIN_COPY.empty.loading}</p>
+              </div>
+            ) : (
+              <AdminEnterpriseTable
+                rows={pendingFees}
+                rowKey={(r) => `${r.kind}:${r.owner}`}
+                emptyMessage={ADMIN_COPY.treasury.pendingFees.empty}
+                columns={[
+                  {
+                    id: "owner",
+                    header: ADMIN_COPY.treasury.pendingFees.owner,
+                    minWidth: "10rem",
+                    cell: (r) => (
+                      <a
+                        href={explorerAddressUrl(r.owner)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="admin-link admin-num"
+                        title={r.owner}
+                      >
+                        {shortAddress(r.owner)}
+                      </a>
+                    ),
+                  },
+                  {
+                    id: "kind",
+                    header: ADMIN_COPY.treasury.pendingFees.kind,
+                    width: "6.5rem",
+                    cell: (r) => r.kind,
+                  },
+                  {
+                    id: "pending",
+                    header: ADMIN_COPY.treasury.pendingFees.pending,
+                    align: "right",
+                    width: "8rem",
+                    sortValue: (r) => Number(r.pendingSol),
+                    sortable: true,
+                    cell: (r) => <span className="admin-num">{r.pendingSol}</span>,
+                  },
+                  {
+                    id: "action",
+                    header: "Action",
+                    align: "right",
+                    width: "6.5rem",
+                    className: "admin-table-col--action",
+                    cell: (r) => {
+                      const key = `${r.kind}:${r.owner}`;
+                      const busy = sweepingPendingKey === key;
+                      return (
+                        <AdminBtn
+                          size="sm"
+                          danger
+                          onClick={() => void onSweepPendingFee(r)}
+                          disabled={adminTxPending || !withdrawTo.trim()}
+                        >
+                          {busy
+                            ? ADMIN_COPY.treasury.pendingFees.sweeping
+                            : ADMIN_COPY.treasury.pendingFees.sweep}
+                        </AdminBtn>
+                      );
+                    },
+                  },
+                ]}
+              />
+            )}
+          </AdminBlock>
+        ) : null}
       </AdminTabPanel>
 
       <AdminTabPanel id="airdrops" active={activeTab}>

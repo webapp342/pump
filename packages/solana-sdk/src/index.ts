@@ -37,6 +37,7 @@ export const IX = {
   claimCreatorFees: 6,
   claimReferrerFees: 7,
   emergencySweep: 8,
+  emergencyClaimPendingFees: 9,
 } as const;
 
 export type SolanaCluster = "localnet" | "devnet" | "mainnet-beta";
@@ -252,6 +253,10 @@ export function encodeClaimReferrerFeesIx(): Buffer {
 
 export function encodeEmergencySweepIx(): Buffer {
   return instructionData(new Uint8Array([IX.emergencySweep]));
+}
+
+export function encodeEmergencyClaimPendingFeesIx(): Buffer {
+  return instructionData(new Uint8Array([IX.emergencyClaimPendingFees]));
 }
 
 export {

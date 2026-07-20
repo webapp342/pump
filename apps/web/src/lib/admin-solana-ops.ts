@@ -7,7 +7,7 @@
  *   SOLANA_AUTHORITY_KEYPAIR / ANCHOR_WALLET — path to solana-keygen JSON
  */
 
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import {
   Connection,
   Keypair,
@@ -16,12 +16,20 @@ import {
   TransactionInstruction,
   sendAndConfirmTransaction,
 } from "@solana/web3.js";
-import { encodeEmergencySweepIx, encodeWithdrawIx } from "@pump/solana-sdk";
+import {
+  encodeEmergencyClaimPendingFeesIx,
+  encodeEmergencySweepIx,
+  encodeWithdrawIx,
+  NATIVE_DECIMALS,
+} from "@pump/solana-sdk";
 import { SOLANA_RPC_URL } from "@/config/solana";
 import {
   decodeGlobalConfig,
+  decodePendingFees,
   launchpadProgramId,
+  pdaCreatorFees,
   pdaGlobal,
+  pdaReferrerFees,
   withdrawableLamports,
 } from "@/lib/solana/launchpad-pdas";
 import { keypairFromSecretBase64 } from "@/lib/solana/transfer";
@@ -30,19 +38,46 @@ function expandHome(p: string): string {
   return p.replace(/^~/, process.env.HOME || process.env.USERPROFILE || "");
 }
 
+const AUTHORITY_ENV_HINT =
+  "Set SOLANA_AUTHORITY_SECRET_BASE64 (preferred) or SOLANA_AUTHORITY_KEYPAIR / ANCHOR_WALLET to the Global.authority keypair JSON on the API host.";
+
 export function loadSolanaAuthorityKeypair(): Keypair {
   const b64 = process.env.SOLANA_AUTHORITY_SECRET_BASE64?.trim();
   if (b64) {
-    return keypairFromSecretBase64(b64);
+    try {
+      return keypairFromSecretBase64(b64);
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : String(err);
+      throw new Error(`SOLANA_AUTHORITY_SECRET_BASE64 invalid: ${detail}`);
+    }
   }
 
   const path =
     process.env.SOLANA_AUTHORITY_KEYPAIR?.trim() ||
     process.env.ANCHOR_WALLET?.trim() ||
-    `${process.env.HOME || process.env.USERPROFILE}/.config/solana/id.json`;
+    "";
 
-  const raw = JSON.parse(readFileSync(expandHome(path), "utf8")) as number[];
-  return Keypair.fromSecretKey(Uint8Array.from(raw));
+  if (!path) {
+    throw new Error(
+      `Solana authority keypair not configured. ${AUTHORITY_ENV_HINT} ` +
+        `(default ~/.config/solana/id.json is not used on the server unless you set the path explicitly.)`
+    );
+  }
+
+  const resolved = expandHome(path);
+  if (!existsSync(resolved)) {
+    throw new Error(
+      `Solana authority keypair file missing: ${resolved}. ${AUTHORITY_ENV_HINT}`
+    );
+  }
+
+  try {
+    const raw = JSON.parse(readFileSync(resolved, "utf8")) as number[];
+    return Keypair.fromSecretKey(Uint8Array.from(raw));
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : String(err);
+    throw new Error(`Failed to read authority keypair at ${resolved}: ${detail}`);
+  }
 }
 
 async function loadGlobal(conn: Connection) {
@@ -138,4 +173,127 @@ export async function adminEmergencySweepLiquidity(input: {
     commitment: "confirmed",
   });
   return { signature: sig, to: to.toBase58() };
+}
+
+const PENDING_FEES_ACCOUNT_LEN = 48;
+
+function formatSolFromLamports(lamports: bigint): string {
+  const base = 10n ** BigInt(NATIVE_DECIMALS);
+  const whole = lamports / base;
+  const frac = (lamports % base).toString().padStart(NATIVE_DECIMALS, "0").replace(/0+$/, "");
+  return frac.length > 0 ? `${whole}.${frac}` : `${whole}`;
+}
+
+export type PendingFeeRow = {
+  kind: "creator" | "referrer";
+  owner: string;
+  pda: string;
+  pendingLamports: string;
+  pendingSol: string;
+};
+
+/** Scan program PendingFees PDAs with pending_lamports > 0. */
+export async function listPendingFeeAccounts(): Promise<PendingFeeRow[]> {
+  const conn = new Connection(SOLANA_RPC_URL, "confirmed");
+  const programId = launchpadProgramId();
+  const accounts = await conn.getProgramAccounts(programId, {
+    commitment: "confirmed",
+    filters: [{ dataSize: PENDING_FEES_ACCOUNT_LEN }],
+  });
+
+  const rows: PendingFeeRow[] = [];
+  for (const { pubkey, account } of accounts) {
+    let decoded;
+    try {
+      decoded = decodePendingFees(account.data);
+    } catch {
+      continue;
+    }
+    if (decoded.pendingLamports <= 0n) continue;
+
+    const owner = decoded.owner;
+    const [creatorPda] = pdaCreatorFees(owner, programId);
+    const [referrerPda] = pdaReferrerFees(owner, programId);
+    let kind: "creator" | "referrer" | null = null;
+    if (pubkey.equals(creatorPda)) kind = "creator";
+    else if (pubkey.equals(referrerPda)) kind = "referrer";
+    if (!kind) continue;
+
+    rows.push({
+      kind,
+      owner: owner.toBase58(),
+      pda: pubkey.toBase58(),
+      pendingLamports: decoded.pendingLamports.toString(),
+      pendingSol: formatSolFromLamports(decoded.pendingLamports),
+    });
+  }
+
+  rows.sort((a, b) => {
+    const diff = BigInt(b.pendingLamports) - BigInt(a.pendingLamports);
+    if (diff > 0n) return 1;
+    if (diff < 0n) return -1;
+    return a.owner.localeCompare(b.owner);
+  });
+  return rows;
+}
+
+/**
+ * Authority sweeps one creator/referrer pending balance from liquidity → `to`.
+ * Requires on-chain IX 9 (program upgrade).
+ */
+export async function adminEmergencyClaimPendingFees(input: {
+  owner: string;
+  kind: "creator" | "referrer";
+  to: string;
+}): Promise<{
+  signature: string;
+  amountLamports: bigint;
+  owner: string;
+  kind: "creator" | "referrer";
+  to: string;
+}> {
+  const authority = loadSolanaAuthorityKeypair();
+  const conn = new Connection(SOLANA_RPC_URL, "confirmed");
+  const { programId, globalPda, global } = await loadGlobal(conn);
+  assertAuthority(global.authority, authority);
+
+  const owner = new PublicKey(input.owner.trim());
+  const to = new PublicKey(input.to.trim());
+  const [pendingPda] =
+    input.kind === "creator" ? pdaCreatorFees(owner, programId) : pdaReferrerFees(owner, programId);
+
+  const info = await conn.getAccountInfo(pendingPda, "confirmed");
+  if (!info?.data) {
+    throw new Error(`Pending fees PDA missing for ${input.kind} ${owner.toBase58()}`);
+  }
+  const pending = decodePendingFees(info.data);
+  if (pending.pendingLamports <= 0n) {
+    throw new Error("No pending fees to sweep");
+  }
+  if (!pending.owner.equals(owner)) {
+    throw new Error("Pending fees owner mismatch");
+  }
+
+  const ix = new TransactionInstruction({
+    programId,
+    keys: [
+      { pubkey: authority.publicKey, isSigner: true, isWritable: true },
+      { pubkey: globalPda, isSigner: false, isWritable: false },
+      { pubkey: global.liquidity, isSigner: false, isWritable: true },
+      { pubkey: pendingPda, isSigner: false, isWritable: true },
+      { pubkey: to, isSigner: false, isWritable: true },
+    ],
+    data: encodeEmergencyClaimPendingFeesIx(),
+  });
+
+  const sig = await sendAndConfirmTransaction(conn, new Transaction().add(ix), [authority], {
+    commitment: "confirmed",
+  });
+  return {
+    signature: sig,
+    amountLamports: pending.pendingLamports,
+    owner: owner.toBase58(),
+    kind: input.kind,
+    to: to.toBase58(),
+  };
 }
