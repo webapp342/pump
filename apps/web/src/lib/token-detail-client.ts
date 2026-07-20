@@ -2,6 +2,7 @@ import type { TokenDetail, TokenListItem } from "@/lib/db/launchpad";
 import type { TokenDetailBundle } from "@/lib/token-server";
 import { normalizeRouteAddressKey } from "@/lib/address";
 import { EMPTY_SOCIAL_LINKS } from "@/lib/token-social";
+import { buildTokenMarketSnapshot } from "@/lib/token-market-snapshot";
 
 /** Session cache — instant re-visits & sidebar switches (Arena board cache pattern). */
 export const tokenDetailBundleCache = new Map<string, TokenDetailBundle>();
@@ -58,5 +59,6 @@ export function seedTokenDetailFromListItem(token: TokenListItem) {
     token: detail,
     trades: [],
     holders: [],
+    market: buildTokenMarketSnapshot(detail),
   });
 }

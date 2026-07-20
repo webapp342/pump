@@ -77,12 +77,16 @@ export function patchTokenDetailFromWsTrade(
   if (!addr || token.address.toLowerCase() !== addr) return null;
 
   const bonding = payload.bonding;
-  const spot = bonding ? arenaWsSpotPriceBnb(bonding) : 0;
+  const spot = bonding
+    ? arenaWsSpotPriceBnb(bonding)
+    : 0;
   const spotStr = spot > 0 ? String(spot) : token.lastPriceBnb;
   const mcapBnb =
     spot > 0
       ? String(spot * BONDING_TOKEN_SUPPLY_HUMAN)
-      : bonding?.marketCapZug ?? token.marketCapBnb;
+      : bonding?.marketCapZug && Number(bonding.marketCapZug) > 0
+        ? bonding.marketCapZug
+        : token.marketCapBnb;
 
   return {
     ...token,

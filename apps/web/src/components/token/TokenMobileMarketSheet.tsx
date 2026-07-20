@@ -17,6 +17,7 @@ type TokenMobileMarketSheetProps = {
   open: boolean;
   onClose: () => void;
   activeTokenAddress: string;
+  activeMarketSnapshot?: { spotPriceBnb: number; marketCapBnb: number };
 };
 
 /** Overlay market picker — chart stays full height (no inline accordion). */
@@ -24,6 +25,7 @@ export function TokenMobileMarketSheet({
   open,
   onClose,
   activeTokenAddress,
+  activeMarketSnapshot,
 }: TokenMobileMarketSheetProps) {
   const [mounted, setMounted] = useState(false);
   const [searchFocused, setSearchFocused] = useState(false);
@@ -147,6 +149,7 @@ export function TokenMobileMarketSheet({
                 <TokenMarketSidebar
                   id="token-mobile-market-sidebar"
                   activeTokenAddress={activeTokenAddress}
+                  activeMarketSnapshot={activeMarketSnapshot}
                   density="compact"
                   mobileSheet
                   showQuickTrade

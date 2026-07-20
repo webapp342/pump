@@ -845,7 +845,7 @@ export function TradeTape({
                 <tr>
                   <th>Account</th>
                   <th>Type</th>
-                  <th className="token-tape-table__col-num">Price</th>
+                  <th className="token-tape-table__col-num">Fill</th>
                   <th className="token-tape-table__col-num">Value</th>
                   <th className="token-tape-table__col-num">{symbol}</th>
                   <th className="token-tape-table__col-end">Age</th>

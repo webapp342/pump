@@ -22,16 +22,14 @@ import {
 } from "@/lib/bonding-curve";
 import type { ActorOptimisticChartSpot, CandleWsUpdate } from "@/lib/candles";
 import { PumpSubscriptPrice } from "@/components/ui/PumpSubscriptPrice";
-import { resolveLatestSpotPriceBnb, sortTradesChronologically, pricesSameMagnitude } from "@/lib/candles";
+import { resolveLatestSpotPriceBnb, sortTradesChronologically } from "@/lib/candles";
 import { mergeWsCandleUpdates } from "@/lib/chart-series-state";
 import { logChartWsMerge } from "@/lib/chart-observability";
 import type { InitialChartCandles } from "@/lib/token-server";
-import { resolveMarkPriceBnb } from "@/lib/mark-price";
+import { buildTokenMarketSnapshot } from "@/lib/token-market-snapshot";
 import {
   bnbToUsd,
-  estimateFdvUsd,
   tokenPriceUsd,
-  DEFAULT_TOKEN_TOTAL_SUPPLY,
 } from "@/lib/format-usd";
 import { useBnbUsdPrice } from "@/hooks/useBnbUsdPrice";
 import {
@@ -101,8 +99,6 @@ import { useTokenChartTapeSplit } from "@/hooks/useTokenChartTapeSplit";
 import { useBondingCurveMachine } from "@/hooks/useBondingCurveMachine";
 import {
   isUninitializedCurveTuple,
-  machineFromSnapshot,
-  machineSpotPriceBnb,
 } from "@/lib/bonding-curve-state";
 import {
   patchTokenDetailFromWsTrade,
@@ -441,46 +437,16 @@ export function TokenDetailLive({
 
   const tradeCurveSnapshot = liveCurveSnapshot ?? chainCurveSnapshot;
 
-  const onChainSpotBnb = useMemo(() => {
-    if (!tradeCurveSnapshot) return null;
-    const spot = machineSpotPriceBnb(machineFromSnapshot(tradeCurveSnapshot));
-    return spot > 0 ? spot : null;
-  }, [tradeCurveSnapshot]);
+  const marketSnapshot = useMemo(
+    () =>
+      buildTokenMarketSnapshot(liveToken, {
+        pendingSpotAfterBnb: actorChartSpot?.spotAfterBnb,
+      }),
+    [liveToken, actorChartSpot?.spotAfterBnb]
+  );
 
-  /** Single mark for header + chart — actor quote wins while pending (avoids machine flicker). */
-  const displayPrice = useMemo(() => {
-    if (actorChartSpot && actorChartSpot.spotAfterBnb > 0) {
-      return actorChartSpot.spotAfterBnb;
-    }
-    if (onChainSpotBnb != null && onChainSpotBnb > 0) {
-      // Until Solana on-chain curve loads, machine may still be on EVM default virtuals.
-      // Prefer indexed spot ticks / lastPrice over a default-virtual machine when they disagree.
-      if (isSolanaLive && !solanaMarket.bondingCurve) {
-        const fromTape = resolveMarkPriceBnb(
-          liveToken,
-          trades,
-          chainCurve as CurveTuple | undefined
-        );
-        if (fromTape > 0 && !pricesSameMagnitude(fromTape, onChainSpotBnb)) {
-          return fromTape;
-        }
-      }
-      return onChainSpotBnb;
-    }
-    return resolveMarkPriceBnb(
-      liveToken,
-      trades,
-      chainCurve as CurveTuple | undefined
-    );
-  }, [
-    actorChartSpot,
-    onChainSpotBnb,
-    isSolanaLive,
-    solanaMarket.bondingCurve,
-    liveToken,
-    trades,
-    chainCurve,
-  ]);
+  const displayPrice = marketSnapshot.spotPriceBnb;
+  const liveMarketCapNative = marketSnapshot.marketCapBnb;
 
   const fetchLive = useCallback(async () => {
     try {
@@ -870,12 +836,7 @@ export function TokenDetailLive({
   }, [bnbUsd, fetchLive, initialTrades, refetchCurve, streamAddress]);
 
   const priceUsd = tokenPriceUsd(displayPrice, bnbUsd);
-  const fdvUsd = estimateFdvUsd(displayPrice, bnbUsd);
-  /** Same native mcap as header FDV — never stale DB market_cap_zug for live X. */
-  const liveMarketCapNative =
-    displayPrice > 0
-      ? displayPrice * DEFAULT_TOKEN_TOTAL_SUPPLY
-      : Number(liveToken.marketCapBnb);
+  const fdvUsd = bnbToUsd(liveMarketCapNative, bnbUsd);
 
   useEffect(() => {
     if (!contentSynced) return;
@@ -1301,6 +1262,7 @@ export function TokenDetailLive({
           <TokenMarketSidebar
             id="token-market-sidebar"
             activeTokenAddress={tokenAddress}
+            activeMarketSnapshot={marketSnapshot}
             showQuickTrade
           />
         </div>
@@ -1349,8 +1311,6 @@ export function TokenDetailLive({
                 fallbackTrades={chartFallbackTrades}
                 wsConnected={wsConnected}
                 bnbUsd={bnbUsd}
-  // Live header/chart pin uses displayPrice (actor/on-chain/tape) — never a stale
-  // machine-only mark that disagrees with the hero during Solana curve bootstrap.
   liveOnChainSpotBnb={displayPrice > 0 ? displayPrice : null}
                 currency={chartCurrency}
                 onCurrencyChange={setChartCurrency}

@@ -23,6 +23,7 @@ import {
   type CandleInterval,
   type VolumeBar,
 } from "@/lib/candles";
+import { buildTokenMarketSnapshot, type TokenMarketSnapshot } from "@/lib/token-market-snapshot";
 
 export type TokenDetailPayload = {
   token: TokenDetail;
@@ -39,6 +40,8 @@ export type InitialChartCandles = {
 
 export type TokenDetailBundle = TokenDetailPayload & {
   holders: TokenHolderSnapshot[];
+  /** Canonical spot + FDV — same math as header/chart/sidebar active row. */
+  market: TokenMarketSnapshot;
   /** SSR chart seed (default 1m) — avoids empty first paint. */
   initialCandles?: InitialChartCandles;
 };
@@ -107,6 +110,7 @@ async function fetchTokenDetailBundleCached(
         token: cached.token,
         trades: cached.trades,
         holders: cached.holders ?? [],
+        market: cached.market ?? buildTokenMarketSnapshot(cached.token),
         initialCandles: cached.initialCandles,
       };
     }
@@ -121,7 +125,8 @@ async function fetchTokenDetailBundleCached(
 
   if (!token) return null;
 
-  const bundle: TokenDetailBundle = { token, trades, holders, initialCandles };
+  const market = buildTokenMarketSnapshot(token);
+  const bundle: TokenDetailBundle = { token, trades, holders, market, initialCandles };
 
   if (useRedisArenaCache()) {
     await writeTokenSnapshotCache(normalized, bundle);

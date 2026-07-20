@@ -12,6 +12,7 @@ import { useArenaExploreBoard } from "@/hooks/useArenaExploreBoard";
 import { useArenaQuickTrade } from "@/hooks/useArenaQuickTrade";
 import { bnbToUsd } from "@/lib/format-usd";
 import { listTokenPriceUsd } from "@/lib/arena-board-format";
+import { applyActiveMarketToListItem } from "@/lib/token-market-snapshot";
 import { emptyExploreFilterCopy } from "@/lib/arena-explore-board-core";
 import { TokenMarketSidebarArenaRow } from "@/components/token/TokenMarketSidebarArenaRow";
 import { TokenMarketSidebarRow } from "@/components/token/TokenMarketSidebarRow";
@@ -31,6 +32,8 @@ let persistentDesktopSidebarScrollTop = 0;
 type TokenMarketSidebarProps = {
   id?: string;
   activeTokenAddress: string;
+  /** Live mark from token page — keeps sidebar row in sync with header/chart. */
+  activeMarketSnapshot?: { spotPriceBnb: number; marketCapBnb: number };
   density?: TokenSidebarDensity;
   headWrapRef?: Ref<HTMLDivElement>;
   className?: string;
@@ -52,6 +55,7 @@ type TokenMarketSidebarProps = {
 export function TokenMarketSidebar({
   id,
   activeTokenAddress,
+  activeMarketSnapshot,
   density = "full",
   headWrapRef,
   className = "",
@@ -275,21 +279,27 @@ export function TokenMarketSidebar({
         ) : (
           exploreBoardTokens.map((token, index) => {
             const addressKey = token.address.toLowerCase();
+            const isActive =
+              activeMarketSnapshot != null &&
+              addressKey === activeTokenAddress.toLowerCase();
+            const rowToken = isActive
+              ? applyActiveMarketToListItem(token, activeMarketSnapshot)
+              : token;
             const mcapUsd =
               animatedCaps[`${addressKey}:cap:mcap`] ??
-              bnbToUsd(Number(token.marketCapBnb), effectiveBnbUsd);
+              bnbToUsd(Number(rowToken.marketCapBnb), effectiveBnbUsd);
             const priceUsd =
               animatedCaps[`${addressKey}:cap:price`] ??
-              listTokenPriceUsd(token.marketCapBnb, effectiveBnbUsd);
+              listTokenPriceUsd(rowToken.marketCapBnb, effectiveBnbUsd);
             const vol24hUsd =
               animatedCaps[`${addressKey}:cap:vol24h`] ??
-              bnbToUsd(Number(token.volume24hBnb ?? 0), effectiveBnbUsd);
+              bnbToUsd(Number(rowToken.volume24hBnb ?? 0), effectiveBnbUsd);
 
             if (useArenaRows) {
               return (
                 <TokenMarketSidebarArenaRow
                   key={addressKey}
-                  token={token}
+                  token={rowToken}
                   activeTokenAddress={activeTokenAddress}
                   mcapUsd={mcapUsd}
                   vol24hUsd={vol24hUsd}
@@ -309,7 +319,7 @@ export function TokenMarketSidebar({
             return (
               <TokenMarketSidebarRow
                 key={addressKey}
-                token={token}
+                token={rowToken}
                 activeTokenAddress={activeTokenAddress}
                 density={density}
                 mcapUsd={mcapUsd}

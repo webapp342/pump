@@ -264,7 +264,7 @@ const TOKEN_LIST_SELECT = `
       bt.logo_url,
       COALESCE(b.progress_bps, 0) AS progress_bps,
       COALESCE(b.reserve_zug, 0)::text AS reserve_zug,
-      COALESCE(b.market_cap_zug, (${SQL_BONDING_MARK_CAP_ZUG}), 0)::text AS market_cap_zug,
+      COALESCE((${SQL_BONDING_MARK_CAP_ZUG}), b.market_cap_zug, 0)::text AS market_cap_zug,
       COALESCE(
         ts.ath_price_zug * 1000000000,
         (${SQL_BONDING_MARK_CAP_ZUG}),
@@ -346,7 +346,7 @@ const TOKEN_LIST_SELECT_BONDING = `
       bt.logo_url,
       COALESCE(b.progress_bps, 0) AS progress_bps,
       COALESCE(b.reserve_zug, 0)::text AS reserve_zug,
-      COALESCE(b.market_cap_zug, (${SQL_BONDING_MARK_CAP_ZUG}), 0)::text AS market_cap_zug,
+      COALESCE((${SQL_BONDING_MARK_CAP_ZUG}), b.market_cap_zug, 0)::text AS market_cap_zug,
       COALESCE(
         ts.ath_price_zug * 1000000000,
         (${SQL_BONDING_MARK_CAP_ZUG}),
@@ -428,7 +428,7 @@ const TOKEN_LIST_SELECT_MV = `
       bt.logo_url,
       COALESCE(b.progress_bps, 0) AS progress_bps,
       COALESCE(b.reserve_zug, 0)::text AS reserve_zug,
-      COALESCE(b.market_cap_zug, (${SQL_BONDING_MARK_CAP_ZUG}), 0)::text AS market_cap_zug,
+      COALESCE((${SQL_BONDING_MARK_CAP_ZUG}), b.market_cap_zug, 0)::text AS market_cap_zug,
       COALESCE(
         mts.ath_price_zug * 1000000000,
         (${SQL_BONDING_MARK_CAP_ZUG}),
@@ -480,10 +480,10 @@ const TOKEN_LIST_SELECT_BOARD_STATS = `
       bt.logo_url,
       COALESCE(tbs.progress_bps, b.progress_bps, 0) AS progress_bps,
       COALESCE(tbs.reserve_zug, b.reserve_zug, 0)::text AS reserve_zug,
-      COALESCE(b.market_cap_zug, (${SQL_BONDING_MARK_CAP_ZUG}), tbs.market_cap_zug, 0)::text AS market_cap_zug,
+      COALESCE((${SQL_BONDING_MARK_CAP_ZUG}), b.market_cap_zug, tbs.market_cap_zug, 0)::text AS market_cap_zug,
       COALESCE(
         GREATEST(
-          COALESCE(b.market_cap_zug, (${SQL_BONDING_MARK_CAP_ZUG}), 0),
+          COALESCE((${SQL_BONDING_MARK_CAP_ZUG}), b.market_cap_zug, 0),
           COALESCE(mts.ath_price_zug * 1000000000, 0)
         ),
         tbs.ath_market_cap_zug,
@@ -1229,7 +1229,7 @@ export async function getTokenByAddress(address: string): Promise<TokenDetail | 
       t.launch_tx_hash,
       COALESCE(b.progress_bps, 0) AS progress_bps,
       COALESCE(b.reserve_zug, 0)::text AS reserve_zug,
-      COALESCE(b.market_cap_zug, 0)::text AS market_cap_zug,
+      COALESCE((${SQL_BONDING_MARK_CAP_ZUG}), 0)::text AS market_cap_zug,
       COALESCE(b.holder_count, 0) AS holder_count,
       COALESCE(b.target_zug, 0)::text AS target_zug,
       COALESCE(b.token_sold, 0)::text AS token_sold,
@@ -1294,6 +1294,7 @@ export async function listTradesForToken(
     fee_zug: string;
     token_amount: string;
     price_zug: string;
+    spot_price_zug: string | null;
     native_usd_rate: string | null;
     tx_hash: string;
     block_time: Date;
@@ -1307,6 +1308,7 @@ export async function listTradesForToken(
       fee_zug::text,
       token_amount::text,
       price_zug::text,
+      spot_price_zug::text,
       native_usd_rate::text,
       tx_hash,
       block_time
@@ -1332,6 +1334,7 @@ export async function listTradesForToken(
         netBnb: String(net),
         tokenAmount: row.token_amount,
         priceBnb: row.price_zug,
+        spotPriceBnb: row.spot_price_zug ?? undefined,
         nativeUsdRate: row.native_usd_rate ?? undefined,
         txHash: row.tx_hash,
         blockTime: row.block_time.toISOString(),
