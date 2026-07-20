@@ -361,6 +361,22 @@ else
   append_check "static_assets" "Static assets" "down" "missing chunks · ${ls_ms}ms" "$probe" "run tma-deploy.sh" "$ls_ms" "[]" "$timings_json"
 fi
 
+# --- ClickHouse (optional OLAP) ---
+CH_URL="$(grep -E '^CLICKHOUSE_URL=' "$APP_DIR/.env" 2>/dev/null | cut -d= -f2- | tr -d '"' | tr -d "'" || true)"
+CH_URL="${CH_URL:-http://127.0.0.1:8123}"
+probe="GET ${CH_URL}/ping"
+ch_started="$(now_ms_fn)"
+ch_out="$(curl -sf "${CH_URL}/ping" 2>/dev/null || true)"
+ch_ms=$(( $(now_ms_fn) - ch_started ))
+timings_json="$(make_timings "{\"ping\":${ch_ms}}")"
+if [[ "$ch_out" == "Ok." || "$ch_out" == *"Ok"* ]]; then
+  append_check "clickhouse" "ClickHouse OLAP" "healthy" "ping OK · ${ch_ms}ms" "$probe" "$ch_out" "$ch_ms" "[]" "$timings_json"
+elif docker ps --format '{{.Names}}' 2>/dev/null | grep -q '^pump-clickhouse$'; then
+  append_check "clickhouse" "ClickHouse OLAP" "degraded" "container up · ping failed · ${ch_ms}ms" "$probe" "run enable-clickhouse.sh" "$ch_ms" "[]" "$timings_json"
+else
+  append_check "clickhouse" "ClickHouse OLAP" "healthy" "not running · optional until enable-clickhouse.sh" "$probe" "skipped" "0" "[]" "{}"
+fi
+
 SCRIPT_ENDED_MS="$(now_ms_fn)"
 SCRIPT_DURATION_MS=$(( SCRIPT_ENDED_MS - SCRIPT_STARTED_MS ))
 

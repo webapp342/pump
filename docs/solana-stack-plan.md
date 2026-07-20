@@ -53,22 +53,21 @@ cd /mnt/c/Users/DARK/Desktop/pump-tma/programs && anchor deploy
 2. Reuse `apps/realtime` channels (or `solana:*` prefix)
 3. Target: board price + callout push &lt;1ms after Redis write
 
-### D — Analytics (ClickHouse) — scaffold ready, gate closed
+### D — Analytics (ClickHouse) — **activate with enable script**
 
-**Locked decision (2026-07-20):** Hybrid only.
+**Locked hybrid:** PG = positions/wallets; CH = trades/OHLCV history.
 
-| Store | Owns |
+```bash
+bash deploy/vm/enable-clickhouse.sh
+```
+
+| Piece | Path |
 |-------|------|
-| PostgreSQL | wallets, `user_positions` (frozen USD cost basis), favorites, auth, claims |
-| Redis + WS | hot board / portfolio deltas |
-| ClickHouse (optional) | `trades_raw` + candle MVs for history scale |
-
-1. Compose: [`deploy/clickhouse/docker-compose.yml`](../deploy/clickhouse/docker-compose.yml) (mem_limit 2g)
-2. Schema: [`deploy/clickhouse/init/01_schema.sql`](../deploy/clickhouse/init/01_schema.sql)
-3. Dual-write: `apps/indexer-sol` → `enqueueTradeClickHouse` when `CLICKHOUSE_DUAL_WRITE=true`
-4. Chart API → CH only after gate; live buckets stay Redis/PG
-
-**Do not** move positions into ClickHouse.
+| Compose | [`deploy/clickhouse/docker-compose.yml`](../deploy/clickhouse/docker-compose.yml) |
+| Schema | [`deploy/clickhouse/init/01_schema.sql`](../deploy/clickhouse/init/01_schema.sql) |
+| Dual-write | `apps/indexer-sol` `enqueueTradeClickHouse` when `CLICKHOUSE_URL` set |
+| Chart read | `USE_CLICKHOUSE_CANDLES` → [`apps/web/src/lib/clickhouse/candles.ts`](../apps/web/src/lib/clickhouse/candles.ts) |
+| Backfill | `npm run backfill-clickhouse-trades -w @pump/indexer-sol` |
 
 ### Cost-basis / chart parity (indexer-sol)
 

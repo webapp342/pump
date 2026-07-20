@@ -1,14 +1,14 @@
 # Self-hosted ClickHouse (OLAP) — chart/trade history only.
 # PG remains source of truth for positions, wallets, auth.
 #
-# Enable dual-write in indexer-sol .env:
-#   CLICKHOUSE_URL=http://127.0.0.1:8123
-#   CLICKHOUSE_DUAL_WRITE=true
-#   CLICKHOUSE_DATABASE=pump
+# Activate on VM:
+#   bash deploy/vm/enable-clickhouse.sh
 #
-# Default: do NOT start on small VMs until chart P95 / table size gate trips.
-#   docker compose -f deploy/clickhouse/docker-compose.yml up -d
-#   docker compose -f deploy/clickhouse/docker-compose.yml exec clickhouse clickhouse-client --queries-file /docker-entrypoint-initdb.d/01_schema.sql
+# Env (set by enable script):
+#   CLICKHOUSE_URL=http://127.0.0.1:8123
+#   CLICKHOUSE_DUAL_WRITE=true   # indexer-sol
+#   USE_CLICKHOUSE_CANDLES=true  # web chart history
+#   REDIS_PUBLISH_ENABLED=true
 
 services:
   clickhouse:

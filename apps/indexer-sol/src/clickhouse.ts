@@ -1,15 +1,14 @@
 /**
  * Optional ClickHouse dual-write (OLAP candles/trades history).
- * Disabled unless CLICKHOUSE_URL is set AND CLICKHOUSE_DUAL_WRITE=true.
+ * On when CLICKHOUSE_URL is set, unless CLICKHOUSE_DUAL_WRITE=false.
  * Uses HTTP JSONEachRow insert (no paid SaaS; no hard SDK dependency).
  * PostgreSQL remains source of truth for positions / wallets.
  */
 
 export function clickhouseDualWriteEnabled(): boolean {
-  return (
-    process.env.CLICKHOUSE_DUAL_WRITE === "true" &&
-    Boolean(process.env.CLICKHOUSE_URL?.trim())
-  );
+  if (!process.env.CLICKHOUSE_URL?.trim()) return false;
+  if (process.env.CLICKHOUSE_DUAL_WRITE === "false") return false;
+  return true;
 }
 
 export type TradeChRow = {

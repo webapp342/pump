@@ -9,6 +9,7 @@ import {
   storedCandlesToBars,
   type CandleInterval,
 } from "@/lib/candles";
+import { listTokenCandlesFromClickHouse } from "@/lib/clickhouse/candles";
 import {
   getTokenByAddress,
   isGapFillCandlesSqlAvailable,
@@ -63,6 +64,48 @@ export async function GET(request: NextRequest, context: RouteContext) {
           },
         }
       );
+    }
+
+    // Prefer ClickHouse history when enabled (falls back to PG on miss/error).
+    const fromCh = await listTokenCandlesFromClickHouse(address, interval, limit);
+    if (fromCh && fromCh.length > 0) {
+      const raw = storedCandlesToBars(fromCh);
+      const { candles, volumes } = fillGapsForStoredCandles(
+        raw.candles,
+        raw.volumes,
+        interval,
+        { endTimeMs: Date.now() }
+      );
+      if (candles.length > 0) {
+        const payload = {
+          candles,
+          volumes,
+          interval,
+          source: "db" as const,
+          gapFilled: true,
+          gapFill: "ts" as const,
+          bucketCount: fromCh.length,
+          frozen: false,
+          status: token.status,
+          olap: "clickhouse" as const,
+        };
+        void writeCandleCache(address, interval, {
+          candles,
+          volumes,
+          interval,
+          source: "db",
+          gapFilled: true,
+          gapFill: "ts",
+        });
+        return NextResponse.json(
+          { data: payload },
+          {
+            headers: {
+              "Cache-Control": "private, max-age=2, stale-while-revalidate=5",
+            },
+          }
+        );
+      }
     }
 
     const stored = await listTokenCandlesFromDb(address, interval, limit);

@@ -24,6 +24,7 @@ ENGINE = ReplacingMergeTree
 PARTITION BY toYYYYMM(block_time)
 ORDER BY (token_address, block_time, tx_hash, log_index);
 
+-- Shared AggregatingMergeTree shape for interval rollups
 CREATE TABLE IF NOT EXISTS pump.candles_1m
 (
   token_address String,
@@ -39,12 +40,77 @@ ENGINE = AggregatingMergeTree
 PARTITION BY toYYYYMM(bucket_start)
 ORDER BY (token_address, bucket_start);
 
+CREATE TABLE IF NOT EXISTS pump.candles_5m AS pump.candles_1m;
+CREATE TABLE IF NOT EXISTS pump.candles_15m AS pump.candles_1m;
+CREATE TABLE IF NOT EXISTS pump.candles_1h AS pump.candles_1m;
+CREATE TABLE IF NOT EXISTS pump.candles_4h AS pump.candles_1m;
+
 CREATE MATERIALIZED VIEW IF NOT EXISTS pump.candles_1m_mv
 TO pump.candles_1m
 AS
 SELECT
   token_address,
   toStartOfMinute(block_time) AS bucket_start,
+  argMinState(spot_price_sol, block_time) AS open_sol,
+  maxState(spot_price_sol) AS high_sol,
+  minState(spot_price_sol) AS low_sol,
+  argMaxState(spot_price_sol, block_time) AS close_sol,
+  sumState(sol_amount) AS volume_sol,
+  countState() AS trade_count
+FROM pump.trades_raw
+GROUP BY token_address, bucket_start;
+
+CREATE MATERIALIZED VIEW IF NOT EXISTS pump.candles_5m_mv
+TO pump.candles_5m
+AS
+SELECT
+  token_address,
+  toStartOfFiveMinutes(block_time) AS bucket_start,
+  argMinState(spot_price_sol, block_time) AS open_sol,
+  maxState(spot_price_sol) AS high_sol,
+  minState(spot_price_sol) AS low_sol,
+  argMaxState(spot_price_sol, block_time) AS close_sol,
+  sumState(sol_amount) AS volume_sol,
+  countState() AS trade_count
+FROM pump.trades_raw
+GROUP BY token_address, bucket_start;
+
+CREATE MATERIALIZED VIEW IF NOT EXISTS pump.candles_15m_mv
+TO pump.candles_15m
+AS
+SELECT
+  token_address,
+  toStartOfFifteenMinutes(block_time) AS bucket_start,
+  argMinState(spot_price_sol, block_time) AS open_sol,
+  maxState(spot_price_sol) AS high_sol,
+  minState(spot_price_sol) AS low_sol,
+  argMaxState(spot_price_sol, block_time) AS close_sol,
+  sumState(sol_amount) AS volume_sol,
+  countState() AS trade_count
+FROM pump.trades_raw
+GROUP BY token_address, bucket_start;
+
+CREATE MATERIALIZED VIEW IF NOT EXISTS pump.candles_1h_mv
+TO pump.candles_1h
+AS
+SELECT
+  token_address,
+  toStartOfHour(block_time) AS bucket_start,
+  argMinState(spot_price_sol, block_time) AS open_sol,
+  maxState(spot_price_sol) AS high_sol,
+  minState(spot_price_sol) AS low_sol,
+  argMaxState(spot_price_sol, block_time) AS close_sol,
+  sumState(sol_amount) AS volume_sol,
+  countState() AS trade_count
+FROM pump.trades_raw
+GROUP BY token_address, bucket_start;
+
+CREATE MATERIALIZED VIEW IF NOT EXISTS pump.candles_4h_mv
+TO pump.candles_4h
+AS
+SELECT
+  token_address,
+  toStartOfInterval(block_time, INTERVAL 4 HOUR) AS bucket_start,
   argMinState(spot_price_sol, block_time) AS open_sol,
   maxState(spot_price_sol) AS high_sol,
   minState(spot_price_sol) AS low_sol,

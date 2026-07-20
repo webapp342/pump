@@ -45,8 +45,24 @@ if [[ ! -f "$ENV_FILE" ]]; then
     echo "INCREMENTAL_CANDLES=true"
     echo "REDIS_PUBLISH_ENABLED=true"
     echo "REDIS_URL=${REDIS_URL:-redis://127.0.0.1:6379}"
+    echo "CLICKHOUSE_URL=${CLICKHOUSE_URL:-http://127.0.0.1:8123}"
+    echo "CLICKHOUSE_DUAL_WRITE=${CLICKHOUSE_DUAL_WRITE:-true}"
+    echo "CLICKHOUSE_DATABASE=${CLICKHOUSE_DATABASE:-pump}"
   } > "$ENV_FILE"
 fi
+
+# Always keep realtime + CH flags present on existing envs
+ensure_env() {
+  local key="$1" value="$2"
+  if ! grep -qE "^${key}=" "$ENV_FILE" 2>/dev/null; then
+    printf '\n%s=%s\n' "$key" "$value" >> "$ENV_FILE"
+  fi
+}
+ensure_env "REDIS_PUBLISH_ENABLED" "true"
+ensure_env "REDIS_URL" "${REDIS_URL:-redis://127.0.0.1:6379}"
+ensure_env "CLICKHOUSE_URL" "${CLICKHOUSE_URL:-http://127.0.0.1:8123}"
+ensure_env "CLICKHOUSE_DUAL_WRITE" "true"
+ensure_env "CLICKHOUSE_DATABASE" "pump"
 
 log "Building indexer-sol from monorepo (requires root npm ci from tma-deploy)"
 cd "$TMA_DIR"

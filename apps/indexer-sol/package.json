@@ -11,6 +11,7 @@
     "backfill-cost-basis": "tsx src/backfill-cost-basis.ts",
     "check-position-invariants": "tsx src/check-position-invariants.ts",
     "check-chart-parity": "tsx src/check-chart-parity.ts",
+    "backfill-clickhouse-trades": "tsx src/backfill-clickhouse-trades.ts",
     "test:decode": "tsx src/decode.selftest.ts",
     "test:position-cost": "tsx src/position-cost.selftest.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"

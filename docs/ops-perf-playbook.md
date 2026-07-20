@@ -16,7 +16,7 @@
 | **3** PgBouncer, PM2 2×2, read URL, watchBlocks | ✅ VM’de aktif | |
 | **4** Bonding machine + local-first | ✅ kod | Zero / Edge / PG18 → **ertelendi** |
 
-**Şu an faz:** Solana cutover + P/L ledger tutarlılığı. Büyük infra (Zero, Edge WS, PG 18) **SLO kapısı olmadan açılmaz**. ClickHouse = opsiyonel OLAP (kapalı default).
+**Şu an faz:** Solana + P/L ledger + **ClickHouse OLAP aktifleştirilebilir** (`enable-clickhouse.sh`). Zero / Edge WS / PG18 hâlâ SLO kapılı.
 
 ---
 
@@ -30,6 +30,14 @@ bash /var/www/pump/tma/deploy/vm/solana-cutover-cleanup.sh
 
 Health: `system-health.sh` skips Alto / EVM indexer / airdrop keeper when `NEXT_PUBLIC_CHAIN_FAMILY=solana`.
 
+**ClickHouse (self-hosted OLAP — activate on VM):**
+
+```bash
+bash /var/www/pump/tma/deploy/vm/enable-clickhouse.sh
+```
+
+Sets dual-write + `USE_CLICKHOUSE_CANDLES` + Redis publish. Positions stay in PostgreSQL.
+
 **P/L / cost basis (indexer-sol):**
 
 ```bash
@@ -38,8 +46,6 @@ npm run backfill-cost-basis -w @pump/indexer-sol
 npm run check-position-invariants -w @pump/indexer-sol
 npm run check-chart-parity -w @pump/indexer-sol
 ```
-
-**ClickHouse (self-hosted, off by default):** [`deploy/clickhouse/README.md`](../deploy/clickhouse/README.md) — enable only when chart history P95 / table growth gate trips. Positions stay in PostgreSQL.
 
 ### Açık env flag’leri (doğrulandı)
 
@@ -52,12 +58,15 @@ npm run check-chart-parity -w @pump/indexer-sol
 - `PGBOUNCER_ENABLED=true`
 - `LAUNCHPAD_DATABASE_READ_URL`
 - `NEXT_PUBLIC_CHAIN_FAMILY=solana` *(prod cutover)*
+- `USE_CLICKHOUSE_CANDLES=true` *(after enable-clickhouse.sh)*
+- `CLICKHOUSE_URL=http://127.0.0.1:8123`
 
 **Indexer Solana** (`apps/indexer-sol/.env`):
 
 - `INCREMENTAL_BOARD_STATS=true`
-- `REDIS_PUBLISH_ENABLED`
-- `CLICKHOUSE_DUAL_WRITE` — leave unset/false until CH gate
+- `REDIS_PUBLISH_ENABLED=true` *(required for live board)*
+- `CLICKHOUSE_URL=http://127.0.0.1:8123`
+- `CLICKHOUSE_DUAL_WRITE=true` *(or omit — URL alone enables)*
 
 **Bundler (Alto):** Solana’da **kullanılmaz** — `solana-cutover-cleanup.sh` ile PM2’den kaldır. EVM rollback için unit/docs duruyor.
 
@@ -118,7 +127,7 @@ VM 2026-06-18 ölçümüne göre **hiçbiri acil değil**:
 | **A) Rocicorp Zero** | Favorites/portfolio/cross-device sync yavaş | API ~2 ms · local-first kodda → ⏸️ |
 | **B) Edge WS** | WS > 2000 veya global WS P95 > 100 ms | WS 14 ms · CPU %1 → ⏸️ |
 | **C) PG 18 + pg_trickle** | MV refresh CPU yiyor | CPU %1 · incremental stats açık → ⏸️ |
-| **D) ClickHouse OLAP** | Chart history / trades scan P95 bozulunca | Compose hazır · dual-write off → ⏸️ |
+| **D) ClickHouse OLAP** | Chart history / trades scale | **Activate:** `bash deploy/vm/enable-clickhouse.sh` |
 
 **Kilitli hybrid:** PostgreSQL = OLTP (positions, wallets, auth). ClickHouse = yalnızca trades/OHLCV history. Tüm DB’yi CH’ye taşımak yok.
 
