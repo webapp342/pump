@@ -178,11 +178,16 @@ export const ADMIN_COPY = {
       kind: "Kind",
       pending: `Pending (${NATIVE_SYMBOL})`,
       sweep: "Sweep",
+      sweepAll: "Sweep all",
       sweeping: "Sweeping…",
+      sweepingAll: "Sweeping all…",
       refresh: "Refresh list",
+      total: "Total pending",
+      recipientHint: "Uses the withdrawal recipient above.",
       confirm:
         "Sweep this owner’s unclaimed {kind} fees ({amount} {symbol}) to {to}? The owner will no longer be able to claim them.",
-      recipientHint: "Uses the withdrawal recipient above.",
+      confirmAll:
+        "Sweep all unclaimed creator/referrer fees ({amount} {symbol} across {count} accounts) to {to}? Owners will no longer be able to claim them.",
     },
     emergency: {
       recipientPlaceholder: "Recipient",

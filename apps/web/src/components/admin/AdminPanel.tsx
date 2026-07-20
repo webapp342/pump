@@ -793,6 +793,62 @@ export function AdminPanel() {
     }
   }
 
+  async function onSweepAllPendingFees() {
+    if (!canWithdrawTreasury || !isSolanaChainFamily || pendingFees.length === 0) return;
+    const to = withdrawTo.trim();
+    if (!isValidSolanaAddress(to)) {
+      setError("Enter a valid recipient address in Withdrawal first");
+      return;
+    }
+    const totalSol = pendingFees
+      .reduce((sum, r) => sum + Number(r.pendingSol), 0)
+      .toFixed(6)
+      .replace(/\.?0+$/, "");
+    const confirmMsg = ADMIN_COPY.treasury.pendingFees.confirmAll
+      .replace("{amount}", totalSol)
+      .replace("{symbol}", NATIVE_SYMBOL)
+      .replace("{count}", String(pendingFees.length))
+      .replace("{to}", shortAddress(to));
+    if (!window.confirm(confirmMsg)) return;
+
+    setError(null);
+    setSolanaTxHash(null);
+    setSweepingPendingKey("all");
+    setSolanaTxPending(true);
+    try {
+      const res = await adminFetch("/api/admin/solana/emergency-claim-fees", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ to, all: true }),
+      });
+      const json = await readAdminJson<{
+        error?: string;
+        data?: {
+          swept?: number;
+          results?: Array<{ signature?: string }>;
+          errors?: Array<{ error: string }>;
+        };
+      }>(res);
+      if (!res.ok) throw new Error(json.error ?? "Emergency claim failed");
+      const firstSig = json.data?.results?.[0]?.signature ?? null;
+      setSolanaTxHash(firstSig);
+      const failed = json.data?.errors?.length ?? 0;
+      if (failed > 0) {
+        setError(
+          `Swept ${json.data?.swept ?? 0}; ${failed} failed: ${json.data?.errors?.[0]?.error ?? "unknown"}`
+        );
+      }
+      void load();
+      void loadStats();
+      void loadPendingFees();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Emergency claim failed");
+    } finally {
+      setSweepingPendingKey(null);
+      setSolanaTxPending(false);
+    }
+  }
+
   function onWithdrawTreasuryToken() {
     if (isSolanaChainFamily) return;
     if (!canWithdrawTreasury || !treasuryContract) return;
@@ -1165,10 +1221,19 @@ export function AdminPanel() {
       </AdminTabPanel>
 
       <AdminTabPanel id="portfolio" active={activeTab}>
-        {address ? (
-          <AdminPortfolioTab address={address} />
+        {address &&
+        (isSolanaChainFamily ? Boolean(solanaAuthority) : true) ? (
+          <AdminPortfolioTab
+            address={isSolanaChainFamily ? solanaAuthority! : address}
+          />
         ) : (
-          <AdminEmptyState title={ADMIN_COPY.portfolio.empty} />
+          <AdminEmptyState
+            title={
+              isSolanaChainFamily && address && !solanaAuthority
+                ? "Loading Solana authority wallet…"
+                : ADMIN_COPY.portfolio.empty
+            }
+          />
         )}
       </AdminTabPanel>
 
@@ -1639,14 +1704,45 @@ export function AdminPanel() {
             title={ADMIN_COPY.treasury.pendingFees.title}
             description={ADMIN_COPY.treasury.pendingFees.description}
             actions={
-              <AdminBtn size="sm" onClick={() => void loadPendingFees()} disabled={pendingFeesLoading}>
-                {pendingFeesLoading
-                  ? ADMIN_COPY.actions.refreshing
-                  : ADMIN_COPY.treasury.pendingFees.refresh}
-              </AdminBtn>
+              <div className="admin-card-actions">
+                <AdminBtn size="sm" onClick={() => void loadPendingFees()} disabled={pendingFeesLoading}>
+                  {pendingFeesLoading
+                    ? ADMIN_COPY.actions.refreshing
+                    : ADMIN_COPY.treasury.pendingFees.refresh}
+                </AdminBtn>
+                <AdminBtn
+                  size="sm"
+                  danger
+                  onClick={() => void onSweepAllPendingFees()}
+                  disabled={
+                    adminTxPending ||
+                    pendingFeesLoading ||
+                    pendingFees.length === 0 ||
+                    !withdrawTo.trim()
+                  }
+                >
+                  {sweepingPendingKey === "all"
+                    ? ADMIN_COPY.treasury.pendingFees.sweepingAll
+                    : ADMIN_COPY.treasury.pendingFees.sweepAll}
+                </AdminBtn>
+              </div>
             }
           >
             <p className="admin-compact-hint">{ADMIN_COPY.treasury.pendingFees.recipientHint}</p>
+            {pendingFees.length > 0 ? (
+              <p className="admin-note admin-card-note">
+                {ADMIN_COPY.treasury.pendingFees.total}{" "}
+                <span className="admin-num">
+                  {pendingFees
+                    .reduce((sum, r) => sum + Number(r.pendingSol), 0)
+                    .toFixed(6)
+                    .replace(/\.?0+$/, "")}{" "}
+                  {NATIVE_SYMBOL}
+                </span>
+                {" · "}
+                {pendingFees.length} account{pendingFees.length === 1 ? "" : "s"}
+              </p>
+            ) : null}
             {pendingFeesLoading && pendingFees.length === 0 ? (
               <div className="admin-empty admin-empty--panel">
                 <p className="admin-empty-copy">{ADMIN_COPY.empty.loading}</p>

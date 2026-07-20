@@ -2197,6 +2197,14 @@
   align-items: start;
 }
 
+/* Data tables must not inherit CSS-grid display from .admin-ent-grid */
+table.admin-ent-data-grid {
+  display: table;
+  grid-template-columns: unset;
+  gap: unset;
+  align-items: unset;
+}
+
 .admin-layout--enterprise .admin-card {
   border: 1px solid rgb(var(--pump-border) / 0.28);
   border-radius: var(--radius-lg);
@@ -2723,14 +2731,15 @@
   max-height: min(68vh, 720px);
 }
 
-.admin-ent-grid {
+.admin-ent-data-grid {
+  display: table;
   width: 100%;
   border-collapse: collapse;
   font-size: 12px;
   line-height: 1.35;
 }
 
-.admin-ent-grid thead th {
+.admin-ent-data-grid thead th {
   position: sticky;
   top: 0;
   z-index: 2;
@@ -2746,17 +2755,17 @@
   white-space: nowrap;
 }
 
-.admin-ent-grid tbody td {
+.admin-ent-data-grid tbody td {
   padding: 6px 10px;
   border-bottom: 1px solid rgb(var(--pump-border) / 0.14);
   vertical-align: middle;
 }
 
-.admin-ent-grid--zebra tbody tr:nth-child(even) td {
+.admin-ent-data-grid--zebra tbody tr:nth-child(even) td {
   background: rgb(var(--pump-border) / 0.03);
 }
 
-.admin-ent-grid tbody tr:hover td {
+.admin-ent-data-grid tbody tr:hover td {
   background: rgb(var(--pump-border) / 0.07);
 }
 
@@ -3016,12 +3025,13 @@
   gap: 10px;
 }
 
-.admin-ent-grid {
-  table-layout: fixed;
+.admin-ent-data-grid {
+  table-layout: auto;
 }
 
-.admin-ent-table-scroll .admin-ent-grid {
-  min-width: 56rem;
+.admin-ent-table-scroll .admin-ent-data-grid {
+  min-width: 0;
+  width: 100%;
 }
 
 @media (max-width: 700px) {
@@ -3496,9 +3506,10 @@
   max-height: min(70vh, 760px);
 }
 
-.admin-ent-grid {
+.admin-ent-data-grid {
+  display: table;
   width: 100%;
-  min-width: 52rem;
+  min-width: 0;
   table-layout: auto;
   border-collapse: separate;
   border-spacing: 0;
@@ -3506,7 +3517,16 @@
   line-height: 1.35;
 }
 
-.admin-ent-grid thead th {
+/* Wide ops queues (airdrops) keep horizontal scroll; narrow tables stay compact */
+.admin-ent-table-scroll .admin-ent-data-grid {
+  min-width: min(100%, 40rem);
+}
+
+.admin-ent-table-scroll .admin-ent-data-grid:has(th:nth-child(6)) {
+  min-width: 52rem;
+}
+
+.admin-ent-data-grid thead th {
   position: sticky;
   top: 0;
   z-index: 2;
@@ -3524,21 +3544,21 @@
   vertical-align: middle;
 }
 
-.admin-ent-grid tbody td {
+.admin-ent-data-grid tbody td {
   padding: 0.75rem 0.9rem;
   border-bottom: 1px solid rgb(var(--pump-border) / 0.16);
   vertical-align: middle;
 }
 
-.admin-ent-grid tbody tr:last-child td {
+.admin-ent-data-grid tbody tr:last-child td {
   border-bottom: none;
 }
 
-.admin-ent-grid--zebra tbody tr:nth-child(even) td {
+.admin-ent-data-grid--zebra tbody tr:nth-child(even) td {
   background: rgb(var(--pump-border) / 0.035);
 }
 
-.admin-ent-grid tbody tr:hover td {
+.admin-ent-data-grid tbody tr:hover td {
   background: rgb(var(--pump-accent) / 0.05);
 }
 

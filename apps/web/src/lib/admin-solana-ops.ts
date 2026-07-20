@@ -297,3 +297,60 @@ export async function adminEmergencyClaimPendingFees(input: {
     to: to.toBase58(),
   };
 }
+
+/** Sweep every PendingFees PDA with balance > 0 (sequential txs). */
+export async function adminEmergencyClaimAllPendingFees(input: {
+  to: string;
+}): Promise<{
+  to: string;
+  swept: number;
+  totalLamports: bigint;
+  results: Array<{
+    owner: string;
+    kind: "creator" | "referrer";
+    signature: string;
+    amountLamports: bigint;
+  }>;
+  errors: Array<{ owner: string; kind: "creator" | "referrer"; error: string }>;
+}> {
+  const rows = await listPendingFeeAccounts();
+  const results: Array<{
+    owner: string;
+    kind: "creator" | "referrer";
+    signature: string;
+    amountLamports: bigint;
+  }> = [];
+  const errors: Array<{ owner: string; kind: "creator" | "referrer"; error: string }> = [];
+  let totalLamports = 0n;
+
+  for (const row of rows) {
+    try {
+      const r = await adminEmergencyClaimPendingFees({
+        owner: row.owner,
+        kind: row.kind,
+        to: input.to,
+      });
+      results.push({
+        owner: r.owner,
+        kind: r.kind,
+        signature: r.signature,
+        amountLamports: r.amountLamports,
+      });
+      totalLamports += r.amountLamports;
+    } catch (err) {
+      errors.push({
+        owner: row.owner,
+        kind: row.kind,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  return {
+    to: input.to.trim(),
+    swept: results.length,
+    totalLamports,
+    results,
+    errors,
+  };
+}

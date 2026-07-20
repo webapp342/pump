@@ -140,7 +140,7 @@ export function AdminEnterpriseTable<T>({
       ) : null}
 
       <div className="admin-ent-table-scroll">
-        <table className={`admin-ent-grid${zebra ? " admin-ent-grid--zebra" : ""}`}>
+        <table className={`admin-ent-data-grid${zebra ? " admin-ent-data-grid--zebra" : ""}`}>
           <thead>
             <tr>
               {columns.map((col) => {

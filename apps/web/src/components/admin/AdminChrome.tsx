@@ -19,7 +19,8 @@ import {
   faWallet,
   faXmark,
 } from "@/lib/icons";
-import { explorerAddressUrl, pumpChain, shortAddress } from "@/config/chain";
+import { CHAIN_DISPLAY_NAME, explorerAddressUrl, pumpChain, shortAddress } from "@/config/chain";
+import { isSolanaChainFamily } from "@/config/chain-family";
 import { PumpLogo } from "@/components/brand/PumpLogo";
 import { ADMIN_COPY } from "@/lib/admin/copy";
 
@@ -267,7 +268,7 @@ export function AdminLayout({
             </span>
           </div>
         </div>
-        <span className="admin-wallet-network">{pumpChain.name}</span>
+        <span className="admin-wallet-network">{CHAIN_DISPLAY_NAME}</span>
       </div>
     </div>
   );
@@ -389,7 +390,8 @@ export function AdminLayout({
                     {shortAddress(address)}
                   </a>
                   <span className="admin-ent-user-menu-meta">
-                    {pumpChain.name} · chain {pumpChain.id}
+                    {CHAIN_DISPLAY_NAME}
+                    {!isSolanaChainFamily ? ` · chain ${pumpChain.id}` : ""}
                   </span>
                   {onSignOut ? (
                     <button
