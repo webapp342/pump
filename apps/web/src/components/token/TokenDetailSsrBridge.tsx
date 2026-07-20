@@ -3,6 +3,7 @@
 import { createContext, useContext, useMemo, useRef, type ReactNode } from "react";
 import type { ArenaHomePayload } from "@/lib/arena-server";
 import type { TokenDetailBundle } from "@/lib/token-server";
+import { normalizeRouteAddressKey } from "@/lib/address";
 import { seedTokenDetailBundle } from "@/lib/token-detail-client";
 import {
   arenaExploreBoardCache,
@@ -46,12 +47,12 @@ export function TokenDetailSsrProvider({ children }: { children: ReactNode }) {
   const value = useMemo<TokenDetailSsrContextValue>(
     () => ({
       registerBundle: (address, bundle) => {
-        const key = address.toLowerCase();
+        const key = normalizeRouteAddressKey(address);
         mapsRef.current.bundles.set(key, bundle);
         seedTokenDetailBundle(key, bundle);
       },
       peekBundle: (address) =>
-        mapsRef.current.bundles.get(address.toLowerCase()) ?? null,
+        mapsRef.current.bundles.get(normalizeRouteAddressKey(address)) ?? null,
       registerBoard: (payload) => {
         mapsRef.current.boards.set("default", payload);
         seedExploreBoardCache(payload);

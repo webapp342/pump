@@ -61,6 +61,8 @@ import {
   resolveVerifiedTokenBalance,
   scaleCostBasisForBalance,
 } from "@/lib/onchain-balance";
+import { addressCacheKey, routeAddressKeysEqual } from "@/lib/address";
+import { tokenDetailPath } from "@/lib/token-routes";
 import { useLiveChannel, resolveLivePollDelay } from "@/hooks/useLiveChannel";
 import { useLocalFirstReads } from "@/lib/local-first/flags";
 import {
@@ -132,12 +134,16 @@ type PortfolioQuickTradeTarget = {
   tokenBalanceWei?: bigint;
 };
 
+function portfolioTokenMapKey(tokenAddress: string): string {
+  return addressCacheKey(tokenAddress) ?? tokenAddress.trim();
+}
+
 function portfolioTokenBalanceWei(
   tokenAddress: string,
   onChainBalances: Record<string, string>,
   fallbackBalance?: number
 ): bigint | undefined {
-  const onChain = onChainBalances[tokenAddress.toLowerCase()];
+  const onChain = onChainBalances[portfolioTokenMapKey(tokenAddress)];
   if (onChain) {
     try {
       return parseUnits(onChain, 18);
@@ -181,7 +187,7 @@ function buildVerifiedPositionView(
   const indexedBalance = Number(position.tokenBalance);
   const fullCostBasis = Math.max(0, Number(position.remainingCostBasisBnb));
   const fullCostBasisUsd = Math.max(0, Number(position.remainingCostBasisUsd ?? 0));
-  const onChainStr = onChainBalances[position.tokenAddress.toLowerCase()];
+  const onChainStr = onChainBalances[portfolioTokenMapKey(position.tokenAddress)];
   const onChainBalance = onChainStr != null ? Number(onChainStr) : null;
 
   const { displayBalance, hidden, pending } = resolveVerifiedTokenBalance(
@@ -371,7 +377,7 @@ function WalletHoldingMobileRow({
           />
         }
         title={
-          <Link href={`/token/${holding.tokenAddress}`} className="truncate">
+          <Link href={tokenDetailPath(holding.tokenAddress)} className="truncate">
             {holding.symbol}
           </Link>
         }
@@ -400,7 +406,7 @@ function WalletHoldingDesktopRow({
     <tr className="group border-b border-pump-border/10 last:border-b-0">
       <td className="px-4 py-3">
         <Link
-          href={`/token/${holding.tokenAddress}`}
+          href={tokenDetailPath(holding.tokenAddress)}
           className="portfolio-holdings-grid__coin-row flex min-w-0 items-center gap-2"
         >
           <TokenAvatar
@@ -474,7 +480,7 @@ function buildLaunchedHoldingMetricsByAddress(
         remainingCostBasis,
         bnbUsd
       );
-      map[position.tokenAddress.toLowerCase()] = {
+      map[portfolioTokenMapKey(position.tokenAddress)] = {
         balance,
         valueBnb,
         valueUsd,
@@ -492,7 +498,7 @@ function buildLaunchedHoldingMetricsByAddress(
 
     const balance = Number(row.holding.tokenBalance);
     const valueBnb = balance * Number(row.holding.lastPriceBnb);
-    map[row.holding.tokenAddress.toLowerCase()] = {
+    map[portfolioTokenMapKey(row.holding.tokenAddress)] = {
       balance,
       valueBnb,
       valueUsd: bnbToUsd(valueBnb, bnbUsd) ?? 0,
@@ -629,7 +635,7 @@ function portfolioMatchesWallet(
   walletAddress: string | null | undefined
 ): boolean {
   if (!portfolio || !walletAddress) return false;
-  return portfolio.address.toLowerCase() === walletAddress.toLowerCase();
+  return routeAddressKeysEqual(portfolio.address, walletAddress);
 }
 
 export function PortfolioPanel({
@@ -938,7 +944,7 @@ export function PortfolioPanel({
         return;
       }
       setQuickTradeTarget({
-        tokenAddress: tokenAddress.toLowerCase() as `0x${string}`,
+        tokenAddress: portfolioTokenMapKey(tokenAddress) as `0x${string}`,
         symbol,
         side,
         ...(side === "sell" && tokenBalanceWei != null ? { tokenBalanceWei } : {}),
@@ -1128,7 +1134,7 @@ export function PortfolioPanel({
     let totalPnl = 0;
 
     for (const view of views) {
-      const key = view.position.tokenAddress.toLowerCase();
+      const key = portfolioTokenMapKey(view.position.tokenAddress);
       const val = view.balance * Number(view.position.lastPriceBnb);
       values[key] = val;
       totalValue += val;
@@ -1136,7 +1142,7 @@ export function PortfolioPanel({
     }
 
     for (const holding of walletHoldings) {
-      const key = holding.tokenAddress.toLowerCase();
+      const key = portfolioTokenMapKey(holding.tokenAddress);
       const val = Number(holding.tokenBalance) * Number(holding.lastPriceBnb);
       values[key] = val;
       totalValue += val;
@@ -1379,7 +1385,9 @@ export function PortfolioPanel({
   const showEmptyHoldings = tokenHoldingsCount === 0 && nativeBnb <= 0;
 
   const isOwnPortfolio =
-    Boolean(address) && address!.toLowerCase() === walletAddress.toLowerCase();
+    address != null &&
+    walletAddress != null &&
+    routeAddressKeysEqual(address, walletAddress);
   const displayUsername = isOwnPortfolio
     ? (ownDisplayUsername ?? resolveDisplayUsername(walletAddress, ownUsername))
     : resolveDisplayUsername(walletAddress, data.username);
@@ -1440,7 +1448,7 @@ export function PortfolioPanel({
           }}
           onConfirmed={() => {
             if (quickTradeTarget.side === "sell") {
-              const key = quickTradeTarget.tokenAddress.toLowerCase();
+              const key = portfolioTokenMapKey(quickTradeTarget.tokenAddress);
               setOnChainBalances((prev) => ({ ...prev, [key]: "0" }));
             }
             if (address) void loadPortfolio(walletAddress);
@@ -1465,7 +1473,7 @@ export function PortfolioPanel({
           }}
           onTradeConfirmed={() => {
             if (fundingBlockedTradeTarget.side === "sell") {
-              const key = fundingBlockedTradeTarget.tokenAddress.toLowerCase();
+              const key = portfolioTokenMapKey(fundingBlockedTradeTarget.tokenAddress);
               setOnChainBalances((prev) => ({ ...prev, [key]: "0" }));
             }
             setFundingBlockedTradeTarget(null);
@@ -1589,7 +1597,7 @@ export function PortfolioPanel({
                               />
                             }
                             title={
-                              <Link href={`/token/${position.tokenAddress}`} className="truncate">
+                              <Link href={tokenDetailPath(position.tokenAddress)} className="truncate">
                                 {position.symbol}
                               </Link>
                             }
@@ -1601,7 +1609,7 @@ export function PortfolioPanel({
                                 : null
                             }
                             valueFlashClass={flashText(
-                              holdingFlashes[position.tokenAddress.toLowerCase()]
+                              holdingFlashes[portfolioTokenMapKey(position.tokenAddress)]
                             )}
                           />
                         </HoldingSwipeRow>
@@ -1673,7 +1681,7 @@ export function PortfolioPanel({
                             <tr key={position.tokenAddress} className="group">
                               <td className="px-4 py-3">
                                 <Link
-                                  href={`/token/${position.tokenAddress}`}
+                                  href={tokenDetailPath(position.tokenAddress)}
                                   className="portfolio-holdings-grid__coin-row flex min-w-0 items-center gap-2"
                                 >
                                   <TokenAvatar
@@ -1706,7 +1714,7 @@ export function PortfolioPanel({
                               <td className="portfolio-holdings-grid__num portfolio-holdings-grid__data px-4 py-3 financial-value text-pump-text">
                                 {formatHoldingAmount(balance)}
                               </td>
-                              <td className={`portfolio-holdings-grid__num portfolio-holdings-grid__data portfolio-holdings-grid__value-cell px-4 py-3 financial-value text-pump-text ${flashText(holdingFlashes[position.tokenAddress.toLowerCase()])}`}>
+                              <td className={`portfolio-holdings-grid__num portfolio-holdings-grid__data portfolio-holdings-grid__value-cell px-4 py-3 financial-value text-pump-text ${flashText(holdingFlashes[portfolioTokenMapKey(position.tokenAddress)])}`}>
                                 {formatPortfolioHoldingValueUsd(positionValueUsd)}
                               </td>
                               <td className="portfolio-holdings-grid__num portfolio-holdings-grid__data px-4 py-3 financial-value text-pump-text">

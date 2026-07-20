@@ -1,4 +1,5 @@
 import type { TradePrefillConfig } from "@/lib/token-trade-prefill";
+import { tokenDetailPath } from "@/lib/token-routes";
 
 export type ArenaQuickTradePrefs = {
   buyAmountUsd: string;
@@ -121,7 +122,6 @@ export function buildArenaQuickTradeHref(
   side: "buy" | "sell",
   prefs: ArenaQuickTradePrefs = readArenaQuickTradePrefs()
 ): string {
-  const addr = tokenAddress.toLowerCase();
   const params = new URLSearchParams({ trade: side, auto: "1" });
 
   if (side === "buy") {
@@ -131,5 +131,5 @@ export function buildArenaQuickTradeHref(
     params.set("sellPct", String(prefs.sellPercent));
   }
 
-  return `/token/${addr}?${params.toString()}`;
+  return `${tokenDetailPath(tokenAddress)}?${params.toString()}`;
 }

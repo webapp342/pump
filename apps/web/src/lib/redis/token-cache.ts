@@ -1,10 +1,11 @@
 import type { TokenDetailBundle } from "@/lib/token-server";
+import { normalizeRouteAddressKey } from "@/lib/address";
 import { readCacheJson, writeCacheJson } from "@/lib/redis/client";
 
 const TOKEN_SNAPSHOT_TTL_SEC = 5;
 
 export function buildTokenSnapshotCacheKey(tokenAddress: string): string {
-  return `pump:cache:token:${tokenAddress.toLowerCase()}`;
+  return `pump:cache:token:${normalizeRouteAddressKey(tokenAddress)}`;
 }
 
 export async function readTokenSnapshotCache(

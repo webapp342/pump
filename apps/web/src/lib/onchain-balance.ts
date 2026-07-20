@@ -1,8 +1,9 @@
+import { addressCacheKey } from "@/lib/address";
+
 /** Minimum ERC20 balance treated as a non-zero holding. */
 export const ON_CHAIN_BALANCE_EPSILON = 1e-6;
 
-/**
- * Prefer on-chain balance when verified; hide ghost indexer rows when on-chain is zero.
+/** Prefer on-chain balance when verified; hide ghost indexer rows when on-chain is zero.
  * (After a full sell, RPC is authoritative — do not keep showing stale indexed balance.)
  */
 export function resolveVerifiedTokenBalance(
@@ -32,6 +33,10 @@ type HoldingsPosition = {
   lastPriceBnb: string;
 };
 
+function balanceLookupKey(tokenAddress: string): string {
+  return addressCacheKey(tokenAddress) ?? tokenAddress.trim();
+}
+
 /** Sum holdings USD value using on-chain balances; skip pending or hidden rows. */
 export function sumVerifiedHoldingsBnb(
   positions: HoldingsPosition[],
@@ -39,13 +44,13 @@ export function sumVerifiedHoldingsBnb(
 ): number {
   return positions.reduce((sum, position) => {
     const indexedBalance = Number(position.tokenBalance);
-    const onChainStr = onChainBalances[position.tokenAddress.toLowerCase()];
+    const onChainStr = onChainBalances[balanceLookupKey(position.tokenAddress)];
     const onChainBalance = onChainStr != null ? Number(onChainStr) : null;
     const { displayBalance, hidden, pending } = resolveVerifiedTokenBalance(
       indexedBalance,
       onChainBalance
     );
-    if (hidden) return sum;
+    if (hidden || pending) return sum;
 
     const price = Number(position.lastPriceBnb);
     if (!Number.isFinite(price)) return sum;

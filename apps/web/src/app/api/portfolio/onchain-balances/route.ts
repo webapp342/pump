@@ -1,7 +1,12 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
-import { normalizeAddressParam } from "@/lib/address";
+import { addressCacheKey, normalizeAddressParam } from "@/lib/address";
+import { isSolanaChainFamily } from "@/config/chain-family";
 import { fetchOnChainTokenBalancesForWallet } from "@/lib/portfolio-onchain";
+
+function balanceKey(tokenAddress: string): string {
+  return addressCacheKey(tokenAddress) ?? tokenAddress.trim();
+}
 
 async function resolveOnChainBalances(
   address: string,
@@ -12,12 +17,21 @@ async function resolveOnChainBalances(
   const balances = await fetchOnChainTokenBalancesForWallet(address, tokenAddresses);
   const data: Record<string, string> = {};
   for (const tokenAddress of tokenAddresses) {
-    data[tokenAddress.toLowerCase()] = balances.get(tokenAddress.toLowerCase()) ?? "0";
+    const key = balanceKey(tokenAddress);
+    const value = balances.get(key);
+    if (value != null) {
+      data[key] = value;
+      continue;
+    }
+    // EVM: missing multicall entry means zero. Solana: omit so UI keeps indexer balance.
+    if (!isSolanaChainFamily) {
+      data[key] = "0";
+    }
   }
   return data;
 }
 
-/** GET /api/portfolio/onchain-balances — verify indexer positions via ERC20 balanceOf. */
+/** GET /api/portfolio/onchain-balances — verify indexer positions via on-chain balances. */
 export async function GET(request: NextRequest) {
   const address = normalizeAddressParam(request.nextUrl.searchParams.get("address"));
   if (!address) {

@@ -663,9 +663,11 @@ export function resolveTokenInForBnbOut(
   if (y0 === 0n || x0 === 0n) return null;
 
   const { ethOut: maxEthOut } = quoteSellFromCurveState(curve, protocolFeeBps, y0);
-  const effectiveTarget =
-    maxEthOut > 0n && targetZugOut > maxEthOut ? maxEthOut : targetZugOut;
-  if (effectiveTarget <= 0n) return null;
+  // USD/native output mode represents an exact requested receive amount.
+  // Never silently shrink it to the curve's available real liquidity: doing so
+  // makes (for example) a $1 input preview a dust-sized sell.
+  if (maxEthOut <= 0n || targetZugOut > maxEthOut) return null;
+  const effectiveTarget = targetZugOut;
 
   const feeMultiplier = BPS - protocolFeeBps;
   if (feeMultiplier <= 0n) return null;

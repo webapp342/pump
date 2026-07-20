@@ -11,11 +11,13 @@ import {
 import { PnlCell } from "@/components/portfolio/PortfolioPnlCell";
 import { TokenAvatar } from "@/components/token/TokenAvatar";
 import type { TokenListItem } from "@/lib/db/launchpad";
+import { addressCacheKey } from "@/lib/address";
 import {
   bnbToUsd,
   formatPortfolioHoldingValueUsd,
   formatUsdReadable,
 } from "@/lib/format-usd";
+import { tokenDetailPath } from "@/lib/token-routes";
 import {
   formatPortfolioTokenAmount,
   sortLaunchedTokenRows,
@@ -54,7 +56,7 @@ function buildLaunchedRows(
   bnbUsd: number | null
 ): Array<LaunchedTokenRow & LaunchedTokenHoldingMetrics> {
   return tokens.map((token) => {
-    const metrics = holdingMetricsByAddress[token.address.toLowerCase()];
+    const metrics = holdingMetricsByAddress[addressCacheKey(token.address) ?? token.address];
     if (metrics) {
       return {
         token,
@@ -97,7 +99,7 @@ function LaunchedDesktopRow({
     <tr>
       <td className="px-4 py-3">
         <Link
-          href={`/token/${token.address}`}
+          href={tokenDetailPath(token.address)}
           className="portfolio-holdings-grid__coin-row flex min-w-0 items-center gap-2"
         >
           <TokenAvatar
@@ -217,7 +219,7 @@ export function PortfolioLaunchedList({
                   />
                 }
                 title={
-                  <Link href={`/token/${row.token.address}`} className="truncate">
+                  <Link href={tokenDetailPath(row.token.address)} className="truncate">
                     {row.token.symbol}
                   </Link>
                 }

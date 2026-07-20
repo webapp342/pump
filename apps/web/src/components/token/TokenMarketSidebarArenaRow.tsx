@@ -11,6 +11,7 @@ import {
   seedTokenDetailFromListItem,
   tokenDetailQueryKey,
 } from "@/lib/token-detail-client";
+import { addressCacheKey } from "@/lib/address";
 import { writeLastTradeTokenAddress } from "@/lib/last-trade-token";
 import { tokenDetailPath } from "@/lib/token-routes";
 import type { FlashTone } from "@/lib/arena-explore-board-core";
@@ -41,8 +42,10 @@ export function TokenMarketSidebarArenaRow({
   const router = useRouter();
   const queryClient = useQueryClient();
   const suppressNavUntilRef = useRef(0);
-  const addressKey = token.address.toLowerCase();
-  const isActive = activeTokenAddress?.toLowerCase() === addressKey;
+  const addressKey = addressCacheKey(token.address) ?? token.address;
+  const isActive =
+    activeTokenAddress != null &&
+    (addressCacheKey(activeTokenAddress) ?? activeTokenAddress) === addressKey;
   const tokenHref = tokenDetailPath(token.address);
 
   const prefetchBundle = useCallback(() => {

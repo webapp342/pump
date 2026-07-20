@@ -14,7 +14,7 @@ type TokenDetailRouteLayoutProps = {
 
 function TokenDetailShellFromSeed({ address }: { address: string }) {
   const ssrBundle = useTokenDetailSsrBundle(address);
-  const initialBundle = ssrBundle ?? peekTokenDetailBundle(address.toLowerCase()) ?? null;
+  const initialBundle = ssrBundle ?? peekTokenDetailBundle(address) ?? null;
   return <TokenDetailShell address={address} initialBundle={initialBundle} />;
 }
 

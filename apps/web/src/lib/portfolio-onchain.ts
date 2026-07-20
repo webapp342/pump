@@ -7,6 +7,7 @@ import { createPublicClient, formatUnits, http, type Address } from "viem";
 import { erc20Abi } from "@/lib/abis/erc20";
 import { pumpChain, rpcUrl } from "@/config/chain";
 import { isSolanaChainFamily } from "@/config/chain-family";
+import { addressCacheKey } from "@/lib/address";
 import { PUMP_TOKEN_DECIMALS } from "@/lib/solana/amount-scale";
 import { getSolanaConnection } from "@/lib/solana/transfer";
 import {
@@ -21,6 +22,10 @@ const publicClient = createPublicClient({
 
 const MIN_TOKEN_BALANCE = 1e-9;
 
+function tokenMapKey(address: string): string {
+  return addressCacheKey(address) ?? address.trim();
+}
+
 export type WalletLaunchpadHolding = {
   tokenAddress: string;
   symbol: string;
@@ -31,11 +36,54 @@ export type WalletLaunchpadHolding = {
   estimatedValueBnb: number;
 };
 
-/** ERC20 balanceOf(wallet) for many launchpad tokens. */
+/** SPL token balances for one wallet across many mints. */
+async function fetchSplTokenBalancesForWallet(
+  walletAddress: string,
+  tokenAddresses: string[]
+): Promise<Map<string, string>> {
+  const balances = new Map<string, string>();
+  if (tokenAddresses.length === 0) return balances;
+
+  let owner: PublicKey;
+  try {
+    owner = new PublicKey(walletAddress);
+  } catch {
+    return balances;
+  }
+
+  const conn = getSolanaConnection();
+  const chunkSize = 25;
+
+  for (let i = 0; i < tokenAddresses.length; i += chunkSize) {
+    const chunk = tokenAddresses.slice(i, i + chunkSize);
+    await Promise.all(
+      chunk.map(async (tokenAddress) => {
+        const key = tokenMapKey(tokenAddress);
+        try {
+          const mint = new PublicKey(tokenAddress);
+          const ata = getAssociatedTokenAddressSync(mint, owner, false, TOKEN_PROGRAM_ID);
+          const bal = await conn.getTokenAccountBalance(ata, "confirmed");
+          const raw = bal?.value?.amount ? BigInt(bal.value.amount) : 0n;
+          balances.set(key, formatUnits(raw, PUMP_TOKEN_DECIMALS));
+        } catch {
+          // Omit — UI falls back to indexer balance instead of treating as zero.
+        }
+      })
+    );
+  }
+
+  return balances;
+}
+
+/** On-chain token balances for many launchpad tokens (ERC20 or SPL). */
 export async function fetchOnChainTokenBalancesForWallet(
   walletAddress: string,
   tokenAddresses: string[]
 ): Promise<Map<string, string>> {
+  if (isSolanaChainFamily) {
+    return fetchSplTokenBalancesForWallet(walletAddress, tokenAddresses);
+  }
+
   const wallet = walletAddress.toLowerCase() as Address;
   const balances = new Map<string, string>();
   if (tokenAddresses.length === 0) return balances;
@@ -65,13 +113,14 @@ export async function fetchOnChainTokenBalancesForWallet(
       chunk.forEach((tokenAddress, index) => {
         const result = results[index];
         const wei = result?.status === "success" ? result.result : 0n;
-        balances.set(tokenAddress.toLowerCase(), formatUnits(wei, 18));
+        balances.set(tokenMapKey(tokenAddress), formatUnits(wei, 18));
       });
       continue;
     }
 
     await Promise.all(
       chunk.map(async (tokenAddress) => {
+        const key = tokenMapKey(tokenAddress);
         try {
           const wei = await publicClient.readContract({
             address: tokenAddress.toLowerCase() as Address,
@@ -79,9 +128,9 @@ export async function fetchOnChainTokenBalancesForWallet(
             functionName: "balanceOf",
             args: [wallet],
           });
-          balances.set(tokenAddress.toLowerCase(), formatUnits(wei, 18));
+          balances.set(key, formatUnits(wei, 18));
         } catch {
-          balances.set(tokenAddress.toLowerCase(), "0");
+          balances.set(key, "0");
         }
       })
     );
@@ -198,14 +247,14 @@ type WalletHoldingsScanOptions = {
   scanLimit?: number;
 };
 
-/** On-chain ERC20 balances for launchpad tokens not already covered by indexer positions. */
+/** On-chain ERC20/SPL balances for launchpad tokens not already covered by indexer positions. */
 export async function fetchWalletLaunchpadHoldings(
   walletAddress: string,
   excludeTokenAddresses: Iterable<string>,
   options?: WalletHoldingsScanOptions
 ): Promise<WalletLaunchpadHolding[]> {
   const exclude = new Set(
-    [...excludeTokenAddresses].map((address) => address.toLowerCase())
+    [...excludeTokenAddresses].map((address) => tokenMapKey(address))
   );
   const catalog = options?.creatorAddress
     ? await listLaunchpadTokensByCreatorForWalletBalance(
@@ -213,7 +262,7 @@ export async function fetchWalletLaunchpadHoldings(
         options.scanLimit
       )
     : await listLaunchpadTokensForWalletBalance();
-  const candidates = catalog.filter((token) => !exclude.has(token.address.toLowerCase()));
+  const candidates = catalog.filter((token) => !exclude.has(tokenMapKey(token.address)));
   if (candidates.length === 0) return [];
 
   const balances = await fetchOnChainTokenBalancesForWallet(
@@ -224,7 +273,8 @@ export async function fetchWalletLaunchpadHoldings(
   const holdings: WalletLaunchpadHolding[] = [];
 
   for (const token of candidates) {
-    const balanceStr = balances.get(token.address.toLowerCase()) ?? "0";
+    const balanceStr = balances.get(tokenMapKey(token.address));
+    if (balanceStr == null) continue;
     const balance = Number(balanceStr);
     if (!Number.isFinite(balance) || balance <= MIN_TOKEN_BALANCE) continue;
 
