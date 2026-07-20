@@ -31,6 +31,7 @@ import {
   bnbToUsd,
   estimateFdvUsd,
   tokenPriceUsd,
+  DEFAULT_TOKEN_TOTAL_SUPPLY,
 } from "@/lib/format-usd";
 import { useBnbUsdPrice } from "@/hooks/useBnbUsdPrice";
 import {
@@ -817,6 +818,11 @@ export function TokenDetailLive({
     resolveMarkPriceBnb(liveToken, trades, chainCurve as CurveTuple | undefined);
   const priceUsd = tokenPriceUsd(displayPrice, bnbUsd);
   const fdvUsd = estimateFdvUsd(displayPrice, bnbUsd);
+  /** Same native mcap as header FDV — never stale DB market_cap_zug for live X. */
+  const liveMarketCapNative =
+    displayPrice > 0
+      ? displayPrice * DEFAULT_TOKEN_TOTAL_SUPPLY
+      : Number(liveToken.marketCapBnb);
 
   useEffect(() => {
     if (!contentSynced) return;
@@ -949,7 +955,7 @@ export function TokenDetailLive({
     holdersRefreshKey,
     initialHolders,
     currentPriceBnb: displayPrice,
-    currentMarketCapBnb: liveToken.marketCapBnb,
+    currentMarketCapBnb: liveMarketCapNative,
     bnbUsd,
     onAddressClick: setProfileAddress,
     creatorDisplayUsername: liveToken.creatorDisplayUsername,
@@ -1290,7 +1296,7 @@ export function TokenDetailLive({
                 fallbackTrades={chartFallbackTrades}
                 wsConnected={wsConnected}
                 bnbUsd={bnbUsd}
-                liveOnChainSpotBnb={onChainSpotBnb}
+                liveOnChainSpotBnb={onChainSpotBnb ?? (displayPrice > 0 ? displayPrice : null)}
                 currency={chartCurrency}
                 onCurrencyChange={setChartCurrency}
               />
@@ -1351,7 +1357,7 @@ export function TokenDetailLive({
             tokenAddress={streamAddress}
             refreshKey={announcementsRefreshKey}
             onOpenProfile={setProfileAddress}
-            currentMarketCapBnb={liveToken.marketCapBnb}
+            currentMarketCapBnb={liveMarketCapNative}
             bnbUsd={bnbUsd}
           />
         </aside>

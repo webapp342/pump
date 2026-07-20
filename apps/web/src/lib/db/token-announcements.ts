@@ -1,4 +1,5 @@
 import { dbStorageAddress } from "@/lib/address";
+import { isSolanaChainFamily } from "@/config/chain-family";
 import { getLaunchpadReadPool, getLaunchpadWritePool } from "@/lib/db/pool";
 import {
   BONDING_TOKEN_SUPPLY_HUMAN,
@@ -13,6 +14,10 @@ import {
 } from "@/lib/token-announcements-shared";
 import { attachAddressDisplayNames } from "@/lib/user-display";
 import { resolveDisplayUsername } from "@/lib/username";
+
+/** Solana pump.fun-feel virtuals (human): 30 SOL / 1.073B tokens. */
+const SOLANA_VIRTUAL_SOL_HUMAN = 30;
+const SOLANA_VIRTUAL_TOKEN_HUMAN = 1_073_000_000;
 
 export {
   ANNOUNCE_COOLDOWN_MS,
@@ -65,27 +70,34 @@ function mapAnnouncement(
 export async function fetchTokenMcapSnapshot(tokenAddress: string): Promise<SnapshotRow | null> {
   const db = getLaunchpadReadPool();
   const token = dbStorageAddress(tokenAddress);
+  const virtualNative = isSolanaChainFamily
+    ? SOLANA_VIRTUAL_SOL_HUMAN
+    : BONDING_VIRTUAL_BNB_HUMAN;
+  const virtualToken = isSolanaChainFamily
+    ? SOLANA_VIRTUAL_TOKEN_HUMAN
+    : BONDING_TOKEN_SUPPLY_HUMAN;
+  const supply = BONDING_TOKEN_SUPPLY_HUMAN;
   const result = await db.query<SnapshotRow>(
     `
     SELECT
       COALESCE(
         b.market_cap_zug,
         (
-          (COALESCE(b.virtual_zug_reserve, ${BONDING_VIRTUAL_BNB_HUMAN})::numeric
+          (COALESCE(b.virtual_zug_reserve, ${virtualNative})::numeric
             + COALESCE(b.reserve_zug, 0))
           / NULLIF(
-              COALESCE(b.virtual_token_reserve, ${BONDING_TOKEN_SUPPLY_HUMAN})::numeric
+              COALESCE(b.virtual_token_reserve, ${virtualToken})::numeric
                 - COALESCE(b.token_sold, 0),
               0
             )
-          * ${BONDING_TOKEN_SUPPLY_HUMAN}::numeric
+          * ${supply}::numeric
         ),
         0
       )::text AS market_cap_zug,
       (
-        COALESCE(b.virtual_zug_reserve, ${BONDING_VIRTUAL_BNB_HUMAN})::numeric
-        / NULLIF(COALESCE(b.virtual_token_reserve, ${BONDING_TOKEN_SUPPLY_HUMAN})::numeric, 0)
-        * ${BONDING_TOKEN_SUPPLY_HUMAN}::numeric
+        COALESCE(b.virtual_zug_reserve, ${virtualNative})::numeric
+        / NULLIF(COALESCE(b.virtual_token_reserve, ${virtualToken})::numeric, 0)
+        * ${supply}::numeric
       )::text AS launch_mcap_zug
     FROM tokens t
     LEFT JOIN bonding_states b ON b.token_address = t.address

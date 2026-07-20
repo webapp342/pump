@@ -6,6 +6,7 @@ import {
   pinTailCandleToLiveMark,
   sanitizeTailCandleSeries,
   scaleCandleBars,
+  seriesHasTemporalGaps,
   type ActorOptimisticChartSpot,
   type CandleBar,
   type CandleInterval,
@@ -134,7 +135,13 @@ export function deriveChartSeries(input: DeriveChartSeriesInput): {
   /** Volume stays native — MCAP axis scale must not inflate histogram. */
   let volumes = state.volumes;
 
-  if (!state.gapFilledByApi && state.source === "trades") {
+  const needsClientGapFill =
+    (!state.gapFilledByApi && state.source === "trades") ||
+    (!state.gapFilledByApi &&
+      state.interval != null &&
+      seriesHasTemporalGaps(state.candles, state.interval));
+
+  if (needsClientGapFill && state.interval) {
     const filled = fillGapsForStoredCandles(candles, volumes, displayInterval, {
       endTimeMs,
     });

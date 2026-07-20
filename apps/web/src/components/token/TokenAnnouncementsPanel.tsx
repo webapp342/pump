@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { useAccount } from "wagmi";
+import { useActiveWalletAddress } from "@/hooks/useActiveWalletAddress";
 import { UserAvatarForAddress } from "@/components/user/UserAvatarForAddress";
 import { UserDisplayName } from "@/components/user/UserDisplayName";
 import { useCreatorFollows } from "@/components/creators/CreatorFollowsProvider";
@@ -13,6 +13,7 @@ import {
 } from "@/lib/token-announcements-shared";
 import { formatAge, formatArenaQuoteUsd } from "@/lib/arena-board-format";
 import { bnbToUsd } from "@/lib/format-usd";
+import { normalizeAddressParam } from "@/lib/address";
 
 function formatMultiplierX(value: number | null | undefined): string {
   if (value == null || !Number.isFinite(value) || value <= 0) return "—";
@@ -40,7 +41,7 @@ export function TokenAnnouncementsPanel({
   currentMarketCapBnb = null,
   bnbUsd = null,
 }: TokenAnnouncementsPanelProps) {
-  const { address } = useAccount();
+  const { address } = useActiveWalletAddress();
   const { isFollowing, toggleFollow } = useCreatorFollows();
   const [items, setItems] = useState<TokenAnnouncementRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -68,7 +69,6 @@ export function TokenAnnouncementsPanel({
   }, [load, refreshKey]);
 
   const currentMcap = Number(currentMarketCapBnb);
-  const self = address?.toLowerCase() ?? "";
 
   const shellClass =
     variant === "tape"
@@ -102,7 +102,8 @@ export function TokenAnnouncementsPanel({
           {items.map((item) => {
             const liveX = liveCalloutMultiplierX(currentMcap, item.marketCapZugAtAnnounce);
             const calledUsd = bnbToUsd(Number(item.marketCapZugAtAnnounce), bnbUsd);
-            const announcer = item.announcerAddress.toLowerCase();
+            const self = address ? normalizeAddressParam(address) : null;
+            const announcer = normalizeAddressParam(item.announcerAddress);
             const isSelf = Boolean(self) && self === announcer;
             const following = isFollowing(item.announcerAddress);
             const xLabel = liveX != null ? formatMultiplierX(liveX) : null;

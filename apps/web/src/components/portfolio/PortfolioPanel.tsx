@@ -50,7 +50,7 @@ import {
   fetchPendingCreatorFeesLamports,
   fetchPendingReferrerFeesLamports,
 } from "@/lib/solana/pending-fees";
-import { bnbToUsd, formatPortfolioHoldingValueUsd, formatUsdReadable, positionAvgEntryUsd, positionUnrealizedUsd, positionUnrealizedPct, scaleCostBasisUsdForBalance } from "@/lib/format-usd";
+import { bnbToUsd, formatPortfolioHoldingValueUsd, formatUsdReadable, positionAvgEntryUsd, positionUnrealizedUsd, positionUnrealizedPct, resolveOpenLotCostUsd, scaleCostBasisUsdForBalance } from "@/lib/format-usd";
 import { formatCapForBoard } from "@/lib/arena-board-format";
 import {
   PORTFOLIO_CREATOR_WALLET_SCAN_MAX,
@@ -1166,7 +1166,7 @@ export function PortfolioPanel({
       const val = view.balance * Number(view.position.lastPriceBnb);
       values[key] = val;
       totalValue += val;
-      totalPnl += holdingNetPnlBnb(view);
+      totalPnl += holdingOpenPnlBnb(view);
     }
 
     for (const holding of walletHoldings) {
@@ -1377,33 +1377,20 @@ export function PortfolioPanel({
     (sum, view) => sum + (holdingOpenPnlUsd(view, bnbUsd) ?? 0),
     0
   );
-  const totalRealizedPnlUsd = metricViews.reduce(
-    (sum, view) => sum + view.realizedPnlUsd,
-    0
-  );
-  const totalNetPnlUsd = totalUnrealizedPnlUsd + totalRealizedPnlUsd;
   const nativeBnb = nativeCashBalance;
   const nativeUsd = bnbToUsd(nativeBnb, bnbUsd) ?? 0;
   const holdingsOnlyUsd = bnbToUsd(holdingsBnbTotal, bnbUsd) ?? 0;
   const totalEstimatedUsd = holdingsOnlyUsd + nativeUsd;
-  const totalCostBasisUsd = metricViews.reduce(
-    (sum, view) => sum + view.remainingCostBasisUsd,
-    0
-  );
-  const totalUnrealizedPnl = metricViews.reduce(
-    (sum, view) => sum + holdingOpenPnlBnb(view),
-    0
-  );
-  const totalRealizedPnl = metricViews.reduce((sum, view) => sum + view.realizedPnlBnb, 0);
-  const totalNetPnl = totalUnrealizedPnl + totalRealizedPnl;
-  const totalCostBasis = metricViews.reduce(
-    (sum, view) => sum + view.remainingCostBasis,
-    0
-  );
+  const totalCostBasisUsd = metricViews.reduce((sum, view) => {
+    const cost = resolveOpenLotCostUsd(
+      view.remainingCostBasisUsd,
+      view.remainingCostBasis,
+      bnbUsd
+    );
+    return sum + (cost ?? 0);
+  }, 0);
   const portfolioValuePct =
     totalCostBasisUsd > 0 ? (totalUnrealizedPnlUsd / totalCostBasisUsd) * 100 : null;
-  const portfolioNetPnlPct =
-    totalCostBasisUsd > 0 ? (totalNetPnlUsd / totalCostBasisUsd) * 100 : null;
   const topHolding = resolveTopHoldingSummary(displayHoldingsRows, nativeBnb, bnbUsd);
   const claimedBnb = data.creatorFeesClaimedBnb ?? 0;
   const pendingBnb = isSolanaPortfolio
@@ -1527,8 +1514,8 @@ export function PortfolioPanel({
           canEditProfile={isOwnPortfolio && isConnected}
           onOpenProfileEditor={() => setAvatarPickerOpen(true)}
           totalValueUsd={totalEstimatedUsd}
-          totalNetPnlUsd={totalNetPnlUsd}
-          totalNetPnlPct={portfolioNetPnlPct}
+          totalNetPnlUsd={totalUnrealizedPnlUsd}
+          totalNetPnlPct={portfolioValuePct}
           valueFlashClass={flashText(totalValueFlash)}
           showWalletActions={isOwnPortfolio && isConnected}
         />
@@ -1554,8 +1541,8 @@ export function PortfolioPanel({
 
         <PortfolioSummaryStrip
           totalValueUsd={totalEstimatedUsd}
-          totalNetPnlUsd={totalNetPnlUsd}
-          totalNetPnlPct={portfolioNetPnlPct}
+          totalNetPnlUsd={totalUnrealizedPnlUsd}
+          totalNetPnlPct={portfolioValuePct}
           topHolding={topHolding}
           coinsHeld={tokenHoldingsCount}
           valueFlashClass={flashText(totalValueFlash)}
