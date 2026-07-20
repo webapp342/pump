@@ -8,7 +8,7 @@ import {
   readBoardStatsForPublish,
 } from "./board-stats.js";
 import { upsertCandlesAfterTrade } from "./candles.js";
-import { publishTrade } from "./redis-publish.js";
+import { publishTrade, publishWalletTrade } from "./redis-publish.js";
 import {
   asBigInt,
   asBool,
@@ -418,6 +418,60 @@ export class SolanaEventHandlers {
         },
       });
 
+      const positionRow = await this.context.launchpadPool.query<{
+        token_balance: string;
+        remaining_cost_basis_zug: string;
+        realized_pnl_zug: string;
+        remaining_cost_basis_usd: string;
+        realized_pnl_usd: string;
+      }>(
+        `
+          SELECT
+            token_balance::text,
+            COALESCE(remaining_cost_basis_zug, 0)::text AS remaining_cost_basis_zug,
+            realized_pnl_zug::text,
+            COALESCE(remaining_cost_basis_usd, 0)::text AS remaining_cost_basis_usd,
+            COALESCE(realized_pnl_usd, 0)::text AS realized_pnl_usd
+          FROM user_positions
+          WHERE token_address = $1 AND address = $2
+        `,
+        [mint, trader]
+      );
+      const position = positionRow.rows[0];
+      if (position) {
+        await publishWalletTrade({
+          type: "wallet_trade",
+          walletAddress: trader,
+          tokenAddress: mint,
+          trade: {
+            id: inserted.tradeId,
+            side,
+            traderAddress: trader,
+            zugAmount: lamportsToSol(solAmount),
+            feeZug: lamportsToSol(feeLamports),
+            tokenAmount: tokenAmountToDecimal(tokenAmount, decimals),
+            priceZug: executionPrice,
+            txHash: event.signature,
+            logIndex: event.logIndex,
+            blockTime: blockTime.toISOString(),
+          },
+          position: {
+            tokenBalance: position.token_balance,
+            remainingCostBasisZug: position.remaining_cost_basis_zug,
+            realizedPnlZug: position.realized_pnl_zug,
+            remainingCostBasisUsd: position.remaining_cost_basis_usd,
+            realizedPnlUsd: position.realized_pnl_usd,
+          },
+          bonding: {
+            reserveZug: inserted.bonding.reserve_zug,
+            tokenSold: inserted.bonding.token_sold,
+            lastPriceZug: markPrice,
+            marketCapZug: mcap,
+            spotPriceZug: markPrice,
+          },
+        });
+      }
+
       console.log(
         `[indexer-sol] Trade ${side} mint=${mint} trader=${trader} sol=${lamportsToSol(solAmount)}`
       );
@@ -478,6 +532,7 @@ export class SolanaEventHandlers {
 
     const row = existing.rows[0];
     let balance = Number(row?.token_balance ?? 0);
+    const oldBalance = balance;
     let bought = Number(row?.total_bought_zug ?? 0);
     let sold = Number(row?.total_sold_zug ?? 0);
     let cost = Number(row?.remaining_cost_basis_zug ?? 0);
@@ -526,5 +581,39 @@ export class SolanaEventHandlers {
         String(realized),
       ]
     );
+
+    await this.updateHolderCountIncremental(client, mint, oldBalance, balance);
+  }
+
+  private async updateHolderCountIncremental(
+    client: pg.PoolClient,
+    token: string,
+    oldBalance: number,
+    newBalance: number
+  ): Promise<void> {
+    if (oldBalance <= 0 && newBalance > 0) {
+      await client.query(
+        `
+          UPDATE bonding_states
+          SET holder_count = holder_count + 1,
+              updated_at = now()
+          WHERE token_address = $1
+        `,
+        [token]
+      );
+      return;
+    }
+
+    if (oldBalance > 0 && newBalance <= 0) {
+      await client.query(
+        `
+          UPDATE bonding_states
+          SET holder_count = GREATEST(holder_count - 1, 0),
+              updated_at = now()
+          WHERE token_address = $1
+        `,
+        [token]
+      );
+    }
   }
 }

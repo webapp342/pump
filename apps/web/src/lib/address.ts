@@ -74,3 +74,32 @@ export function normalizeUserStorageAddress(value: string): string {
   if (!normalized) throw new Error("Invalid address");
   return normalized;
 }
+
+/**
+ * Address for SQL WHERE / INSERT on launchpad tables.
+ * Solana: canonical base58 (case-sensitive). EVM: lowercase 0x.
+ */
+export function dbStorageAddress(value: string): string {
+  if (isSolanaChainFamily) {
+    const normalized = normalizeAddressParam(value);
+    if (!normalized) throw new Error("Invalid Solana address");
+    return normalized;
+  }
+  return value.trim().toLowerCase();
+}
+
+/**
+ * Compare/store tx hashes safely across chain families.
+ * EVM: lowercase 0x. Solana: preserve base58 case (signatures are case-sensitive).
+ */
+export function txHashKey(value: string): string {
+  const trimmed = value.trim();
+  if (trimmed.startsWith("0x") || trimmed.startsWith("0X")) {
+    return trimmed.toLowerCase();
+  }
+  return trimmed;
+}
+
+export function txHashesEqual(a: string, b: string): boolean {
+  return txHashKey(a) === txHashKey(b);
+}

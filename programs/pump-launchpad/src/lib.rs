@@ -456,6 +456,10 @@ fn process_buy(program_id: &Pubkey, accounts: &[AccountInfo], data: &[u8]) -> Pr
     if c.paused != 0 || !keys_eq(&c.mint, mint.key()) || !keys_eq(&c.token_vault, vault.key()) {
         return Err(ProgramError::InvalidAccountData);
     }
+    // Creator account must match curve PDA state (prevents fee redirection).
+    if !keys_eq(&c.creator, creator.key()) {
+        return Err(ProgramError::InvalidAccountData);
+    }
 
     let quote = math::quote_buy(
         sol_in,
@@ -559,8 +563,18 @@ fn process_sell(program_id: &Pubkey, accounts: &[AccountInfo], data: &[u8]) -> P
     let token_in = read_u64(data, 0)?;
     let min_sol = read_u64(data, 8)?;
     let g = load_pod::<GlobalConfig>(global)?;
+    if g.emergency_halt != 0 {
+        return Err(ProgramError::InvalidAccountData);
+    }
+    if !keys_eq(&g.treasury, treasury.key()) {
+        return Err(ProgramError::InvalidAccountData);
+    }
+
     let mut c = load_pod::<Curve>(curve)?;
-    if !keys_eq(&c.mint, mint.key()) || !keys_eq(&c.token_vault, vault.key()) {
+    if c.paused != 0 || !keys_eq(&c.mint, mint.key()) || !keys_eq(&c.token_vault, vault.key()) {
+        return Err(ProgramError::InvalidAccountData);
+    }
+    if !keys_eq(&c.creator, creator.key()) {
         return Err(ProgramError::InvalidAccountData);
     }
 
@@ -698,6 +712,14 @@ fn split_fees(
         .ok_or(ProgramError::InvalidAccountData)?
         .checked_sub(referrer_fee)
         .ok_or(ProgramError::InvalidAccountData)?;
+
+    // Defense in depth: never pay fees to a mismatched creator account.
+    if !keys_eq(&c.creator, creator.key()) {
+        return Err(ProgramError::InvalidAccountData);
+    }
+    if !keys_eq(&g.treasury, treasury.key()) {
+        return Err(ProgramError::InvalidAccountData);
+    }
 
     if creator_fee > 0 {
         *curve.try_borrow_mut_lamports()? -= creator_fee;

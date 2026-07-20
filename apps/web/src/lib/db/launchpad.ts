@@ -1,5 +1,6 @@
-import { Pool } from "pg";
+﻿import { Pool } from "pg";
 import {
+  dbStorageAddress,
   normalizeAddressParam,
   normalizeTokenAddress,
   normalizeUserStorageAddress,
@@ -34,7 +35,7 @@ const SQL_BONDING_MARK_PRICE_ZUG = `
   END
 `;
 
-/** SQL: FDV / market cap from bonding mark price × 1B supply. */
+/** SQL: FDV / market cap from bonding mark price أ— 1B supply. */
 const SQL_BONDING_MARK_CAP_ZUG = `((${SQL_BONDING_MARK_PRICE_ZUG}) * ${BONDING_TOKEN_SUPPLY_HUMAN})`;
 
 function resolvePositionMarkPriceBnb(
@@ -590,9 +591,14 @@ function arenaBoardFilterClause(
   }
   if (filter === "hasAirdrop") {
     if (airdropAddresses.length > 0) {
+      const params = isSolanaChainFamily
+        ? airdropAddresses.map((address) => dbStorageAddress(address))
+        : airdropAddresses.map((address) => address.toLowerCase());
       return {
-        clause: "WHERE LOWER(address) = ANY($3::text[])",
-        params: airdropAddresses.map((address) => address.toLowerCase()),
+        clause: isSolanaChainFamily
+          ? "WHERE address = ANY($3::text[])"
+          : "WHERE LOWER(address) = ANY($3::text[])",
+        params,
       };
     }
     return {
@@ -653,8 +659,14 @@ export async function listTokenListItemsByAddresses(
   const normalized = [
     ...new Set(
       addresses
-        .map((address) => address.toLowerCase())
-        .filter((address) => /^0x[a-f0-9]{40}$/.test(address))
+        .map((address) => {
+          try {
+            return dbStorageAddress(address);
+          } catch {
+            return null;
+          }
+        })
+        .filter((address): address is string => address != null)
     ),
   ];
   if (normalized.length === 0) return [];
@@ -894,7 +906,7 @@ export async function listTokensByCreator(
   offset = 0
 ): Promise<TokenListItem[]> {
   const db = getLaunchpadReadPool();
-  const normalized = creatorAddress.toLowerCase();
+  const normalized = dbStorageAddress(creatorAddress);
   let orderBy = limit ? "ORDER BY bt.created_at DESC LIMIT $2" : "ORDER BY bt.created_at DESC";
   const params: (string | number)[] = [normalized];
 
@@ -931,7 +943,7 @@ export async function listTokensByCreator(
 
 export async function countTokensByCreator(creatorAddress: string): Promise<number> {
   const db = getLaunchpadReadPool();
-  const normalized = creatorAddress.toLowerCase();
+  const normalized = dbStorageAddress(creatorAddress);
   const result = await db.query<{ count: number }>(
     `
       SELECT COUNT(*)::int AS count
@@ -1139,7 +1151,7 @@ export type TokenHolderSnapshot = {
   remainingCostBasisBnb: string;
   remainingCostBasisUsd?: string;
   realizedPnlUsd?: string;
-  /** Open-lot start (earliest open lot); client shows “Held …”. */
+  /** Open-lot start (earliest open lot); client shows â€œHeld â€¦â€‌. */
   heldSince?: string | null;
 };
 
@@ -1158,7 +1170,7 @@ export async function getTopTokenAddressByMcap(): Promise<string | null> {
       `
     );
     if (board.rows[0]?.token_address) {
-      return board.rows[0].token_address.toLowerCase();
+      return board.rows[0].token_address;
     }
   }
 
@@ -1172,7 +1184,7 @@ export async function getTopTokenAddressByMcap(): Promise<string | null> {
     LIMIT 1
     `
   );
-  return bonding.rows[0]?.token_address?.toLowerCase() ?? null;
+  return bonding.rows[0]?.token_address ?? null;
 }
 
 export async function getTokenByAddress(address: string): Promise<TokenDetail | null> {
@@ -1303,7 +1315,7 @@ export async function listTradesForToken(
     ORDER BY block_number DESC, log_index DESC
     LIMIT $2 OFFSET $3
     `,
-    [address.toLowerCase(), limit, offset]
+    [dbStorageAddress(address), limit, offset]
   );
 
   return attachTraderDisplayNames(
@@ -1332,7 +1344,7 @@ export async function countTradesForToken(address: string): Promise<number> {
   const db = getLaunchpadReadPool();
   const result = await db.query<{ count: string }>(
     `SELECT COUNT(*)::text AS count FROM trades WHERE token_address = $1`,
-    [address.toLowerCase()]
+    [dbStorageAddress(address)]
   );
   return Number(result.rows[0]?.count ?? 0);
 }
@@ -1343,7 +1355,7 @@ export async function listTokenHolders(
   offset = 0
 ): Promise<TokenHolderSnapshot[]> {
   const db = getLaunchpadReadPool();
-  const normalized = tokenAddress.toLowerCase();
+  const normalized = dbStorageAddress(tokenAddress);
 
   type HolderDbRow = {
     address: string;
@@ -1402,7 +1414,7 @@ export async function listTokenHolders(
     );
     return mapRows(result.rows);
   } catch {
-    // user_position_lots may be missing before migration 042 — still return balances.
+    // user_position_lots may be missing before migration 042 â€” still return balances.
     const result = await db.query<HolderDbRow>(
       `
       SELECT
@@ -1435,7 +1447,7 @@ export async function countTokenHolders(tokenAddress: string): Promise<number> {
     WHERE p.token_address = $1
       AND p.token_balance > 0
     `,
-    [tokenAddress.toLowerCase()]
+    [dbStorageAddress(tokenAddress)]
   );
   return Number(result.rows[0]?.count ?? 0);
 }
@@ -1491,7 +1503,7 @@ export async function listTradesForChart(address: string, limit = 5000): Promise
     ) recent
     ORDER BY recent.block_time ASC, recent.block_number ASC, recent.log_index ASC
     `,
-    [address.toLowerCase(), limit]
+    [dbStorageAddress(address), limit]
   );
 
   return result.rows.map((row) => {
@@ -1559,7 +1571,7 @@ export async function listTokenCandlesFromDb(
     ORDER BY bucket_ts DESC
     LIMIT $3
     `,
-    [address.toLowerCase(), interval, limit]
+    [dbStorageAddress(address), interval, limit]
   );
 
   return result.rows
@@ -1605,7 +1617,7 @@ export async function listTokenCandlesGapFilledFromDb(
       trade_count
     FROM gap_fill_candles($1, $2, $3, now())
     `,
-    [address.toLowerCase(), interval, limit]
+    [dbStorageAddress(address), interval, limit]
   );
 
   return result.rows.map((row) => ({
@@ -1649,7 +1661,7 @@ export async function getUserVolumeBnb(address: string): Promise<number> {
   const db = getLaunchpadReadPool();
   const result = await db.query<{ total_volume_zug: string | null }>(
     "SELECT total_volume_zug::text FROM user_volumes WHERE address = $1",
-    [address.toLowerCase()]
+    [dbStorageAddress(address)]
   );
 
   return Number(result.rows[0]?.total_volume_zug ?? 0);
@@ -1665,12 +1677,12 @@ export type FirstSmartBuyTrade = {
   zugAmountBnb: number;
 };
 
-/** Earliest qualifying buy on another creator's token (≥ 0.01 BNB). */
+/** Earliest qualifying buy on another creator's token (â‰¥ 0.01 BNB). */
 export async function getFirstSmartBuyQualifyingTrade(
   traderAddress: string
 ): Promise<FirstSmartBuyTrade | null> {
   const db = getLaunchpadReadPool();
-  const normalized = traderAddress.toLowerCase();
+  const normalized = dbStorageAddress(traderAddress);
 
   const result = await db.query<{
     event_id: string;
@@ -1772,7 +1784,7 @@ export async function getCreatorFeesClaimedBnb(address: string): Promise<number>
     FROM creator_fee_claims
     WHERE creator_address = $1
     `,
-    [address.toLowerCase()]
+    [dbStorageAddress(address)]
   );
 
   return Number(result.rows[0]?.total ?? 0);
@@ -1795,7 +1807,7 @@ export async function listCreatorFeeClaims(
     ORDER BY block_time DESC
     LIMIT $2
     `,
-    [address.toLowerCase(), limit]
+    [dbStorageAddress(address), limit]
   );
 
   return result.rows.map((row) => ({
@@ -1827,9 +1839,9 @@ export async function recordCreatorFeeClaim(input: {
     ON CONFLICT (tx_hash, log_index) DO NOTHING
     `,
     [
-      input.creatorAddress.toLowerCase(),
+      dbStorageAddress(input.creatorAddress),
       input.amountBnb,
-      input.txHash.toLowerCase(),
+      isSolanaChainFamily ? input.txHash : input.txHash.toLowerCase(),
       input.logIndex,
       input.blockNumber,
       input.blockTime,
@@ -1846,7 +1858,7 @@ export type ReferralStats = {
 
 export async function getReferralStats(address: string): Promise<ReferralStats> {
   const db = getLaunchpadReadPool();
-  const normalized = address.toLowerCase();
+  const normalized = dbStorageAddress(address);
 
   const rollup = await db.query<{
     qualified_invite_count: number;
@@ -1944,9 +1956,9 @@ export async function recordReferrerFeeClaim(input: {
     ON CONFLICT (tx_hash, log_index) DO NOTHING
     `,
     [
-      input.referrerAddress.toLowerCase(),
+      dbStorageAddress(input.referrerAddress),
       input.amountBnb,
-      input.txHash.toLowerCase(),
+      isSolanaChainFamily ? input.txHash : input.txHash.toLowerCase(),
       input.logIndex,
       input.blockNumber,
       input.blockTime,
@@ -1954,7 +1966,7 @@ export async function recordReferrerFeeClaim(input: {
   );
 }
 
-/** @deprecated Use getCreatorFeesClaimedBnb — trade fees ≠ claimable balance. */
+/** @deprecated Use getCreatorFeesClaimedBnb â€” trade fees â‰  claimable balance. */
 export async function getCreatorFeesAccruedBnb(address: string): Promise<number> {
   return getCreatorFeesClaimedBnb(address);
 }
@@ -2006,7 +2018,7 @@ export async function listLaunchpadTokensByCreatorForWalletBalance(
   limit?: number
 ): Promise<LaunchpadTokenWalletCatalogEntry[]> {
   const db = getLaunchpadReadPool();
-  const normalized = creatorAddress.toLowerCase();
+  const normalized = dbStorageAddress(creatorAddress);
   const cappedLimit =
     limit != null && Number.isFinite(limit) && limit > 0 ? Math.floor(limit) : null;
 
@@ -2069,7 +2081,7 @@ export async function getPortfolioForAddress(
   options?: { createdLimit?: number }
 ): Promise<PortfolioSnapshot> {
   const db = getLaunchpadReadPool();
-  const normalized = address.toLowerCase();
+  const normalized = dbStorageAddress(address);
   const createdLimit = options?.createdLimit;
 
   const [volumeResult, positionsResult, createdTokens, createdTokensTotal, creatorFeesClaimedBnb, followCountsResult, userResult] =
@@ -2214,7 +2226,7 @@ export async function getCreatorFollowNetwork(
   limit = 100
 ): Promise<CreatorFollowNetwork> {
   const db = getLaunchpadReadPool();
-  const normalized = address.toLowerCase();
+  const normalized = dbStorageAddress(address);
 
   const [countsResult, followingResult, followersResult] = await Promise.all([
     db.query<{ following_count: number; follower_count: number }>(
@@ -2450,8 +2462,8 @@ export async function getCreatorCardData(
   viewerAddress?: string | null
 ): Promise<CreatorCardData | null> {
   const db = getLaunchpadReadPool();
-  const token = tokenAddress.toLowerCase();
-  const viewer = viewerAddress?.toLowerCase() ?? null;
+  const token = dbStorageAddress(tokenAddress);
+  const viewer = viewerAddress ? dbStorageAddress(viewerAddress) : null;
 
   const result = await db.query<{
     creator_address: string;
@@ -2535,7 +2547,7 @@ export type CreatorProfile = {
 
 export async function getCreatorProfile(address: string): Promise<CreatorProfile> {
   const db = getLaunchpadReadPool();
-  const normalized = address.toLowerCase();
+  const normalized = dbStorageAddress(address);
 
   const [countsResult, volumeResult, createdResult, otherHoldingsResult, creatorFeesClaimedBnb] =
     await Promise.all([

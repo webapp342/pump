@@ -48,6 +48,11 @@ import {
   removeOptimisticActivities,
 } from "@/lib/optimistic-activity";
 import { contracts, explorerAddressUrl, pumpChain, shortAddress } from "@/config/chain";
+import {
+  normalizeRouteAddressKey,
+  routeAddressKeysEqual,
+  txHashKey,
+} from "@/lib/address";
 import { isSolanaChainFamily } from "@/config/chain-family";
 import { usePumpWallet } from "@/components/wallet/PumpWalletProvider";
 import { useSolanaTradeMarket } from "@/hooks/useSolanaTradeMarket";
@@ -440,16 +445,16 @@ export function TokenDetailLive({
 
       if (!response.ok || !body.data) return;
 
-      const dbHashes = new Set(body.data.trades.map((t) => t.txHash.toLowerCase()));
+      const dbHashes = new Set(body.data.trades.map((t) => txHashKey(t.txHash)));
       const stillPending = optimisticRef.current.some(
-        (t) => !dbHashes.has(t.txHash.toLowerCase())
+        (t) => !dbHashes.has(txHashKey(t.txHash))
       );
 
       removeOptimisticActivities(body.data.trades.map((t) => t.txHash));
 
       setDbTrades(body.data.trades);
       setOptimisticTrades((prev) =>
-        prev.filter((t) => !dbHashes.has(t.txHash.toLowerCase()))
+        prev.filter((t) => !dbHashes.has(txHashKey(t.txHash)))
       );
 
       if (stillPending) {
@@ -506,7 +511,7 @@ export function TokenDetailLive({
           }
           setToken((prev) => patchTokenDetailFromWsTrade(prev, payload) ?? prev);
           setOptimisticTrades((prev) =>
-            prev.filter((t) => t.txHash.toLowerCase() !== tradeItem.txHash.toLowerCase())
+            prev.filter((t) => txHashKey(t.txHash) !== txHashKey(tradeItem.txHash))
           );
           if (payload.candleUpdates?.length) {
             setActorChartSpot(null);
@@ -526,7 +531,7 @@ export function TokenDetailLive({
   const queueWsMessage = useRafMessageQueue(applyWsMessages);
 
   const { connected: wsConnected } = useLiveChannel({
-    room: `token:${streamAddress.toLowerCase()}`,
+    room: `token:${normalizeRouteAddressKey(streamAddress)}`,
     onMessage: (message) => {
       queueWsMessage(message);
     },
@@ -555,7 +560,21 @@ export function TokenDetailLive({
 
   const applyOptimisticFromReceipt = useCallback(
     async (payload: TradeConfirmedPayload) => {
-      if (!payload.receipt) return;
+      // Solana silent trades have no EVM receipt — keep optimistic row until DB/WS catches up.
+      if (!payload.receipt) {
+        if (isSolanaChainFamily) {
+          const pendingPrefix = "pending:";
+          setOptimisticTrades((prev) =>
+            prev.map((t) =>
+              t.txHash.startsWith(pendingPrefix)
+                ? { ...t, txHash: payload.txHash, id: payload.txHash }
+                : t
+            )
+          );
+          void refetchCurve();
+        }
+        return;
+      }
       let blockTimeIso: string | undefined;
       try {
         const block = await publicClient.getBlock({
@@ -580,7 +599,7 @@ export function TokenDetailLive({
       if (parsed.length > 0) {
         setOptimisticTrades((prev) => {
           const without = prev.filter(
-            (t) => t.txHash.toLowerCase() !== payload.txHash.toLowerCase()
+            (t) => txHashKey(t.txHash) !== txHashKey(payload.txHash)
           );
           return [...items, ...without];
         });
@@ -634,7 +653,7 @@ export function TokenDetailLive({
       setActorChartSpot(null);
       setOptimisticTrades((prev) => {
         const next = prev.filter(
-          (t) => t.txHash.toLowerCase() !== pendingTxHash.toLowerCase()
+          (t) => txHashKey(t.txHash) !== txHashKey(pendingTxHash)
         );
         if (next.length === 0) {
           optimisticTokenSnapshotRef.current = null;
@@ -661,9 +680,21 @@ export function TokenDetailLive({
       burstUntilRef.current = Date.now() + BURST_DURATION_MS;
       setIndexerSyncing(true);
       optimisticTokenSnapshotRef.current = null;
-      setOptimisticTrades((prev) =>
-        prev.filter((t) => !t.txHash.toLowerCase().startsWith("pending:"))
-      );
+
+      if (isSolanaChainFamily && !payload.receipt) {
+        // Promote pending:* → real signature so the tape stays visible until indexer lands.
+        setOptimisticTrades((prev) =>
+          prev.map((t) =>
+            t.txHash.startsWith("pending:")
+              ? { ...t, txHash: payload.txHash, id: payload.txHash }
+              : t
+          )
+        );
+      } else {
+        setOptimisticTrades((prev) =>
+          prev.filter((t) => !txHashKey(t.txHash).startsWith("pending:"))
+        );
+      }
 
       pushOptimisticActivity({
         txHash: payload.txHash,
@@ -695,20 +726,27 @@ export function TokenDetailLive({
     }
 
     const knownHashes = new Set(
-      initialTrades.map((t) => t.txHash.toLowerCase())
+      initialTrades.map((t) => txHashKey(t.txHash))
     );
 
     const pending = listRecentOptimisticActivities().filter(
       (activity) =>
-        activity.tokenAddress?.toLowerCase() === streamAddress.toLowerCase() &&
+        activity.tokenAddress != null &&
+        routeAddressKeysEqual(activity.tokenAddress, streamAddress) &&
         (activity.type === "create" || activity.type === "buy" || activity.type === "sell") &&
-        !knownHashes.has(activity.txHash.toLowerCase())
+        !knownHashes.has(txHashKey(activity.txHash))
     );
 
     if (pending.length === 0) return;
 
     burstUntilRef.current = Date.now() + BURST_DURATION_MS;
     setIndexerSyncing(true);
+
+    // Solana signatures are not EVM receipts — skip receipt hydration.
+    if (isSolanaChainFamily) {
+      void fetchLive();
+      return;
+    }
 
     void (async () => {
       const snapshotUsdRate =
@@ -733,7 +771,7 @@ export function TokenDetailLive({
 
       for (const row of receipts) {
         if (!row) continue;
-        dropHashes.add(row.activity.txHash.toLowerCase());
+        dropHashes.add(txHashKey(row.activity.txHash));
 
         let blockTimeIso: string | undefined;
         try {
@@ -759,7 +797,7 @@ export function TokenDetailLive({
       if (batchItems.length > 0) {
         setOptimisticTrades((prev) => {
           const without = prev.filter(
-            (t) => !dropHashes.has(t.txHash.toLowerCase())
+            (t) => !dropHashes.has(txHashKey(t.txHash))
           );
           return [...batchItems, ...without];
         });

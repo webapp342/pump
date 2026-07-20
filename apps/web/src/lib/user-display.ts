@@ -1,13 +1,22 @@
+import { addressCacheKey } from "@/lib/address";
 import { getUsernamesMap } from "@/lib/db/users";
 import type { TokenListItem, TradeItem, TokenHolderSnapshot } from "@/lib/db/launchpad";
 import { resolveDisplayUsername } from "@/lib/username";
+
+function usernameMapKey(address: string): string {
+  return addressCacheKey(address) ?? address.trim();
+}
 
 export function displayUsernameFor(
   address: string,
   usernameMap: Map<string, string | null>,
   compact = false
 ): string {
-  return resolveDisplayUsername(address, usernameMap.get(address.toLowerCase()) ?? null, compact);
+  return resolveDisplayUsername(
+    address,
+    usernameMap.get(usernameMapKey(address)) ?? null,
+    compact
+  );
 }
 
 export async function attachCreatorDisplayNames(
@@ -16,7 +25,7 @@ export async function attachCreatorDisplayNames(
   if (tokens.length === 0) return tokens;
   const map = await getUsernamesMap(tokens.map((token) => token.creatorAddress));
   return tokens.map((token) => {
-    const username = map.get(token.creatorAddress.toLowerCase()) ?? null;
+    const username = map.get(usernameMapKey(token.creatorAddress)) ?? null;
     return {
       ...token,
       creatorUsername: username,
@@ -29,7 +38,7 @@ export async function attachTraderDisplayNames(trades: TradeItem[]): Promise<Tra
   if (trades.length === 0) return trades;
   const map = await getUsernamesMap(trades.map((trade) => trade.traderAddress));
   return trades.map((trade) => {
-    const username = map.get(trade.traderAddress.toLowerCase()) ?? null;
+    const username = map.get(usernameMapKey(trade.traderAddress)) ?? null;
     return {
       ...trade,
       traderUsername: username,
@@ -68,7 +77,7 @@ export async function buildDisplayUsernameRecord(
   const map = await getUsernamesMap(addresses);
   const record: Record<string, string> = {};
   for (const address of addresses) {
-    const key = address.toLowerCase();
+    const key = usernameMapKey(address);
     record[key] = displayUsernameFor(address, map, compact);
   }
   return record;

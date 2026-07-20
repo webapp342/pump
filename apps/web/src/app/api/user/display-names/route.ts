@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
-import { normalizeAddressParam } from "@/lib/address";
+import { addressCacheKey, normalizeAddressParam } from "@/lib/address";
 import { addressesWithActiveMarketItem } from "@/lib/db/incentive";
 import { buildDisplayUsernameRecord } from "@/lib/user-display";
 import { getUsernamesMap } from "@/lib/db/users";
@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
     const usernames: Record<string, string | null> = {};
     const statusBadges: Record<string, boolean> = {};
     for (const address of addresses) {
-      const key = address.toLowerCase();
+      const key = addressCacheKey(address) ?? address;
       usernames[key] = usernameMap.get(key) ?? null;
       statusBadges[key] = badgeOwners.has(key);
     }
@@ -45,10 +45,13 @@ export async function GET(request: NextRequest) {
           usernames,
           statusBadges,
           resolve: Object.fromEntries(
-            addresses.map((address) => [
-              address.toLowerCase(),
-              resolveDisplayUsername(address, usernameMap.get(address.toLowerCase()) ?? null, compact),
-            ])
+            addresses.map((address) => {
+              const key = addressCacheKey(address) ?? address;
+              return [
+                key,
+                resolveDisplayUsername(address, usernameMap.get(key) ?? null, compact),
+              ];
+            })
           ),
         },
       },

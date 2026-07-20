@@ -21,5 +21,10 @@ export function setHoldersCache<T>(key: string, data: T): void {
 }
 
 export function holdersCacheKey(tokenAddress: string, limit: number, offset: number): string {
-  return `holders:${tokenAddress.toLowerCase()}:${limit}:${offset}`;
+  // Preserve Solana base58 case; only lowercase EVM 0x addresses.
+  const key =
+    tokenAddress.startsWith("0x") || tokenAddress.startsWith("0X")
+      ? tokenAddress.toLowerCase()
+      : tokenAddress;
+  return `holders:${key}:${limit}:${offset}`;
 }

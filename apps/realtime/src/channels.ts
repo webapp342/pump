@@ -20,11 +20,18 @@ export const REDIS_CHANNELS = {
 } as const;
 
 export function tradeRoom(tokenAddress: string): string {
-  return `token:${tokenAddress.toLowerCase()}`;
+  // Solana base58 is case-sensitive — never lowercase non-0x addresses.
+  const key = tokenAddress.startsWith("0x") || tokenAddress.startsWith("0X")
+    ? tokenAddress.toLowerCase()
+    : tokenAddress;
+  return `token:${key}`;
 }
 
 export function walletRoom(walletAddress: string): string {
-  return `wallet:${walletAddress.toLowerCase()}`;
+  const key = walletAddress.startsWith("0x") || walletAddress.startsWith("0X")
+    ? walletAddress.toLowerCase()
+    : walletAddress;
+  return `wallet:${key}`;
 }
 
 export function arenaRoom(): string {

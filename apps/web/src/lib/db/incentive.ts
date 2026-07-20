@@ -1212,8 +1212,14 @@ export async function addressesWithActiveMarketItem(
   const normalized = [
     ...new Set(
       addresses
-        .map((address) => address.toLowerCase())
-        .filter((address) => /^0x[a-f0-9]{40}$/.test(address))
+        .map((address) => {
+          try {
+            return normalizeUserStorageAddress(address);
+          } catch {
+            return null;
+          }
+        })
+        .filter((address): address is string => address != null)
     ),
   ];
   const owned = new Set<string>();
@@ -1233,7 +1239,11 @@ export async function addressesWithActiveMarketItem(
       [normalized, itemId]
     );
     for (const row of result.rows) {
-      owned.add(row.address.toLowerCase());
+      try {
+        owned.add(normalizeUserStorageAddress(row.address));
+      } catch {
+        owned.add(row.address);
+      }
     }
   } catch {
     // incentive DB unavailable — treat as no badges
