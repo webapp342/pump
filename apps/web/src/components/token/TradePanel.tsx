@@ -338,14 +338,14 @@ function formatTokenCompact(value: string | number): string {
 }
 
 function TradeOrderValueStrip({
-  side,
+  primaryAsset,
   tokenAddress,
   symbol,
   orderValuePrimary,
   orderValueUsd,
   className = "",
 }: {
-  side: Side;
+  primaryAsset: "token" | "native";
   tokenAddress: `0x${string}`;
   symbol: string;
   orderValuePrimary: string | null;
@@ -357,7 +357,7 @@ function TradeOrderValueStrip({
       <span className="trade-detail-row__label">Order value</span>
       {orderValuePrimary ? (
         <div className="trade-order-value-primary">
-          {side === "buy" ? (
+          {primaryAsset === "token" ? (
             <TokenAvatar address={tokenAddress} symbol={symbol} size="xs" className="!ring-0" />
           ) : (
             <NativeLogo size="xs" />
@@ -1312,9 +1312,13 @@ export function TradePanel({
       if (estimatedOut <= 0n) return null;
       return `${formatTokenCompact(formatUnits(estimatedOut, 18))} ${symbol}`;
     }
+    if (sellInputMode === "usd") {
+      if (sellTokenWei <= 0n) return null;
+      return `${formatTokenCompact(formatUnits(sellTokenWei, 18))} ${symbol}`;
+    }
     if (estimatedOut <= 0n) return null;
     return `${formatBnbReadable(Number(formatEther(estimatedOut)))} ${NATIVE_SYMBOL}`;
-  }, [hasTradeAmount, side, estimatedOut, symbol]);
+  }, [hasTradeAmount, side, sellInputMode, sellTokenWei, estimatedOut, symbol]);
 
   const orderValueUsd = useMemo(() => {
     if (!hasTradeAmount) return null;
@@ -3106,7 +3110,11 @@ export function TradePanel({
 
             {hasTradeAmount ? (
               <TradeOrderValueStrip
-                side={side}
+                primaryAsset={
+                  side === "buy" || (side === "sell" && sellInputMode === "usd")
+                    ? "token"
+                    : "native"
+                }
                 tokenAddress={tokenAddress}
                 symbol={symbol}
                 orderValuePrimary={orderValuePrimary}

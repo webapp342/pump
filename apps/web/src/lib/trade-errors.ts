@@ -32,19 +32,21 @@ export function formatTradeError(err: unknown): string {
     return raw;
   }
 
+  // Runtime rent errors can also include custom program error 0x1. Check
+  // these before the generic SPL-token mapping below.
+  if (
+    lower.includes("insufficient funds for rent") ||
+    lower.includes("insufficientfundsforrent")
+  ) {
+    return `Not enough ${NATIVE_SYMBOL} left for rent after this trade. Lower the amount slightly.`;
+  }
+
   // SPL token "insufficient funds" is NOT a SOL balance problem (vault/ATA).
   if (
     lower.includes("insufficient funds") &&
     (lower.includes("token") || lower.includes("custom program error: 0x1"))
   ) {
     return "Token transfer failed — vault or token account has no balance. Refresh and try again.";
-  }
-
-  if (
-    lower.includes("insufficient funds for rent") ||
-    lower.includes("insufficientfundsforrent")
-  ) {
-    return `Not enough ${NATIVE_SYMBOL} left for rent after this trade. Lower the amount slightly.`;
   }
 
   if (

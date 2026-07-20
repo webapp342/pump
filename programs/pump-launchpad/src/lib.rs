@@ -54,6 +54,7 @@ const IX_WITHDRAW: u8 = 4;
 const IX_SET_REFERRER: u8 = 5;
 
 /// Rent-exempt minimums (devnet/mainnet 2026 — match `getMinimumBalanceForRentExemption`).
+const TREASURY_RENT_LAMPORTS: u64 = 890_880;
 const GLOBAL_RENT_LAMPORTS: u64 = 2_200_000;
 const CURVE_RENT_LAMPORTS: u64 = 1_948_800;
 
@@ -245,6 +246,23 @@ fn process_initialize(
     if global.key() != &global_pda {
         return Err(ProgramError::InvalidSeeds);
     }
+    if global.lamports() > 0 {
+        if !owner_eq(global, program_id) {
+            return Err(ProgramError::IncorrectProgramId);
+        }
+        // Re-initialize is an admin update, not a public takeover path.
+        // The authority is the first 32 bytes in both old and new layouts.
+        let existing_authority_matches = {
+            let existing = unsafe { global.borrow_data_unchecked() };
+            existing
+                .get(..32)
+                .map(|stored| stored == authority.key().as_ref())
+                .unwrap_or(false)
+        };
+        if !existing_authority_matches {
+            return Err(ProgramError::IllegalOwner);
+        }
+    }
     let (signer_pda, signer_bump) = find_program_address(&[FACTORY_SIGNER_SEED], program_id);
     if factory_signer.key() != &signer_pda {
         return Err(ProgramError::InvalidSeeds);
@@ -252,6 +270,25 @@ fn process_initialize(
     let (vault_pda, vault_bump) = find_program_address(&[VAULT_SEED], program_id);
     if treasury.key() != &vault_pda {
         return Err(ProgramError::InvalidSeeds);
+    }
+
+    // Treasury must exist as a rent-exempt, program-owned PDA before receiving
+    // small protocol fees. Crediting an absent account with less than the
+    // rent-exempt minimum makes the runtime reject the entire trade.
+    if treasury.lamports() == 0 {
+        let bump_seed = [vault_bump];
+        let seeds = [Seed::from(VAULT_SEED), Seed::from(bump_seed.as_ref())];
+        let signers = [Signer::from(&seeds)];
+        CreateAccount {
+            from: authority,
+            to: treasury,
+            lamports: TREASURY_RENT_LAMPORTS,
+            space: 0,
+            owner: program_id,
+        }
+        .invoke_signed(&signers)?;
+    } else if !owner_eq(treasury, program_id) {
+        return Err(ProgramError::IncorrectProgramId);
     }
 
     let protocol_fee_bps = read_u64(data, 0)?;

@@ -103,6 +103,7 @@ async function fetchMarket(mintAddress: string, ownerAddress?: string) {
         virtualZugReserve: lamportsToWei(curve.virtualSolReserves),
         virtualTokenReserve: tokenRawToWei(curve.virtualTokenReserves),
         realTokenReserves: tokenRawToWei(curve.realTokenReserves),
+        realSolReserves: lamportsToWei(curve.realSolReserves),
       }
     : undefined;
 

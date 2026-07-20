@@ -507,6 +507,8 @@ export type BondingCurveState = {
   virtualTokenReserve: bigint;
   /** pump.fun real_token_reserves — caps buy output (Solana). */
   realTokenReserves?: bigint;
+  /** pump.fun real_sol_reserves — caps sell output (Solana). */
+  realSolReserves?: bigint;
 };
 
 /** JSON-safe curve fields for passing between client components. */
@@ -517,6 +519,7 @@ export type BondingCurveSnapshot = {
   virtualTokenReserve: string;
   paused: boolean;
   realTokenReserves?: string;
+  realSolReserves?: string;
 };
 
 export function bondingCurveFromSnapshot(snapshot: BondingCurveSnapshot): BondingCurveState {
@@ -527,6 +530,8 @@ export function bondingCurveFromSnapshot(snapshot: BondingCurveSnapshot): Bondin
     virtualTokenReserve: BigInt(snapshot.virtualTokenReserve),
     realTokenReserves:
       snapshot.realTokenReserves != null ? BigInt(snapshot.realTokenReserves) : undefined,
+    realSolReserves:
+      snapshot.realSolReserves != null ? BigInt(snapshot.realSolReserves) : undefined,
   };
 }
 
@@ -585,14 +590,20 @@ export function quoteSellFromCurveState(
 ): { ethOut: bigint; feeZug: bigint } {
   if (tokenIn <= 0n) return { ethOut: 0n, feeZug: 0n };
 
-  const x0 = curve.virtualZugReserve + curve.reserveZug;
-  const y0 = curve.virtualTokenReserve - curve.soldTokens;
+  const pumpFeel = curve.realSolReserves != null;
+  const x0 = pumpFeel
+    ? curve.virtualZugReserve
+    : curve.virtualZugReserve + curve.reserveZug;
+  const y0 = pumpFeel
+    ? curve.virtualTokenReserve
+    : curve.virtualTokenReserve - curve.soldTokens;
   if (y0 === 0n) return { ethOut: 0n, feeZug: 0n };
 
   const k = x0 * y0;
   const x1 = k / (y0 + tokenIn);
   let grossZugOut = x0 - x1;
-  if (grossZugOut > curve.reserveZug) grossZugOut = curve.reserveZug;
+  const realLiquidity = pumpFeel ? curve.realSolReserves! : curve.reserveZug;
+  if (grossZugOut > realLiquidity) grossZugOut = realLiquidity;
 
   const feeZug = (grossZugOut * protocolFeeBps) / BPS;
   return { ethOut: grossZugOut - feeZug, feeZug };
@@ -642,8 +653,13 @@ export function resolveTokenInForBnbOut(
 ): bigint | null {
   if (targetZugOut <= 0n) return null;
 
-  const x0 = curve.virtualZugReserve + curve.reserveZug;
-  const y0 = curve.virtualTokenReserve - curve.soldTokens;
+  const pumpFeel = curve.realSolReserves != null;
+  const x0 = pumpFeel
+    ? curve.virtualZugReserve
+    : curve.virtualZugReserve + curve.reserveZug;
+  const y0 = pumpFeel
+    ? curve.virtualTokenReserve
+    : curve.virtualTokenReserve - curve.soldTokens;
   if (y0 === 0n || x0 === 0n) return null;
 
   const { ethOut: maxEthOut } = quoteSellFromCurveState(curve, protocolFeeBps, y0);
@@ -655,7 +671,8 @@ export function resolveTokenInForBnbOut(
   if (feeMultiplier <= 0n) return null;
 
   let grossNeeded = (effectiveTarget * BPS + feeMultiplier - 1n) / feeMultiplier;
-  if (grossNeeded > curve.reserveZug) grossNeeded = curve.reserveZug;
+  const realLiquidity = pumpFeel ? curve.realSolReserves! : curve.reserveZug;
+  if (grossNeeded > realLiquidity) grossNeeded = realLiquidity;
   if (grossNeeded <= 0n || grossNeeded >= x0) return null;
 
   const k = x0 * y0;
