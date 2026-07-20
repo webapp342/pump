@@ -156,29 +156,61 @@ export async function upsertBoardStatsAfterTrade(
 export async function reconcileBoardStatsRollingWindows(pool: pg.Pool): Promise<void> {
   if (!incrementalBoardStatsEnabled()) return;
 
+  // Use per-token virtual reserves (Solana pump-feel is ~30/1.073B, not EVM 5/1B).
   await pool.query(`
     UPDATE token_board_stats tbs
     SET
       spot_price_zug = CASE
-        WHEN (1000000000::numeric - COALESCE(b.token_sold, 0)) > 0
-        THEN (5::numeric + COALESCE(b.reserve_zug, 0))
-             / (1000000000::numeric - COALESCE(b.token_sold, 0))
+        WHEN (
+          COALESCE(b.virtual_token_reserve, 1000000000)::numeric - COALESCE(b.token_sold, 0)
+        ) > 0
+        THEN (
+          COALESCE(b.virtual_zug_reserve, 5)::numeric + COALESCE(b.reserve_zug, 0)
+        ) / (
+          COALESCE(b.virtual_token_reserve, 1000000000)::numeric - COALESCE(b.token_sold, 0)
+        )
         ELSE tbs.spot_price_zug
       END,
       market_cap_zug = CASE
-        WHEN (1000000000::numeric - COALESCE(b.token_sold, 0)) > 0
-        THEN ((5::numeric + COALESCE(b.reserve_zug, 0))
-             / (1000000000::numeric - COALESCE(b.token_sold, 0)))
-             * 1000000000
+        WHEN (
+          COALESCE(b.virtual_token_reserve, 1000000000)::numeric - COALESCE(b.token_sold, 0)
+        ) > 0
+        THEN (
+          (
+            COALESCE(b.virtual_zug_reserve, 5)::numeric + COALESCE(b.reserve_zug, 0)
+          ) / (
+            COALESCE(b.virtual_token_reserve, 1000000000)::numeric - COALESCE(b.token_sold, 0)
+          )
+        ) * 1000000000
         ELSE tbs.market_cap_zug
       END,
       ath_market_cap_zug = GREATEST(
         tbs.ath_market_cap_zug,
         CASE
-          WHEN (1000000000::numeric - COALESCE(b.token_sold, 0)) > 0
-          THEN ((5::numeric + COALESCE(b.reserve_zug, 0))
-               / (1000000000::numeric - COALESCE(b.token_sold, 0)))
-               * 1000000000
+          WHEN (
+            COALESCE(b.virtual_token_reserve, 1000000000)::numeric - COALESCE(b.token_sold, 0)
+          ) > 0
+          THEN (
+            (
+              COALESCE(b.virtual_zug_reserve, 5)::numeric + COALESCE(b.reserve_zug, 0)
+            ) / (
+              COALESCE(b.virtual_token_reserve, 1000000000)::numeric - COALESCE(b.token_sold, 0)
+            )
+          ) * 1000000000
+          ELSE 0
+        END
+      ),
+      ath_price_zug = GREATEST(
+        COALESCE(tbs.ath_price_zug, 0),
+        CASE
+          WHEN (
+            COALESCE(b.virtual_token_reserve, 1000000000)::numeric - COALESCE(b.token_sold, 0)
+          ) > 0
+          THEN (
+            COALESCE(b.virtual_zug_reserve, 5)::numeric + COALESCE(b.reserve_zug, 0)
+          ) / (
+            COALESCE(b.virtual_token_reserve, 1000000000)::numeric - COALESCE(b.token_sold, 0)
+          )
           ELSE 0
         END
       ),

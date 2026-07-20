@@ -1,0 +1,19 @@
+# Local-first risk-scored PR review via code-review-graph (Tree-sitter graph on runner).
+# Docs: https://github.com/tirth8205/code-review-graph/blob/main/docs/GITHUB_ACTION.md
+name: code-review-graph
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: tirth8205/code-review-graph@v2.3.7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}

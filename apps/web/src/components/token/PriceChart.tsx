@@ -351,24 +351,36 @@ export function PriceChart({
 
     // Use the last rendered authoritative close as open hint for the optimistic bar (matches professional "continuation" candle).
     const lastRendered = renderedCandlesRef.current.length > 0
-      ? renderedCandlesRef.current[renderedCandlesRef.current.length - 1]!.close
+      ? renderedCandlesRef.current[renderedCandlesRef.current.length - 1]!
       : undefined;
 
     const opt = createOptimisticCandleBar(
       actorOptimisticSpot,
       timeInterval,
-      lastRendered,
+      lastRendered?.close,
       candleUnitScale
     );
     if (!opt) return;
 
+    // Merge into existing live bucket so we never drop a prior trade high/low (no ghost reset).
+    const candle =
+      lastRendered && lastRendered.time === opt.candle.time
+        ? {
+            time: opt.candle.time,
+            open: lastRendered.open,
+            high: Math.max(lastRendered.high, opt.candle.high),
+            low: Math.min(lastRendered.low, opt.candle.low),
+            close: opt.candle.close,
+          }
+        : opt.candle;
+
     const mainSeries = mainSeriesRef.current;
 
-    mainSeries.update(candleToMainChartPoint(chartStyleRef.current, opt.candle) as never);
+    mainSeries.update(candleToMainChartPoint(chartStyleRef.current, candle) as never);
 
     // Keep our incremental tracking in sync so a subsequent derive doesn't force a disruptive setData.
     const prevC = renderedCandlesRef.current;
-    const newLast = opt.candle;
+    const newLast = candle;
     renderedCandlesRef.current = prevC.length === 0 || prevC[prevC.length-1]!.time < newLast.time
       ? [...prevC, newLast]
       : [...prevC.slice(0, -1), newLast];

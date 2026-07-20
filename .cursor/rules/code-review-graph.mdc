@@ -1,0 +1,34 @@
+---
+description: Use code-review-graph MCP for exploration, impact, and reviews before broad Grep/Glob.
+alwaysApply: true
+---
+
+# code-review-graph (Pump)
+
+This repo has a local Tree-sitter knowledge graph via the **code-review-graph** MCP server.
+
+**Prefer graph tools before Grep/Glob/Read** when exploring structure, callers, impact, or reviewing diffs. Fall back to file tools only when the graph lacks coverage (e.g. new unindexed files, generated assets, or Solana IDL JSON).
+
+## When to use first
+
+| Task | Tool |
+|---|---|
+| Find symbol / how X works | `semantic_search_nodes` or `query_graph` |
+| Blast radius / dependents | `get_impact_radius` |
+| Review local or PR diffs | `detect_changes` + `get_review_context` |
+| Callers / callees / imports / tests | `query_graph` (`callers_of`, `callees_of`, `imports_of`, `tests_for`) |
+| Architecture map | `get_architecture_overview` + `list_communities` |
+
+Start reviews with `get_minimal_context` when available; use `detail_level="minimal"` and escalate only if needed.
+
+## Pump scope hints
+
+- Web UI: `apps/web/src/`
+- Solana indexer: `apps/indexer-sol/`
+- Program: `programs/pump-launchpad/`
+- Admin: `apps/admin/`
+- Do not treat ClickHouse / Redis / deploy scripts as a substitute for position/cost-basis truth — graph helps navigate code, not runtime data.
+
+## Keep graph fresh
+
+After large refactors or pulling main: `code-review-graph update` (or `build` if DB missing). Optional: `code-review-graph watch` during long sessions.

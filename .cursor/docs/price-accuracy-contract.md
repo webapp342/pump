@@ -76,3 +76,5 @@ Tape after confirm: $0.103   ← fill (can differ within slippage bps)
 - ETH/USD oracle değişince işlem olmasa bile USD chart yukarı/aşağı kayar — doğru davranış.
 - Kontrata idle poll **yapma**; native spot trade dışında değişmez.
 - Gap mumları: SQL `gap_fill_candles` + client `extendSeriesToLiveBucket` only.
+- **OHLC kuralı (trade-only):** high/low yalnızca gerçekleşen trade spot’larından; live pin sadece close günceller (transient mark wick üretmez).
+- **Solana virtuals:** board reconcile / mark price `bonding_states.virtual_*` kullanır — EVM default 5/1B Solana satırlarını ezmez.

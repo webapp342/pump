@@ -49,6 +49,7 @@ Persisted page specs: `.cursor/design-system/pages/portfolio.md` (wallet actions
 
 | Task | Skill / doc |
 |------|-------------|
+| Impact / review / callers before Grep | **code-review-graph** MCP (`.cursor/rules/code-review-graph.mdc`) |
 | Docs, APIs, versions, web facts | global `research-verified` (`~/.cursor/skills/`) |
 | Ultra-fast Faz 2–6, DB/Redis/WS | `.cursor/docs/ultra-fast-architecture-phases-2-6.md` |
 | Strategy + tier roadmap | `.cursor/docs/ultra-fast-strategy-2026.md` |

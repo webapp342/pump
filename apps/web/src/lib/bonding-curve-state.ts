@@ -87,7 +87,9 @@ export function machineFromTokenReserves(
   reserveBnb: string,
   tokenSold: string,
   paused = false,
-  version = 0
+  version = 0,
+  virtualZugReserveWei: string = DEFAULT_VIRTUAL_ZUG_RESERVE.toString(),
+  virtualTokenReserveWei: string = DEFAULT_VIRTUAL_TOKEN_RESERVE.toString()
 ): BondingCurveMachine {
   const reserveWei = normalizeReserveWei(reserveBnb, "0");
   const soldWei = normalizeSoldWei(tokenSold, "0");
@@ -96,8 +98,8 @@ export function machineFromTokenReserves(
     {
       reserveZug: reserveWei,
       soldTokens: soldWei,
-      virtualZugReserve: DEFAULT_VIRTUAL_ZUG_RESERVE.toString(),
-      virtualTokenReserve: DEFAULT_VIRTUAL_TOKEN_RESERVE.toString(),
+      virtualZugReserve: virtualZugReserveWei,
+      virtualTokenReserve: virtualTokenReserveWei,
       paused,
     },
     version

@@ -124,8 +124,12 @@ export function resolveLatestSpotPriceBnb(trades: TradeItem[]): number | null {
   const chronological = [...trades].sort(
     (a, b) => new Date(a.blockTime).getTime() - new Date(b.blockTime).getTime()
   );
-  const ticks = buildTradeSpotTicks(chronological);
   const last = chronological[chronological.length - 1]!;
+  // Prefer indexer spot column (Solana-accurate) over EVM-default virtual replay.
+  const indexedSpot = Number(last.spotPriceBnb);
+  if (Number.isFinite(indexedSpot) && indexedSpot > 0) return indexedSpot;
+
+  const ticks = buildTradeSpotTicks(chronological);
   const tick = ticks.get(last.id);
   if (tick && tick.after > 0) return tick.after;
 
@@ -929,7 +933,11 @@ export function reconcileCandleSeriesToLiveMark(
   return changed ? { candles: nextCandles, volumes } : { candles, volumes };
 }
 
-/** Keep the live interval bucket aligned with header / tape mark price. */
+/**
+ * Pin live bucket close to mark price only.
+ * High/low expand solely when close prints beyond them — never invent wicks from a
+ * transient mark (CoinAPI / BitMEX trade-only OHLC rule).
+ */
 export function pinTailCandleToLiveMark(
   candles: CandleBar[],
   volumes: VolumeBar[],
@@ -959,13 +967,16 @@ export function pinTailCandleToLiveMark(
   const openSeed =
     bucketVolume > 0 ? existing.open : (priorClose ?? existing.open);
   const open = coherentOpenForBar(openSeed, close, priorClose);
+  // Preserve trade-derived extremes; only extend when the pinned close is outside.
+  const high = Math.max(existing.high, close);
+  const low = Math.min(existing.low, close);
   const nextCandles = candles.slice();
   nextCandles[targetIdx] = sanitizeCandleOhlc(
     {
       time: existing.time,
       open,
-      high: Math.max(existing.high, open, close),
-      low: Math.min(existing.low, open, close),
+      high,
+      low,
       close,
     },
     close

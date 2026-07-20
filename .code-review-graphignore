@@ -1,0 +1,20 @@
+# Extra ignores for pump-tma (defaults already skip node_modules, .next, dist, .git)
+apps/web/public/**
+apps/admin/public/**
+deploy/vm/**/*.log
+**/coverage/**
+**/.turbo/**
+**/.vercel/**
+programs/target/**
+contracts/out/**
+contracts/cache/**
+contracts/broadcast/**
+contracts/lib/**
+*.wasm
+*.so
+*.dll
+*.bin
+docs/archive/**
+.cursor/skills/ui-ux-pro-max/data/**
+.cursor/design-system/**
+agent-transcripts/**

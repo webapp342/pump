@@ -61,3 +61,7 @@ coverage/
 # Misc
 .vercel/
 .turbo/
+
+# code-review-graph (local SQLite graph + generated wiki/html + tooling venv)
+.code-review-graph/
+.venv-crg/

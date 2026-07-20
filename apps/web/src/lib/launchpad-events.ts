@@ -93,13 +93,29 @@ export function resolveTradeItemsFromReceipt(
 }
 
 export function applyTradeToToken(token: TokenDetail, trade: ParsedTradeEvent): TokenDetail {
-  const spotAfter = spotPriceZugFromReserves(trade.reserveBnb, trade.soldTokens);
+  // Solana pump-feel synthetics stash virtual pool SOL in reserveBnb and a single-fill
+  // token amount in soldTokens — must not feed EVM-style spot math (creates false MCAP spikes).
+  const pumpFeelSynthetic =
+    trade.soldTokens === trade.tokenAmount && trade.tokenAmount > 0n;
+
+  const spotAfter = pumpFeelSynthetic
+    ? 0
+    : spotPriceZugFromReserves(trade.reserveBnb, trade.soldTokens);
   const price =
     spotAfter > 0
       ? String(spotAfter)
       : trade.tokenAmount > 0n
         ? formatEther((trade.nativeAmount * 10n ** 18n) / trade.tokenAmount)
         : token.lastPriceBnb;
+
+  if (pumpFeelSynthetic) {
+    return {
+      ...token,
+      lastPriceBnb: price,
+      tradeCount: token.tradeCount + 1,
+      status: token.status === "PAUSED" ? "PAUSED" : "BONDING",
+    };
+  }
 
   return {
     ...token,
