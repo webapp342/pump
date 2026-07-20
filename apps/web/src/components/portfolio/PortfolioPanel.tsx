@@ -50,7 +50,15 @@ import {
   fetchPendingCreatorFeesLamports,
   fetchPendingReferrerFeesLamports,
 } from "@/lib/solana/pending-fees";
-import { bnbToUsd, formatPortfolioHoldingValueUsd, formatUsdReadable, positionAvgEntryUsd, positionUnrealizedUsd, positionUnrealizedPct, resolveOpenLotCostUsd, scaleCostBasisUsdForBalance } from "@/lib/format-usd";
+import { PUMP_FEEL_DEFAULTS } from "@/config/solana";
+import { bnbToUsd, formatPortfolioHoldingValueUsd, formatUsdReadable, positionAvgEntryUsd, resolveOpenLotCostUsd, scaleCostBasisUsdForBalance } from "@/lib/format-usd";
+import type { BondingCurveSnapshot } from "@/lib/bonding-curve";
+import {
+  bondingSnapshotFromDbBondingState,
+  computeOpenLotUnrealizedPnl,
+  positionExitValueBnb,
+} from "@/lib/position-exit-value";
+import { isEmptyCurveSnapshot } from "@/lib/bonding-curve-state";
 import { formatCapForBoard } from "@/lib/arena-board-format";
 import {
   PORTFOLIO_CREATOR_WALLET_SCAN_MAX,
@@ -102,8 +110,55 @@ type PortfolioPosition = {
   remainingCostBasisUsd: string;
   realizedPnlUsd: string;
   lastPriceBnb: string;
+  reserveBnb?: string;
+  tokenSold?: string;
+  virtualZugReserve?: string;
+  virtualTokenReserve?: string;
   estimatedValueBnb: number;
 };
+
+const PORTFOLIO_PROTOCOL_FEE_BPS = isSolanaChainFamily
+  ? BigInt(PUMP_FEEL_DEFAULTS.protocolFeeBps)
+  : 100n;
+
+function holdingBondingSnapshot(position: PortfolioPosition): BondingCurveSnapshot | null {
+  if (position.reserveBnb == null && position.tokenSold == null) return null;
+  return bondingSnapshotFromDbBondingState(
+    position.reserveBnb ?? "0",
+    position.tokenSold ?? "0",
+    position.virtualZugReserve,
+    position.virtualTokenReserve
+  );
+}
+
+function holdingOpenLotPnl(
+  view: VerifiedPositionView,
+  liveBnbUsd: number | null | undefined
+) {
+  return computeOpenLotUnrealizedPnl(
+    view.balance,
+    view.remainingCostBasisUsd,
+    view.remainingCostBasis,
+    liveBnbUsd,
+    Number(view.position.lastPriceBnb),
+    holdingBondingSnapshot(view.position),
+    PORTFOLIO_PROTOCOL_FEE_BPS
+  );
+}
+
+/** Mark value in native — sell-all curve quote when known (matches P/L). */
+function holdingMarkValueBnb(view: VerifiedPositionView): number {
+  const snapshot = holdingBondingSnapshot(view.position);
+  if (snapshot && !isEmptyCurveSnapshot(snapshot)) {
+    const exitBnb = positionExitValueBnb(
+      view.balance,
+      snapshot,
+      PORTFOLIO_PROTOCOL_FEE_BPS
+    );
+    if (exitBnb > 0) return exitBnb;
+  }
+  return view.balance * Number(view.position.lastPriceBnb);
+}
 
 type PortfolioData = {
   address: string;
@@ -221,8 +276,17 @@ function buildVerifiedPositionView(
   };
 }
 
-/** Open-lot PnL (native) — internal / fallback. */
+/** Open-lot PnL (native) — sell-all curve quote when bonding state is known. */
 function holdingOpenPnlBnb(view: VerifiedPositionView): number {
+  const snapshot = holdingBondingSnapshot(view.position);
+  if (snapshot && !isEmptyCurveSnapshot(snapshot)) {
+    const exitBnb = positionExitValueBnb(
+      view.balance,
+      snapshot,
+      PORTFOLIO_PROTOCOL_FEE_BPS
+    );
+    if (exitBnb > 0) return exitBnb - view.remainingCostBasis;
+  }
   return view.balance * Number(view.position.lastPriceBnb) - view.remainingCostBasis;
 }
 
@@ -230,13 +294,7 @@ function holdingOpenPnlUsd(
   view: VerifiedPositionView,
   liveBnbUsd: number | null | undefined
 ): number | null {
-  return positionUnrealizedUsd(
-    view.balance,
-    Number(view.position.lastPriceBnb),
-    view.remainingCostBasisUsd,
-    view.remainingCostBasis,
-    liveBnbUsd
-  );
+  return holdingOpenLotPnl(view, liveBnbUsd).usd;
 }
 
 /** Unrealized + cumulative realized for this wallet+token. */
@@ -454,7 +512,7 @@ function buildPortfolioHoldingRows(
     ...verifiedPositionViews.map((view) => ({
       kind: "position" as const,
       view,
-      estimatedValueBnb: view.balance * Number(view.position.lastPriceBnb),
+      estimatedValueBnb: holdingMarkValueBnb(view),
     })),
     ...walletHoldings.map((holding) => ({
       kind: "wallet" as const,
@@ -475,15 +533,9 @@ function buildLaunchedHoldingMetricsByAddress(
   for (const row of rows) {
     if (row.kind === "position") {
       const { position, balance, remainingCostBasis, remainingCostBasisUsd } = row.view;
-      const valueBnb = balance * Number(position.lastPriceBnb);
+      const valueBnb = holdingMarkValueBnb(row.view);
       const valueUsd = bnbToUsd(valueBnb, bnbUsd) ?? 0;
-      const pnlUsd = holdingOpenPnlUsd(row.view, bnbUsd);
-      const pnlPct = positionUnrealizedPct(
-        pnlUsd,
-        remainingCostBasisUsd,
-        remainingCostBasis,
-        bnbUsd
-      );
+      const { usd: pnlUsd, pct: pnlPct } = holdingOpenLotPnl(row.view, bnbUsd);
       map[portfolioTokenMapKey(position.tokenAddress)] = {
         balance,
         valueBnb,
@@ -1594,7 +1646,7 @@ export function PortfolioPanel({
 
                       const { position, balance } = row.view;
                       const positionValueUsd = bnbToUsd(
-                        balance * Number(position.lastPriceBnb),
+                        holdingMarkValueBnb(row.view),
                         effectiveBnbUsd
                       );
                       const openPnlUsd = holdingOpenPnlUsd(row.view, effectiveBnbUsd);
@@ -1684,14 +1736,11 @@ export function PortfolioPanel({
                             effectiveBnbUsd
                           );
                           const positionValueUsd = bnbToUsd(
-                            balance * Number(position.lastPriceBnb),
+                            holdingMarkValueBnb(row.view),
                             effectiveBnbUsd
                           );
-                          const openPnlUsd = holdingOpenPnlUsd(row.view, effectiveBnbUsd);
-                          const openPnlPct = positionUnrealizedPct(
-                            openPnlUsd,
-                            remainingCostBasisUsd,
-                            remainingCostBasis,
+                          const { usd: openPnlUsd, pct: openPnlPct } = holdingOpenLotPnl(
+                            row.view,
                             effectiveBnbUsd
                           );
 

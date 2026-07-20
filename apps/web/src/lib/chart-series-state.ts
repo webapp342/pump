@@ -77,7 +77,15 @@ export function chartSeriesReducer(
         action.update,
         action.priceScale
       );
-      return { ...state, candles: merged.candles, volumes: merged.volumes };
+      const close = Number(action.update.close) * action.priceScale;
+      return {
+        ...state,
+        candles:
+          Number.isFinite(close) && close > 0
+            ? sanitizeTailCandleSeries(merged.candles, close)
+            : merged.candles,
+        volumes: merged.volumes,
+      };
     }
     case "apply_actor": {
       if (state.candles.length === 0) return state;
@@ -168,6 +176,8 @@ export function deriveChartSeries(input: DeriveChartSeriesInput): {
     );
     candles = pinned.candles;
     volumes = pinned.volumes;
+    // Heal false needles already stuck in the live bucket (DB/WS LEAST lows).
+    candles = sanitizeTailCandleSeries(candles, liveOnChainSpotBnb * priceScale);
   }
 
   if (actorOptimisticSpot) {

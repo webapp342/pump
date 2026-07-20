@@ -1729,6 +1729,10 @@ export type PortfolioPosition = {
   realizedPnlUsd: string;
   lastPriceBnb: string;
   progressBps: number;
+  reserveBnb: string;
+  tokenSold: string;
+  virtualZugReserve: string;
+  virtualTokenReserve: string;
   estimatedValueBnb: number;
 };
 
@@ -2110,6 +2114,8 @@ export async function getPortfolioForAddress(
       realized_pnl_usd: string;
       reserve_zug: string;
       token_sold: string;
+      virtual_zug_reserve: string;
+      virtual_token_reserve: string;
       last_price_zug: string;
       progress_bps: number;
     }>(
@@ -2129,6 +2135,8 @@ export async function getPortfolioForAddress(
           COALESCE(p.realized_pnl_usd, 0)::text AS realized_pnl_usd,
           COALESCE(b.reserve_zug, 0)::text AS reserve_zug,
           COALESCE(b.token_sold, 0)::text AS token_sold,
+          COALESCE(b.virtual_zug_reserve, ${BONDING_VIRTUAL_BNB_HUMAN})::text AS virtual_zug_reserve,
+          COALESCE(b.virtual_token_reserve, ${BONDING_TOKEN_SUPPLY_HUMAN})::text AS virtual_token_reserve,
           COALESCE((${SQL_BONDING_MARK_PRICE_ZUG}), 0)::text AS last_price_zug,
           COALESCE(b.progress_bps, 0) AS progress_bps
         FROM user_positions p
@@ -2186,6 +2194,10 @@ export async function getPortfolioForAddress(
       realizedPnlUsd: row.realized_pnl_usd,
       lastPriceBnb: row.last_price_zug,
       progressBps: row.progress_bps,
+      reserveBnb: row.reserve_zug,
+      tokenSold: row.token_sold,
+      virtualZugReserve: row.virtual_zug_reserve,
+      virtualTokenReserve: row.virtual_token_reserve,
       estimatedValueBnb: balance * price,
     };
   });

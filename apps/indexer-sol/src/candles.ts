@@ -98,7 +98,14 @@ async function upsertIntervalCandle(
   const priorClose = isNewBucket
     ? await readPriorBucketClose(client, input.tokenAddress, interval, bucketTs)
     : null;
-  const spotOpen = spotBefore > 0 && Number.isFinite(spotBefore) ? spotBefore : spotAfter;
+  let spotOpen = spotBefore > 0 && Number.isFinite(spotBefore) ? spotBefore : spotAfter;
+  // Reject garbage spotBefore (false lower wick) — same 4× guard as arena / web chart.
+  if (spotAfter > 0 && spotOpen > 0) {
+    const ratio = spotOpen / spotAfter;
+    if (ratio > 4 || ratio < 1 / 4) {
+      spotOpen = priorClose != null && priorClose > 0 ? priorClose : spotAfter;
+    }
+  }
   const open = priorClose ?? (isNewBucket ? spotAfter : spotOpen);
   const prices = [open, spotOpen, spotAfter];
   const high = Math.max(...prices);

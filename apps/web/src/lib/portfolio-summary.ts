@@ -1,9 +1,11 @@
 import { NATIVE_SYMBOL } from "@/config/chain";
+import { isSolanaChainFamily } from "@/config/chain-family";
+import { PUMP_FEEL_DEFAULTS } from "@/config/solana";
+import { bnbToUsd } from "@/lib/format-usd";
 import {
-  bnbToUsd,
-  positionUnrealizedPct,
-  positionUnrealizedUsd,
-} from "@/lib/format-usd";
+  bondingSnapshotFromDbBondingState,
+  computeOpenLotUnrealizedPnl,
+} from "@/lib/position-exit-value";
 import type { WalletLaunchpadHolding } from "@/lib/portfolio-onchain";
 
 type PositionLike = {
@@ -12,6 +14,10 @@ type PositionLike = {
     lastPriceBnb: string | number;
     tokenAddress: string;
     logoUrl: string | null;
+    reserveBnb?: string;
+    tokenSold?: string;
+    virtualZugReserve?: string;
+    virtualTokenReserve?: string;
   };
   balance: number;
   remainingCostBasisUsd: number;
@@ -32,16 +38,33 @@ export type TopHoldingSummary = {
   isNative: boolean;
 };
 
-function holdingOpenPnlUsd(
+const PROTOCOL_FEE_BPS = isSolanaChainFamily
+  ? BigInt(PUMP_FEEL_DEFAULTS.protocolFeeBps)
+  : 100n;
+
+function holdingOpenLotPnl(
   view: PositionLike,
   liveBnbUsd: number | null | undefined
-): number | null {
-  return positionUnrealizedUsd(
+) {
+  const { position } = view;
+  const snapshot =
+    position.reserveBnb != null || position.tokenSold != null
+      ? bondingSnapshotFromDbBondingState(
+          position.reserveBnb ?? "0",
+          position.tokenSold ?? "0",
+          position.virtualZugReserve,
+          position.virtualTokenReserve
+        )
+      : null;
+
+  return computeOpenLotUnrealizedPnl(
     view.balance,
-    Number(view.position.lastPriceBnb),
     view.remainingCostBasisUsd,
     view.remainingCostBasis,
-    liveBnbUsd
+    liveBnbUsd,
+    Number(position.lastPriceBnb),
+    snapshot,
+    PROTOCOL_FEE_BPS
   );
 }
 
@@ -71,13 +94,7 @@ export function resolveTopHoldingSummary(
     let summary: TopHoldingSummary;
     if (row.kind === "position") {
       const { view } = row;
-      const pnlUsd = holdingOpenPnlUsd(view, bnbUsd);
-      const pnlPct = positionUnrealizedPct(
-        pnlUsd,
-        view.remainingCostBasisUsd,
-        view.remainingCostBasis,
-        bnbUsd
-      );
+      const { usd: pnlUsd, pct: pnlPct } = holdingOpenLotPnl(view, bnbUsd);
       summary = {
         symbol: row.view.position.symbol,
         tokenAddress: row.view.position.tokenAddress,
@@ -99,7 +116,7 @@ export function resolveTopHoldingSummary(
       };
     }
 
-    if (!best || (best.valueUsd ?? 0) < valueUsd) {
+    if (!best || (summary.valueUsd ?? 0) > (best.valueUsd ?? 0)) {
       best = summary;
     }
   }

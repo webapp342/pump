@@ -439,6 +439,25 @@ export function TokenDetailLive({
 
   const tradeCurveSnapshot = liveCurveSnapshot ?? chainCurveSnapshot;
 
+  /** Sell-all quote for holder P/L — Solana needs on-chain real_sol_reserves. */
+  const holderCurveSnapshot = useMemo(() => {
+    if (!tradeCurveSnapshot) return null;
+    if (!isSolanaLive) return tradeCurveSnapshot;
+    const curve = solanaMarket.bondingCurve;
+    if (!curve) return tradeCurveSnapshot;
+    return {
+      ...tradeCurveSnapshot,
+      reserveZug: "0",
+      soldTokens: "0",
+      realTokenReserves: curve.realTokenReserves?.toString(),
+      realSolReserves: curve.realSolReserves?.toString(),
+    };
+  }, [tradeCurveSnapshot, isSolanaLive, solanaMarket.bondingCurve]);
+
+  const holderProtocolFeeBps = isSolanaLive
+    ? (solanaMarket.protocolFeeBps ?? BigInt(PUMP_FEEL_DEFAULTS.protocolFeeBps))
+    : 100n;
+
   const marketSnapshot = useMemo(
     () =>
       buildTokenMarketSnapshot(liveToken, {
@@ -979,8 +998,8 @@ export function TokenDetailLive({
     currentPriceBnb: displayPrice,
     currentMarketCapBnb: liveMarketCapNative,
     bnbUsd: effectiveBnbUsd,
-    curveSnapshot: tradeCurveSnapshot ?? null,
-    protocolFeeBps: BigInt(PUMP_FEEL_DEFAULTS.protocolFeeBps),
+    curveSnapshot: holderCurveSnapshot,
+    protocolFeeBps: holderProtocolFeeBps,
     onAddressClick: setProfileAddress,
     creatorDisplayUsername: liveToken.creatorDisplayUsername,
     launchTxHash: liveToken.launchTxHash,

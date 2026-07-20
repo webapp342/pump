@@ -618,10 +618,11 @@ export function mergeWsCandleUpdate(
   update: CandleWsUpdate,
   priceScale = 1
 ): { candles: CandleBar[]; volumes: VolumeBar[] } {
-  const { candle, volume } = wsCandleUpdateToBars(update, priceScale);
-  if (!Number.isFinite(candle.close) || candle.close <= 0) {
+  const { candle: raw, volume } = wsCandleUpdateToBars(update, priceScale);
+  if (!Number.isFinite(raw.close) || raw.close <= 0) {
     return { candles, volumes };
   }
+  const candle = sanitizeCandleOhlc(raw, raw.close);
 
   if (candles.length === 0) {
     return { candles: [candle], volumes: [volume] };
@@ -629,13 +630,19 @@ export function mergeWsCandleUpdate(
 
   const last = candles[candles.length - 1]!;
   if (update.isNewBucket && candle.time > last.time) {
+    if (!isSpotMoveSane(last.close, candle.close)) {
+      return { candles, volumes };
+    }
     const priorClose = last.close;
-    const patched: CandleBar = {
-      ...candle,
-      open: priorClose,
-      high: Math.max(candle.high, priorClose),
-      low: Math.min(candle.low, priorClose),
-    };
+    const patched = sanitizeCandleOhlc(
+      {
+        ...candle,
+        open: priorClose,
+        high: Math.max(candle.high, priorClose),
+        low: Math.min(candle.low, priorClose),
+      },
+      candle.close
+    );
     return {
       candles: [...candles, patched],
       volumes: [...volumes, volume],
@@ -644,19 +651,44 @@ export function mergeWsCandleUpdate(
 
   const idx = candles.findIndex((c) => c.time === candle.time);
   if (idx >= 0) {
+    const existing = candles[idx]!;
+    if (!isSpotMoveSane(existing.close, candle.close)) {
+      return { candles, volumes };
+    }
     const nextCandles = candles.slice();
     const nextVolumes = volumes.slice();
-    const priorOpen = candles[idx]!.open;
-    nextCandles[idx] = { ...candle, open: priorOpen };
+    const close = candle.close;
+    const highCandidate = Math.max(existing.high, candle.high, close);
+    const lowCandidate = Math.min(existing.low, candle.low, close);
+    nextCandles[idx] = sanitizeCandleOhlc(
+      {
+        time: candle.time,
+        open: existing.open,
+        high: isSpotMoveSane(close, highCandidate)
+          ? highCandidate
+          : Math.max(existing.high, close),
+        low: isSpotMoveSane(close, lowCandidate)
+          ? lowCandidate
+          : Math.min(existing.low, close),
+        close,
+      },
+      close
+    );
     if (idx < nextVolumes.length) nextVolumes[idx] = volume;
     else nextVolumes.push(volume);
     return { candles: nextCandles, volumes: nextVolumes };
   }
 
   if (candle.time === last.time) {
+    if (!isSpotMoveSane(last.close, candle.close)) {
+      return { candles, volumes };
+    }
     const nextCandles = candles.slice();
     const nextVolumes = volumes.slice();
-    nextCandles[nextCandles.length - 1] = { ...candle, open: last.open };
+    nextCandles[nextCandles.length - 1] = sanitizeCandleOhlc(
+      { ...candle, open: last.open },
+      candle.close
+    );
     if (nextVolumes.length > 0) {
       nextVolumes[nextVolumes.length - 1] = volume;
     } else {
@@ -816,11 +848,22 @@ export function applyActorOptimisticCandleBucket(
 
 const OHLC_MAGNITUDE_LOG_EPS = 0.35;
 const DECADE_RESCALE_LOG_EPS = OHLC_MAGNITUDE_LOG_EPS + 0.1;
+/** Same cap as arena WS MCAP jump reject — blocks false needles from transient marks. */
+const SPOT_JUMP_REJECT_RATIO = 4;
 
 /** Whether two spot prices are on the same decade scale (guards stale 1000× DB OHLC). */
 export function pricesSameMagnitude(a: number, b: number): boolean {
   if (!Number.isFinite(a) || !Number.isFinite(b) || a <= 0 || b <= 0) return true;
   return Math.abs(Math.log10(a / b)) <= OHLC_MAGNITUDE_LOG_EPS;
+}
+
+/** True when next spot is a plausible move from previous (not a garbage wick print). */
+export function isSpotMoveSane(previous: number, next: number): boolean {
+  if (!Number.isFinite(previous) || previous <= 0) return true;
+  if (!Number.isFinite(next) || next <= 0) return false;
+  if (pricesSameMagnitude(previous, next)) return true;
+  const ratio = next / previous;
+  return ratio <= SPOT_JUMP_REJECT_RATIO && ratio >= 1 / SPOT_JUMP_REJECT_RATIO;
 }
 
 function coherentOpenForBar(
@@ -868,7 +911,7 @@ export function sanitizeCandleOhlc(bar: CandleBar, anchor: number): CandleBar {
   if (!Number.isFinite(anchor) || anchor <= 0) return bar;
 
   const pick = (p: number, fallback: number): number =>
-    Number.isFinite(p) && p > 0 && pricesSameMagnitude(p, anchor) ? p : fallback;
+    Number.isFinite(p) && p > 0 && isSpotMoveSane(anchor, p) ? p : fallback;
 
   const close = pick(bar.close, anchor);
   const open = pick(bar.open, close);
@@ -935,8 +978,9 @@ export function reconcileCandleSeriesToLiveMark(
 
 /**
  * Pin live bucket close to mark price only.
- * High/low expand solely when close prints beyond them — never invent wicks from a
- * transient mark (CoinAPI / BitMEX trade-only OHLC rule).
+ * Rejects transient garbage marks (false needles). High/low expand only when the
+ * pinned close is a sane move from the existing body — never invent wicks from
+ * a bad mark (price-accuracy contract).
  */
 export function pinTailCandleToLiveMark(
   candles: CandleBar[],
@@ -963,13 +1007,26 @@ export function pinTailCandleToLiveMark(
   }
 
   const priorClose = targetIdx > 0 ? candles[targetIdx - 1]!.close : undefined;
+  const ref =
+    existing.close > 0
+      ? existing.close
+      : priorClose != null && priorClose > 0
+        ? priorClose
+        : existing.open;
+  if (ref > 0 && !isSpotMoveSane(ref, liveMarkBnb)) {
+    // Transient wrong mark (e.g. Solana virtuals glitch) — do not paint close/wick.
+    return { candles, volumes };
+  }
+
   const close = liveMarkBnb;
   const openSeed =
     bucketVolume > 0 ? existing.open : (priorClose ?? existing.open);
   const open = coherentOpenForBar(openSeed, close, priorClose);
-  // Preserve trade-derived extremes; only extend when the pinned close is outside.
-  const high = Math.max(existing.high, close);
-  const low = Math.min(existing.low, close);
+
+  // Mark already passed isSpotMoveSane vs body — safe to expand trade extremes to close.
+  const high = Math.max(existing.high, open, close);
+  const low = Math.min(existing.low, open, close);
+
   const nextCandles = candles.slice();
   nextCandles[targetIdx] = sanitizeCandleOhlc(
     {

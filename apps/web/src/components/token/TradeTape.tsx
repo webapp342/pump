@@ -5,29 +5,22 @@ import type { TokenHolderSnapshot, TradeItem } from "@/lib/db/launchpad";
 import { explorerTxUrl, shortAddress } from "@/config/chain";
 import { PumpIcon, faArrowDown, faArrowUp, faClock, faExternalLink, faWellness } from "@/lib/icons";
 import { UserAvatarForAddress } from "@/components/user/UserAvatarForAddress";
-import { PctChange } from "@/components/ui/PctChange";
+import { PnlCell } from "@/components/portfolio/PortfolioPnlCell";
 import { ACTIVITY_PAGE_SIZE } from "@/lib/activity-page-size";
 import { normalizeRouteAddressKey } from "@/lib/address";
 import { PumpSubscriptPrice } from "@/components/ui/PumpSubscriptPrice";
 import { formatAge, formatArenaQuoteUsd } from "@/lib/arena-board-format";
 import {
   DEFAULT_TOKEN_TOTAL_SUPPLY,
-  bnbToUsd,
   estimateFdvUsd,
   formatUsdReadable,
   tradeFillPriceUsd,
   tradeNetUsdForDisplay,
   positionAvgEntryUsd,
-  positionUnrealizedUsd,
-  positionUnrealizedPct,
   scaleCostBasisUsdForBalance,
 } from "@/lib/format-usd";
-import {
-  positionExitValueBnb,
-  positionUnrealizedPctFromExit,
-  positionUnrealizedUsdFromExit,
-} from "@/lib/position-exit-value";
 import type { BondingCurveSnapshot } from "@/lib/bonding-curve";
+import { computeOpenLotUnrealizedPnl } from "@/lib/position-exit-value";
 import {
   resolveVerifiedTokenBalance,
   scaleCostBasisForBalance,
@@ -111,10 +104,8 @@ function tradeMarketCapUsd(trade: TradeItem, liveBnbUsd: number | null): number 
 
 type HolderMetrics = {
   avgEntryUsd: number | null;
-  holderValueUsd: number | null;
   unrealizedPnlUsd: number | null;
   unrealizedPnlPct: number | null;
-  pnlTone: string;
 };
 
 function computeHolderMetrics(
@@ -131,54 +122,17 @@ function computeHolderMetrics(
     bnbUsd
   );
 
-  let holderValueUsd: number | null;
-  let unrealizedPnlUsd: number | null;
-  if (curveSnapshot && protocolFeeBps != null) {
-    const exitBnb = positionExitValueBnb(
-      row.netTokens,
-      curveSnapshot,
-      protocolFeeBps
-    );
-    holderValueUsd = bnbToUsd(exitBnb, bnbUsd);
-    unrealizedPnlUsd = positionUnrealizedUsdFromExit(
-      exitBnb,
-      row.remainingCostBasisUsd,
-      row.remainingCostBasisBnb,
-      bnbUsd
-    );
-  } else {
-    holderValueUsd = bnbToUsd(row.netTokens * currentPriceBnb, bnbUsd);
-    unrealizedPnlUsd = positionUnrealizedUsd(
-      row.netTokens,
-      currentPriceBnb,
-      row.remainingCostBasisUsd,
-      row.remainingCostBasisBnb,
-      bnbUsd
-    );
-  }
+  const { usd: unrealizedPnlUsd, pct: unrealizedPnlPct } = computeOpenLotUnrealizedPnl(
+    row.netTokens,
+    row.remainingCostBasisUsd,
+    row.remainingCostBasisBnb,
+    bnbUsd,
+    currentPriceBnb,
+    curveSnapshot,
+    protocolFeeBps
+  );
 
-  const unrealizedPnlPct =
-    curveSnapshot && protocolFeeBps != null
-      ? positionUnrealizedPctFromExit(
-          unrealizedPnlUsd,
-          row.remainingCostBasisUsd,
-          row.remainingCostBasisBnb,
-          bnbUsd
-        )
-      : positionUnrealizedPct(
-          unrealizedPnlUsd,
-          row.remainingCostBasisUsd,
-          row.remainingCostBasisBnb,
-          bnbUsd
-        );
-  const pnlTone =
-    unrealizedPnlUsd == null
-      ? "text-pump-muted"
-      : unrealizedPnlUsd >= 0
-        ? "text-pump-success"
-        : "text-pump-danger";
-
-  return { avgEntryUsd, holderValueUsd, unrealizedPnlUsd, unrealizedPnlPct, pnlTone };
+  return { avgEntryUsd, unrealizedPnlUsd, unrealizedPnlPct };
 }
 
 function mergeTradesByTxHash(...groups: TradeItem[][]): TradeItem[] {
@@ -388,7 +342,7 @@ export function TradeTape({
   followerCount?: number;
   tokenDescription?: string | null;
   announcementsRefreshKey?: number;
-  /** Bonding curve for honest holder exit value / P/L (sell-all quote). */
+  /** On-chain curve for honest holder P/L (sell-all quote, same as max sell). */
   curveSnapshot?: BondingCurveSnapshot | null;
   protocolFeeBps?: bigint;
 }) {
@@ -647,14 +601,13 @@ export function TradeTape({
             <div className={`${activityTableScrollClass} token-holders-mobile`}>
               <ul className="token-holders-mobile__list" aria-label="Holders">
                 {holderRows.map((row) => {
-                  const { holderValueUsd, unrealizedPnlPct } = computeHolderMetrics(
+                  const { unrealizedPnlUsd, unrealizedPnlPct } = computeHolderMetrics(
                     row,
                     currentPriceBnb,
                     bnbUsd,
                     curveSnapshot,
                     protocolFeeBps
                   );
-                  const balanceUsd = holderValueUsd;
                   const meta = displayNameLookup.get(row.address.toLowerCase());
                   const label =
                     row.displayUsername ??
@@ -696,22 +649,13 @@ export function TradeTape({
                         </span>
                       </button>
                       <div className="token-holders-mobile__stats">
-                        <div className="token-holders-mobile__stats-top">
-                          <span className="token-holders-mobile__share financial-value">
-                            {formatSupplyShareMobile(row.netTokens)}
-                          </span>
-                          <span className="token-holders-mobile__sep" aria-hidden />
-                          <span className="token-holders-mobile__balance financial-value">
-                            {formatUsdReadable(balanceUsd, {
-                              compact: true,
-                              twoDecimalsUnder: 10_000,
-                            })}
-                          </span>
-                        </div>
-                        <PctChange
-                          value={unrealizedPnlPct}
-                          className="token-holders-mobile__pnl"
-                          hideWhenEmpty
+                        <span className="token-holders-mobile__share financial-value">
+                          {formatSupplyShareMobile(row.netTokens)}
+                        </span>
+                        <PnlCell
+                          usd={unrealizedPnlUsd}
+                          pct={unrealizedPnlPct}
+                          align="end"
                         />
                       </div>
                     </li>
@@ -732,17 +676,17 @@ export function TradeTape({
                     <th className="token-tape-table__col-num">Amount</th>
                     <th className="token-tape-table__col-num">Supply</th>
                     <th className="token-tape-table__col-num">Entry</th>
-                    <th className="token-tape-table__col-num" title="Est. USD if sold now on curve">
-                      Exit value
-                    </th>
-                    <th className="token-tape-table__col-end" title="Vs cost basis; sell-all quote">
-                      Exit P/L
+                    <th
+                      className="token-tape-table__col-end"
+                      title="Max sell quote − invested (cost basis)"
+                    >
+                      P/L
                     </th>
                   </tr>
                 </thead>
                 <tbody>
                   {holderRows.map((row, index) => {
-                    const { avgEntryUsd, holderValueUsd, unrealizedPnlUsd, pnlTone } =
+                    const { avgEntryUsd, unrealizedPnlUsd, unrealizedPnlPct } =
                       computeHolderMetrics(
                         row,
                         currentPriceBnb,
@@ -750,7 +694,6 @@ export function TradeTape({
                         curveSnapshot,
                         protocolFeeBps
                       );
-                    const valueUsd = holderValueUsd;
 
                     return (
                       <tr key={row.address}>
@@ -781,19 +724,12 @@ export function TradeTape({
                         <td className="token-tape-table__col-num token-tape-table__value financial-value token-tape-table__muted">
                           <PumpSubscriptPrice value={avgEntryUsd} />
                         </td>
-                        <td className="token-tape-table__col-num token-tape-table__value financial-value token-tape-table__cell-value">
-                          {formatUsdReadable(valueUsd, {
-                            compact: true,
-                            twoDecimalsUnder: 10_000,
-                          })}
-                        </td>
-                        <td
-                          className={`token-tape-table__col-end token-tape-table__value financial-value font-medium ${pnlTone}`}
-                        >
-                          {formatUsdReadable(unrealizedPnlUsd, {
-                            compact: true,
-                            signed: true,
-                          })}
+                        <td className="token-tape-table__col-end token-tape-table__value">
+                          <PnlCell
+                            usd={unrealizedPnlUsd}
+                            pct={unrealizedPnlPct}
+                            align="end"
+                          />
                         </td>
                       </tr>
                     );

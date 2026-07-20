@@ -77,4 +77,5 @@ Tape after confirm: $0.103   ← fill (can differ within slippage bps)
 - Kontrata idle poll **yapma**; native spot trade dışında değişmez.
 - Gap mumları: SQL `gap_fill_candles` + client `extendSeriesToLiveBucket` only.
 - **OHLC kuralı (trade-only):** high/low yalnızca gerçekleşen trade spot’larından; live pin sadece close günceller (transient mark wick üretmez).
+- **Wick guard:** live mark / WS / indexer `spotBefore` jumps >4× (veya magnitude dışı) reddedilir; `sanitizeCandleOhlc` live close’a göre false needle’ları keser.
 - **Solana virtuals:** board reconcile / mark price `bonding_states.virtual_*` kullanır — EVM default 5/1B Solana satırlarını ezmez.

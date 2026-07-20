@@ -4,10 +4,98 @@ import {
   quoteSellFromCurveState,
   type BondingCurveSnapshot,
 } from "@/lib/bonding-curve";
+import { isEmptyCurveSnapshot, machineFromTokenReserves } from "@/lib/bonding-curve-state";
 import {
   bnbToUsd,
+  positionUnrealizedPct,
+  positionUnrealizedUsd,
   resolveOpenLotCostUsd,
 } from "@/lib/format-usd";
+
+export type OpenLotUnrealizedPnl = {
+  usd: number | null;
+  pct: number | null;
+};
+
+/** DB bonding_state decimals → snapshot for sell-all P/L quotes. */
+export function bondingSnapshotFromDbBondingState(
+  reserveBnb: string,
+  tokenSold: string,
+  virtualZugReserveHuman?: string | number | null,
+  virtualTokenReserveHuman?: string | number | null,
+  paused = false
+): BondingCurveSnapshot {
+  const virtualZugWei =
+    virtualZugReserveHuman != null && String(virtualZugReserveHuman).trim() !== ""
+      ? parseUnits(String(virtualZugReserveHuman), 18).toString()
+      : undefined;
+  const virtualTokenWei =
+    virtualTokenReserveHuman != null && String(virtualTokenReserveHuman).trim() !== ""
+      ? parseUnits(String(virtualTokenReserveHuman), 18).toString()
+      : undefined;
+
+  return machineFromTokenReserves(
+    reserveBnb,
+    tokenSold,
+    paused,
+    0,
+    virtualZugWei,
+    virtualTokenWei
+  ).snapshot;
+}
+
+/**
+ * Unrealized P/L — prefers sell-all curve quote (max sell) over spot × balance.
+ * Falls back to spot mark when curve snapshot is unavailable.
+ */
+export function computeOpenLotUnrealizedPnl(
+  balanceTokens: number,
+  remainingCostBasisUsd: number,
+  remainingCostBasisBnb: number,
+  liveBnbUsd: number | null | undefined,
+  spotPriceBnb: number,
+  curveSnapshot?: BondingCurveSnapshot | null,
+  protocolFeeBps?: bigint
+): OpenLotUnrealizedPnl {
+  const canExitQuote =
+    curveSnapshot &&
+    protocolFeeBps != null &&
+    !isEmptyCurveSnapshot(curveSnapshot);
+
+  if (canExitQuote) {
+    const exitBnb = positionExitValueBnb(balanceTokens, curveSnapshot, protocolFeeBps);
+    if (exitBnb > 0) {
+      const usd = positionUnrealizedUsdFromExit(
+        exitBnb,
+        remainingCostBasisUsd,
+        remainingCostBasisBnb,
+        liveBnbUsd
+      );
+      const pct = positionUnrealizedPctFromExit(
+        usd,
+        remainingCostBasisUsd,
+        remainingCostBasisBnb,
+        liveBnbUsd
+      );
+      return { usd, pct };
+    }
+  }
+
+  const usd = positionUnrealizedUsd(
+    balanceTokens,
+    spotPriceBnb,
+    remainingCostBasisUsd,
+    remainingCostBasisBnb,
+    liveBnbUsd
+  );
+  const pct = positionUnrealizedPct(
+    usd,
+    remainingCostBasisUsd,
+    remainingCostBasisBnb,
+    liveBnbUsd
+  );
+  return { usd, pct };
+}
 
 /** Human token balance → 18-dec wei (no float drift on large balances). */
 export function tokenBalanceHumanToWei(balance: number): bigint {
