@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Enable self-hosted ClickHouse + indexer dual-write + Redis publish (Solana realtime).
 # Run on VM: bash /var/www/pump/tma/deploy/vm/enable-clickhouse.sh
+# If Docker is missing, installs Docker CE from the official apt repo (INSTALL_DOCKER=1).
 set -euo pipefail
 
 TMA_DIR="${TMA_DIR:-/var/www/pump/tma}"
@@ -8,17 +9,56 @@ COMPOSE_FILE="${TMA_DIR}/deploy/clickhouse/docker-compose.yml"
 SCHEMA_FILE="${TMA_DIR}/deploy/clickhouse/init/01_schema.sql"
 INDEXER_ENV="${TMA_DIR}/apps/indexer-sol/.env"
 WEB_ENV="${TMA_DIR}/.env"
+INSTALL_DOCKER="${INSTALL_DOCKER:-1}"
 
 log() { echo "[enable-clickhouse] $*"; }
 
+install_docker_ce() {
+  log "Docker missing — installing Docker CE + compose plugin (official apt repo)…"
+  export DEBIAN_FRONTEND=noninteractive
+  apt-get update -qq
+  apt-get install -y -qq ca-certificates curl
+  install -m 0755 -d /etc/apt/keyrings
+  if [[ ! -f /etc/apt/keyrings/docker.asc ]]; then
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+    chmod a+r /etc/apt/keyrings/docker.asc
+  fi
+  local codename
+  # shellcheck disable=SC1091
+  . /etc/os-release
+  codename="${UBUNTU_CODENAME:-${VERSION_CODENAME:-jammy}}"
+  tee /etc/apt/sources.list.d/docker.sources >/dev/null <<EOF
+Types: deb
+URIs: https://download.docker.com/linux/ubuntu
+Suites: ${codename}
+Components: stable
+Architectures: $(dpkg --print-architecture)
+Signed-By: /etc/apt/keyrings/docker.asc
+EOF
+  apt-get update -qq
+  apt-get install -y -qq docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+  systemctl enable --now docker
+  log "Docker installed: $(docker --version)"
+}
+
 if [[ ! -f "$COMPOSE_FILE" ]]; then
-  log "ERROR: missing $COMPOSE_FILE"
+  log "ERROR: missing $COMPOSE_FILE — pull latest tma code first"
   exit 1
 fi
 
 if ! command -v docker >/dev/null 2>&1; then
-  log "ERROR: docker not installed"
-  exit 1
+  if [[ "$INSTALL_DOCKER" == "1" ]]; then
+    install_docker_ce
+  else
+    log "ERROR: docker not installed. Run with INSTALL_DOCKER=1"
+    exit 1
+  fi
+fi
+
+if ! docker compose version >/dev/null 2>&1; then
+  log "Installing docker-compose-plugin…"
+  apt-get update -qq
+  apt-get install -y -qq docker-compose-plugin
 fi
 
 log "Starting ClickHouse (mem_limit 2g)…"
@@ -26,12 +66,12 @@ cd "$TMA_DIR"
 docker compose -f "$COMPOSE_FILE" up -d
 
 log "Waiting for HTTP ping…"
-for i in $(seq 1 30); do
+for i in $(seq 1 60); do
   if curl -sf "http://127.0.0.1:8123/ping" >/dev/null 2>&1; then
     break
   fi
   sleep 1
-  if [[ "$i" -eq 30 ]]; then
+  if [[ "$i" -eq 60 ]]; then
     log "ERROR: ClickHouse did not become ready"
     docker compose -f "$COMPOSE_FILE" logs --tail 40
     exit 1
@@ -86,7 +126,7 @@ if [[ -f "$INDEXER_ENV" ]]; then
   set +a
 fi
 npm run backfill-clickhouse-trades -w @pump/indexer-sol 2>/dev/null || \
-  log "WARN: backfill script failed or not built yet — run after deploy: npm run backfill-clickhouse-trades -w @pump/indexer-sol"
+  log "WARN: backfill failed — after deploy run: npm run backfill-clickhouse-trades -w @pump/indexer-sol"
 
 log "Verify:"
 curl -sf "http://127.0.0.1:8123/ping" && echo " clickhouse ping ok"
