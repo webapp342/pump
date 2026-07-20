@@ -38,9 +38,10 @@ import {
   pdaCurve,
   pdaFactorySigner,
   pdaGlobal,
+  pdaLiquidityVault,
   pdaReferrerBinding,
-  pdaTreasuryVault,
 } from "@/lib/solana/launchpad-pdas";
+import { solanaTradeAccountMetas } from "@/lib/solana/trade-accounts";
 
 export type SolanaSilentCreateResult = {
   signature: string;
@@ -81,9 +82,10 @@ async function buildCreateMemeInstructions(input: {
   const programId = launchpadProgramId();
   const [globalPda] = pdaGlobal(programId);
   const [factorySigner] = pdaFactorySigner(programId);
-  const [treasury] = pdaTreasuryVault(programId);
+  const [liquidity] = pdaLiquidityVault(programId);
   const [curvePda] = pdaCurve(input.mint, programId);
-  const vault = getAssociatedTokenAddressSync(input.mint, curvePda, true, TOKEN_PROGRAM_ID);
+  // Token vault ATA owned by shared liquidity PDA (Base: tokens on manager).
+  const vault = getAssociatedTokenAddressSync(input.mint, liquidity, true, TOKEN_PROGRAM_ID);
   const conn = getSolanaConnection();
   const mintRent = await conn.getMinimumBalanceForRentExemption(MINT_SIZE);
 
@@ -105,7 +107,7 @@ async function buildCreateMemeInstructions(input: {
     createAssociatedTokenAccountIdempotentInstruction(
       input.creator,
       vault,
-      curvePda,
+      liquidity,
       input.mint,
       TOKEN_PROGRAM_ID,
       ASSOCIATED_TOKEN_PROGRAM_ID
@@ -128,7 +130,7 @@ async function buildCreateMemeInstructions(input: {
         { pubkey: vault, isSigner: false, isWritable: true },
         { pubkey: factorySigner, isSigner: false, isWritable: false },
         { pubkey: globalPda, isSigner: false, isWritable: false },
-        { pubkey: treasury, isSigner: false, isWritable: true },
+        { pubkey: liquidity, isSigner: false, isWritable: true },
         { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
         { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
       ],
@@ -149,10 +151,24 @@ async function buildCreateMemeInstructions(input: {
       TOKEN_PROGRAM_ID
     );
     const minOut = input.minTokenOut ?? 1n;
-    const { referrerBinding, referrerWallet } = referrerAccounts(
+    const { referrerWallet } = referrerAccounts(
       input.creator,
       input.referrerAddress
     );
+    const curvePlaceholder = {
+      mint: input.mint,
+      creator: input.creator,
+      tokenVault: vault,
+      virtualTokenReserves: 0n,
+      virtualSolReserves: 0n,
+      realTokenReserves: 0n,
+      realSolReserves: 0n,
+      tokenTotalSupply: 0n,
+      initialRealTokenReserves: 0n,
+      complete: 0,
+      paused: 0,
+      bump: 0,
+    };
     ixs.push(
       createAssociatedTokenAccountIdempotentInstruction(
         input.creator,
@@ -164,20 +180,14 @@ async function buildCreateMemeInstructions(input: {
       ),
       new TransactionInstruction({
         programId,
-        keys: [
-          { pubkey: input.creator, isSigner: true, isWritable: true },
-          { pubkey: globalPda, isSigner: false, isWritable: false },
-          { pubkey: curvePda, isSigner: false, isWritable: true },
-          { pubkey: treasury, isSigner: false, isWritable: true },
-          { pubkey: input.creator, isSigner: false, isWritable: true },
-          { pubkey: input.mint, isSigner: false, isWritable: false },
-          { pubkey: vault, isSigner: false, isWritable: true },
-          { pubkey: traderAta, isSigner: false, isWritable: true },
-          { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
-          { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
-          { pubkey: referrerBinding, isSigner: false, isWritable: false },
-          { pubkey: referrerWallet, isSigner: false, isWritable: true },
-        ],
+        keys: solanaTradeAccountMetas({
+          trader: input.creator,
+          mint: input.mint,
+          curvePda,
+          curve: curvePlaceholder,
+          traderAta,
+          referrerWallet,
+        }),
         data: encodeBuyIx(initialBuy, minOut),
       })
     );

@@ -12,7 +12,12 @@ export const CURVE_EVENTS = {
   TradeEvent: "TradeEvent",
   FeeSplitEvent: "FeeSplitEvent",
   ReferrerSetEvent: "ReferrerSetEvent",
-  FeesClaimed: "FeesClaimed",
+  /** Base CreatorFeeClaimed parity — pending fees require claim. */
+  CreatorFeeClaimed: "CreatorFeeClaimed",
+  /** Base ReferrerFeeClaimed parity. */
+  ReferrerFeeClaimed: "ReferrerFeeClaimed",
+  /** Base EmergencyEthSwept parity (liquidity vault drain). */
+  EmergencyEthSwept: "EmergencyEthSwept",
 } as const;
 
 export const TREASURY_EVENTS = {
@@ -30,7 +35,9 @@ export const EVENT_TO_HANDLER = {
   TradeEvent: "onTrade",
   FeeSplitEvent: "onFeeSplit",
   ReferrerSetEvent: "onReferrerSet",
-  FeesClaimed: "onFeesClaimed",
+  CreatorFeeClaimed: "onCreatorFeeClaimed",
+  ReferrerFeeClaimed: "onReferrerFeeClaimed",
+  EmergencyEthSwept: "onEmergencyEthSwept",
   TreasuryWithdraw: "onTreasuryWithdraw",
 } as const;
 

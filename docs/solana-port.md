@@ -64,9 +64,9 @@ Remaining architecture (Yellowstone / Go / ClickHouse / silent sign): [`docs/sol
 ### Phase 1b on-chain behavior
 
 - **Math:** `programs/pump-curve/src/math.rs` — same CP quotes as EVM `quoteBuy` / `quoteSell`.
-- **Buy/sell:** SOL into curve account; SPL from/to curve token vault; protocol fee → treasury; creator/referrer shares paid immediately.
-- **Factory:** mint SPL → vault ATA → CPI `register_curve` (factory-signer PDA).
-- **Treasury:** `withdraw` from vault PDA.
+- **Buy/sell:** SOL into shared **liquidity** vault PDA; SPL from/to token vault (ATA owned by liquidity); protocol fee → protocol-treasury immediately; creator/referrer **pending + claim**.
+- **Factory:** mint SPL → vault ATA → CPI `create_meme` (factory-signer PDA).
+- **Treasury:** `withdraw_protocol_treasury` from protocol-treasury PDA; `emergency_sweep` drains liquidity vault.
 - **Not yet:** ~~Metaplex metadata~~ (create tx embeds Metaplex name/symbol/uri + `/api/tokens/{mint}/metaplex.json`), verified-KOL BPS, Anchor integration tests on validator.
 
 ## Program map (EVM → Solana)

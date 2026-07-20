@@ -1,6 +1,6 @@
 /**
  * Launchpad PDAs + account layouts matching programs/pump-launchpad.
- * Curve layout = pump.fun BondingCurve fields (+ vault pubkey). Decoders use Uint8Array/DataView.
+ * Liquidity model: Base BondingCurveManager parity (shared SOL vault + claimable fees).
  */
 
 import { PublicKey } from "@solana/web3.js";
@@ -24,9 +24,23 @@ export function pdaFactorySigner(programId = launchpadProgramId()): [PublicKey, 
   );
 }
 
-export function pdaTreasuryVault(programId = launchpadProgramId()): [PublicKey, number] {
+/** Shared SOL liquidity vault (all curve reserves + pending claimable fees). */
+export function pdaLiquidityVault(programId = launchpadProgramId()): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(
     [Buffer.from(PDA_SEEDS.vault)],
+    programId
+  );
+}
+
+/** @deprecated use pdaLiquidityVault */
+export function pdaTreasuryVault(programId = launchpadProgramId()): [PublicKey, number] {
+  return pdaLiquidityVault(programId);
+}
+
+/** Protocol fee sink (Base LaunchpadTreasury analogue). */
+export function pdaProtocolTreasury(programId = launchpadProgramId()): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from(PDA_SEEDS.protocolTreasury)],
     programId
   );
 }
@@ -47,6 +61,26 @@ export function pdaReferrerBinding(
 ): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(
     [Buffer.from(PDA_SEEDS.referrer), trader.toBuffer()],
+    programId
+  );
+}
+
+export function pdaCreatorFees(
+  creator: PublicKey,
+  programId = launchpadProgramId()
+): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from(PDA_SEEDS.creatorFees), creator.toBuffer()],
+    programId
+  );
+}
+
+export function pdaReferrerFees(
+  referrer: PublicKey,
+  programId = launchpadProgramId()
+): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from(PDA_SEEDS.referrerFees), referrer.toBuffer()],
     programId
   );
 }
@@ -121,8 +155,9 @@ export function decodeCurveAccount(data: Uint8Array): OnchainCurve {
   };
 }
 
-/** GlobalConfig — pump.fun reserve fields + our fees. */
 export type OnchainGlobal = {
+  liquidity: PublicKey;
+  protocolTreasury: PublicKey;
   protocolFeeBps: bigint;
   creatorFeeShareBps: bigint;
   referrerShareBps: bigint;
@@ -136,22 +171,25 @@ export type OnchainGlobal = {
 };
 
 export function decodeGlobalConfig(data: Uint8Array): OnchainGlobal {
-  if (data.length < 176) {
+  if (data.length < 208) {
     throw new Error("Global account too small");
   }
-  // Skip authority(32) + treasury(32) + factory_signer(32) = 96
-  const protocolFeeBps = readBigUInt64LE(data, 96);
-  const creatorFeeShareBps = readBigUInt64LE(data, 104);
-  const referrerShareBps = readBigUInt64LE(data, 112);
-  // verified_referrer_share_bps @120
-  const createFeeLamports = readBigUInt64LE(data, 128);
-  const initialVirtualSolReserves = readBigUInt64LE(data, 136);
-  const initialVirtualTokenReserves = readBigUInt64LE(data, 144);
-  const initialRealTokenReserves = readBigUInt64LE(data, 152);
-  const tokenTotalSupply = readBigUInt64LE(data, 160);
-  const tokenDecimals = readUInt8(data, 168) || 6;
-  const emergencyHalt = readUInt8(data, 169);
+  // authority(32) + liquidity(32) + protocol_treasury(32) + factory_signer(32) = 128
+  const liquidity = new PublicKey(data.subarray(32, 64));
+  const protocolTreasury = new PublicKey(data.subarray(64, 96));
+  const protocolFeeBps = readBigUInt64LE(data, 128);
+  const creatorFeeShareBps = readBigUInt64LE(data, 136);
+  const referrerShareBps = readBigUInt64LE(data, 144);
+  const createFeeLamports = readBigUInt64LE(data, 160);
+  const initialVirtualSolReserves = readBigUInt64LE(data, 168);
+  const initialVirtualTokenReserves = readBigUInt64LE(data, 176);
+  const initialRealTokenReserves = readBigUInt64LE(data, 184);
+  const tokenTotalSupply = readBigUInt64LE(data, 192);
+  const tokenDecimals = readUInt8(data, 200) || 6;
+  const emergencyHalt = readUInt8(data, 201);
   return {
+    liquidity,
+    protocolTreasury,
     protocolFeeBps,
     creatorFeeShareBps,
     referrerShareBps,
@@ -162,5 +200,22 @@ export function decodeGlobalConfig(data: Uint8Array): OnchainGlobal {
     tokenTotalSupply,
     tokenDecimals,
     emergencyHalt,
+  };
+}
+
+export type OnchainPendingFees = {
+  owner: PublicKey;
+  pendingLamports: bigint;
+  bump: number;
+};
+
+export function decodePendingFees(data: Uint8Array): OnchainPendingFees {
+  if (data.length < 48) {
+    throw new Error("PendingFees account too small");
+  }
+  return {
+    owner: new PublicKey(data.subarray(0, 32)),
+    pendingLamports: readBigUInt64LE(data, 32),
+    bump: readUInt8(data, 40),
   };
 }

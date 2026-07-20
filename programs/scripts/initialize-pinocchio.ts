@@ -3,6 +3,7 @@
  *
  *   cd programs && npx tsx scripts/initialize-pinocchio.ts
  *
+ * Creates shared liquidity vault + protocol treasury (Base parity).
  * Env: SOLANA_RPC_URL / ANCHOR_PROVIDER_URL, ANCHOR_WALLET
  */
 
@@ -50,8 +51,12 @@ async function main(): Promise<void> {
     [Buffer.from(PDA_SEEDS.factorySigner)],
     programId
   );
-  const [treasuryVault] = PublicKey.findProgramAddressSync(
+  const [liquidityVault] = PublicKey.findProgramAddressSync(
     [Buffer.from(PDA_SEEDS.vault)],
+    programId
+  );
+  const [protocolTreasury] = PublicKey.findProgramAddressSync(
+    [Buffer.from(PDA_SEEDS.protocolTreasury)],
     programId
   );
 
@@ -61,7 +66,8 @@ async function main(): Promise<void> {
     programId: programId.toBase58(),
     globalPda: globalPda.toBase58(),
     factorySigner: factorySigner.toBase58(),
-    treasuryVault: treasuryVault.toBase58(),
+    liquidityVault: liquidityVault.toBase58(),
+    protocolTreasury: protocolTreasury.toBase58(),
     rpc,
   });
 
@@ -75,7 +81,8 @@ async function main(): Promise<void> {
     programId,
     keys: [
       { pubkey: payer.publicKey, isSigner: true, isWritable: true },
-      { pubkey: treasuryVault, isSigner: false, isWritable: true },
+      { pubkey: liquidityVault, isSigner: false, isWritable: true },
+      { pubkey: protocolTreasury, isSigner: false, isWritable: true },
       { pubkey: factorySigner, isSigner: false, isWritable: false },
       { pubkey: globalPda, isSigner: false, isWritable: true },
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },

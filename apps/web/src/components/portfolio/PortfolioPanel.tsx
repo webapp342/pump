@@ -46,6 +46,10 @@ import type { PortfolioSnapshot, TokenListItem } from "@/lib/db/launchpad";
 import { useBnbUsdPrice } from "@/hooks/useBnbUsdPrice";
 import { useScwBalance } from "@/hooks/useScwBalance";
 import { useSolanaNativeBalance } from "@/hooks/useSolanaNativeBalance";
+import {
+  fetchPendingCreatorFeesLamports,
+  fetchPendingReferrerFeesLamports,
+} from "@/lib/solana/pending-fees";
 import { bnbToUsd, formatPortfolioHoldingValueUsd, formatUsdReadable, positionAvgEntryUsd, positionUnrealizedUsd, positionUnrealizedPct, scaleCostBasisUsdForBalance } from "@/lib/format-usd";
 import { formatCapForBoard } from "@/lib/arena-board-format";
 import {
@@ -820,6 +824,30 @@ export function PortfolioPanel({
     query: { enabled: Boolean(wagmiAddress) && !isSolanaPortfolio, refetchInterval: 15_000 },
   });
 
+  const [solPendingCreatorLamports, setSolPendingCreatorLamports] = useState(0n);
+  const [solPendingReferrerLamports, setSolPendingReferrerLamports] = useState(0n);
+
+  const refetchSolPending = useCallback(async () => {
+    if (!isSolanaPortfolio || !solanaAddress) {
+      setSolPendingCreatorLamports(0n);
+      setSolPendingReferrerLamports(0n);
+      return;
+    }
+    const [creator, referrer] = await Promise.all([
+      fetchPendingCreatorFeesLamports(solanaAddress),
+      fetchPendingReferrerFeesLamports(solanaAddress),
+    ]);
+    setSolPendingCreatorLamports(creator);
+    setSolPendingReferrerLamports(referrer);
+  }, [isSolanaPortfolio, solanaAddress]);
+
+  useEffect(() => {
+    if (!isSolanaPortfolio || !solanaAddress) return;
+    void refetchSolPending();
+    const id = window.setInterval(() => void refetchSolPending(), 15_000);
+    return () => window.clearInterval(id);
+  }, [isSolanaPortfolio, solanaAddress, refetchSolPending]);
+
   const loadPortfolio = useCallback(
     async (
       walletAddress: string,
@@ -1378,7 +1406,16 @@ export function PortfolioPanel({
     totalCostBasisUsd > 0 ? (totalNetPnlUsd / totalCostBasisUsd) * 100 : null;
   const topHolding = resolveTopHoldingSummary(displayHoldingsRows, nativeBnb, bnbUsd);
   const claimedBnb = data.creatorFeesClaimedBnb ?? 0;
-  const pendingBnb = pendingWei != null ? Number(formatEther(pendingWei)) : 0;
+  const pendingBnb = isSolanaPortfolio
+    ? Number(solPendingCreatorLamports) / 1e9
+    : pendingWei != null
+      ? Number(formatEther(pendingWei))
+      : 0;
+  const referralPendingBnb = isSolanaPortfolio
+    ? Number(solPendingReferrerLamports) / 1e9
+    : pendingReferrerWei != null
+      ? Number(formatEther(pendingReferrerWei))
+      : 0;
   const tokenHoldingsCount = sortedHoldingsRows.length;
   const visibleHoldingsRows = sortedHoldingsRows.slice(0, holdingsVisibleLimit);
   const hasMoreHoldings = visibleHoldingsRows.length < sortedHoldingsRows.length;
@@ -1395,38 +1432,35 @@ export function PortfolioPanel({
     ? ownHasStatusBadge
     : Boolean(data.hasStatusBadge);
 
-  const feesPending =
-    pendingBnb > 0 || (pendingReferrerWei != null && pendingReferrerWei > 0n);
+  const feesPending = pendingBnb > 0 || referralPendingBnb > 0;
 
   return (
     <>
-      {!isSolanaPortfolio ? (
-        <>
-          <ClaimCreatorFeesModal
-            open={claimOpen}
-            onClose={() => setClaimOpen(false)}
-            claimedBnb={claimedBnb}
-            onClaimed={() => {
-              void refetchPending();
-              if (address) void loadPortfolio(address);
-            }}
-          />
+      <ClaimCreatorFeesModal
+        open={claimOpen}
+        onClose={() => setClaimOpen(false)}
+        claimedBnb={claimedBnb}
+        onClaimed={() => {
+          if (isSolanaPortfolio) void refetchSolPending();
+          else void refetchPending();
+          if (address) void loadPortfolio(address);
+        }}
+      />
 
-          <ClaimReferrerFeesModal
-            open={referrerClaimOpen}
-            onClose={() => setReferrerClaimOpen(false)}
-            claimedBnb={referralStats?.claimedBnb ?? 0}
-            inviteCount={referralStats?.inviteCount ?? 0}
-            referralVolumeBnb={referralStats?.referralVolumeBnb ?? 0}
-            onClaimed={() => {
-              void refetchReferrerPending();
-              if (address) {
-                void fetchReferralStats(address).then((stats) => setReferralStats(stats));
-              }
-            }}
-          />
-        </>
-      ) : null}
+      <ClaimReferrerFeesModal
+        open={referrerClaimOpen}
+        onClose={() => setReferrerClaimOpen(false)}
+        claimedBnb={referralStats?.claimedBnb ?? 0}
+        inviteCount={referralStats?.inviteCount ?? 0}
+        referralVolumeBnb={referralStats?.referralVolumeBnb ?? 0}
+        onClaimed={() => {
+          if (isSolanaPortfolio) void refetchSolPending();
+          else void refetchReferrerPending();
+          if (address) {
+            void fetchReferralStats(address).then((stats) => setReferralStats(stats));
+          }
+        }}
+      />
 
       <FollowNetworkModal
         open={followModalOpen}
@@ -1798,7 +1832,7 @@ export function PortfolioPanel({
             bnbUsd={bnbUsd}
             onOpenCreatorClaim={() => setClaimOpen(true)}
             referralClaimedBnb={referralStats?.claimedBnb ?? 0}
-            pendingReferrerWei={pendingReferrerWei}
+            referralPendingBnb={referralPendingBnb}
             onOpenReferrerClaim={() => setReferrerClaimOpen(true)}
           />
           </div>

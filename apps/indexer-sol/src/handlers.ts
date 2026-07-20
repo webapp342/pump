@@ -70,10 +70,16 @@ export class SolanaEventHandlers {
       case "onReferrerSet":
         await this.onReferrerSet(event);
         break;
-      case "onFeesClaimed":
+      case "onCreatorFeeClaimed":
+        await this.onCreatorFeeClaimed(event);
+        break;
+      case "onReferrerFeeClaimed":
+        await this.onReferrerFeeClaimed(event);
+        break;
+      case "onEmergencyEthSwept":
       case "onTreasuryWithdraw":
         console.log(
-          `[indexer-sol] ${event.name} noted sig=${event.signature} (no PG yet)`
+          `[indexer-sol] ${event.name} noted sig=${event.signature} (ops only)`
         );
         break;
       default:
@@ -492,6 +498,72 @@ export class SolanaEventHandlers {
     );
     console.log(
       `[indexer-sol] ReferrerSet trader=${trader} referrer=${referrer}`
+    );
+  }
+
+  async onCreatorFeeClaimed(event: DecodedSolanaEvent): Promise<void> {
+    const f = event.fields!;
+    const amountLamports = asBigInt(f.amount);
+    if (amountLamports <= 0n) return;
+
+    const creator = asString(f.creator);
+    const amount = lamportsToSol(amountLamports);
+    await this.context.launchpadPool.query(
+      `
+        INSERT INTO creator_fee_claims (
+          creator_address,
+          amount_bnb,
+          tx_hash,
+          log_index,
+          block_number,
+          block_time
+        ) VALUES ($1, $2, $3, $4, $5, $6)
+        ON CONFLICT (tx_hash, log_index) DO NOTHING
+      `,
+      [
+        creator,
+        amount,
+        event.signature,
+        event.logIndex,
+        String(event.slot),
+        new Date(),
+      ]
+    );
+    console.log(
+      `[indexer-sol] CreatorFeeClaimed creator=${creator} amount=${amount} sig=${event.signature}`
+    );
+  }
+
+  async onReferrerFeeClaimed(event: DecodedSolanaEvent): Promise<void> {
+    const f = event.fields!;
+    const amountLamports = asBigInt(f.amount);
+    if (amountLamports <= 0n) return;
+
+    const referrer = asString(f.referrer);
+    const amount = lamportsToSol(amountLamports);
+    await this.context.launchpadPool.query(
+      `
+        INSERT INTO referrer_fee_claims (
+          referrer_address,
+          amount_bnb,
+          tx_hash,
+          log_index,
+          block_number,
+          block_time
+        ) VALUES ($1, $2, $3, $4, $5, $6)
+        ON CONFLICT (tx_hash, log_index) DO NOTHING
+      `,
+      [
+        referrer,
+        amount,
+        event.signature,
+        event.logIndex,
+        String(event.slot),
+        new Date(),
+      ]
+    );
+    console.log(
+      `[indexer-sol] ReferrerFeeClaimed referrer=${referrer} amount=${amount} sig=${event.signature}`
     );
   }
 

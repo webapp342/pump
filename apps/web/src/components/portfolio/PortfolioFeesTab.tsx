@@ -10,7 +10,7 @@ type PortfolioFeesTabProps = {
   bnbUsd: number | null;
   onOpenCreatorClaim: () => void;
   referralClaimedBnb: number;
-  pendingReferrerWei: bigint | undefined;
+  referralPendingBnb: number;
   onOpenReferrerClaim: () => void;
 };
 
@@ -21,7 +21,7 @@ export function PortfolioFeesTab({
   bnbUsd,
   onOpenCreatorClaim,
   referralClaimedBnb,
-  pendingReferrerWei,
+  referralPendingBnb,
   onOpenReferrerClaim,
 }: PortfolioFeesTabProps) {
   return (
@@ -37,7 +37,7 @@ export function PortfolioFeesTab({
         <ReferralRewardsCard
           address={walletAddress}
           claimedBnb={referralClaimedBnb}
-          pendingWei={pendingReferrerWei}
+          pendingBnb={referralPendingBnb}
           bnbUsd={bnbUsd}
           onOpenModal={onOpenReferrerClaim}
           className="portfolio-earnings-tab__card"

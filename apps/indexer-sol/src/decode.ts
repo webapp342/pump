@@ -34,7 +34,9 @@ const DISC_TO_NAME: Map<string, string> = (() => {
     CURVE_EVENTS.TradeEvent,
     CURVE_EVENTS.FeeSplitEvent,
     CURVE_EVENTS.ReferrerSetEvent,
-    CURVE_EVENTS.FeesClaimed,
+    CURVE_EVENTS.CreatorFeeClaimed,
+    CURVE_EVENTS.ReferrerFeeClaimed,
+    CURVE_EVENTS.EmergencyEthSwept,
     TREASURY_EVENTS.TreasuryWithdraw,
   ];
   const map = new Map<string, string>();
@@ -121,9 +123,19 @@ function decodeFields(name: string, body: Buffer): Record<string, unknown> {
         trader: readPubkey(r),
         referrer: readPubkey(r),
       };
-    case CURVE_EVENTS.FeesClaimed:
+    case CURVE_EVENTS.CreatorFeeClaimed:
       return {
-        owner: readPubkey(r),
+        creator: readPubkey(r),
+        amount: readU64(r),
+      };
+    case CURVE_EVENTS.ReferrerFeeClaimed:
+      return {
+        referrer: readPubkey(r),
+        amount: readU64(r),
+      };
+    case CURVE_EVENTS.EmergencyEthSwept:
+      return {
+        to: readPubkey(r),
         amount: readU64(r),
       };
     case TREASURY_EVENTS.TreasuryWithdraw:

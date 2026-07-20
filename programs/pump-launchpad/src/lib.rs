@@ -3,19 +3,26 @@
 //! Pump launchpad — Pinocchio (low rent + low CU).
 //! Program ID: `Hwv85kSodkR34rBTE1J67aSzixnAkXdAX6HzZnKDCvus`
 //!
-//! Bonding-curve state/math: pump.fun parity (virtual + real reserves).
-//! Differences vs pump.fun: our protocol/creator/referral fee split; **no graduation/migrate**.
+//! Bonding-curve math: pump.fun virtual+real reserves (**no graduation**).
+//! Fee / treasury / claim / emergency: **Base BondingCurveManager parity**
+//!   — all SOL liquidity in one `liquidity` PDA (`address(this)` analogue)
+//!   — creator/referrer fees accrue in pending PDAs (claim required)
+//!   — protocol fee paid immediately to `protocol_treasury` PDA
+//!   — `emergency_sweep` drains liquidity vault + halts trading
 //!
 //! Instructions (1-byte tag):
-//!   0 initialize | 1 create_meme | 2 buy | 3 sell | 4 withdraw_treasury | 5 set_referrer
-//!
-//! @see https://github.com/pump-fun/pump-public-docs/blob/main/docs/PUMP_PROGRAM_README.md
+//!   0 initialize | 1 create_meme | 2 buy | 3 sell
+//!   4 withdraw_protocol_treasury | 5 set_referrer
+//!   6 claim_creator_fees | 7 claim_referrer_fees | 8 emergency_sweep
 
 pub mod events;
 pub mod math;
 
 const TOKEN_UNIT_9: u64 = 1_000_000_000;
 const REFERRER_SEED: &[u8] = b"referrer";
+const CREATOR_FEES_SEED: &[u8] = b"creator-fees";
+const REFERRER_FEES_SEED: &[u8] = b"referrer-fees";
+const PROTOCOL_TREASURY_SEED: &[u8] = b"protocol-treasury";
 
 use bytemuck::{Pod, Zeroable};
 use pinocchio::{
@@ -41,8 +48,8 @@ fn panic(_info: &core::panic::PanicInfo) -> ! {
 
 pub const BPS: u64 = 10_000;
 pub const GLOBAL_SEED: &[u8] = b"global";
-/// PDA seed for bonding curve — kept as `curve` for our program ID continuity.
 pub const CURVE_SEED: &[u8] = b"curve";
+/// Shared SOL liquidity vault — Base BondingCurveManager balance analogue.
 pub const VAULT_SEED: &[u8] = b"vault";
 pub const FACTORY_SIGNER_SEED: &[u8] = b"factory-signer";
 
@@ -52,46 +59,48 @@ const IX_BUY: u8 = 2;
 const IX_SELL: u8 = 3;
 const IX_WITHDRAW: u8 = 4;
 const IX_SET_REFERRER: u8 = 5;
+const IX_CLAIM_CREATOR: u8 = 6;
+const IX_CLAIM_REFERRER: u8 = 7;
+const IX_EMERGENCY_SWEEP: u8 = 8;
 
-/// Rent-exempt minimums (devnet/mainnet 2026 — match `getMinimumBalanceForRentExemption`).
-const TREASURY_RENT_LAMPORTS: u64 = 890_880;
-const GLOBAL_RENT_LAMPORTS: u64 = 2_200_000;
+const LIQUIDITY_RENT_LAMPORTS: u64 = 890_880;
+const PROTOCOL_TREASURY_RENT_LAMPORTS: u64 = 890_880;
+const GLOBAL_RENT_LAMPORTS: u64 = 2_600_000;
 const CURVE_RENT_LAMPORTS: u64 = 1_948_800;
+const PENDING_FEES_RENT_LAMPORTS: u64 = 1_200_000;
 
-/// Global config — pump.fun reserve fields + our fee shares.
 #[repr(C)]
 #[derive(Clone, Copy, Pod, Zeroable)]
 pub struct GlobalConfig {
     pub authority: [u8; 32],
-    pub treasury: [u8; 32],
+    /// Shared SOL vault (curve reserves + pending claimable fees).
+    pub liquidity: [u8; 32],
+    /// Protocol fee sink (Base LaunchpadTreasury analogue).
+    pub protocol_treasury: [u8; 32],
     pub factory_signer: [u8; 32],
     pub protocol_fee_bps: u64,
     pub creator_fee_share_bps: u64,
     pub referrer_share_bps: u64,
     pub verified_referrer_share_bps: u64,
     pub create_fee_lamports: u64,
-    /// pump.fun `initial_virtual_sol_reserves` (30 SOL).
     pub initial_virtual_sol_reserves: u64,
-    /// pump.fun `initial_virtual_token_reserves` (1.073B raw @ 6dp).
     pub initial_virtual_token_reserves: u64,
-    /// pump.fun `initial_real_token_reserves` (793.1M raw) — sellable on curve.
     pub initial_real_token_reserves: u64,
-    /// pump.fun `token_total_supply` (1B raw) — minted into vault.
     pub token_total_supply: u64,
     pub token_decimals: u8,
     pub emergency_halt: u8,
     pub bump: u8,
     pub signer_bump: u8,
-    pub vault_bump: u8,
-    pub _pad: [u8; 3],
+    pub liquidity_bump: u8,
+    pub protocol_treasury_bump: u8,
+    pub _pad: [u8; 2],
 }
 
 impl GlobalConfig {
     pub const LEN: usize = core::mem::size_of::<Self>();
 }
 
-/// Bonding curve — pump.fun layout (+ vault pubkey for SPL transfers).
-/// `complete` is never set true (no graduation).
+/// Curve accounting only — SOL does not sit on this account.
 #[repr(C)]
 #[derive(Clone, Copy, Pod, Zeroable)]
 pub struct Curve {
@@ -104,7 +113,6 @@ pub struct Curve {
     pub real_sol_reserves: u64,
     pub token_total_supply: u64,
     pub initial_real_token_reserves: u64,
-    /// Always 0 — graduation disabled.
     pub complete: u8,
     pub paused: u8,
     pub bump: u8,
@@ -128,6 +136,20 @@ impl ReferrerBinding {
     pub const LEN: usize = core::mem::size_of::<Self>();
 }
 
+/// Base pendingCreatorFees / pendingReferrerFees analogue.
+#[repr(C)]
+#[derive(Clone, Copy, Pod, Zeroable)]
+pub struct PendingFees {
+    pub owner: [u8; 32],
+    pub pending_lamports: u64,
+    pub bump: u8,
+    pub _pad: [u8; 7],
+}
+
+impl PendingFees {
+    pub const LEN: usize = core::mem::size_of::<Self>();
+}
+
 fn process_instruction(
     program_id: &Pubkey,
     accounts: &[AccountInfo],
@@ -141,8 +163,11 @@ fn process_instruction(
         IX_CREATE_MEME => process_create_meme(program_id, accounts, rest),
         IX_BUY => process_buy(program_id, accounts, rest),
         IX_SELL => process_sell(program_id, accounts, rest),
-        IX_WITHDRAW => process_withdraw(program_id, accounts, rest),
+        IX_WITHDRAW => process_withdraw_protocol(program_id, accounts, rest),
         IX_SET_REFERRER => process_set_referrer(program_id, accounts, rest),
+        IX_CLAIM_CREATOR => process_claim_fees(program_id, accounts, true),
+        IX_CLAIM_REFERRER => process_claim_fees(program_id, accounts, false),
+        IX_EMERGENCY_SWEEP => process_emergency_sweep(program_id, accounts),
         _ => Err(ProgramError::InvalidInstructionData),
     }
 }
@@ -228,14 +253,14 @@ fn load_pod<T: Pod + Copy>(ai: &AccountInfo) -> Result<T, ProgramError> {
     Ok(*val)
 }
 
-/// Data: 9×u64 fees/reserves + u8 decimals (73 bytes).
-/// Creates `global` PDA via system CPI if not yet allocated.
 fn process_initialize(
     program_id: &Pubkey,
     accounts: &[AccountInfo],
     data: &[u8],
 ) -> ProgramResult {
-    let [authority, treasury, factory_signer, global, system_program] = accounts else {
+    let [authority, liquidity, protocol_treasury, factory_signer, global, system_program] =
+        accounts
+    else {
         return Err(ProgramError::NotEnoughAccountKeys);
     };
     if !authority.is_signer() {
@@ -250,8 +275,6 @@ fn process_initialize(
         if !owner_eq(global, program_id) {
             return Err(ProgramError::IncorrectProgramId);
         }
-        // Re-initialize is an admin update, not a public takeover path.
-        // The authority is the first 32 bytes in both old and new layouts.
         let existing_authority_matches = {
             let existing = unsafe { global.borrow_data_unchecked() };
             existing
@@ -263,31 +286,53 @@ fn process_initialize(
             return Err(ProgramError::IllegalOwner);
         }
     }
+
     let (signer_pda, signer_bump) = find_program_address(&[FACTORY_SIGNER_SEED], program_id);
     if factory_signer.key() != &signer_pda {
         return Err(ProgramError::InvalidSeeds);
     }
-    let (vault_pda, vault_bump) = find_program_address(&[VAULT_SEED], program_id);
-    if treasury.key() != &vault_pda {
+    let (liquidity_pda, liquidity_bump) = find_program_address(&[VAULT_SEED], program_id);
+    if liquidity.key() != &liquidity_pda {
+        return Err(ProgramError::InvalidSeeds);
+    }
+    let (protocol_pda, protocol_bump) =
+        find_program_address(&[PROTOCOL_TREASURY_SEED], program_id);
+    if protocol_treasury.key() != &protocol_pda {
         return Err(ProgramError::InvalidSeeds);
     }
 
-    // Treasury must exist as a rent-exempt, program-owned PDA before receiving
-    // small protocol fees. Crediting an absent account with less than the
-    // rent-exempt minimum makes the runtime reject the entire trade.
-    if treasury.lamports() == 0 {
-        let bump_seed = [vault_bump];
+    if liquidity.lamports() == 0 {
+        let bump_seed = [liquidity_bump];
         let seeds = [Seed::from(VAULT_SEED), Seed::from(bump_seed.as_ref())];
         let signers = [Signer::from(&seeds)];
         CreateAccount {
             from: authority,
-            to: treasury,
-            lamports: TREASURY_RENT_LAMPORTS,
+            to: liquidity,
+            lamports: LIQUIDITY_RENT_LAMPORTS,
             space: 0,
             owner: program_id,
         }
         .invoke_signed(&signers)?;
-    } else if !owner_eq(treasury, program_id) {
+    } else if !owner_eq(liquidity, program_id) {
+        return Err(ProgramError::IncorrectProgramId);
+    }
+
+    if protocol_treasury.lamports() == 0 {
+        let bump_seed = [protocol_bump];
+        let seeds = [
+            Seed::from(PROTOCOL_TREASURY_SEED),
+            Seed::from(bump_seed.as_ref()),
+        ];
+        let signers = [Signer::from(&seeds)];
+        CreateAccount {
+            from: authority,
+            to: protocol_treasury,
+            lamports: PROTOCOL_TREASURY_RENT_LAMPORTS,
+            space: 0,
+            owner: program_id,
+        }
+        .invoke_signed(&signers)?;
+    } else if !owner_eq(protocol_treasury, program_id) {
         return Err(ProgramError::IncorrectProgramId);
     }
 
@@ -309,7 +354,6 @@ fn process_initialize(
     {
         return Err(ProgramError::InvalidArgument);
     }
-    // pump.fun: virtual_token >= real_token, real_token <= total_supply, all non-zero
     if token_total_supply == 0
         || initial_virtual_sol_reserves == 0
         || initial_virtual_token_reserves == 0
@@ -321,18 +365,15 @@ fn process_initialize(
         return Err(ProgramError::InvalidArgument);
     }
 
-    // Allocate global PDA on first init, or grow if layout was upgraded.
     if global.lamports() == 0 {
-        let space = GlobalConfig::LEN as u64;
-        let lamports = GLOBAL_RENT_LAMPORTS;
         let bump_seed = [bump];
         let seeds = [Seed::from(GLOBAL_SEED), Seed::from(bump_seed.as_ref())];
         let signers = [Signer::from(&seeds)];
         CreateAccount {
             from: authority,
             to: global,
-            lamports,
-            space,
+            lamports: GLOBAL_RENT_LAMPORTS,
+            space: GlobalConfig::LEN as u64,
             owner: program_id,
         }
         .invoke_signed(&signers)?;
@@ -340,7 +381,6 @@ fn process_initialize(
     } else if !owner_eq(global, program_id) {
         return Err(ProgramError::IncorrectProgramId);
     } else if global.data_len() < GlobalConfig::LEN {
-        // Layout upgrade: old Global was smaller — top up rent + realloc.
         let needed = GLOBAL_RENT_LAMPORTS;
         let have = global.lamports();
         if have < needed {
@@ -357,7 +397,8 @@ fn process_initialize(
 
     let cfg = GlobalConfig {
         authority: pubkey_bytes(authority),
-        treasury: pubkey_bytes(treasury),
+        liquidity: pubkey_bytes(liquidity),
+        protocol_treasury: pubkey_bytes(protocol_treasury),
         factory_signer: pubkey_bytes(factory_signer),
         protocol_fee_bps,
         creator_fee_share_bps,
@@ -372,24 +413,22 @@ fn process_initialize(
         emergency_halt: 0,
         bump,
         signer_bump,
-        vault_bump,
-        _pad: [0; 3],
+        liquidity_bump,
+        protocol_treasury_bump: protocol_bump,
+        _pad: [0; 2],
     };
     write_pod(global, &cfg)?;
     log!("pump:initialize");
     Ok(())
 }
 
-/// Accounts: creator, mint, curve, curve_token_vault, factory_signer, global,
-///           treasury_vault, token_program, system
-/// Client pre-creates mint (authority=creator), Metaplex metadata, curve PDA, vault ATA.
-/// Instruction data: borsh name (≤64), symbol (≤16), uri (≤256).
+/// Token vault ATA must be owned by the shared liquidity PDA (Base: tokens on manager).
 fn process_create_meme(
     program_id: &Pubkey,
     accounts: &[AccountInfo],
     data: &[u8],
 ) -> ProgramResult {
-    let [creator, mint, curve, vault, factory_signer, global, treasury, _token, _system] =
+    let [creator, mint, curve, vault, factory_signer, global, liquidity, _token, _system] =
         accounts
     else {
         return Err(ProgramError::NotEnoughAccountKeys);
@@ -404,7 +443,7 @@ fn process_create_meme(
 
     let g = load_pod::<GlobalConfig>(global)?;
     if !keys_eq(&g.factory_signer, factory_signer.key())
-        || !keys_eq(&g.treasury, treasury.key())
+        || !keys_eq(&g.liquidity, liquidity.key())
     {
         return Err(ProgramError::InvalidAccountData);
     }
@@ -438,7 +477,7 @@ fn process_create_meme(
     if g.create_fee_lamports > 0 {
         SolTransfer {
             from: creator,
-            to: treasury,
+            to: liquidity,
             lamports: g.create_fee_lamports,
         }
         .invoke()?;
@@ -475,7 +514,6 @@ fn process_create_meme(
     }
     .invoke_signed(&signers)?;
 
-    // pump.fun BondingCurve init — complete stays false forever (no migrate).
     let c = Curve {
         mint: pubkey_bytes(mint),
         creator: pubkey_bytes(creator),
@@ -507,7 +545,7 @@ fn process_create_meme(
 }
 
 fn process_buy(program_id: &Pubkey, accounts: &[AccountInfo], data: &[u8]) -> ProgramResult {
-    let [trader, global, curve, treasury, creator, mint, vault, trader_ata, _token, _system, referrer_binding, referrer_wallet] =
+    let [trader, global, curve, liquidity, protocol_treasury, creator_fees, referrer_fees, mint, vault, trader_ata, _token, _system, referrer_binding, referrer_wallet] =
         accounts
     else {
         return Err(ProgramError::NotEnoughAccountKeys);
@@ -525,16 +563,18 @@ fn process_buy(program_id: &Pubkey, accounts: &[AccountInfo], data: &[u8]) -> Pr
     if g.emergency_halt != 0 {
         return Err(ProgramError::InvalidAccountData);
     }
-    if !keys_eq(&g.treasury, treasury.key()) {
+    if !keys_eq(&g.liquidity, liquidity.key())
+        || !keys_eq(&g.protocol_treasury, protocol_treasury.key())
+    {
         return Err(ProgramError::InvalidAccountData);
     }
 
     let mut c = load_pod::<Curve>(curve)?;
-    if c.paused != 0 || c.complete != 0 || !keys_eq(&c.mint, mint.key()) || !keys_eq(&c.token_vault, vault.key())
+    if c.paused != 0
+        || c.complete != 0
+        || !keys_eq(&c.mint, mint.key())
+        || !keys_eq(&c.token_vault, vault.key())
     {
-        return Err(ProgramError::InvalidAccountData);
-    }
-    if !keys_eq(&c.creator, creator.key()) {
         return Err(ProgramError::InvalidAccountData);
     }
     if c.real_token_reserves == 0 {
@@ -553,30 +593,26 @@ fn process_buy(program_id: &Pubkey, accounts: &[AccountInfo], data: &[u8]) -> Pr
         return Err(ProgramError::InvalidArgument);
     }
 
+    // All SOL into shared liquidity vault (Base manager).
     SolTransfer {
         from: trader,
-        to: curve,
+        to: liquidity,
         lamports: sol_in,
     }
     .invoke()?;
 
-    let bump_seed = [c.bump];
-    let seeds = [
-        Seed::from(CURVE_SEED),
-        Seed::from(mint.key().as_ref()),
-        Seed::from(bump_seed.as_ref()),
-    ];
+    let bump_seed = [g.liquidity_bump];
+    let seeds = [Seed::from(VAULT_SEED), Seed::from(bump_seed.as_ref())];
     let signers = [Signer::from(&seeds)];
 
     TokenTransfer {
         from: vault,
         to: trader_ata,
-        authority: curve,
+        authority: liquidity,
         amount: quote.token_out,
     }
     .invoke_signed(&signers)?;
 
-    // pump.fun: both virtual and real move by the same amounts
     c.virtual_sol_reserves = c
         .virtual_sol_reserves
         .checked_add(quote.net_lamports)
@@ -593,29 +629,23 @@ fn process_buy(program_id: &Pubkey, accounts: &[AccountInfo], data: &[u8]) -> Pr
         .real_token_reserves
         .checked_sub(quote.token_out)
         .ok_or(ProgramError::InvalidAccountData)?;
-    // No graduation: never set complete=1 even when real_token_reserves==0
 
     write_pod(curve, &c)?;
 
-    let fees = split_fees(
-        curve,
-        creator,
-        treasury,
+    let fees = accrue_fees(
+        trader,
+        liquidity,
+        protocol_treasury,
+        creator_fees,
+        referrer_fees,
         referrer_binding,
         referrer_wallet,
         program_id,
-        trader,
         &g,
-        quote.fee_lamports,
         &c,
+        quote.fee_lamports,
     )?;
-    events::emit_fee_split(
-        &c.mint,
-        &c.creator,
-        fees.0,
-        fees.1,
-        fees.2,
-    );
+    events::emit_fee_split(&c.mint, &c.creator, fees.0, fees.1, fees.2);
     let sold = c
         .initial_real_token_reserves
         .saturating_sub(c.real_token_reserves);
@@ -639,7 +669,7 @@ fn process_buy(program_id: &Pubkey, accounts: &[AccountInfo], data: &[u8]) -> Pr
 }
 
 fn process_sell(program_id: &Pubkey, accounts: &[AccountInfo], data: &[u8]) -> ProgramResult {
-    let [trader, global, curve, treasury, creator, mint, vault, trader_ata, _token, _system, referrer_binding, referrer_wallet] =
+    let [trader, global, curve, liquidity, protocol_treasury, creator_fees, referrer_fees, mint, vault, trader_ata, _token, _system, referrer_binding, referrer_wallet] =
         accounts
     else {
         return Err(ProgramError::NotEnoughAccountKeys);
@@ -657,15 +687,14 @@ fn process_sell(program_id: &Pubkey, accounts: &[AccountInfo], data: &[u8]) -> P
     if g.emergency_halt != 0 {
         return Err(ProgramError::InvalidAccountData);
     }
-    if !keys_eq(&g.treasury, treasury.key()) {
+    if !keys_eq(&g.liquidity, liquidity.key())
+        || !keys_eq(&g.protocol_treasury, protocol_treasury.key())
+    {
         return Err(ProgramError::InvalidAccountData);
     }
 
     let mut c = load_pod::<Curve>(curve)?;
     if c.paused != 0 || !keys_eq(&c.mint, mint.key()) || !keys_eq(&c.token_vault, vault.key()) {
-        return Err(ProgramError::InvalidAccountData);
-    }
-    if !keys_eq(&c.creator, creator.key()) {
         return Err(ProgramError::InvalidAccountData);
     }
 
@@ -689,7 +718,6 @@ fn process_sell(program_id: &Pubkey, accounts: &[AccountInfo], data: &[u8]) -> P
     }
     .invoke()?;
 
-    // pump.fun: virtual + real move together on sell
     c.virtual_sol_reserves = c
         .virtual_sol_reserves
         .checked_sub(quote.gross_lamports)
@@ -706,35 +734,35 @@ fn process_sell(program_id: &Pubkey, accounts: &[AccountInfo], data: &[u8]) -> P
         .real_token_reserves
         .checked_add(token_in)
         .ok_or(ProgramError::InvalidAccountData)?;
-    // Cap real tokens at initial (cannot exceed sellable inventory)
     if c.real_token_reserves > c.initial_real_token_reserves {
         c.real_token_reserves = c.initial_real_token_reserves;
     }
 
     write_pod(curve, &c)?;
 
-    *curve.try_borrow_mut_lamports()? -= quote.lamports_out;
+    // Pay trader from shared liquidity; fee share stays / routes via accrue_fees.
+    let bump_seed = [g.liquidity_bump];
+    let seeds = [Seed::from(VAULT_SEED), Seed::from(bump_seed.as_ref())];
+    let signers = [Signer::from(&seeds)];
+    // Manual lamport move signed by vault ownership (system transfer from PDA).
+    *liquidity.try_borrow_mut_lamports()? -= quote.lamports_out;
     *trader.try_borrow_mut_lamports()? += quote.lamports_out;
+    let _ = signers;
 
-    let fees = split_fees(
-        curve,
-        creator,
-        treasury,
+    let fees = accrue_fees(
+        trader,
+        liquidity,
+        protocol_treasury,
+        creator_fees,
+        referrer_fees,
         referrer_binding,
         referrer_wallet,
         program_id,
-        trader,
         &g,
-        quote.fee_lamports,
         &c,
+        quote.fee_lamports,
     )?;
-    events::emit_fee_split(
-        &c.mint,
-        &c.creator,
-        fees.0,
-        fees.1,
-        fees.2,
-    );
+    events::emit_fee_split(&c.mint, &c.creator, fees.0, fees.1, fees.2);
     let sold = c
         .initial_real_token_reserves
         .saturating_sub(c.real_token_reserves);
@@ -765,31 +793,72 @@ fn load_referrer_binding(
     if !owner_eq(ai, program_id) || ai.data_len() < ReferrerBinding::LEN {
         return None;
     }
-    let (pda, _bump) = find_program_address(
-        &[REFERRER_SEED, trader.key().as_ref()],
-        program_id,
-    );
+    let (pda, _bump) =
+        find_program_address(&[REFERRER_SEED, trader.key().as_ref()], program_id);
     if ai.key() != &pda {
         return None;
     }
     load_pod::<ReferrerBinding>(ai).ok()
 }
 
-fn split_fees(
-    curve: &AccountInfo,
-    creator: &AccountInfo,
-    treasury: &AccountInfo,
+fn ensure_pending_fees(
+    payer: &AccountInfo,
+    account: &AccountInfo,
+    program_id: &Pubkey,
+    seed: &[u8],
+    owner: &[u8; 32],
+) -> Result<u8, ProgramError> {
+    let (pda, bump) = find_program_address(&[seed, owner.as_ref()], program_id);
+    if account.key() != &pda {
+        return Err(ProgramError::InvalidSeeds);
+    }
+    if account.lamports() == 0 {
+        let bump_seed = [bump];
+        let seeds = [
+            Seed::from(seed),
+            Seed::from(owner.as_ref()),
+            Seed::from(bump_seed.as_ref()),
+        ];
+        let signers = [Signer::from(&seeds)];
+        CreateAccount {
+            from: payer,
+            to: account,
+            lamports: PENDING_FEES_RENT_LAMPORTS,
+            space: PendingFees::LEN as u64,
+            owner: program_id,
+        }
+        .invoke_signed(&signers)?;
+        let init = PendingFees {
+            owner: *owner,
+            pending_lamports: 0,
+            bump,
+            _pad: [0; 7],
+        };
+        write_pod(account, &init)?;
+    } else if !owner_eq(account, program_id) {
+        return Err(ProgramError::IncorrectProgramId);
+    }
+    Ok(bump)
+}
+
+/// Base `_distributeFee`: pending creator/referrer + immediate protocol treasury.
+fn accrue_fees(
+    payer: &AccountInfo,
+    liquidity: &AccountInfo,
+    protocol_treasury: &AccountInfo,
+    creator_fees: &AccountInfo,
+    referrer_fees: &AccountInfo,
     referrer_binding: &AccountInfo,
     referrer_wallet: &AccountInfo,
     program_id: &Pubkey,
-    trader: &AccountInfo,
     g: &GlobalConfig,
-    fee: u64,
     c: &Curve,
+    fee: u64,
 ) -> Result<(u64, u64, u64), ProgramError> {
     if fee == 0 {
         return Ok((0, 0, 0));
     }
+
     let creator_fee = (fee as u128)
         .checked_mul(g.creator_fee_share_bps as u128)
         .ok_or(ProgramError::InvalidAccountData)?
@@ -797,7 +866,8 @@ fn split_fees(
         .ok_or(ProgramError::InvalidAccountData)? as u64;
 
     let mut referrer_fee = 0u64;
-    if let Some(binding) = load_referrer_binding(referrer_binding, program_id, trader) {
+    let mut referrer_key = [0u8; 32];
+    if let Some(binding) = load_referrer_binding(referrer_binding, program_id, payer) {
         let zero = [0u8; 32];
         if binding.referrer != zero && keys_eq(&binding.referrer, referrer_wallet.key()) {
             referrer_fee = (fee as u128)
@@ -805,6 +875,7 @@ fn split_fees(
                 .ok_or(ProgramError::InvalidAccountData)?
                 .checked_div(BPS as u128)
                 .ok_or(ProgramError::InvalidAccountData)? as u64;
+            referrer_key = binding.referrer;
         }
     }
 
@@ -814,28 +885,96 @@ fn split_fees(
         .checked_sub(referrer_fee)
         .ok_or(ProgramError::InvalidAccountData)?;
 
-    // Defense in depth: never pay fees to a mismatched creator account.
-    if !keys_eq(&c.creator, creator.key()) {
-        return Err(ProgramError::InvalidAccountData);
+    if creator_fee > 0 {
+        ensure_pending_fees(payer, creator_fees, program_id, CREATOR_FEES_SEED, &c.creator)?;
+        let mut pending = load_pod::<PendingFees>(creator_fees)?;
+        if pending.owner != c.creator {
+            return Err(ProgramError::InvalidAccountData);
+        }
+        pending.pending_lamports = pending
+            .pending_lamports
+            .checked_add(creator_fee)
+            .ok_or(ProgramError::InvalidAccountData)?;
+        write_pod(creator_fees, &pending)?;
     }
-    if !keys_eq(&g.treasury, treasury.key()) {
+
+    if referrer_fee > 0 {
+        ensure_pending_fees(payer, referrer_fees, program_id, REFERRER_FEES_SEED, &referrer_key)?;
+        let mut pending = load_pod::<PendingFees>(referrer_fees)?;
+        if pending.owner != referrer_key {
+            return Err(ProgramError::InvalidAccountData);
+        }
+        pending.pending_lamports = pending
+            .pending_lamports
+            .checked_add(referrer_fee)
+            .ok_or(ProgramError::InvalidAccountData)?;
+        write_pod(referrer_fees, &pending)?;
+    }
+
+    // Protocol share leaves liquidity immediately (Base → LaunchpadTreasury).
+    if treasury_fee > 0 {
+        *liquidity.try_borrow_mut_lamports()? -= treasury_fee;
+        *protocol_treasury.try_borrow_mut_lamports()? += treasury_fee;
+    }
+
+    Ok((creator_fee, referrer_fee, treasury_fee))
+}
+
+fn process_claim_fees(
+    program_id: &Pubkey,
+    accounts: &[AccountInfo],
+    is_creator: bool,
+) -> ProgramResult {
+    let [claimer, global, liquidity, pending_fees] = accounts else {
+        return Err(ProgramError::NotEnoughAccountKeys);
+    };
+    if !claimer.is_signer() {
+        return Err(ProgramError::MissingRequiredSignature);
+    }
+    if !owner_eq(global, program_id) || !owner_eq(pending_fees, program_id) {
+        return Err(ProgramError::IncorrectProgramId);
+    }
+    let g = load_pod::<GlobalConfig>(global)?;
+    if !keys_eq(&g.liquidity, liquidity.key()) {
         return Err(ProgramError::InvalidAccountData);
     }
 
-    if creator_fee > 0 {
-        *curve.try_borrow_mut_lamports()? -= creator_fee;
-        *creator.try_borrow_mut_lamports()? += creator_fee;
+    let seed = if is_creator {
+        CREATOR_FEES_SEED
+    } else {
+        REFERRER_FEES_SEED
+    };
+    let (pda, _bump) = find_program_address(&[seed, claimer.key().as_ref()], program_id);
+    if pending_fees.key() != &pda {
+        return Err(ProgramError::InvalidSeeds);
     }
-    if referrer_fee > 0 {
-        *curve.try_borrow_mut_lamports()? -= referrer_fee;
-        *referrer_wallet.try_borrow_mut_lamports()? += referrer_fee;
+
+    let mut pending = load_pod::<PendingFees>(pending_fees)?;
+    if !keys_eq(&pending.owner, claimer.key()) {
+        return Err(ProgramError::InvalidAccountData);
     }
-    if treasury_fee > 0 {
-        *curve.try_borrow_mut_lamports()? -= treasury_fee;
-        *treasury.try_borrow_mut_lamports()? += treasury_fee;
+    let amount = pending.pending_lamports;
+    if amount == 0 {
+        return Err(ProgramError::Custom(1));
     }
-    let _ = c;
-    Ok((creator_fee, referrer_fee, treasury_fee))
+    // Keep rent-exempt floor on liquidity vault.
+    if liquidity.lamports() < amount.saturating_add(LIQUIDITY_RENT_LAMPORTS) {
+        return Err(ProgramError::InsufficientFunds);
+    }
+
+    pending.pending_lamports = 0;
+    write_pod(pending_fees, &pending)?;
+
+    *liquidity.try_borrow_mut_lamports()? -= amount;
+    *claimer.try_borrow_mut_lamports()? += amount;
+
+    if is_creator {
+        events::emit_creator_fee_claimed(&pubkey_bytes(claimer), amount);
+    } else {
+        events::emit_referrer_fee_claimed(&pubkey_bytes(claimer), amount);
+    }
+    log!("pump:claim_fees");
+    Ok(())
 }
 
 fn process_set_referrer(
@@ -898,12 +1037,13 @@ fn process_set_referrer(
     Ok(())
 }
 
-fn process_withdraw(
+/// Authority withdraws protocol fees from protocol_treasury PDA.
+fn process_withdraw_protocol(
     program_id: &Pubkey,
     accounts: &[AccountInfo],
     data: &[u8],
 ) -> ProgramResult {
-    let [authority, global, vault, to] = accounts else {
+    let [authority, global, protocol_treasury, to] = accounts else {
         return Err(ProgramError::NotEnoughAccountKeys);
     };
     if !authority.is_signer() {
@@ -913,15 +1053,52 @@ fn process_withdraw(
         return Err(ProgramError::IncorrectProgramId);
     }
     let g = load_pod::<GlobalConfig>(global)?;
-    if !keys_eq(&g.authority, authority.key()) || !keys_eq(&g.treasury, vault.key()) {
+    if !keys_eq(&g.authority, authority.key())
+        || !keys_eq(&g.protocol_treasury, protocol_treasury.key())
+    {
         return Err(ProgramError::InvalidAccountData);
     }
     let amount = read_u64(data, 0)?;
-    if amount == 0 || vault.lamports() < amount {
+    if amount == 0
+        || protocol_treasury.lamports() < amount.saturating_add(PROTOCOL_TREASURY_RENT_LAMPORTS)
+    {
         return Err(ProgramError::Custom(1));
     }
-    *vault.try_borrow_mut_lamports()? -= amount;
+    *protocol_treasury.try_borrow_mut_lamports()? -= amount;
     *to.try_borrow_mut_lamports()? += amount;
-    log!("pump:withdraw");
+    log!("pump:withdraw_protocol");
+    Ok(())
+}
+
+/// Base `emergencySweepAllEth` — drain shared liquidity vault and halt trading.
+fn process_emergency_sweep(program_id: &Pubkey, accounts: &[AccountInfo]) -> ProgramResult {
+    let [authority, global, liquidity, to] = accounts else {
+        return Err(ProgramError::NotEnoughAccountKeys);
+    };
+    if !authority.is_signer() {
+        return Err(ProgramError::MissingRequiredSignature);
+    }
+    if !owner_eq(global, program_id) {
+        return Err(ProgramError::IncorrectProgramId);
+    }
+    let mut g = load_pod::<GlobalConfig>(global)?;
+    if !keys_eq(&g.authority, authority.key()) || !keys_eq(&g.liquidity, liquidity.key()) {
+        return Err(ProgramError::InvalidAccountData);
+    }
+
+    let bal = liquidity.lamports();
+    if bal <= LIQUIDITY_RENT_LAMPORTS {
+        return Err(ProgramError::Custom(1));
+    }
+    let amount = bal - LIQUIDITY_RENT_LAMPORTS;
+
+    g.emergency_halt = 1;
+    write_pod(global, &g)?;
+
+    *liquidity.try_borrow_mut_lamports()? -= amount;
+    *to.try_borrow_mut_lamports()? += amount;
+
+    events::emit_emergency_swept(&pubkey_bytes(to), amount);
+    log!("pump:emergency_sweep");
     Ok(())
 }

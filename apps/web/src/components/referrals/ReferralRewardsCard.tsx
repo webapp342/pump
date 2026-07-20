@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { formatEther } from "viem";
 import { PortfolioEarningsCard } from "@/components/portfolio/PortfolioEarningsCard";
 import { ShareSheetModal } from "@/components/ui/ShareSheetModal";
 import { PumpIcon, faInviteLink } from "@/lib/icons";
@@ -11,7 +10,8 @@ import { referralSharePayload } from "@/lib/share-links";
 type ReferralRewardsCardProps = {
   address: string;
   claimedBnb: number;
-  pendingWei: bigint | undefined;
+  /** Pending native amount in whole units (BNB / SOL), not wei/lamports. */
+  pendingBnb: number;
   bnbUsd: number | null;
   onOpenModal: () => void;
   className?: string;
@@ -20,14 +20,13 @@ type ReferralRewardsCardProps = {
 export function ReferralRewardsCard({
   address,
   claimedBnb,
-  pendingWei,
+  pendingBnb,
   bnbUsd,
   onOpenModal,
   className = "",
 }: ReferralRewardsCardProps) {
   const [shareOpen, setShareOpen] = useState(false);
 
-  const pendingBnb = pendingWei != null ? Number(formatEther(pendingWei)) : 0;
   const sharePayload = useMemo(() => referralSharePayload(address), [address]);
 
   return (

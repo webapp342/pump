@@ -29,8 +29,8 @@ import {
   pdaCurve,
   pdaGlobal,
   pdaReferrerBinding,
-  pdaTreasuryVault,
 } from "@/lib/solana/launchpad-pdas";
+import { solanaTradeAccountMetas } from "@/lib/solana/trade-accounts";
 
 /** Must match programs/pump-launchpad set_referrer CreateAccount lamports. */
 const REFERRER_BINDING_RENT_LAMPORTS = 1_500_000n;
@@ -146,8 +146,6 @@ export async function silentBuy(input: {
   const trader = await traderPubkey();
   const mint = new PublicKey(input.mintAddress);
   const programId = launchpadProgramId();
-  const [globalPda] = pdaGlobal(programId);
-  const [treasury] = pdaTreasuryVault(programId);
   const { curvePda, curve } = await loadCurve(mint);
 
   if (curve.paused) throw new Error("Trading paused");
@@ -165,7 +163,6 @@ export async function silentBuy(input: {
     throw new Error("Token vault is empty — this coin was not minted correctly. Create again.");
   }
 
-  const [referrerBinding] = pdaReferrerBinding(trader);
   const referrerWallet =
     input.referrerAddress &&
     input.referrerAddress !== trader.toBase58()
@@ -196,20 +193,14 @@ export async function silentBuy(input: {
   ixs.push(
     new TransactionInstruction({
       programId,
-      keys: [
-        { pubkey: trader, isSigner: true, isWritable: true },
-        { pubkey: globalPda, isSigner: false, isWritable: false },
-        { pubkey: curvePda, isSigner: false, isWritable: true },
-        { pubkey: treasury, isSigner: false, isWritable: true },
-        { pubkey: curve.creator, isSigner: false, isWritable: true },
-        { pubkey: mint, isSigner: false, isWritable: false },
-        { pubkey: curve.tokenVault, isSigner: false, isWritable: true },
-        { pubkey: traderAta, isSigner: false, isWritable: true },
-        { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
-        { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
-        { pubkey: referrerBinding, isSigner: false, isWritable: false },
-        { pubkey: referrerWallet, isSigner: false, isWritable: true },
-      ],
+      keys: solanaTradeAccountMetas({
+        trader,
+        mint,
+        curvePda,
+        curve,
+        traderAta,
+        referrerWallet,
+      }),
       data: encodeBuyIx(input.solInLamports, input.minTokenOut),
     })
   );
@@ -239,13 +230,10 @@ export async function silentSell(input: {
   const trader = await traderPubkey();
   const mint = new PublicKey(input.mintAddress);
   const programId = launchpadProgramId();
-  const [globalPda] = pdaGlobal(programId);
-  const [treasury] = pdaTreasuryVault(programId);
   const { curvePda, curve } = await loadCurve(mint);
 
   if (curve.paused) throw new Error("Trading paused");
 
-  const [referrerBinding] = pdaReferrerBinding(trader);
   const referrerWallet =
     input.referrerAddress &&
     input.referrerAddress !== trader.toBase58()
@@ -256,20 +244,14 @@ export async function silentSell(input: {
 
   const ix = new TransactionInstruction({
     programId,
-    keys: [
-      { pubkey: trader, isSigner: true, isWritable: true },
-      { pubkey: globalPda, isSigner: false, isWritable: false },
-      { pubkey: curvePda, isSigner: false, isWritable: true },
-      { pubkey: treasury, isSigner: false, isWritable: true },
-      { pubkey: curve.creator, isSigner: false, isWritable: true },
-      { pubkey: mint, isSigner: false, isWritable: false },
-      { pubkey: curve.tokenVault, isSigner: false, isWritable: true },
-      { pubkey: traderAta, isSigner: false, isWritable: true },
-      { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
-      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
-      { pubkey: referrerBinding, isSigner: false, isWritable: false },
-      { pubkey: referrerWallet, isSigner: false, isWritable: true },
-    ],
+    keys: solanaTradeAccountMetas({
+      trader,
+      mint,
+      curvePda,
+      curve,
+      traderAta,
+      referrerWallet,
+    }),
     data: encodeSellIx(input.tokenIn, input.minSolOut),
   });
 

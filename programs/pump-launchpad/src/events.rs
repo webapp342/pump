@@ -7,6 +7,9 @@ const DISC_TOKEN_CREATED: [u8; 8] = [0xec, 0x13, 0x29, 0xff, 0x82, 0x4e, 0x93, 0
 const DISC_TRADE_EVENT: [u8; 8] = [0xbd, 0xdb, 0x7f, 0xd3, 0x4e, 0xe6, 0x61, 0xee];
 const DISC_FEE_SPLIT: [u8; 8] = [0x54, 0xe9, 0x74, 0xac, 0xb3, 0xb9, 0x4f, 0xce];
 const DISC_REFERRER_SET: [u8; 8] = [0xd7, 0x63, 0xd4, 0x8c, 0x3b, 0xef, 0x5f, 0x23];
+const DISC_CREATOR_FEE_CLAIMED: [u8; 8] = [0x36, 0x78, 0xc1, 0x1a, 0xa1, 0x2f, 0xbb, 0xcf];
+const DISC_REFERRER_FEE_CLAIMED: [u8; 8] = [0x60, 0x57, 0xa3, 0x26, 0xfd, 0x3b, 0x0a, 0x88];
+const DISC_EMERGENCY_SWEPT: [u8; 8] = [0x80, 0xce, 0xe1, 0xbd, 0x40, 0x19, 0xd0, 0xa9];
 
 fn write_u64(buf: &mut [u8], off: &mut usize, v: u64) {
     buf[*off..*off + 8].copy_from_slice(&v.to_le_bytes());
@@ -112,5 +115,32 @@ pub fn emit_referrer_set(trader: &[u8; 32], referrer: &[u8; 32]) {
     let mut off = 8;
     write_pubkey(&mut buf, &mut off, trader);
     write_pubkey(&mut buf, &mut off, referrer);
+    emit(&buf[..off]);
+}
+
+pub fn emit_creator_fee_claimed(creator: &[u8; 32], amount: u64) {
+    let mut buf = [0u8; 8 + 32 + 8];
+    buf[..8].copy_from_slice(&DISC_CREATOR_FEE_CLAIMED);
+    let mut off = 8;
+    write_pubkey(&mut buf, &mut off, creator);
+    write_u64(&mut buf, &mut off, amount);
+    emit(&buf[..off]);
+}
+
+pub fn emit_referrer_fee_claimed(referrer: &[u8; 32], amount: u64) {
+    let mut buf = [0u8; 8 + 32 + 8];
+    buf[..8].copy_from_slice(&DISC_REFERRER_FEE_CLAIMED);
+    let mut off = 8;
+    write_pubkey(&mut buf, &mut off, referrer);
+    write_u64(&mut buf, &mut off, amount);
+    emit(&buf[..off]);
+}
+
+pub fn emit_emergency_swept(to: &[u8; 32], amount: u64) {
+    let mut buf = [0u8; 8 + 32 + 8];
+    buf[..8].copy_from_slice(&DISC_EMERGENCY_SWEPT);
+    let mut off = 8;
+    write_pubkey(&mut buf, &mut off, to);
+    write_u64(&mut buf, &mut off, amount);
     emit(&buf[..off]);
 }

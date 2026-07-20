@@ -2,7 +2,7 @@
  * Instruction builders for live fee estimation (must mirror silent-trade sends).
  */
 
-import { PublicKey, SystemProgram, TransactionInstruction } from "@solana/web3.js";
+import { PublicKey, TransactionInstruction } from "@solana/web3.js";
 import {
   ASSOCIATED_TOKEN_PROGRAM_ID,
   TOKEN_PROGRAM_ID,
@@ -10,13 +10,8 @@ import {
   getAssociatedTokenAddressSync,
 } from "@solana/spl-token";
 import { encodeBuyIx, encodeSellIx } from "@pump/solana-sdk";
-import {
-  type OnchainCurve,
-  launchpadProgramId,
-  pdaGlobal,
-  pdaReferrerBinding,
-  pdaTreasuryVault,
-} from "@/lib/solana/launchpad-pdas";
+import { type OnchainCurve, launchpadProgramId } from "@/lib/solana/launchpad-pdas";
+import { solanaTradeAccountMetas } from "@/lib/solana/trade-accounts";
 
 export function buildSolanaBuyInstructions(input: {
   trader: PublicKey;
@@ -28,9 +23,6 @@ export function buildSolanaBuyInstructions(input: {
   includeAtaCreate: boolean;
 }): TransactionInstruction[] {
   const programId = launchpadProgramId();
-  const [globalPda] = pdaGlobal(programId);
-  const [treasury] = pdaTreasuryVault(programId);
-  const [referrerBinding] = pdaReferrerBinding(input.trader);
   const traderAta = getAssociatedTokenAddressSync(
     input.mint,
     input.trader,
@@ -54,20 +46,13 @@ export function buildSolanaBuyInstructions(input: {
   ixs.push(
     new TransactionInstruction({
       programId,
-      keys: [
-        { pubkey: input.trader, isSigner: true, isWritable: true },
-        { pubkey: globalPda, isSigner: false, isWritable: false },
-        { pubkey: input.curvePda, isSigner: false, isWritable: true },
-        { pubkey: treasury, isSigner: false, isWritable: true },
-        { pubkey: input.curve.creator, isSigner: false, isWritable: true },
-        { pubkey: input.mint, isSigner: false, isWritable: false },
-        { pubkey: input.curve.tokenVault, isSigner: false, isWritable: true },
-        { pubkey: traderAta, isSigner: false, isWritable: true },
-        { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
-        { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
-        { pubkey: referrerBinding, isSigner: false, isWritable: false },
-        { pubkey: input.trader, isSigner: false, isWritable: true },
-      ],
+      keys: solanaTradeAccountMetas({
+        trader: input.trader,
+        mint: input.mint,
+        curvePda: input.curvePda,
+        curve: input.curve,
+        traderAta,
+      }),
       data: encodeBuyIx(input.solInLamports, input.minTokenOut),
     })
   );
@@ -83,9 +68,6 @@ export function buildSolanaSellInstructions(input: {
   minSolOut: bigint;
 }): TransactionInstruction[] {
   const programId = launchpadProgramId();
-  const [globalPda] = pdaGlobal(programId);
-  const [treasury] = pdaTreasuryVault(programId);
-  const [referrerBinding] = pdaReferrerBinding(input.trader);
   const traderAta = getAssociatedTokenAddressSync(
     input.mint,
     input.trader,
@@ -96,20 +78,13 @@ export function buildSolanaSellInstructions(input: {
   return [
     new TransactionInstruction({
       programId,
-      keys: [
-        { pubkey: input.trader, isSigner: true, isWritable: true },
-        { pubkey: globalPda, isSigner: false, isWritable: false },
-        { pubkey: input.curvePda, isSigner: false, isWritable: true },
-        { pubkey: treasury, isSigner: false, isWritable: true },
-        { pubkey: input.curve.creator, isSigner: false, isWritable: true },
-        { pubkey: input.mint, isSigner: false, isWritable: false },
-        { pubkey: input.curve.tokenVault, isSigner: false, isWritable: true },
-        { pubkey: traderAta, isSigner: false, isWritable: true },
-        { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
-        { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
-        { pubkey: referrerBinding, isSigner: false, isWritable: false },
-        { pubkey: input.trader, isSigner: false, isWritable: true },
-      ],
+      keys: solanaTradeAccountMetas({
+        trader: input.trader,
+        mint: input.mint,
+        curvePda: input.curvePda,
+        curve: input.curve,
+        traderAta,
+      }),
       data: encodeSellIx(input.tokenIn, input.minSolOut),
     }),
   ];

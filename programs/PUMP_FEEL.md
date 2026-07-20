@@ -17,15 +17,26 @@ Official pump.fun reference:
 | Math | Uniswap V2 on **virtual** reserves | Buy capped by **real** token reserves |
 | Graduation | **None** | `complete` never set; no `migrate` |
 
-## Fees (our difference)
+## Liquidity + fees (Base Sepolia BondingCurveManager parity)
+
+Not pump.fun fee recipients — **our** Base EVM model:
+
+| Concern | Behaviour |
+|---------|-----------|
+| SOL liquidity | One shared `vault` PDA (`liquidity`) — all curve SOL + pending claimable fees |
+| Token vault ATA | Owned by **liquidity** PDA (not per-curve) |
+| Protocol fee | Paid **immediately** to `protocol-treasury` PDA |
+| Creator / referrer | Accrue in `creator-fees` / `referrer-fees` PDAs — **claim required** |
+| Protocol withdraw | `withdraw_protocol_treasury` (authority) |
+| Emergency | `emergency_sweep` drains liquidity vault + sets halt (Base `emergencySweepAllEth`) |
 
 | Param | Value | Notes |
 |-------|-------|--------|
 | Create fee | **0 lamports** | User pays Solana rent + tx only |
 | Trade fee | **125 bps (1.25%)** | Taken from SOL in / SOL out |
-| Creator share | **2400 bps of fee** | ~0.30% of trade volume |
-| Referrer share | **1000 bps of fee** | When binding exists |
-| Protocol | Remainder of fee | Treasury PDA |
+| Creator share | **2400 bps of fee** | Accrues pending — claim via UI |
+| Referrer share | **1000 bps of fee** | Accrues pending when binding exists |
+| Protocol | Remainder of fee | → protocol treasury |
 
 ## Network costs (not platform fees)
 
@@ -36,7 +47,7 @@ Official pump.fun reference:
 
 ## Deploy / upgrade
 
-After program upgrade (layout change), **re-run initialize** so Global has pump.fun reserve fields:
+After program upgrade (layout change), **re-run initialize** so Global has liquidity + protocol treasury + pump.fun reserve fields:
 
 ```bash
 bash scripts/solana/wsl-pinocchio-build.sh
@@ -44,4 +55,6 @@ bash scripts/solana/wsl-pinocchio-deploy.sh
 npm run solana:initialize
 ```
 
-Old tokens created before this layout **will not decode** — create new coins after upgrade.
+`initialize` accounts: authority, **liquidity**, **protocol_treasury**, factory_signer, global, system.
+
+Old tokens / Global from before this layout **will not decode** — create new coins after upgrade. Redeploy web + indexer-sol.

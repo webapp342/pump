@@ -2,11 +2,13 @@
 export const PDA_SEEDS = {
   global: "global",
   curve: "curve",
+  /** Shared SOL liquidity vault (Base BondingCurveManager balance). */
   vault: "vault",
+  protocolTreasury: "protocol-treasury",
   factorySigner: "factory-signer",
   referrer: "referrer",
-  pendingFees: "pending-fees",
-  trader: "trader",
+  creatorFees: "creator-fees",
+  referrerFees: "referrer-fees",
 } as const;
 
 /**
@@ -32,6 +34,9 @@ export const IX = {
   sell: 3,
   withdrawTreasury: 4,
   setReferrer: 5,
+  claimCreatorFees: 6,
+  claimReferrerFees: 7,
+  emergencySweep: 8,
 } as const;
 
 export type SolanaCluster = "localnet" | "devnet" | "mainnet-beta";
@@ -110,7 +115,9 @@ export const PUMP_FEEL_DEFAULTS = {
 export const LAUNCHPAD_ACCOUNT_LEN = {
   /** `Curve` Pod in programs/pump-launchpad/src/lib.rs */
   curve: 152,
-  global: 176,
+  /** GlobalConfig with liquidity + protocol_treasury */
+  global: 208,
+  pendingFees: 48,
 } as const;
 
 /**
@@ -233,6 +240,18 @@ export function encodeWithdrawIx(amount: bigint): Buffer {
 
 export function encodeSetReferrerIx(): Buffer {
   return instructionData(new Uint8Array([IX.setReferrer]));
+}
+
+export function encodeClaimCreatorFeesIx(): Buffer {
+  return instructionData(new Uint8Array([IX.claimCreatorFees]));
+}
+
+export function encodeClaimReferrerFeesIx(): Buffer {
+  return instructionData(new Uint8Array([IX.claimReferrerFees]));
+}
+
+export function encodeEmergencySweepIx(): Buffer {
+  return instructionData(new Uint8Array([IX.emergencySweep]));
 }
 
 export {
