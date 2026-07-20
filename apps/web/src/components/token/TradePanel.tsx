@@ -1017,7 +1017,7 @@ export function TradePanel({
 
   const userOpPrefundWei = useMemo(() => {
     if (isSolanaTrade) {
-      // Fallback ~1 sig fee when live quote not ready — still reserve ATA + wallet rent.
+      // Fallback ~1 sig fee when live quote not ready — still reserve ATA/PDA rents if needed.
       const fallbackTxFee = 5_000n;
       if (side === "buy") {
         const txFee = solanaMarket.buyTxFeeLamports ?? fallbackTxFee;
@@ -1034,7 +1034,8 @@ export function TradePanel({
             hasReferrer && solanaMarket.referrerBindingExists !== true,
           // Unknown → assume create (safer Max). False only when we know PDA exists.
           needsCreatorFeesPda: solanaMarket.creatorFeesPdaExists !== true,
-          needsReferrerFeesPda: hasReferrer,
+          // Referrer-fees PDA is checked live in silentBuy; don't always reserve here.
+          needsReferrerFeesPda: false,
         });
       }
       const txFee = solanaMarket.sellTxFeeLamports ?? fallbackTxFee;

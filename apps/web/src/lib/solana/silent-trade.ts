@@ -118,18 +118,18 @@ async function assertBuyAffordable(input: {
   needsReferrerFeesPda: boolean;
 }): Promise<void> {
   const conn = getSolanaConnection();
-  const [balance, ataRent, walletRent, txFee] = await Promise.all([
+  const [balance, ataRent, txFee] = await Promise.all([
     conn.getBalance(input.trader, "confirmed").then(BigInt),
     input.needsAta
       ? conn.getMinimumBalanceForRentExemption(ACCOUNT_SIZE).then(BigInt)
       : Promise.resolve(0n),
-    conn.getMinimumBalanceForRentExemption(0).then(BigInt),
     getLiveTransactionFeeLamports(conn, input.ixs, input.trader),
   ]);
 
   const bindingRent = input.needsReferrerBinding ? SOLANA_REFERRER_BINDING_RENT_LAMPORTS : 0n;
   const creatorFeesRent = input.needsCreatorFeesPda ? SOLANA_PENDING_FEES_RENT_LAMPORTS : 0n;
   const referrerFeesRent = input.needsReferrerFeesPda ? SOLANA_PENDING_FEES_RENT_LAMPORTS : 0n;
+  // No wallet rent-exempt floor — only fee + accounts this buy creates.
   const required =
     input.solInLamports +
     ataRent +
@@ -137,7 +137,6 @@ async function assertBuyAffordable(input: {
     creatorFeesRent +
     referrerFeesRent +
     txFee +
-    walletRent +
     SOLANA_BUY_FEE_SLACK_LAMPORTS;
 
   if (balance >= required) return;
@@ -149,7 +148,7 @@ async function assertBuyAffordable(input: {
       `${bindingRent > 0n ? ` + referrer account ${formatSol(bindingRent)}` : ""}` +
       `${creatorFeesRent > 0n ? ` + creator fees account ${formatSol(creatorFeesRent)}` : ""}` +
       `${referrerFeesRent > 0n ? ` + referrer fees account ${formatSol(referrerFeesRent)}` : ""}` +
-      ` + fee ${formatSol(txFee)} + keep ${formatSol(walletRent)}).`
+      ` + fee ${formatSol(txFee)}).`
   );
 }
 

@@ -42,7 +42,7 @@ export type SolanaBuyPrefundOptions = {
   slackLamports?: bigint;
 };
 
-/** Buy prefund: live tx fee + optional ATA/PDA rents + wallet rent dust + slack. */
+/** Buy prefund: live tx fee + rents only for accounts this buy actually creates + slack. */
 export function solanaBuyPrefundLamports(
   txFeeLamports: bigint,
   options: SolanaBuyPrefundOptions = {}
@@ -61,7 +61,6 @@ export function solanaBuyPrefundLamports(
     (needsReferrerBinding ? SOLANA_REFERRER_BINDING_RENT_LAMPORTS : 0n) +
     (needsCreatorFeesPda ? SOLANA_PENDING_FEES_RENT_LAMPORTS : 0n) +
     (needsReferrerFeesPda ? SOLANA_PENDING_FEES_RENT_LAMPORTS : 0n) +
-    SOLANA_WALLET_RENT_EXEMPT_LAMPORTS +
     slackLamports
   );
 }
@@ -73,10 +72,18 @@ export function solanaBuyPrefundWei(
   return lamportsToWei(solanaBuyPrefundLamports(txFeeLamports, options));
 }
 
+/**
+ * Sell prefund: signature fee + slack only.
+ * Do NOT reserve wallet rent-exempt here — sells credit SOL and never create
+ * trader accounts; requiring ~0.00089 SOL (~$0.10+) falsely opens Deposit on
+ * dust wallets that can still pay a ~5k–50k lamport fee.
+ */
+export function solanaSellPrefundLamports(txFeeLamports: bigint): bigint {
+  return txFeeLamports + SOLANA_BUY_FEE_SLACK_LAMPORTS;
+}
+
 export function solanaSellPrefundWei(txFeeLamports: bigint): bigint {
-  return lamportsToWei(
-    txFeeLamports + SOLANA_WALLET_RENT_EXEMPT_LAMPORTS + SOLANA_BUY_FEE_SLACK_LAMPORTS
-  );
+  return lamportsToWei(solanaSellPrefundLamports(txFeeLamports));
 }
 
 export function lamportsToWei(lamports: bigint): bigint {
