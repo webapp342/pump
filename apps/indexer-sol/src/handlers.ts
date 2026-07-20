@@ -98,7 +98,7 @@ export class SolanaEventHandlers {
     const virtualSol = asBigInt(f.virtualSolReserve);
     const decimals =
       typeof f.decimals === "number" ? f.decimals : this.context.tokenDecimals;
-    const virtualToken = PUMP_FEEL_DEFAULTS.totalSupply;
+    const virtualToken = PUMP_FEEL_DEFAULTS.virtualTokenReserves;
     const spot = startingSpotFromVirtual(virtualSol, virtualToken, decimals);
     const mcap = marketCapSolFromSpot(spot);
     const blockTime = new Date();

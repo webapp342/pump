@@ -40,21 +40,42 @@ export function buildOptimisticBuyPreview(params: {
   nativeUsdRate?: string;
 }): OptimisticTradePreview {
   const netZug = params.submitValueWei - params.feeZug;
-  const reserveAfter = params.curve.reserveZug + netZug;
-  const soldAfter = params.curve.soldTokens + params.tokenOutWei;
+  const pumpFeel = params.curve.realTokenReserves != null;
+  // pump.fun: virtual reserves already include real; spot = vSol/vToken
+  const spotBeforeBnb = pumpFeel
+    ? spotPriceZugFromReserves(
+        0n,
+        0n,
+        params.curve.virtualZugReserve,
+        params.curve.virtualTokenReserve
+      )
+    : spotPriceZugFromReserves(
+        params.curve.reserveZug,
+        params.curve.soldTokens,
+        params.curve.virtualZugReserve,
+        params.curve.virtualTokenReserve
+      );
+  const spotAfterBnb = pumpFeel
+    ? spotPriceZugFromReserves(
+        0n,
+        0n,
+        params.curve.virtualZugReserve + netZug,
+        params.curve.virtualTokenReserve - params.tokenOutWei
+      )
+    : spotPriceZugFromReserves(
+        params.curve.reserveZug + netZug,
+        params.curve.soldTokens + params.tokenOutWei,
+        params.curve.virtualZugReserve,
+        params.curve.virtualTokenReserve
+      );
+
+  const reserveAfter = pumpFeel
+    ? params.curve.virtualZugReserve + netZug
+    : params.curve.reserveZug + netZug;
+  const soldAfter = pumpFeel
+    ? params.tokenOutWei
+    : params.curve.soldTokens + params.tokenOutWei;
   const pendingTxHash = pendingTxHashFromId(params.pendingId);
-  const spotBeforeBnb = spotPriceZugFromReserves(
-    params.curve.reserveZug,
-    params.curve.soldTokens,
-    params.curve.virtualZugReserve,
-    params.curve.virtualTokenReserve
-  );
-  const spotAfterBnb = spotPriceZugFromReserves(
-    reserveAfter,
-    soldAfter,
-    params.curve.virtualZugReserve,
-    params.curve.virtualTokenReserve
-  );
 
   const syntheticTrade: ParsedTradeEvent = {
     token: params.tokenAddress,
@@ -110,27 +131,52 @@ export function buildOptimisticSellPreview(params: {
   nativeUsdRate?: string;
 }): OptimisticTradePreview {
   const grossZug = params.zugOutWei + params.feeZug;
-  const reserveAfter =
-    params.curve.reserveZug > grossZug
+  const pumpFeel = params.curve.realTokenReserves != null;
+  const spotBeforeBnb = pumpFeel
+    ? spotPriceZugFromReserves(
+        0n,
+        0n,
+        params.curve.virtualZugReserve,
+        params.curve.virtualTokenReserve
+      )
+    : spotPriceZugFromReserves(
+        params.curve.reserveZug,
+        params.curve.soldTokens,
+        params.curve.virtualZugReserve,
+        params.curve.virtualTokenReserve
+      );
+  const vSolAfter = pumpFeel
+    ? params.curve.virtualZugReserve > grossZug
+      ? params.curve.virtualZugReserve - grossZug
+      : 0n
+    : 0n;
+  const vTokAfter = pumpFeel
+    ? params.curve.virtualTokenReserve + params.sellTokenWei
+    : 0n;
+  const spotAfterBnb = pumpFeel
+    ? spotPriceZugFromReserves(0n, 0n, vSolAfter, vTokAfter)
+    : spotPriceZugFromReserves(
+        params.curve.reserveZug > grossZug
+          ? params.curve.reserveZug - grossZug
+          : 0n,
+        params.curve.soldTokens > params.sellTokenWei
+          ? params.curve.soldTokens - params.sellTokenWei
+          : 0n,
+        params.curve.virtualZugReserve,
+        params.curve.virtualTokenReserve
+      );
+
+  const reserveAfter = pumpFeel
+    ? vSolAfter
+    : params.curve.reserveZug > grossZug
       ? params.curve.reserveZug - grossZug
       : 0n;
-  const soldAfter =
-    params.curve.soldTokens > params.sellTokenWei
+  const soldAfter = pumpFeel
+    ? 0n
+    : params.curve.soldTokens > params.sellTokenWei
       ? params.curve.soldTokens - params.sellTokenWei
       : 0n;
   const pendingTxHash = pendingTxHashFromId(params.pendingId);
-  const spotBeforeBnb = spotPriceZugFromReserves(
-    params.curve.reserveZug,
-    params.curve.soldTokens,
-    params.curve.virtualZugReserve,
-    params.curve.virtualTokenReserve
-  );
-  const spotAfterBnb = spotPriceZugFromReserves(
-    reserveAfter,
-    soldAfter,
-    params.curve.virtualZugReserve,
-    params.curve.virtualTokenReserve
-  );
 
   const syntheticTrade: ParsedTradeEvent = {
     token: params.tokenAddress,

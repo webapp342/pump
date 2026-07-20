@@ -1,54 +1,83 @@
 # Pump.fun vs Pump TMA (Solana) — architecture compare
 
-Target: pump.fun-class create + buy/sell UX on Solana, with **no graduation** and **protocol + creator + referral fees**.
+Target: **pump.fun bonding-curve parity** (create + buy/sell), with intentional differences only:
+
+- **No graduation** (`complete` never set; no `migrate`)
+- **Our fees**: protocol + creator + referral (not pump.fun fee recipients)
+
+Sources:
+- [pump-public-docs](https://github.com/pump-fun/pump-public-docs)
+- [@pump-fun/pump-sdk bondingCurve.ts](https://www.npmjs.com/package/@pump-fun/pump-sdk)
 
 ## Product differences (intentional)
 
 | Concern | pump.fun | Pump TMA |
 |---|---|---|
-| Graduation / migrate to AMM | Yes (PumpAMM / PumpSwap) | **No** — permanent bonding curve |
-| Protocol fee | Part of 1.25% curve fee | Yes (`protocol_fee_bps`) |
-| Creator fee | ~0.30% of notional (share of fee) | Yes (`creator_fee_share_bps`) |
-| Referral fee | Volume / affiliate programs | Yes (`referrer_share_bps` + binding PDA) |
-| Create platform fee | 0 SOL | 0 SOL (`create_fee_lamports = 0`) |
+| Graduation / migrate to AMM | Yes (PumpAMM) | **No** — permanent curve until real tokens depleted |
+| Protocol fee | Dynamic / fee program | Fixed `protocol_fee_bps` (125) |
+| Creator fee | Creator vault / fee program | Share of trade fee → creator wallet |
+| Referral fee | Social / volume programs | `referrer` binding PDA share |
+| Create platform fee | 0 SOL | 0 SOL |
+| Program ownership | Theirs (`6EF8…`) | **Ours** (`Hwv85…`) |
 
-## On-chain flow (pump.fun pattern → ours)
+## On-chain state (pump.fun layout)
 
-1. **Create** — mint + Metaplex metadata + bonding-curve PDA + vault ATA  
-2. **Buy** — SOL → curve; tokens out of vault; fee split (creator / referrer / treasury)  
-3. **Sell** — tokens → vault; SOL out of curve; same fee split  
-4. **Index** — decode program logs → Postgres → Redis rooms → live tape / holders
+**Global** (our PDA `["global"]`):
 
-Our program: `programs/pump-launchpad` (Pinocchio). Deployed program id is env-driven (`LAUNCHPAD_PROGRAM_ID`).
+- `initial_virtual_sol_reserves` = 30 SOL  
+- `initial_virtual_token_reserves` = 1.073B raw  
+- `initial_real_token_reserves` = 793.1M raw  
+- `token_total_supply` = 1B raw  
+- + our fee BPS fields  
 
-## Enterprise Solana stack (Base Alto/AA analogue)
+**Bonding curve** (PDA `["curve", mint]`):
 
-| Base (EVM) | Solana equivalent in this repo |
+- `virtual_token_reserves` / `virtual_sol_reserves`  
+- `real_token_reserves` / `real_sol_reserves`  
+- `token_total_supply`, `initial_real_token_reserves`  
+- `complete` = always 0  
+
+## Math (official SDK)
+
+```
+buy:  tokens = netSol * vToken / (vSol + netSol)
+      tokens = min(tokens, realTokenReserves)
+sell: sol    = tokens * vSol / (vToken + tokens)
+      sol    = min(sol, realSolReserves)
+```
+
+On each trade, **both** virtual and real reserves move by the same amounts (pump.fun docs).
+
+## Create flow
+
+1. Client: mint + Metaplex + curve PDA + vault ATA (owner = curve)  
+2. Program `create_meme`: MintTo vault (`token_total_supply`), init curve from Global  
+3. Optional same-tx buy  
+
+## Buy / sell
+
+- Buy: `(sol_in, min_token_out)` — fee from SOL, net into curve, tokens from vault  
+- Sell: `(token_in, min_sol_out)` — tokens to vault, SOL out after fee  
+- Fee split: creator / referrer / treasury  
+
+## Deploy after this upgrade
+
+Layout change — old Global/Curve accounts **incompatible**.
+
+```bash
+# WSL
+cd /mnt/c/Users/DARK/Desktop/pump-tma
+bash scripts/solana/wsl-pinocchio-build.sh
+bash scripts/solana/wsl-pinocchio-deploy.sh
+npm run solana:initialize   # writes new Global fields
+```
+
+Then deploy web + indexer-sol. **Create a new token** to smoke-test (old mints stay on old layout).
+
+## Enterprise Solana stack (Base Alto analogue)
+
+| Base (EVM) | Solana |
 |---|---|
-| Alto bundler + Kernel SCW | Solana **silent** keypair / session wallet (`silent-trade`, `silent-create`) |
-| UserOp + paymaster | Single signed versioned tx + optional fee payer (RPC) |
-| Receipt log decode | Program log / Anchor-style event decode (`apps/indexer-sol`) |
-| Realtime rooms `token:0x…` | Rooms **must preserve base58 case** (`token:{mint}`) |
-| Postgres lowercase addresses | Migrations **045–047** drop lowercase CHECKs; app uses `dbStorageAddress` |
-
-## Indexer / UI contract
-
-- Store mint + trader as **canonical base58** (never `.toLowerCase()`).
-- Publish Redis `token:{mint}` matching realtime `tradeRoom`.
-- On trade confirm without EVM receipt: **promote** `pending:*` → signature so Trades tape stays filled until DB row arrives.
-- Update `holder_count` incrementally on position 0↔>0 transitions.
-
-## Fee defaults (aligned with pump.fun bonding fee band)
-
-See `programs/PUMP_FEEL.md` and `PUMP_FEEL_DEFAULTS` in `@pump/solana-sdk`:
-
-- `protocolFeeBps = 125` (1.25%)
-- `creatorFeeShareBps = 2400` (24% of fee → ~0.30% of notional)
-- Remainder → treasury; referrer share from remaining when binding exists
-
-## Ops checklist after deploy
-
-1. Apply migration `047_solana_remaining_address_checks.sql`
-2. Redeploy web + realtime + indexer-sol
-3. Redeploy program if buy/sell account checks changed
-4. Smoke: create → buy small SOL → Trades + Holders populate; sell path
+| Alto + Kernel SCW | Silent custodial keypair |
+| Receipt logs | Program log events → indexer-sol |
+| Rooms `token:0x` | Rooms preserve base58 |

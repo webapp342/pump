@@ -3,8 +3,13 @@
 //! Pump launchpad — Pinocchio (low rent + low CU).
 //! Program ID: `Hwv85kSodkR34rBTE1J67aSzixnAkXdAX6HzZnKDCvus`
 //!
+//! Bonding-curve state/math: pump.fun parity (virtual + real reserves).
+//! Differences vs pump.fun: our protocol/creator/referral fee split; **no graduation/migrate**.
+//!
 //! Instructions (1-byte tag):
-//!   0 initialize | 1 create_meme | 2 buy | 3 sell | 4 withdraw_treasury
+//!   0 initialize | 1 create_meme | 2 buy | 3 sell | 4 withdraw_treasury | 5 set_referrer
+//!
+//! @see https://github.com/pump-fun/pump-public-docs/blob/main/docs/PUMP_PROGRAM_README.md
 
 pub mod events;
 pub mod math;
@@ -36,6 +41,7 @@ fn panic(_info: &core::panic::PanicInfo) -> ! {
 
 pub const BPS: u64 = 10_000;
 pub const GLOBAL_SEED: &[u8] = b"global";
+/// PDA seed for bonding curve — kept as `curve` for our program ID continuity.
 pub const CURVE_SEED: &[u8] = b"curve";
 pub const VAULT_SEED: &[u8] = b"vault";
 pub const FACTORY_SIGNER_SEED: &[u8] = b"factory-signer";
@@ -48,9 +54,10 @@ const IX_WITHDRAW: u8 = 4;
 const IX_SET_REFERRER: u8 = 5;
 
 /// Rent-exempt minimums (devnet/mainnet 2026 — match `getMinimumBalanceForRentExemption`).
-const GLOBAL_RENT_LAMPORTS: u64 = 2_004_480;
-const CURVE_RENT_LAMPORTS: u64 = 1_893_120;
+const GLOBAL_RENT_LAMPORTS: u64 = 2_200_000;
+const CURVE_RENT_LAMPORTS: u64 = 1_948_800;
 
+/// Global config — pump.fun reserve fields + our fee shares.
 #[repr(C)]
 #[derive(Clone, Copy, Pod, Zeroable)]
 pub struct GlobalConfig {
@@ -62,9 +69,14 @@ pub struct GlobalConfig {
     pub referrer_share_bps: u64,
     pub verified_referrer_share_bps: u64,
     pub create_fee_lamports: u64,
-    pub default_virtual_sol_reserve: u64,
-    pub default_virtual_token_reserve: u64,
-    pub default_total_supply: u64,
+    /// pump.fun `initial_virtual_sol_reserves` (30 SOL).
+    pub initial_virtual_sol_reserves: u64,
+    /// pump.fun `initial_virtual_token_reserves` (1.073B raw @ 6dp).
+    pub initial_virtual_token_reserves: u64,
+    /// pump.fun `initial_real_token_reserves` (793.1M raw) — sellable on curve.
+    pub initial_real_token_reserves: u64,
+    /// pump.fun `token_total_supply` (1B raw) — minted into vault.
+    pub token_total_supply: u64,
     pub token_decimals: u8,
     pub emergency_halt: u8,
     pub bump: u8,
@@ -77,20 +89,25 @@ impl GlobalConfig {
     pub const LEN: usize = core::mem::size_of::<Self>();
 }
 
+/// Bonding curve — pump.fun layout (+ vault pubkey for SPL transfers).
+/// `complete` is never set true (no graduation).
 #[repr(C)]
 #[derive(Clone, Copy, Pod, Zeroable)]
 pub struct Curve {
     pub mint: [u8; 32],
     pub creator: [u8; 32],
     pub token_vault: [u8; 32],
-    pub reserve_sol: u64,
-    pub sold_tokens: u64,
-    pub virtual_sol_reserve: u64,
-    pub virtual_token_reserve: u64,
-    pub total_supply: u64,
+    pub virtual_token_reserves: u64,
+    pub virtual_sol_reserves: u64,
+    pub real_token_reserves: u64,
+    pub real_sol_reserves: u64,
+    pub token_total_supply: u64,
+    pub initial_real_token_reserves: u64,
+    /// Always 0 — graduation disabled.
+    pub complete: u8,
     pub paused: u8,
     pub bump: u8,
-    pub _pad: [u8; 6],
+    pub _pad: [u8; 5],
 }
 
 impl Curve {
@@ -210,7 +227,7 @@ fn load_pod<T: Pod + Copy>(ai: &AccountInfo) -> Result<T, ProgramError> {
     Ok(*val)
 }
 
-/// Data: 8×u64 fees/reserves + u8 decimals (65 bytes).
+/// Data: 9×u64 fees/reserves + u8 decimals (73 bytes).
 /// Creates `global` PDA via system CPI if not yet allocated.
 fn process_initialize(
     program_id: &Pubkey,
@@ -242,10 +259,11 @@ fn process_initialize(
     let referrer_share_bps = read_u64(data, 16)?;
     let verified_referrer_share_bps = read_u64(data, 24)?;
     let create_fee_lamports = read_u64(data, 32)?;
-    let default_virtual_sol_reserve = read_u64(data, 40)?;
-    let default_virtual_token_reserve = read_u64(data, 48)?;
-    let default_total_supply = read_u64(data, 56)?;
-    let token_decimals = read_u8(data, 64)?;
+    let initial_virtual_sol_reserves = read_u64(data, 40)?;
+    let initial_virtual_token_reserves = read_u64(data, 48)?;
+    let initial_real_token_reserves = read_u64(data, 56)?;
+    let token_total_supply = read_u64(data, 64)?;
+    let token_decimals = read_u8(data, 72)?;
 
     if protocol_fee_bps > BPS
         || creator_fee_share_bps > BPS
@@ -254,15 +272,19 @@ fn process_initialize(
     {
         return Err(ProgramError::InvalidArgument);
     }
-    if default_total_supply == 0
-        || default_virtual_sol_reserve == 0
-        || default_virtual_token_reserve != default_total_supply
+    // pump.fun: virtual_token >= real_token, real_token <= total_supply, all non-zero
+    if token_total_supply == 0
+        || initial_virtual_sol_reserves == 0
+        || initial_virtual_token_reserves == 0
+        || initial_real_token_reserves == 0
+        || initial_real_token_reserves > token_total_supply
+        || initial_real_token_reserves > initial_virtual_token_reserves
         || token_decimals > 9
     {
         return Err(ProgramError::InvalidArgument);
     }
 
-    // Allocate global PDA on first init
+    // Allocate global PDA on first init, or grow if layout was upgraded.
     if global.lamports() == 0 {
         let space = GlobalConfig::LEN as u64;
         let lamports = GLOBAL_RENT_LAMPORTS;
@@ -280,6 +302,20 @@ fn process_initialize(
         let _ = system_program;
     } else if !owner_eq(global, program_id) {
         return Err(ProgramError::IncorrectProgramId);
+    } else if global.data_len() < GlobalConfig::LEN {
+        // Layout upgrade: old Global was smaller — top up rent + realloc.
+        let needed = GLOBAL_RENT_LAMPORTS;
+        let have = global.lamports();
+        if have < needed {
+            SolTransfer {
+                from: authority,
+                to: global,
+                lamports: needed - have,
+            }
+            .invoke()?;
+        }
+        global.realloc(GlobalConfig::LEN, true)?;
+        let _ = system_program;
     }
 
     let cfg = GlobalConfig {
@@ -291,9 +327,10 @@ fn process_initialize(
         referrer_share_bps,
         verified_referrer_share_bps,
         create_fee_lamports,
-        default_virtual_sol_reserve,
-        default_virtual_token_reserve,
-        default_total_supply,
+        initial_virtual_sol_reserves,
+        initial_virtual_token_reserves,
+        initial_real_token_reserves,
+        token_total_supply,
         token_decimals,
         emergency_halt: 0,
         bump,
@@ -389,7 +426,7 @@ fn process_create_meme(
         mint,
         account: vault,
         mint_authority: factory_signer,
-        amount: g.default_total_supply,
+        amount: g.token_total_supply,
     }
     .invoke_signed(&signers)?;
 
@@ -401,18 +438,21 @@ fn process_create_meme(
     }
     .invoke_signed(&signers)?;
 
+    // pump.fun BondingCurve init — complete stays false forever (no migrate).
     let c = Curve {
         mint: pubkey_bytes(mint),
         creator: pubkey_bytes(creator),
         token_vault: pubkey_bytes(vault),
-        reserve_sol: 0,
-        sold_tokens: 0,
-        virtual_sol_reserve: g.default_virtual_sol_reserve,
-        virtual_token_reserve: g.default_virtual_token_reserve,
-        total_supply: g.default_total_supply,
+        virtual_token_reserves: g.initial_virtual_token_reserves,
+        virtual_sol_reserves: g.initial_virtual_sol_reserves,
+        real_token_reserves: g.initial_real_token_reserves,
+        real_sol_reserves: 0,
+        token_total_supply: g.token_total_supply,
+        initial_real_token_reserves: g.initial_real_token_reserves,
+        complete: 0,
         paused: 0,
         bump: curve_bump,
-        _pad: [0; 6],
+        _pad: [0; 5],
     };
     write_pod(curve, &c)?;
     events::emit_token_created(
@@ -421,8 +461,8 @@ fn process_create_meme(
         name,
         symbol,
         uri,
-        c.total_supply,
-        c.virtual_sol_reserve,
+        c.token_total_supply,
+        c.virtual_sol_reserves,
         g.token_decimals,
     );
     log!("pump:create_meme");
@@ -453,21 +493,23 @@ fn process_buy(program_id: &Pubkey, accounts: &[AccountInfo], data: &[u8]) -> Pr
     }
 
     let mut c = load_pod::<Curve>(curve)?;
-    if c.paused != 0 || !keys_eq(&c.mint, mint.key()) || !keys_eq(&c.token_vault, vault.key()) {
+    if c.paused != 0 || c.complete != 0 || !keys_eq(&c.mint, mint.key()) || !keys_eq(&c.token_vault, vault.key())
+    {
         return Err(ProgramError::InvalidAccountData);
     }
-    // Creator account must match curve PDA state (prevents fee redirection).
     if !keys_eq(&c.creator, creator.key()) {
         return Err(ProgramError::InvalidAccountData);
+    }
+    if c.real_token_reserves == 0 {
+        return Err(ProgramError::InvalidArgument);
     }
 
     let quote = math::quote_buy(
         sol_in,
         g.protocol_fee_bps,
-        c.virtual_sol_reserve,
-        c.virtual_token_reserve,
-        c.reserve_sol,
-        c.sold_tokens,
+        c.virtual_sol_reserves,
+        c.virtual_token_reserves,
+        c.real_token_reserves,
     )
     .ok_or(ProgramError::InvalidArgument)?;
     if quote.token_out < min_out || quote.token_out == 0 {
@@ -497,14 +539,25 @@ fn process_buy(program_id: &Pubkey, accounts: &[AccountInfo], data: &[u8]) -> Pr
     }
     .invoke_signed(&signers)?;
 
-    c.reserve_sol = c
-        .reserve_sol
+    // pump.fun: both virtual and real move by the same amounts
+    c.virtual_sol_reserves = c
+        .virtual_sol_reserves
         .checked_add(quote.net_lamports)
         .ok_or(ProgramError::InvalidAccountData)?;
-    c.sold_tokens = c
-        .sold_tokens
-        .checked_add(quote.token_out)
+    c.real_sol_reserves = c
+        .real_sol_reserves
+        .checked_add(quote.net_lamports)
         .ok_or(ProgramError::InvalidAccountData)?;
+    c.virtual_token_reserves = c
+        .virtual_token_reserves
+        .checked_sub(quote.token_out)
+        .ok_or(ProgramError::InvalidAccountData)?;
+    c.real_token_reserves = c
+        .real_token_reserves
+        .checked_sub(quote.token_out)
+        .ok_or(ProgramError::InvalidAccountData)?;
+    // No graduation: never set complete=1 even when real_token_reserves==0
+
     write_pod(curve, &c)?;
 
     let fees = split_fees(
@@ -526,6 +579,9 @@ fn process_buy(program_id: &Pubkey, accounts: &[AccountInfo], data: &[u8]) -> Pr
         fees.1,
         fees.2,
     );
+    let sold = c
+        .initial_real_token_reserves
+        .saturating_sub(c.real_token_reserves);
     events::emit_trade_event(
         &c.mint,
         &pubkey_bytes(trader),
@@ -533,13 +589,11 @@ fn process_buy(program_id: &Pubkey, accounts: &[AccountInfo], data: &[u8]) -> Pr
         sol_in,
         quote.token_out,
         quote.fee_lamports,
-        c.reserve_sol,
-        c.sold_tokens,
+        c.real_sol_reserves,
+        sold,
         math::spot_price_lamports_per_token(
-            c.virtual_sol_reserve,
-            c.virtual_token_reserve,
-            c.reserve_sol,
-            c.sold_tokens,
+            c.virtual_sol_reserves,
+            c.virtual_token_reserves,
             TOKEN_UNIT_9,
         ),
     );
@@ -581,10 +635,9 @@ fn process_sell(program_id: &Pubkey, accounts: &[AccountInfo], data: &[u8]) -> P
     let quote = math::quote_sell(
         token_in,
         g.protocol_fee_bps,
-        c.virtual_sol_reserve,
-        c.virtual_token_reserve,
-        c.reserve_sol,
-        c.sold_tokens,
+        c.virtual_sol_reserves,
+        c.virtual_token_reserves,
+        c.real_sol_reserves,
     )
     .ok_or(ProgramError::InvalidArgument)?;
     if quote.lamports_out < min_sol || quote.lamports_out == 0 {
@@ -599,18 +652,28 @@ fn process_sell(program_id: &Pubkey, accounts: &[AccountInfo], data: &[u8]) -> P
     }
     .invoke()?;
 
-    let gross = quote
-        .lamports_out
-        .checked_add(quote.fee_lamports)
+    // pump.fun: virtual + real move together on sell
+    c.virtual_sol_reserves = c
+        .virtual_sol_reserves
+        .checked_sub(quote.gross_lamports)
         .ok_or(ProgramError::InvalidAccountData)?;
-    c.reserve_sol = c
-        .reserve_sol
-        .checked_sub(gross)
+    c.real_sol_reserves = c
+        .real_sol_reserves
+        .checked_sub(quote.gross_lamports)
         .ok_or(ProgramError::InvalidAccountData)?;
-    c.sold_tokens = c
-        .sold_tokens
-        .checked_sub(token_in)
+    c.virtual_token_reserves = c
+        .virtual_token_reserves
+        .checked_add(token_in)
         .ok_or(ProgramError::InvalidAccountData)?;
+    c.real_token_reserves = c
+        .real_token_reserves
+        .checked_add(token_in)
+        .ok_or(ProgramError::InvalidAccountData)?;
+    // Cap real tokens at initial (cannot exceed sellable inventory)
+    if c.real_token_reserves > c.initial_real_token_reserves {
+        c.real_token_reserves = c.initial_real_token_reserves;
+    }
+
     write_pod(curve, &c)?;
 
     *curve.try_borrow_mut_lamports()? -= quote.lamports_out;
@@ -635,6 +698,9 @@ fn process_sell(program_id: &Pubkey, accounts: &[AccountInfo], data: &[u8]) -> P
         fees.1,
         fees.2,
     );
+    let sold = c
+        .initial_real_token_reserves
+        .saturating_sub(c.real_token_reserves);
     events::emit_trade_event(
         &c.mint,
         &pubkey_bytes(trader),
@@ -642,13 +708,11 @@ fn process_sell(program_id: &Pubkey, accounts: &[AccountInfo], data: &[u8]) -> P
         quote.gross_lamports,
         token_in,
         quote.fee_lamports,
-        c.reserve_sol,
-        c.sold_tokens,
+        c.real_sol_reserves,
+        sold,
         math::spot_price_lamports_per_token(
-            c.virtual_sol_reserve,
-            c.virtual_token_reserve,
-            c.reserve_sol,
-            c.sold_tokens,
+            c.virtual_sol_reserves,
+            c.virtual_token_reserves,
             TOKEN_UNIT_9,
         ),
     );

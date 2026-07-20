@@ -151,7 +151,11 @@ export async function silentBuy(input: {
   const { curvePda, curve } = await loadCurve(mint);
 
   if (curve.paused) throw new Error("Trading paused");
+  if (curve.complete) throw new Error("Curve complete — trading closed");
   if (!curve.mint.equals(mint)) throw new Error("Mint mismatch");
+  if (curve.realTokenReserves <= 0n) {
+    throw new Error("No tokens left on the bonding curve for this coin.");
+  }
 
   // Vault must hold tokens — empty vault surfaces as SPL "insufficient funds" otherwise.
   const conn = getSolanaConnection();

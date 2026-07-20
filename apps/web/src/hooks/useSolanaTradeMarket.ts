@@ -96,15 +96,20 @@ async function fetchMarket(mintAddress: string, ownerAddress?: string) {
 
   const bondingCurve: BondingCurveState | undefined = curve
     ? {
-        reserveZug: lamportsToWei(curve.reserveSol),
-        soldTokens: tokenRawToWei(curve.soldTokens),
-        virtualZugReserve: lamportsToWei(curve.virtualSolReserve),
-        virtualTokenReserve: tokenRawToWei(curve.virtualTokenReserve),
+        // pump.fun: quotes use virtual reserves only (real is folded into virtual on each trade).
+        // Keep reserveZug/soldTokens at 0 so EVM-style quoteBuy (x0=v+r, y0=v-s) == pump.fun.
+        reserveZug: 0n,
+        soldTokens: 0n,
+        virtualZugReserve: lamportsToWei(curve.virtualSolReserves),
+        virtualTokenReserve: tokenRawToWei(curve.virtualTokenReserves),
+        realTokenReserves: tokenRawToWei(curve.realTokenReserves),
       }
     : undefined;
 
   const paused = Boolean(
-    (curve?.paused ?? 0) !== 0 || (global?.emergencyHalt ?? 0) !== 0
+    (curve?.paused ?? 0) !== 0 ||
+      (curve?.complete ?? 0) !== 0 ||
+      (global?.emergencyHalt ?? 0) !== 0
   );
 
   let buyTxFeeLamports: bigint | undefined;

@@ -208,8 +208,9 @@ export function CreateMemeFormSolana() {
     return quoteFreshBuy({
       zugIn: lamportsToWei(initialBuyLamports),
       virtualZugReserve: lamportsToWei(PUMP_FEEL_DEFAULTS.virtualSolLamports),
-      virtualTokenReserve: tokenRawToWei(PUMP_FEEL_DEFAULTS.totalSupply),
+      virtualTokenReserve: tokenRawToWei(PUMP_FEEL_DEFAULTS.virtualTokenReserves),
       protocolFeeBps,
+      realTokenReserves: tokenRawToWei(PUMP_FEEL_DEFAULTS.realTokenReserves),
     });
   }, [initialBuyLamports, protocolFeeBps]);
 

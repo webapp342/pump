@@ -2,26 +2,46 @@
 
 Source of truth: `@pump/solana-sdk` → `PUMP_FEEL_DEFAULTS`.
 
-Official pump.fun reference (May 2026): [pump.fun/docs/fees](https://pump.fun/docs/fees)
+Official pump.fun reference:
+- [pump-public-docs PUMP_PROGRAM_README](https://github.com/pump-fun/pump-public-docs/blob/main/docs/PUMP_PROGRAM_README.md)
+- Fees (May 2026): [pump.fun/docs/fees](https://pump.fun/docs/fees)
+
+## Bonding curve (pump.fun parity)
 
 | Param | Value | Notes |
 |-------|-------|--------|
-| Create fee | **0 lamports** | Platform fee free; user pays Solana rent + tx only (~0.011 SOL typical) |
-| Virtual SOL | 30 SOL | pump.fun-style virtual liquidity |
-| Supply | 1B tokens @ 6 decimals | `1_000_000_000 * 10^6` |
-| Bonding curve trade fee | **125 bps (1.25%)** | Total fee on each buy/sell |
-| Creator share | **2400 bps of fee (0.30% of trade)** | 30/125 of fee pool → creator wallet |
-| Protocol share | **9500 bps of fee (0.95% of trade)** | Remainder when no referrer bound |
-| Referrer share | **1000 bps of fee (0.10% of trade)** | Only when referrer binding exists; taken from protocol slice |
-| Graduation | **None** | Permanent curve — intentional product difference |
+| Virtual SOL | 30 SOL | `initial_virtual_sol_reserves` |
+| Virtual tokens | 1.073B raw @ 6dp | `initial_virtual_token_reserves` |
+| Real tokens (sellable) | 793.1M raw | `initial_real_token_reserves` |
+| Total supply (minted to vault) | 1B raw | `token_total_supply` |
+| Math | Uniswap V2 on **virtual** reserves | Buy capped by **real** token reserves |
+| Graduation | **None** | `complete` never set; no `migrate` |
+
+## Fees (our difference)
+
+| Param | Value | Notes |
+|-------|-------|--------|
+| Create fee | **0 lamports** | User pays Solana rent + tx only |
+| Trade fee | **125 bps (1.25%)** | Taken from SOL in / SOL out |
+| Creator share | **2400 bps of fee** | ~0.30% of trade volume |
+| Referrer share | **1000 bps of fee** | When binding exists |
+| Protocol | Remainder of fee | Treasury PDA |
 
 ## Network costs (not platform fees)
 
 | Action | Typical cost | Notes |
 |--------|--------------|--------|
-| Create (no buy) | ~0.007 SOL | SPL mint + vault ATA + Metaplex metadata (MPL `byteSize`) + curve program rent + live tx fee |
-| Create + initial buy | ~0.013 SOL + buy amount | Adds trader ATA rent |
-| Buy / sell | ~0.000005 SOL tx | Quoted live via RPC `getFeeForMessage` (no priority tip) |
-| Jito bundle tip | **Not required** | pump.fun optional for snipers; normal trades use standard RPC |
+| Create (no buy) | ~0.007–0.011 SOL | Mint + vault ATA + Metaplex + curve rent + tx |
+| Buy / sell | ~0.000005 SOL tx | Live via `getFeeForMessage` |
 
-After deploy, re-run `npm run solana:initialize` to write fee defaults to the global PDA.
+## Deploy / upgrade
+
+After program upgrade (layout change), **re-run initialize** so Global has pump.fun reserve fields:
+
+```bash
+bash scripts/solana/wsl-pinocchio-build.sh
+bash scripts/solana/wsl-pinocchio-deploy.sh
+npm run solana:initialize
+```
+
+Old tokens created before this layout **will not decode** — create new coins after upgrade.

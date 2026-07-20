@@ -1,6 +1,6 @@
 /**
  * Launchpad PDAs + account layouts matching programs/pump-launchpad.
- * Decoders use Uint8Array/DataView — safe in browser (no Node Buffer.read*).
+ * Curve layout = pump.fun BondingCurve fields (+ vault pubkey). Decoders use Uint8Array/DataView.
  */
 
 import { PublicKey } from "@solana/web3.js";
@@ -60,22 +60,24 @@ function readUInt8(data: Uint8Array, offset: number): number {
   return data[offset] ?? 0;
 }
 
-/** On-chain Curve account layout (bytemuck Pod). */
+/** On-chain Curve — pump.fun BondingCurve + token_vault. */
 export type OnchainCurve = {
   mint: PublicKey;
   creator: PublicKey;
   tokenVault: PublicKey;
-  reserveSol: bigint;
-  soldTokens: bigint;
-  virtualSolReserve: bigint;
-  virtualTokenReserve: bigint;
-  totalSupply: bigint;
+  virtualTokenReserves: bigint;
+  virtualSolReserves: bigint;
+  realTokenReserves: bigint;
+  realSolReserves: bigint;
+  tokenTotalSupply: bigint;
+  initialRealTokenReserves: bigint;
+  complete: number;
   paused: number;
   bump: number;
 };
 
 export function decodeCurveAccount(data: Uint8Array): OnchainCurve {
-  if (data.length < 144) {
+  if (data.length < 152) {
     throw new Error("Curve account too small");
   }
   let o = 0;
@@ -92,11 +94,14 @@ export function decodeCurveAccount(data: Uint8Array): OnchainCurve {
   const mint = readPk();
   const creator = readPk();
   const tokenVault = readPk();
-  const reserveSol = readU64();
-  const soldTokens = readU64();
-  const virtualSolReserve = readU64();
-  const virtualTokenReserve = readU64();
-  const totalSupply = readU64();
+  const virtualTokenReserves = readU64();
+  const virtualSolReserves = readU64();
+  const realTokenReserves = readU64();
+  const realSolReserves = readU64();
+  const tokenTotalSupply = readU64();
+  const initialRealTokenReserves = readU64();
+  const complete = readUInt8(data, o);
+  o += 1;
   const paused = readUInt8(data, o);
   o += 1;
   const bump = readUInt8(data, o);
@@ -104,41 +109,57 @@ export function decodeCurveAccount(data: Uint8Array): OnchainCurve {
     mint,
     creator,
     tokenVault,
-    reserveSol,
-    soldTokens,
-    virtualSolReserve,
-    virtualTokenReserve,
-    totalSupply,
+    virtualTokenReserves,
+    virtualSolReserves,
+    realTokenReserves,
+    realSolReserves,
+    tokenTotalSupply,
+    initialRealTokenReserves,
+    complete,
     paused,
     bump,
   };
 }
 
-/** GlobalConfig layout — matches programs/pump-launchpad GlobalConfig. */
+/** GlobalConfig — pump.fun reserve fields + our fees. */
 export type OnchainGlobal = {
   protocolFeeBps: bigint;
   creatorFeeShareBps: bigint;
   referrerShareBps: bigint;
   createFeeLamports: bigint;
+  initialVirtualSolReserves: bigint;
+  initialVirtualTokenReserves: bigint;
+  initialRealTokenReserves: bigint;
+  tokenTotalSupply: bigint;
   tokenDecimals: number;
   emergencyHalt: number;
 };
 
 export function decodeGlobalConfig(data: Uint8Array): OnchainGlobal {
-  if (data.length < 162) {
+  if (data.length < 176) {
     throw new Error("Global account too small");
   }
+  // Skip authority(32) + treasury(32) + factory_signer(32) = 96
   const protocolFeeBps = readBigUInt64LE(data, 96);
   const creatorFeeShareBps = readBigUInt64LE(data, 104);
   const referrerShareBps = readBigUInt64LE(data, 112);
+  // verified_referrer_share_bps @120
   const createFeeLamports = readBigUInt64LE(data, 128);
-  const tokenDecimals = readUInt8(data, 160) || 6;
-  const emergencyHalt = readUInt8(data, 161);
+  const initialVirtualSolReserves = readBigUInt64LE(data, 136);
+  const initialVirtualTokenReserves = readBigUInt64LE(data, 144);
+  const initialRealTokenReserves = readBigUInt64LE(data, 152);
+  const tokenTotalSupply = readBigUInt64LE(data, 160);
+  const tokenDecimals = readUInt8(data, 168) || 6;
+  const emergencyHalt = readUInt8(data, 169);
   return {
     protocolFeeBps,
     creatorFeeShareBps,
     referrerShareBps,
     createFeeLamports,
+    initialVirtualSolReserves,
+    initialVirtualTokenReserves,
+    initialRealTokenReserves,
+    tokenTotalSupply,
     tokenDecimals,
     emergencyHalt,
   };

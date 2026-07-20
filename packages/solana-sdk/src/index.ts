@@ -81,14 +81,20 @@ export function programId(key: ProgramIdKey, override?: string | null): string {
 }
 
 /**
- * Pump.fun bonding-curve parity (no graduation on our launchpad).
- * @see https://pump.fun/docs/fees — 1.25% total: 0.30% creator + 0.95% protocol (+ 0% LP on curve).
- * Create: 0 SOL platform fee; user pays Solana rent + tx only.
+ * Pump.fun bonding-curve parity (no graduation).
+ * Official Global reserves: https://github.com/pump-fun/pump-public-docs
+ * Fees: our protocol/creator/referral split (not pump.fun fee recipients).
  */
 export const PUMP_FEEL_DEFAULTS = {
   tokenDecimals: 6,
+  /** 1B tokens @ 6 decimals — minted into vault. */
   totalSupply: 1_000_000_000_000_000n,
+  /** pump.fun initial_virtual_sol_reserves */
   virtualSolLamports: 30_000_000_000n,
+  /** pump.fun initial_virtual_token_reserves (1.073B raw) */
+  virtualTokenReserves: 1_073_000_000_000_000n,
+  /** pump.fun initial_real_token_reserves (793.1M raw) — sellable on curve */
+  realTokenReserves: 793_100_000_000_000n,
   /** Platform create fee — 0 like pump.fun (rent is separate network cost). */
   createFeeLamports: 0n,
   /** Total trade fee on bonding curve (125 bps = 1.25%). */
@@ -103,8 +109,8 @@ export const PUMP_FEEL_DEFAULTS = {
 /** On-chain account sizes — program layout (must match pump-launchpad Rust). */
 export const LAUNCHPAD_ACCOUNT_LEN = {
   /** `Curve` Pod in programs/pump-launchpad/src/lib.rs */
-  curve: 144,
-  global: 160,
+  curve: 152,
+  global: 176,
 } as const;
 
 /**
@@ -112,7 +118,7 @@ export const LAUNCHPAD_ACCOUNT_LEN = {
  * Keep in sync with `CURVE_RENT_LAMPORTS` in programs/pump-launchpad/src/lib.rs.
  */
 export const LAUNCHPAD_PROGRAM_RENT_LAMPORTS = {
-  curve: 1_893_120n,
+  curve: 1_948_800n,
 } as const;
 
 export type PumpFeelDefaults = typeof PUMP_FEEL_DEFAULTS;
@@ -120,7 +126,7 @@ export type PumpFeelDefaults = typeof PUMP_FEEL_DEFAULTS;
 export function pumpFeelVirtualTokenReserve(
   defaults: PumpFeelDefaults = PUMP_FEEL_DEFAULTS
 ): bigint {
-  return defaults.totalSupply;
+  return defaults.virtualTokenReserves;
 }
 
 function writeU8(out: Uint8Array, offset: number, value: number): number {
@@ -153,9 +159,9 @@ function instructionData(bytes: Uint8Array): Buffer {
   return Buffer.from(bytes);
 }
 
-/** Encode Pinocchio `initialize` instruction data (tag + 8×u64 + u8). */
+/** Encode Pinocchio `initialize` — tag + 9×u64 + u8 decimals. */
 export function encodeInitializeIx(defaults: PumpFeelDefaults = PUMP_FEEL_DEFAULTS): Buffer {
-  const out = new Uint8Array(1 + 64 + 1);
+  const out = new Uint8Array(1 + 72 + 1);
   let o = writeU8(out, 0, IX.initialize);
   o = writeU64Le(out, o, BigInt(defaults.protocolFeeBps));
   o = writeU64Le(out, o, BigInt(defaults.creatorFeeShareBps));
@@ -163,7 +169,8 @@ export function encodeInitializeIx(defaults: PumpFeelDefaults = PUMP_FEEL_DEFAUL
   o = writeU64Le(out, o, BigInt(defaults.verifiedReferrerShareBps));
   o = writeU64Le(out, o, defaults.createFeeLamports);
   o = writeU64Le(out, o, defaults.virtualSolLamports);
-  o = writeU64Le(out, o, defaults.totalSupply);
+  o = writeU64Le(out, o, defaults.virtualTokenReserves);
+  o = writeU64Le(out, o, defaults.realTokenReserves);
   o = writeU64Le(out, o, defaults.totalSupply);
   writeU8(out, o, defaults.tokenDecimals);
   return instructionData(out);

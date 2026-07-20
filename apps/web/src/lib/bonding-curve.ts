@@ -374,6 +374,7 @@ export function quoteFreshBuy(params: {
   virtualZugReserve: bigint;
   virtualTokenReserve: bigint;
   protocolFeeBps: bigint;
+  realTokenReserves?: bigint;
 }): bigint {
   if (params.zugIn <= 0n) return 0n;
 
@@ -383,7 +384,11 @@ export function quoteFreshBuy(params: {
   const y0 = params.virtualTokenReserve;
   const k = x0 * y0;
   const y1 = k / (x0 + netZug);
-  return y0 - y1;
+  let tokenOut = y0 - y1;
+  if (params.realTokenReserves != null && tokenOut > params.realTokenReserves) {
+    tokenOut = params.realTokenReserves;
+  }
+  return tokenOut;
 }
 
 export function minOutWithSlippage(amount: bigint, slippageBps = SLIPPAGE_BPS): bigint {
@@ -500,6 +505,8 @@ export type BondingCurveState = {
   soldTokens: bigint;
   virtualZugReserve: bigint;
   virtualTokenReserve: bigint;
+  /** pump.fun real_token_reserves — caps buy output (Solana). */
+  realTokenReserves?: bigint;
 };
 
 /** JSON-safe curve fields for passing between client components. */
@@ -509,6 +516,7 @@ export type BondingCurveSnapshot = {
   virtualZugReserve: string;
   virtualTokenReserve: string;
   paused: boolean;
+  realTokenReserves?: string;
 };
 
 export function bondingCurveFromSnapshot(snapshot: BondingCurveSnapshot): BondingCurveState {
@@ -517,6 +525,8 @@ export function bondingCurveFromSnapshot(snapshot: BondingCurveSnapshot): Bondin
     soldTokens: BigInt(snapshot.soldTokens),
     virtualZugReserve: BigInt(snapshot.virtualZugReserve),
     virtualTokenReserve: BigInt(snapshot.virtualTokenReserve),
+    realTokenReserves:
+      snapshot.realTokenReserves != null ? BigInt(snapshot.realTokenReserves) : undefined,
   };
 }
 
@@ -543,7 +553,8 @@ export function bondingCurveStateFromTuple(
   };
 }
 
-/** Same math as BondingCurveManager.quoteBuy — runs locally, no RPC. */
+/** Same math as BondingCurveManager.quoteBuy — runs locally, no RPC.
+ * Solana/pump.fun: set reserveZug=0, soldTokens=0 and optional realTokenReserves cap. */
 export function quoteBuyFromCurveState(
   curve: BondingCurveState,
   protocolFeeBps: bigint,
@@ -559,7 +570,11 @@ export function quoteBuyFromCurveState(
 
   const k = x0 * y0;
   const y1 = k / (x0 + netZug);
-  return { tokenOut: y0 - y1, feeZug };
+  let tokenOut = y0 - y1;
+  if (curve.realTokenReserves != null && tokenOut > curve.realTokenReserves) {
+    tokenOut = curve.realTokenReserves;
+  }
+  return { tokenOut, feeZug };
 }
 
 /** Same math as BondingCurveManager.quoteSell — runs locally, no RPC. */
