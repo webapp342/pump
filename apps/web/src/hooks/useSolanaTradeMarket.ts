@@ -19,8 +19,10 @@ import { getSolanaConnection } from "@/lib/solana/transfer";
 import {
   decodeCurveAccount,
   decodeGlobalConfig,
+  pdaCreatorFees,
   pdaCurve,
   pdaGlobal,
+  pdaReferrerBinding,
 } from "@/lib/solana/launchpad-pdas";
 import {
   buildSolanaBuyInstructions,
@@ -42,6 +44,10 @@ export type SolanaTradeMarket = {
   tokenBalanceWei: bigint | undefined;
   /** False when first buy must create the trader ATA (~0.002 SOL rent). */
   traderAtaExists: boolean | undefined;
+  /** False when set_referrer must create the binding PDA. */
+  referrerBindingExists: boolean | undefined;
+  /** False when buy must CreateAccount the creator-fees PDA (paid by trader). */
+  creatorFeesPdaExists: boolean | undefined;
   /** Base tx fee from RPC getFeeForMessage (no priority tip). */
   buyTxFeeLamports: bigint | undefined;
   sellTxFeeLamports: bigint | undefined;
@@ -54,7 +60,7 @@ async function fetchMarket(mintAddress: string, ownerAddress?: string) {
   const [globalPda] = pdaGlobal();
   const [curvePda] = pdaCurve(mint);
 
-  const [globalInfo, curveInfo, solLamports, tokenSnapshot] = await Promise.all([
+  const [globalInfo, curveInfo, solLamports, tokenSnapshot, bindingInfo] = await Promise.all([
     conn.getAccountInfo(globalPda, "confirmed"),
     conn.getAccountInfo(curvePda, "confirmed"),
     ownerAddress
@@ -78,6 +84,9 @@ async function fetchMarket(mintAddress: string, ownerAddress?: string) {
           };
         })()
       : Promise.resolve(null),
+    ownerAddress
+      ? conn.getAccountInfo(pdaReferrerBinding(new PublicKey(ownerAddress))[0], "confirmed")
+      : Promise.resolve(null),
   ]);
 
   let global = null;
@@ -93,6 +102,17 @@ async function fetchMarket(mintAddress: string, ownerAddress?: string) {
   } catch {
     curve = null;
   }
+
+  let creatorFeesPdaExists: boolean | undefined;
+  if (curve) {
+    const [feesPda] = pdaCreatorFees(curve.creator);
+    const feesInfo = await conn.getAccountInfo(feesPda, "confirmed");
+    creatorFeesPdaExists = feesInfo != null && feesInfo.lamports > 0;
+  }
+
+  const referrerBindingExists = ownerAddress
+    ? bindingInfo != null && (bindingInfo.data?.length ?? 0) >= 65
+    : undefined;
 
   const bondingCurve: BondingCurveState | undefined = curve
     ? {
@@ -156,6 +176,8 @@ async function fetchMarket(mintAddress: string, ownerAddress?: string) {
     tokenBalanceWei:
       tokenSnapshot != null ? tokenRawToWei(tokenSnapshot.tokenRaw) : undefined,
     traderAtaExists: tokenSnapshot?.traderAtaExists,
+    referrerBindingExists,
+    creatorFeesPdaExists,
     buyTxFeeLamports,
     sellTxFeeLamports,
   };
@@ -189,6 +211,8 @@ export function useSolanaTradeMarket(
     solBalanceWei: query.data?.solBalanceWei,
     tokenBalanceWei: query.data?.tokenBalanceWei,
     traderAtaExists: query.data?.traderAtaExists,
+    referrerBindingExists: query.data?.referrerBindingExists,
+    creatorFeesPdaExists: query.data?.creatorFeesPdaExists,
     buyTxFeeLamports: query.data?.buyTxFeeLamports,
     sellTxFeeLamports: query.data?.sellTxFeeLamports,
     refetchBalances,

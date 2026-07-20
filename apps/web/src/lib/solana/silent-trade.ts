@@ -26,14 +26,17 @@ import {
 import {
   decodeCurveAccount,
   launchpadProgramId,
+  pdaCreatorFees,
   pdaCurve,
-  pdaGlobal,
   pdaReferrerBinding,
+  pdaReferrerFees,
 } from "@/lib/solana/launchpad-pdas";
 import { solanaTradeAccountMetas } from "@/lib/solana/trade-accounts";
-
-/** Must match programs/pump-launchpad set_referrer CreateAccount lamports. */
-const REFERRER_BINDING_RENT_LAMPORTS = 1_500_000n;
+import {
+  SOLANA_BUY_FEE_SLACK_LAMPORTS,
+  SOLANA_PENDING_FEES_RENT_LAMPORTS,
+  SOLANA_REFERRER_BINDING_RENT_LAMPORTS,
+} from "@/lib/solana/amount-scale";
 
 export type SolanaSilentTradeResult = {
   signature: string;
@@ -97,8 +100,13 @@ function formatSol(lamports: bigint): string {
   return frac ? `${whole}.${frac}` : whole.toString();
 }
 
+function accountNeedsInit(info: { lamports: number; data: Uint8Array } | null): boolean {
+  return info == null || info.lamports === 0;
+}
+
 /**
  * Live affordability check against the signing wallet (not a cached UI balance).
+ * Includes ATA / referrer binding / pending fee PDA rents the buy ix may create.
  */
 async function assertBuyAffordable(input: {
   trader: PublicKey;
@@ -106,6 +114,8 @@ async function assertBuyAffordable(input: {
   ixs: TransactionInstruction[];
   needsAta: boolean;
   needsReferrerBinding: boolean;
+  needsCreatorFeesPda: boolean;
+  needsReferrerFeesPda: boolean;
 }): Promise<void> {
   const conn = getSolanaConnection();
   const [balance, ataRent, walletRent, txFee] = await Promise.all([
@@ -117,9 +127,18 @@ async function assertBuyAffordable(input: {
     getLiveTransactionFeeLamports(conn, input.ixs, input.trader),
   ]);
 
-  const bindingRent = input.needsReferrerBinding ? REFERRER_BINDING_RENT_LAMPORTS : 0n;
+  const bindingRent = input.needsReferrerBinding ? SOLANA_REFERRER_BINDING_RENT_LAMPORTS : 0n;
+  const creatorFeesRent = input.needsCreatorFeesPda ? SOLANA_PENDING_FEES_RENT_LAMPORTS : 0n;
+  const referrerFeesRent = input.needsReferrerFeesPda ? SOLANA_PENDING_FEES_RENT_LAMPORTS : 0n;
   const required =
-    input.solInLamports + ataRent + bindingRent + txFee + walletRent;
+    input.solInLamports +
+    ataRent +
+    bindingRent +
+    creatorFeesRent +
+    referrerFeesRent +
+    txFee +
+    walletRent +
+    SOLANA_BUY_FEE_SLACK_LAMPORTS;
 
   if (balance >= required) return;
 
@@ -128,6 +147,8 @@ async function assertBuyAffordable(input: {
       `(buy ${formatSol(input.solInLamports)}` +
       `${ataRent > 0n ? ` + token account ${formatSol(ataRent)}` : ""}` +
       `${bindingRent > 0n ? ` + referrer account ${formatSol(bindingRent)}` : ""}` +
+      `${creatorFeesRent > 0n ? ` + creator fees account ${formatSol(creatorFeesRent)}` : ""}` +
+      `${referrerFeesRent > 0n ? ` + referrer fees account ${formatSol(referrerFeesRent)}` : ""}` +
       ` + fee ${formatSol(txFee)} + keep ${formatSol(walletRent)}).`
   );
 }
@@ -155,7 +176,6 @@ export async function silentBuy(input: {
     throw new Error("No tokens left on the bonding curve for this coin.");
   }
 
-  // Vault must hold tokens — empty vault surfaces as SPL "insufficient funds" otherwise.
   const conn = getSolanaConnection();
   const vaultBal = await conn.getTokenAccountBalance(curve.tokenVault, "confirmed").catch(() => null);
   const vaultRaw = vaultBal?.value?.amount ? BigInt(vaultBal.value.amount) : 0n;
@@ -170,11 +190,21 @@ export async function silentBuy(input: {
       : trader;
 
   const traderAta = getAssociatedTokenAddressSync(mint, trader, false, TOKEN_PROGRAM_ID);
-  const [ataInfo, setRefIx] = await Promise.all([
+  const [creatorFeesPda] = pdaCreatorFees(curve.creator, programId);
+  const [referrerFeesPda] = pdaReferrerFees(referrerWallet, programId);
+
+  const [ataInfo, setRefIx, creatorFeesInfo, referrerFeesInfo] = await Promise.all([
     conn.getAccountInfo(traderAta, "confirmed"),
     maybeSetReferrer(trader, input.referrerAddress),
+    conn.getAccountInfo(creatorFeesPda, "confirmed"),
+    referrerWallet.equals(trader)
+      ? Promise.resolve(null)
+      : conn.getAccountInfo(referrerFeesPda, "confirmed"),
   ]);
   const needsAta = ataInfo === null;
+  const needsCreatorFeesPda = accountNeedsInit(creatorFeesInfo);
+  const needsReferrerFeesPda =
+    !referrerWallet.equals(trader) && accountNeedsInit(referrerFeesInfo);
 
   const ixs: TransactionInstruction[] = [];
   if (setRefIx) ixs.push(setRefIx);
@@ -211,6 +241,8 @@ export async function silentBuy(input: {
     ixs,
     needsAta,
     needsReferrerBinding: setRefIx !== null,
+    needsCreatorFeesPda,
+    needsReferrerFeesPda,
   });
 
   const { signature } = await sendSolanaSilentTransaction(ixs);
@@ -229,7 +261,6 @@ export async function silentSell(input: {
   if (input.tokenIn <= 0n) throw new Error("Amount must be greater than zero");
   const trader = await traderPubkey();
   const mint = new PublicKey(input.mintAddress);
-  const programId = launchpadProgramId();
   const { curvePda, curve } = await loadCurve(mint);
 
   if (curve.paused) throw new Error("Trading paused");
@@ -243,7 +274,7 @@ export async function silentSell(input: {
   const traderAta = getAssociatedTokenAddressSync(mint, trader, false, TOKEN_PROGRAM_ID);
 
   const ix = new TransactionInstruction({
-    programId,
+    programId: launchpadProgramId(),
     keys: solanaTradeAccountMetas({
       trader,
       mint,

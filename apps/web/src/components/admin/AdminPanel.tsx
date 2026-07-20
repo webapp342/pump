@@ -14,7 +14,9 @@ import {
   useWriteContract,
 } from "wagmi";
 import { ADMIN_ADDRESS } from "@/config/admin";
+import { isSolanaChainFamily } from "@/config/chain-family";
 import { adminFetch, readAdminJson } from "@/lib/admin-api-client";
+import { isValidSolanaAddress } from "@/lib/admin-solana-onchain";
 import { WIPE_DATA_CONFIRMATION_PHRASE } from "@/lib/admin/wipe-data.constants";
 import { adminSignOut } from "@/lib/admin/auth-client";
 import { ADMIN_COPY } from "@/lib/admin/copy";
@@ -88,6 +90,9 @@ type ProtocolSnapshot = {
     referrerShareBps: number;
     contractBalanceBnb: string;
     emergencyHalt: boolean;
+    liquidityVault?: string;
+    withdrawableLiquiditySol?: string;
+    withdrawableProtocolSol?: string;
   };
   airdropManager: {
     address: string;
@@ -97,6 +102,14 @@ type ProtocolSnapshot = {
     contractBalanceBnb: string;
   } | null;
   treasury: { address: string; owner: string; balanceBnb: string };
+  solana?: {
+    programId: string;
+    globalPda: string;
+    authority: string;
+    liquidityVault: string;
+    protocolTreasury: string;
+    factorySigner: string;
+  };
 };
 
 type TreasuryWithdrawMode = "bnb" | "token";
@@ -198,6 +211,8 @@ export function AdminPanel() {
   const [withdrawTokenAddress, setWithdrawTokenAddress] = useState("");
   const [withdrawTokenAmount, setWithdrawTokenAmount] = useState("");
   const [withdrawMode, setWithdrawMode] = useState<TreasuryWithdrawMode>("bnb");
+  const [solanaTxHash, setSolanaTxHash] = useState<string | null>(null);
+  const [solanaTxPending, setSolanaTxPending] = useState(false);
   const [promoTasks, setPromoTasks] = useState<AdminLinkTask[]>([]);
   const [promoLoading, setPromoLoading] = useState(true);
   const [promoSaving, setPromoSaving] = useState(false);
@@ -221,24 +236,28 @@ export function AdminPanel() {
   const [lastRefreshedAt, setLastRefreshedAt] = useState<Date | null>(null);
   const { globalQuery, setGlobalQuery } = useAdminShell();
 
-  const treasuryContract = protocol?.treasury.address as `0x${string}` | undefined;
+  const treasuryContract = protocol?.treasury.address;
   const treasuryOwner = protocol?.treasury.owner;
   const bondingOwner = protocol?.bondingCurveManager.owner;
+  const solanaAuthority = protocol?.solana?.authority ?? bondingOwner;
 
-  const canWithdrawTreasury =
-    Boolean(address) &&
-    Boolean(treasuryContract) &&
-    treasuryOwner != null &&
-    address!.toLowerCase() === treasuryOwner.toLowerCase();
+  /** EVM: connected wallet must own treasury. Solana: SIWE admin + server signs with Global.authority. */
+  const canWithdrawTreasury = isSolanaChainFamily
+    ? Boolean(address) && Boolean(treasuryContract)
+    : Boolean(address) &&
+      Boolean(treasuryContract) &&
+      treasuryOwner != null &&
+      address!.toLowerCase() === treasuryOwner.toLowerCase();
 
-  const canEmergencySweepBonding =
-    Boolean(address) &&
-    Boolean(contracts.bondingCurveManager) &&
-    bondingOwner != null &&
-    address!.toLowerCase() === bondingOwner.toLowerCase();
+  const canEmergencySweepBonding = isSolanaChainFamily
+    ? Boolean(address) && Boolean(protocol?.bondingCurveManager.address)
+    : Boolean(address) &&
+      Boolean(contracts.bondingCurveManager) &&
+      bondingOwner != null &&
+      address!.toLowerCase() === bondingOwner.toLowerCase();
   const memeFactoryOwner = protocol?.memeFactory.owner;
   const airdropAdmin = protocol?.airdropManager?.admin;
-  const opsWallet = treasuryOwner ?? ADMIN_ADDRESS;
+  const opsWallet = solanaAuthority ?? treasuryOwner ?? ADMIN_ADDRESS;
   const curveRecoverButtonLabel = useMemo(() => {
     switch (curveRecoverPhase) {
       case "wallet-sweep":
@@ -254,6 +273,7 @@ export function AdminPanel() {
     }
   }, [curveRecoverPhase]);
   const opsWalletsUnified = useMemo(() => {
+    if (isSolanaChainFamily) return true;
     const wallets = [treasuryOwner, bondingOwner, airdropAdmin]
       .filter(Boolean)
       .map((w) => w!.toLowerCase());
@@ -262,33 +282,45 @@ export function AdminPanel() {
   }, [treasuryOwner, bondingOwner, airdropAdmin]);
 
   const { data: treasuryLiveBalance, refetch: refetchTreasuryBalance } = useBalance({
-    address: treasuryContract,
+    address: !isSolanaChainFamily && treasuryContract ? (treasuryContract as `0x${string}`) : undefined,
     chainId: pumpChain.id,
-    query: { enabled: Boolean(treasuryContract), refetchInterval: 15_000 },
+    query: {
+      enabled: !isSolanaChainFamily && Boolean(treasuryContract),
+      refetchInterval: 15_000,
+    },
   });
 
-  const tokenWithdrawAddress = isAddress(withdrawTokenAddress)
-    ? (withdrawTokenAddress as `0x${string}`)
-    : undefined;
+  const tokenWithdrawAddress =
+    !isSolanaChainFamily && isAddress(withdrawTokenAddress)
+      ? (withdrawTokenAddress as `0x${string}`)
+      : undefined;
 
   const { data: treasuryTokenBalance, refetch: refetchTreasuryTokenBalance } = useReadContract({
     address: tokenWithdrawAddress,
     abi: erc20Abi,
     functionName: "balanceOf",
-    args: treasuryContract ? [treasuryContract] : undefined,
+    args:
+      !isSolanaChainFamily && treasuryContract
+        ? [treasuryContract as `0x${string}`]
+        : undefined,
     chainId: pumpChain.id,
-    query: { enabled: Boolean(treasuryContract && tokenWithdrawAddress), refetchInterval: 15_000 },
+    query: {
+      enabled: !isSolanaChainFamily && Boolean(treasuryContract && tokenWithdrawAddress),
+      refetchInterval: 15_000,
+    },
   });
 
   const {
     writeContract,
     writeContractAsync,
     data: adminTxHash,
-    isPending: adminTxPending,
+    isPending: adminTxPendingWagmi,
     reset: resetAdminTx,
   } = useWriteContract();
   const publicClient = usePublicClient({ chainId: pumpChain.id });
   const { isSuccess: adminTxDone } = useWaitForTransactionReceipt({ hash: adminTxHash });
+  const adminTxPending = adminTxPendingWagmi || solanaTxPending;
+  const displayTxHash = solanaTxHash ?? adminTxHash ?? null;
 
   const loadPromoTasks = useCallback(async () => {
     if (!address) return;
@@ -389,19 +421,36 @@ export function AdminPanel() {
   ]);
 
   useEffect(() => {
+    if (isSolanaChainFamily) setWithdrawMode("bnb");
+  }, []);
+
+  useEffect(() => {
+    if (isSolanaChainFamily) {
+      if (solanaAuthority && !withdrawTo) {
+        setWithdrawTo(solanaAuthority);
+      }
+      return;
+    }
     if (address && !withdrawTo) {
       setWithdrawTo(address);
     }
-  }, [address, withdrawTo]);
+  }, [address, withdrawTo, solanaAuthority]);
 
   useEffect(() => {
+    if (isSolanaChainFamily) {
+      // Base parity: sweep liquidity to deployer/authority wallet (ops destination).
+      if (solanaAuthority && !emergencySweepTo) {
+        setEmergencySweepTo(solanaAuthority);
+      }
+      return;
+    }
     if (treasuryContract && !emergencySweepTo) {
       setEmergencySweepTo(treasuryContract);
     }
-  }, [treasuryContract, emergencySweepTo]);
+  }, [treasuryContract, emergencySweepTo, solanaAuthority]);
 
   function onSweep(row: SweepRow) {
-    if (!contracts.airdropManager) return;
+    if (isSolanaChainFamily || !contracts.airdropManager) return;
     setSweepingId(row.onChainId);
     writeContract({
       address: contracts.airdropManager,
@@ -448,22 +497,65 @@ export function AdminPanel() {
   }
 
   async function runCurveRecovery(options: { sweepEscrow: boolean }) {
-    if (!canEmergencySweepBonding || !contracts.bondingCurveManager || !publicClient) {
-      setError("Connect the curve owner wallet on the correct chain.");
+    if (!canEmergencySweepBonding) {
+      setError(
+        isSolanaChainFamily
+          ? "Admin session required for Solana recovery."
+          : "Connect the curve owner wallet on the correct chain."
+      );
       return;
     }
 
     const to = emergencySweepTo.trim();
-    if (options.sweepEscrow && !isAddress(to)) {
-      setError("Enter a valid recovery recipient address");
-      return;
+    if (options.sweepEscrow) {
+      if (isSolanaChainFamily ? !isValidSolanaAddress(to) : !isAddress(to)) {
+        setError("Enter a valid recovery recipient address");
+        return;
+      }
     }
 
     setError(null);
     setCurveRecoverSuccess(null);
     setCurveRecoverBusy(true);
+    setSolanaTxHash(null);
 
     try {
+      if (isSolanaChainFamily) {
+        if (options.sweepEscrow) {
+          setCurveRecoverPhase("wallet-sweep");
+          setSolanaTxPending(true);
+          const res = await adminFetch("/api/admin/solana/emergency-sweep", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ to }),
+          });
+          const json = await readAdminJson<{
+            error?: string;
+            data?: { signature?: string };
+          }>(res);
+          if (!res.ok) throw new Error(json.error ?? "Emergency sweep failed");
+          setSolanaTxHash(json.data?.signature ?? null);
+          setCurveRecoverPhase("chain-sweep");
+        } else if (!protocol?.bondingCurveManager.emergencyHalt) {
+          setError("Curve trading is already active.");
+          return;
+        } else {
+          setError(
+            "Solana has no resume-halt instruction yet. Redeploy/re-initialize clears halt only via new Global."
+          );
+          return;
+        }
+
+        setCurveRecoverPhase(curveRecoverResetDb ? "wipe" : "idle");
+        await finishCurveRecovery();
+        return;
+      }
+
+      if (!contracts.bondingCurveManager || !publicClient) {
+        setError("Connect the curve owner wallet on the correct chain.");
+        return;
+      }
+
       if (options.sweepEscrow) {
         setCurveRecoverPhase("wallet-sweep");
         const sweepHash = await writeContractAsync({
@@ -503,15 +595,17 @@ export function AdminPanel() {
     } finally {
       setCurveRecoverBusy(false);
       setCurveRecoverPhase("idle");
+      setSolanaTxPending(false);
       resetAdminTx();
     }
   }
 
   function onRecoverCurveEscrow() {
-    if (!canEmergencySweepBonding || !contracts.bondingCurveManager) return;
+    if (!canEmergencySweepBonding) return;
+    if (!isSolanaChainFamily && !contracts.bondingCurveManager) return;
 
     const to = emergencySweepTo.trim();
-    if (!isAddress(to)) {
+    if (isSolanaChainFamily ? !isValidSolanaAddress(to) : !isAddress(to)) {
       setError("Enter a valid recovery recipient address");
       return;
     }
@@ -540,7 +634,14 @@ export function AdminPanel() {
   }
 
   function onResumeCurveTradingOnly() {
-    if (!canEmergencySweepBonding || !contracts.bondingCurveManager) return;
+    if (!canEmergencySweepBonding) return;
+    if (isSolanaChainFamily) {
+      setError(
+        "Solana has no resume-halt instruction yet. Halt clears only with a new Global initialize."
+      );
+      return;
+    }
+    if (!contracts.bondingCurveManager) return;
     if (!protocol?.bondingCurveManager.emergencyHalt) {
       setError("Curve trading is already active.");
       return;
@@ -553,12 +654,45 @@ export function AdminPanel() {
     void runCurveRecovery({ sweepEscrow: false });
   }
 
-  function onWithdrawTreasuryBnb() {
+  async function onWithdrawTreasuryBnb() {
     if (!canWithdrawTreasury || !treasuryContract) return;
-    if (!isAddress(withdrawTo)) {
+    const to = withdrawTo.trim();
+    if (isSolanaChainFamily ? !isValidSolanaAddress(to) : !isAddress(to)) {
       setError("Enter a valid recipient address");
       return;
     }
+
+    if (isSolanaChainFamily) {
+      const amountSol = withdrawAmount.trim();
+      if (!amountSol || Number(amountSol) <= 0) {
+        setError("Amount must be greater than 0");
+        return;
+      }
+      setError(null);
+      setSolanaTxHash(null);
+      setSolanaTxPending(true);
+      try {
+        const res = await adminFetch("/api/admin/solana/withdraw-protocol", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ to, amountSol }),
+        });
+        const json = await readAdminJson<{
+          error?: string;
+          data?: { signature?: string };
+        }>(res);
+        if (!res.ok) throw new Error(json.error ?? "Withdraw failed");
+        setSolanaTxHash(json.data?.signature ?? null);
+        void load();
+        void loadStats();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Withdraw failed");
+      } finally {
+        setSolanaTxPending(false);
+      }
+      return;
+    }
+
     let amount: bigint;
     try {
       amount = parseEther(withdrawAmount.trim() || "0");
@@ -572,15 +706,16 @@ export function AdminPanel() {
     }
     setError(null);
     writeContract({
-      address: treasuryContract,
+      address: treasuryContract as `0x${string}`,
       abi: launchpadTreasuryAbi,
       functionName: "withdrawNative",
-      args: [withdrawTo as `0x${string}`, amount],
+      args: [to as `0x${string}`, amount],
       chainId: pumpChain.id,
     });
   }
 
   function onWithdrawTreasuryToken() {
+    if (isSolanaChainFamily) return;
     if (!canWithdrawTreasury || !treasuryContract) return;
     if (!isAddress(withdrawTo)) {
       setError("Enter a valid recipient address");
@@ -603,7 +738,7 @@ export function AdminPanel() {
     }
     setError(null);
     writeContract({
-      address: treasuryContract,
+      address: treasuryContract as `0x${string}`,
       abi: launchpadTreasuryAbi,
       functionName: "withdrawToken",
       args: [withdrawTokenAddress as `0x${string}`, withdrawTo as `0x${string}`, amount],
@@ -612,6 +747,11 @@ export function AdminPanel() {
   }
 
   function fillMaxTreasuryBnb() {
+    if (isSolanaChainFamily) {
+      const max = protocol?.bondingCurveManager.withdrawableProtocolSol;
+      if (max) setWithdrawAmount(max);
+      return;
+    }
     if (!treasuryLiveBalance?.value) return;
     setWithdrawAmount(formatEther(treasuryLiveBalance.value));
   }
@@ -675,9 +815,14 @@ export function AdminPanel() {
   }
 
   const readySweeps = airdrops.filter((r) => r.canSweep);
-  const treasuryBnb = treasuryLiveBalance
-    ? formatEther(treasuryLiveBalance.value)
-    : (protocol?.treasury.balanceBnb ?? "0");
+  const treasuryBnb = isSolanaChainFamily
+    ? (protocol?.treasury.balanceBnb ?? "0")
+    : treasuryLiveBalance
+      ? formatEther(treasuryLiveBalance.value)
+      : (protocol?.treasury.balanceBnb ?? "0");
+  const withdrawableProtocolDisplay = isSolanaChainFamily
+    ? (protocol?.bondingCurveManager.withdrawableProtocolSol ?? treasuryBnb)
+    : treasuryBnb;
 
   const sweepStats = useMemo(() => {
     let remainingUsd = 0;
@@ -924,7 +1069,7 @@ export function AdminPanel() {
                 onSearchQueryChange={setGlobalQuery}
                 adminTxPending={adminTxPending}
                 sweepingId={sweepingId}
-                adminTxHash={adminTxHash}
+                adminTxHash={displayTxHash ?? undefined}
                 onSweep={onSweep}
                 toolbar={
                   <AdminBtn size="sm" onClick={() => void load()} disabled={loading}>
@@ -958,7 +1103,9 @@ export function AdminPanel() {
             <AdminDataRow
               label="Trade fee"
               loading={!protocol}
-              onEdit={protocol ? () => setProtocolFeeModalOpen(true) : undefined}
+              onEdit={
+                !isSolanaChainFamily && protocol ? () => setProtocolFeeModalOpen(true) : undefined
+              }
               editLabel="Edit trade fee"
             >
               {protocol ? (
@@ -978,7 +1125,9 @@ export function AdminPanel() {
             <AdminDataRow
               label="Creator share"
               loading={!protocol}
-              onEdit={protocol ? () => setCreatorShareModalOpen(true) : undefined}
+              onEdit={
+                !isSolanaChainFamily && protocol ? () => setCreatorShareModalOpen(true) : undefined
+              }
             >
               {protocol
                 ? `${creatorShareBpsToPercent(creatorFeeShareBps).toFixed(2)}% of protocol fee`
@@ -987,7 +1136,9 @@ export function AdminPanel() {
             <AdminDataRow
               label="Referrer share"
               loading={!protocol}
-              onEdit={protocol ? () => setReferrerShareModalOpen(true) : undefined}
+              onEdit={
+                !isSolanaChainFamily && protocol ? () => setReferrerShareModalOpen(true) : undefined
+              }
             >
               {protocol
                 ? `${referrerShareBpsToPercent(referrerShareBps).toFixed(2)}% of protocol fee`
@@ -996,7 +1147,11 @@ export function AdminPanel() {
             <AdminDataRow
               label="Meme launch fee"
               loading={!protocol}
-              onEdit={protocol ? () => setMemeCreateFeeModalOpen(true) : undefined}
+              onEdit={
+                !isSolanaChainFamily && protocol
+                  ? () => setMemeCreateFeeModalOpen(true)
+                  : undefined
+              }
             >
               {protocol ? (
                 <>
@@ -1012,22 +1167,28 @@ export function AdminPanel() {
             <AdminDataRow
               label="Min initial buy"
               loading={platformSettingsLoading}
-              onEdit={() => setMinInitialBuyModalOpen(true)}
+              onEdit={
+                !isSolanaChainFamily ? () => setMinInitialBuyModalOpen(true) : undefined
+              }
             >
               {formatBnb(minInitialBuyBnb)} {NATIVE_SYMBOL}
             </AdminDataRow>
             <AdminDataRow
               label="Fee exemption"
-              onEdit={() => setFeeExemptModalOpen(true)}
+              onEdit={
+                !isSolanaChainFamily ? () => setFeeExemptModalOpen(true) : undefined
+              }
               editLabel="Manage exemptions"
             >
-              MemeFactory · AirdropManager
+              {isSolanaChainFamily ? "Not applicable on Solana" : "MemeFactory · AirdropManager"}
             </AdminDataRow>
             <AdminDataRow
               label="Airdrop create fee"
-              loading={!protocol?.airdropManager}
+              loading={!isSolanaChainFamily && !protocol?.airdropManager}
               onEdit={
-                protocol?.airdropManager ? () => setAirdropCreateFeeModalOpen(true) : undefined
+                !isSolanaChainFamily && protocol?.airdropManager
+                  ? () => setAirdropCreateFeeModalOpen(true)
+                  : undefined
               }
             >
               {protocol?.airdropManager ? (
@@ -1038,7 +1199,7 @@ export function AdminPanel() {
                     : ""}
                 </>
               ) : (
-                "—"
+                isSolanaChainFamily ? "N/A (Solana)" : "—"
               )}
             </AdminDataRow>
           </AdminDataTable>
@@ -1066,7 +1227,7 @@ export function AdminPanel() {
             <AdminDataRow label="Balance">
               <BnbAmountWithUsd bnb={treasuryBnb} bnbUsd={bnbUsd} inline />
             </AdminDataRow>
-            <AdminDataRow label="Curve escrow">
+            <AdminDataRow label={isSolanaChainFamily ? "Liquidity vault" : "Curve escrow"}>
               {protocol ? (
                 <>
                   <BnbAmountWithUsd
@@ -1076,6 +1237,20 @@ export function AdminPanel() {
                   />
                   {protocol.bondingCurveManager.emergencyHalt ? (
                     <span className="admin-meta"> · halted</span>
+                  ) : null}
+                  {isSolanaChainFamily && protocol.solana?.liquidityVault ? (
+                    <span className="admin-meta">
+                      {" "}
+                      ·{" "}
+                      <a
+                        href={explorerAddressUrl(protocol.solana.liquidityVault)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="admin-link admin-num"
+                      >
+                        {shortAddress(protocol.solana.liquidityVault)}
+                      </a>
+                    </span>
                   ) : null}
                 </>
               ) : (
@@ -1181,6 +1356,7 @@ export function AdminPanel() {
             padded
           >
             <div className="admin-compact-form admin-compact-form--withdraw">
+              {!isSolanaChainFamily ? (
               <div className="admin-compact-row">
                 <span className="admin-field-label">Type</span>
                 <div className="segment-control segment-control--compact">
@@ -1208,6 +1384,7 @@ export function AdminPanel() {
                   </button>
                 </div>
               </div>
+              ) : null}
 
               <AdminField label={ADMIN_COPY.treasury.withdraw.recipient}>
                 <input
@@ -1224,7 +1401,8 @@ export function AdminPanel() {
                     label={ADMIN_COPY.treasury.withdraw.amountBnb}
                     hint={
                       <span className="admin-num">
-                        {formatBnb(treasuryBnb)} {NATIVE_SYMBOL} available
+                        {formatBnb(withdrawableProtocolDisplay)} {NATIVE_SYMBOL} available
+                        {isSolanaChainFamily ? " (protocol − rent)" : ""}
                       </span>
                     }
                   >
@@ -1239,7 +1417,11 @@ export function AdminPanel() {
                       <AdminBtn
                         size="sm"
                         onClick={fillMaxTreasuryBnb}
-                        disabled={!treasuryLiveBalance?.value}
+                        disabled={
+                          isSolanaChainFamily
+                            ? Number(withdrawableProtocolDisplay) <= 0
+                            : !treasuryLiveBalance?.value
+                        }
                       >
                         Max
                       </AdminBtn>
@@ -1280,31 +1462,37 @@ export function AdminPanel() {
               <div className="admin-compact-actions">
                 <AdminBtn
                   primary
-                  onClick={
-                    withdrawMode === "bnb" ? onWithdrawTreasuryBnb : onWithdrawTreasuryToken
-                  }
+                onClick={
+                  isSolanaChainFamily || withdrawMode === "bnb"
+                    ? () => void onWithdrawTreasuryBnb()
+                    : onWithdrawTreasuryToken
+                }
                   disabled={adminTxPending}
                 >
                   {adminTxPending ? ADMIN_COPY.actions.withdrawing : ADMIN_COPY.actions.withdraw}
                 </AdminBtn>
               </div>
             </div>
-            {adminTxHash && !sweepingId ? (
+            {displayTxHash && !sweepingId ? (
               <p className="admin-note admin-card-note">
                 Tx{" "}
                 <a
-                  href={explorerTxUrl(adminTxHash)}
+                  href={explorerTxUrl(displayTxHash)}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="admin-link admin-num"
                 >
-                  {shortAddress(adminTxHash)}
+                  {shortAddress(displayTxHash)}
                 </a>
               </p>
             ) : null}
           </AdminBlock>
         ) : (
-          <p className="admin-note">{ADMIN_COPY.treasury.withdraw.ownerRequired}</p>
+          <p className="admin-note">
+            {isSolanaChainFamily
+              ? "Sign in as admin to withdraw protocol fees (server signs with Global.authority keypair)."
+              : ADMIN_COPY.treasury.withdraw.ownerRequired}
+          </p>
         )}
       </AdminTabPanel>
 
@@ -1318,7 +1506,7 @@ export function AdminPanel() {
           onSearchQueryChange={setGlobalQuery}
           adminTxPending={adminTxPending}
           sweepingId={sweepingId}
-          adminTxHash={adminTxHash}
+          adminTxHash={displayTxHash ?? undefined}
           onSweep={onSweep}
           toolbar={
             <AdminBtn size="sm" onClick={() => void load()} disabled={loading}>
@@ -1490,29 +1678,39 @@ export function AdminPanel() {
       <AdminTabPanel id="contracts" active={activeTab}>
         <div className="admin-registry-grid">
           {(
-            [
-              [
-                ADMIN_COPY.contracts.labels.memeFactory,
-                protocol?.memeFactory.address ?? contracts.memeFactory,
-              ],
-              [
-                ADMIN_COPY.contracts.labels.bonding,
-                protocol?.bondingCurveManager.address ?? contracts.bondingCurveManager,
-              ],
-              [
-                ADMIN_COPY.contracts.labels.airdrop,
-                protocol?.airdropManager?.address ?? contracts.airdropManager ?? null,
-              ],
-              [
-                ADMIN_COPY.contracts.labels.treasury,
-                protocol?.treasury.address ?? treasuryContract ?? null,
-              ],
-            ] as const
+            isSolanaChainFamily
+              ? ([
+                  ["Launchpad program", protocol?.solana?.programId ?? protocol?.bondingCurveManager.address ?? null],
+                  ["Authority (deployer)", protocol?.solana?.authority ?? bondingOwner ?? null],
+                  ["Liquidity vault", protocol?.solana?.liquidityVault ?? protocol?.bondingCurveManager.liquidityVault ?? null],
+                  ["Protocol treasury", protocol?.solana?.protocolTreasury ?? protocol?.treasury.address ?? null],
+                  ["Global PDA", protocol?.solana?.globalPda ?? null],
+                ] as const)
+              : ([
+                  [
+                    ADMIN_COPY.contracts.labels.memeFactory,
+                    protocol?.memeFactory.address ?? contracts.memeFactory,
+                  ],
+                  [
+                    ADMIN_COPY.contracts.labels.bonding,
+                    protocol?.bondingCurveManager.address ?? contracts.bondingCurveManager,
+                  ],
+                  [
+                    ADMIN_COPY.contracts.labels.airdrop,
+                    protocol?.airdropManager?.address ?? contracts.airdropManager ?? null,
+                  ],
+                  [
+                    ADMIN_COPY.contracts.labels.treasury,
+                    protocol?.treasury.address ?? treasuryContract ?? null,
+                  ],
+                ] as const)
           ).map(([label, addr]) => (
             <article key={label} className="admin-registry-card">
               <div className="admin-registry-card-head">
                 <p className="admin-registry-label">{label}</p>
-                <span className="admin-registry-badge">UUPS</span>
+                <span className="admin-registry-badge">
+                  {isSolanaChainFamily ? "PDA" : "UUPS"}
+                </span>
               </div>
               {addr ? (
                 <>
@@ -1533,7 +1731,9 @@ export function AdminPanel() {
           ))}
         </div>
         <p className="admin-section-desc admin-registry-footnote">
-          {ADMIN_COPY.contracts.tableDescription}
+          {isSolanaChainFamily
+            ? "Solana launchpad PDAs. Withdraw/sweep recipient defaults to Global.authority (deployer)."
+            : ADMIN_COPY.contracts.tableDescription}
         </p>
       </AdminTabPanel>
 

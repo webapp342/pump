@@ -58,3 +58,11 @@ npm run solana:initialize
 `initialize` accounts: authority, **liquidity**, **protocol_treasury**, factory_signer, global, system.
 
 Old tokens / Global from before this layout **will not decode** — create new coins after upgrade. Redeploy web + indexer-sol.
+
+## Admin console (Solana)
+
+- Overview / Treasury / Contracts read **on-chain Solana** balances (liquidity vault + protocol treasury PDAs).
+- **Withdraw** → `withdraw_protocol_treasury` (server-signed with Global.authority keypair).
+- **Emergency sweep** → `emergency_sweep` → recipient defaults to **Global.authority** (deployer).
+- Env on the API host: `SOLANA_AUTHORITY_KEYPAIR` or `ANCHOR_WALLET` or `SOLANA_AUTHORITY_SECRET_BASE64`.
+- Login gate remains MetaMask `NEXT_PUBLIC_ADMIN_ADDRESS` (ops SIWE); on-chain txs use the Solana authority key.

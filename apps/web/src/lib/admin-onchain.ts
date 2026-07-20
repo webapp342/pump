@@ -5,6 +5,8 @@ import { memeFactoryAbi } from "@/lib/abis/meme-factory";
 import { bondingCurveManagerAbi } from "@/lib/bonding-curve";
 import { TREASURY_ADDRESS } from "@/config/admin";
 import { contracts, pumpChain, rpcUrl } from "@/config/chain";
+import { isSolanaChainFamily } from "@/config/chain-family";
+import { getAdminProtocolSnapshotSolana } from "@/lib/admin-solana-onchain";
 
 const publicClient = createPublicClient({
   chain: pumpChain,
@@ -21,6 +23,7 @@ export type OnChainAirdropState = {
 };
 
 export async function readAirdropOnChain(onChainId: string): Promise<OnChainAirdropState | null> {
+  if (isSolanaChainFamily) return null;
   if (!contracts.airdropManager) return null;
 
   const [state, remainingWei] = await Promise.all([
@@ -49,6 +52,10 @@ export async function readAirdropOnChain(onChainId: string): Promise<OnChainAird
 }
 
 export async function getAdminProtocolSnapshot() {
+  if (isSolanaChainFamily) {
+    return getAdminProtocolSnapshotSolana();
+  }
+
   const manager = contracts.airdropManager;
   const factory = contracts.memeFactory;
   const bonding = contracts.bondingCurveManager;

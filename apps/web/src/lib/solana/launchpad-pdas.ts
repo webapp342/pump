@@ -155,9 +155,14 @@ export function decodeCurveAccount(data: Uint8Array): OnchainCurve {
   };
 }
 
+/** Keep rent-exempt floor on vault PDAs (matches programs/pump-launchpad). */
+export const SOLANA_VAULT_RENT_LAMPORTS = 890_880n;
+
 export type OnchainGlobal = {
+  authority: PublicKey;
   liquidity: PublicKey;
   protocolTreasury: PublicKey;
+  factorySigner: PublicKey;
   protocolFeeBps: bigint;
   creatorFeeShareBps: bigint;
   referrerShareBps: bigint;
@@ -175,8 +180,10 @@ export function decodeGlobalConfig(data: Uint8Array): OnchainGlobal {
     throw new Error("Global account too small");
   }
   // authority(32) + liquidity(32) + protocol_treasury(32) + factory_signer(32) = 128
+  const authority = new PublicKey(data.subarray(0, 32));
   const liquidity = new PublicKey(data.subarray(32, 64));
   const protocolTreasury = new PublicKey(data.subarray(64, 96));
+  const factorySigner = new PublicKey(data.subarray(96, 128));
   const protocolFeeBps = readBigUInt64LE(data, 128);
   const creatorFeeShareBps = readBigUInt64LE(data, 136);
   const referrerShareBps = readBigUInt64LE(data, 144);
@@ -188,8 +195,10 @@ export function decodeGlobalConfig(data: Uint8Array): OnchainGlobal {
   const tokenDecimals = readUInt8(data, 200) || 6;
   const emergencyHalt = readUInt8(data, 201);
   return {
+    authority,
     liquidity,
     protocolTreasury,
+    factorySigner,
     protocolFeeBps,
     creatorFeeShareBps,
     referrerShareBps,
@@ -201,6 +210,11 @@ export function decodeGlobalConfig(data: Uint8Array): OnchainGlobal {
     tokenDecimals,
     emergencyHalt,
   };
+}
+
+export function withdrawableLamports(balance: bigint | number): bigint {
+  const bal = typeof balance === "bigint" ? balance : BigInt(balance);
+  return bal > SOLANA_VAULT_RENT_LAMPORTS ? bal - SOLANA_VAULT_RENT_LAMPORTS : 0n;
 }
 
 export type OnchainPendingFees = {

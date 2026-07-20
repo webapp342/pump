@@ -1021,8 +1021,21 @@ export function TradePanel({
       const fallbackTxFee = 5_000n;
       if (side === "buy") {
         const txFee = solanaMarket.buyTxFeeLamports ?? fallbackTxFee;
-        const needsTraderAta = solanaMarket.traderAtaExists !== true;
-        return solanaBuyPrefundWei(needsTraderAta, txFee);
+        const tradeReferrer = resolveTradeReferrer({
+          storedReferrer: readStoredReferrer(),
+          boundReferrer,
+          hasTraded,
+          traderAddress: address,
+        });
+        const hasReferrer = Boolean(tradeReferrer);
+        return solanaBuyPrefundWei(txFee, {
+          needsTraderAta: solanaMarket.traderAtaExists !== true,
+          needsReferrerBinding:
+            hasReferrer && solanaMarket.referrerBindingExists !== true,
+          // Unknown → assume create (safer Max). False only when we know PDA exists.
+          needsCreatorFeesPda: solanaMarket.creatorFeesPdaExists !== true,
+          needsReferrerFeesPda: hasReferrer,
+        });
       }
       const txFee = solanaMarket.sellTxFeeLamports ?? fallbackTxFee;
       return solanaSellPrefundWei(txFee);
@@ -1040,8 +1053,13 @@ export function TradePanel({
     isSolanaTrade,
     side,
     solanaMarket.traderAtaExists,
+    solanaMarket.referrerBindingExists,
+    solanaMarket.creatorFeesPdaExists,
     solanaMarket.buyTxFeeLamports,
     solanaMarket.sellTxFeeLamports,
+    boundReferrer,
+    hasTraded,
+    address,
     gasCostWei,
     gasPrice,
     needsLegacyApproval,
