@@ -20,17 +20,21 @@ This creates `.venv-crg/` (gitignored), installs the CLI, builds `.code-review-g
 
 Then **restart Cursor** so the `code-review-graph` MCP server loads.
 
-### Windows: do not enable CRG file hooks
+### Windows: auto-update on save (PowerShell hooks)
 
-`code-review-graph install --platform cursor` can add global hooks under `%USERPROFILE%\.cursor\hooks.json` (`crg-update.sh`, `crg-pre-commit.sh`, …). On Windows those are **bash scripts** — Cursor/Windows often **opens them in Visual Studio** instead of running them silently on every save.
+Global hooks live in `%USERPROFILE%\.cursor\hooks\` as **`.ps1`** (not `.sh` — bash scripts open in Visual Studio on Windows).
 
-**Use MCP only on Windows.** If hooks were installed, remove the `afterFileEdit` / `sessionStart` / CRG `beforeShellExecution` entries from `~/.cursor/hooks.json` and keep only your existing PowerShell hooks (e.g. `shell-guard.ps1`). Refresh the graph manually:
+- `crg-update.ps1` — runs `code_review_graph update --skip-flows` after each save when `.code-review-graph/` exists
+- Wired from `~/.cursor/hooks.json` via `powershell -ExecutionPolicy Bypass -File …`
+
+One-time graph build (if missing):
 
 ```powershell
-python -m code_review_graph update
+cd C:\Users\DARK\Desktop\pump-tma
+python -m code_review_graph build
 ```
 
-Or from project venv after `scripts/setup-code-review-graph.ps1`.
+Restart Cursor after hook changes. No per-prompt action needed — agents use MCP graph tools; saves keep the graph fresh.
 
 ## Daily use
 

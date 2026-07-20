@@ -481,6 +481,8 @@ export function TokenDetailLive({
     trades,
     chainCurve,
   ]);
+
+  const fetchLive = useCallback(async () => {
     try {
       const response = await fetch(`/api/tokens/${streamAddress}`, { cache: "no-store" });
       const body = (await response.json()) as {
