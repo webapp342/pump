@@ -28,7 +28,8 @@ import { bondingCurveManagerAbi } from "@/lib/bonding-curve";
 import {
   airdropRewardAmountUsd,
 } from "@/lib/airdrop-board-format";
-import { AdminAirdropCreateFeeModal } from "@/components/admin/AdminAirdropCreateFeeModal";
+import { AdminDangerConfirmModal } from "@/components/admin/AdminDangerConfirmModal";
+import { ADMIN_DANGER_PHRASES } from "@/lib/admin/danger-confirm";
 import { AdminAirdropSweepTable, type SweepRow } from "@/components/admin/AdminAirdropSweepTable";
 import { AdminEnterpriseTable } from "@/components/admin/AdminEnterpriseTable";
 import { AdminCreatorShareModal } from "@/components/admin/AdminCreatorShareModal";
@@ -121,6 +122,25 @@ type PendingFeeAdminRow = {
   pendingLamports: string;
   pendingSol: string;
 };
+
+type DangerPending =
+  | {
+      kind: "curve-recover";
+      amount: string;
+      to: string;
+      wipe: boolean;
+    }
+  | { kind: "resume"; wipe: boolean }
+  | { kind: "pending-fee"; row: PendingFeeAdminRow; to: string }
+  | { kind: "pending-fees-all"; to: string; totalSol: string; count: number }
+  | {
+      kind: "withdraw";
+      maxAvailable: boolean;
+      to: string;
+      amountLabel: string;
+    }
+  | { kind: "airdrop-sweep"; row: SweepRow }
+  | { kind: "delete-promo"; taskKey: string; title: string };
 
 type AdminLinkTask = {
   taskKey: string;
@@ -241,6 +261,8 @@ export function AdminPanel() {
   const [minInitialBuyBnb, setMinInitialBuyBnb] = useState("0");
   const [platformSettingsLoading, setPlatformSettingsLoading] = useState(true);
   const [airdropCreateFeeModalOpen, setAirdropCreateFeeModalOpen] = useState(false);
+  const [dangerPending, setDangerPending] = useState<DangerPending | null>(null);
+  const [dangerBusy, setDangerBusy] = useState(false);
   const [activeTab, setActiveTab] = useState<AdminTabId>("dashboard");
   const [stats, setStats] = useState<AdminPlatformStats | null>(null);
   const [statsLoading, setStatsLoading] = useState(true);
@@ -491,6 +513,11 @@ export function AdminPanel() {
 
   function onSweep(row: SweepRow) {
     if (isSolanaChainFamily || !contracts.airdropManager) return;
+    setDangerPending({ kind: "airdrop-sweep", row });
+  }
+
+  function executeAirdropSweep(row: SweepRow) {
+    if (isSolanaChainFamily || !contracts.airdropManager) return;
     setSweepingId(row.onChainId);
     writeContract({
       address: contracts.airdropManager,
@@ -685,14 +712,12 @@ export function AdminPanel() {
       return;
     }
 
-    const confirmTemplate = curveRecoverResetDb
-      ? ADMIN_COPY.treasury.curveRecovery.confirmSweepWithWipe
-      : ADMIN_COPY.treasury.curveRecovery.confirmSweep;
-    const confirmed = window.confirm(
-      confirmTemplate.replace("{amount}", balanceBnb).replace("{to}", to)
-    );
-    if (!confirmed) return;
-    void runCurveRecovery({ sweepEscrow: true });
+    setDangerPending({
+      kind: "curve-recover",
+      amount: balanceBnb,
+      to,
+      wipe: curveRecoverResetDb,
+    });
   }
 
   function onResumeCurveTradingOnly() {
@@ -702,11 +727,7 @@ export function AdminPanel() {
         setError("Curve trading is already active.");
         return;
       }
-      const confirmTemplate = curveRecoverResetDb
-        ? ADMIN_COPY.treasury.curveRecovery.confirmResumeWithWipe
-        : ADMIN_COPY.treasury.curveRecovery.confirmResume;
-      if (!window.confirm(confirmTemplate)) return;
-      void runCurveRecovery({ sweepEscrow: false });
+      setDangerPending({ kind: "resume", wipe: curveRecoverResetDb });
       return;
     }
     if (!contracts.bondingCurveManager) return;
@@ -714,15 +735,56 @@ export function AdminPanel() {
       setError("Curve trading is already active.");
       return;
     }
-
-    const confirmTemplate = curveRecoverResetDb
-      ? ADMIN_COPY.treasury.curveRecovery.confirmResumeWithWipe
-      : ADMIN_COPY.treasury.curveRecovery.confirmResume;
-    if (!window.confirm(confirmTemplate)) return;
-    void runCurveRecovery({ sweepEscrow: false });
+    setDangerPending({ kind: "resume", wipe: curveRecoverResetDb });
   }
 
   async function onWithdrawTreasuryBnb(opts?: { maxAvailable?: boolean }) {
+    if (!canWithdrawTreasury || !treasuryContract) return;
+    const to = withdrawTo.trim();
+    if (isSolanaChainFamily ? !isValidSolanaAddress(to) : !isAddress(to)) {
+      setError("Enter a valid recipient address");
+      return;
+    }
+
+    if (isSolanaChainFamily) {
+      const useMax = opts?.maxAvailable === true;
+      const amountSol = withdrawAmount.trim();
+      if (!useMax && (!amountSol || Number(amountSol) <= 0)) {
+        setError("Amount must be greater than 0");
+        return;
+      }
+      setDangerPending({
+        kind: "withdraw",
+        maxAvailable: useMax,
+        to,
+        amountLabel: useMax
+          ? `all available (${withdrawableProtocolDisplay} ${NATIVE_SYMBOL})`
+          : `${amountSol} ${NATIVE_SYMBOL}`,
+      });
+      return;
+    }
+
+    // EVM: open typed confirm then execute via executeDangerConfirm
+    let amount: bigint;
+    try {
+      amount = parseEther(withdrawAmount.trim() || "0");
+    } catch {
+      setError(`Invalid ${NATIVE_SYMBOL} amount`);
+      return;
+    }
+    if (amount <= 0n) {
+      setError("Amount must be greater than 0");
+      return;
+    }
+    setDangerPending({
+      kind: "withdraw",
+      maxAvailable: false,
+      to,
+      amountLabel: `${withdrawAmount.trim()} ${NATIVE_SYMBOL}`,
+    });
+  }
+
+  async function executeWithdrawTreasuryBnb(opts?: { maxAvailable?: boolean }) {
     if (!canWithdrawTreasury || !treasuryContract) return;
     const to = withdrawTo.trim();
     if (isSolanaChainFamily ? !isValidSolanaAddress(to) : !isAddress(to)) {
@@ -744,9 +806,7 @@ export function AdminPanel() {
         const res = await adminFetch("/api/admin/solana/withdraw-protocol", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(
-            useMax ? { to } : { to, amountSol }
-          ),
+          body: JSON.stringify(useMax ? { to } : { to, amountSol }),
         });
         const json = await readAdminJson<{
           error?: string;
@@ -786,20 +846,18 @@ export function AdminPanel() {
     });
   }
 
-  async function onSweepPendingFee(row: PendingFeeAdminRow) {
+  function requestSweepPendingFee(row: PendingFeeAdminRow) {
     if (!canWithdrawTreasury || !isSolanaChainFamily) return;
     const to = withdrawTo.trim();
     if (!isValidSolanaAddress(to)) {
       setError("Enter a valid recipient address in Withdrawal first");
       return;
     }
-    const confirmMsg = ADMIN_COPY.treasury.pendingFees.confirm
-      .replace("{kind}", row.kind)
-      .replace("{amount}", row.pendingSol)
-      .replace("{symbol}", NATIVE_SYMBOL)
-      .replace("{to}", shortAddress(to));
-    if (!window.confirm(confirmMsg)) return;
+    setDangerPending({ kind: "pending-fee", row, to });
+  }
 
+  async function executeSweepPendingFee(row: PendingFeeAdminRow, to: string) {
+    if (!canWithdrawTreasury || !isSolanaChainFamily) return;
     const sweepKey = `${row.kind}:${row.owner}`;
     setError(null);
     setSolanaTxHash(null);
@@ -828,7 +886,7 @@ export function AdminPanel() {
     }
   }
 
-  async function onSweepAllPendingFees() {
+  function requestSweepAllPendingFees() {
     if (!canWithdrawTreasury || !isSolanaChainFamily || pendingFees.length === 0) return;
     const to = withdrawTo.trim();
     if (!isValidSolanaAddress(to)) {
@@ -839,12 +897,16 @@ export function AdminPanel() {
       .reduce((sum, r) => sum + Number(r.pendingSol), 0)
       .toFixed(6)
       .replace(/\.?0+$/, "");
-    const confirmMsg = ADMIN_COPY.treasury.pendingFees.confirmAll
-      .replace("{amount}", totalSol)
-      .replace("{symbol}", NATIVE_SYMBOL)
-      .replace("{count}", String(pendingFees.length))
-      .replace("{to}", shortAddress(to));
-    if (!window.confirm(confirmMsg)) return;
+    setDangerPending({
+      kind: "pending-fees-all",
+      to,
+      totalSol,
+      count: pendingFees.length,
+    });
+  }
+
+  async function executeSweepAllPendingFees(to: string) {
+    if (!canWithdrawTreasury || !isSolanaChainFamily || pendingFees.length === 0) return;
 
     setError(null);
     setSolanaTxHash(null);
@@ -962,9 +1024,13 @@ export function AdminPanel() {
     }
   }
 
-  async function onDeletePromoTask(taskKey: string, title: string) {
+  function requestDeletePromoTask(taskKey: string, title: string) {
     if (!address) return;
-    if (!window.confirm(`Delete "${title}"? Users keep any points already earned.`)) return;
+    setDangerPending({ kind: "delete-promo", taskKey, title });
+  }
+
+  async function executeDeletePromoTask(taskKey: string) {
+    if (!address) return;
 
     setDeletingKey(taskKey);
     setError(null);
@@ -983,6 +1049,179 @@ export function AdminPanel() {
       setDeletingKey(null);
     }
   }
+
+  async function executeDangerConfirm() {
+    if (!dangerPending) return;
+    const pending = dangerPending;
+    setDangerBusy(true);
+    try {
+      switch (pending.kind) {
+        case "curve-recover":
+          setDangerPending(null);
+          await runCurveRecovery({ sweepEscrow: true });
+          break;
+        case "resume":
+          setDangerPending(null);
+          await runCurveRecovery({ sweepEscrow: false });
+          break;
+        case "pending-fee":
+          setDangerPending(null);
+          await executeSweepPendingFee(pending.row, pending.to);
+          break;
+        case "pending-fees-all":
+          setDangerPending(null);
+          await executeSweepAllPendingFees(pending.to);
+          break;
+        case "withdraw":
+          setDangerPending(null);
+          await executeWithdrawTreasuryBnb({ maxAvailable: pending.maxAvailable });
+          break;
+        case "airdrop-sweep":
+          setDangerPending(null);
+          executeAirdropSweep(pending.row);
+          break;
+        case "delete-promo":
+          setDangerPending(null);
+          await executeDeletePromoTask(pending.taskKey);
+          break;
+      }
+    } finally {
+      setDangerBusy(false);
+    }
+  }
+
+  const dangerModalProps = useMemo(() => {
+    if (!dangerPending) return null;
+    const dc = ADMIN_COPY.dangerConfirm;
+    switch (dangerPending.kind) {
+      case "curve-recover":
+        return {
+          title: dc.titles.curveRecover,
+          consequence: dc.consequences.curveRecover,
+          phrase: ADMIN_DANGER_PHRASES.curveRecover,
+          confirmLabel: ADMIN_COPY.treasury.curveRecovery.recoverAndResume,
+          details: (
+            <>
+              <p>
+                Amount{" "}
+                <span className="admin-num">
+                  {dangerPending.amount} {NATIVE_SYMBOL}
+                </span>
+              </p>
+              <p>
+                Recipient <span className="admin-num">{shortAddress(dangerPending.to)}</span>
+              </p>
+              {dangerPending.wipe ? <p>Also resets app database after recovery.</p> : null}
+            </>
+          ),
+        };
+      case "resume":
+        return {
+          title: dc.titles.resumeTrading,
+          consequence: dc.consequences.resumeTrading,
+          phrase: ADMIN_DANGER_PHRASES.resumeTrading,
+          confirmLabel: ADMIN_COPY.treasury.curveRecovery.resumeOnly,
+          details: dangerPending.wipe ? (
+            <p>Also resets app database after resume.</p>
+          ) : undefined,
+        };
+      case "pending-fee":
+        return {
+          title: dc.titles.pendingFee,
+          consequence: dc.consequences.pendingFee,
+          phrase: ADMIN_DANGER_PHRASES.pendingFee,
+          confirmLabel: ADMIN_COPY.treasury.pendingFees.sweep,
+          details: (
+            <>
+              <p>
+                Owner <span className="admin-num">{shortAddress(dangerPending.row.owner)}</span>
+              </p>
+              <p>Kind {dangerPending.row.kind}</p>
+              <p>
+                Amount{" "}
+                <span className="admin-num">
+                  {dangerPending.row.pendingSol} {NATIVE_SYMBOL}
+                </span>
+              </p>
+              <p>
+                Recipient <span className="admin-num">{shortAddress(dangerPending.to)}</span>
+              </p>
+            </>
+          ),
+        };
+      case "pending-fees-all":
+        return {
+          title: dc.titles.pendingFeesAll,
+          consequence: dc.consequences.pendingFeesAll,
+          phrase: ADMIN_DANGER_PHRASES.pendingFeesAll,
+          confirmLabel: ADMIN_COPY.treasury.pendingFees.sweepAll,
+          details: (
+            <>
+              <p>
+                Total{" "}
+                <span className="admin-num">
+                  {dangerPending.totalSol} {NATIVE_SYMBOL}
+                </span>{" "}
+                · {dangerPending.count} accounts
+              </p>
+              <p>
+                Recipient <span className="admin-num">{shortAddress(dangerPending.to)}</span>
+              </p>
+            </>
+          ),
+        };
+      case "withdraw":
+        return {
+          title: dc.titles.withdrawProtocol,
+          consequence: dc.consequences.withdrawProtocol,
+          phrase: ADMIN_DANGER_PHRASES.withdrawProtocol,
+          confirmLabel: ADMIN_COPY.actions.withdraw,
+          details: (
+            <>
+              <p>
+                Amount <span className="admin-num">{dangerPending.amountLabel}</span>
+              </p>
+              <p>
+                Recipient <span className="admin-num">{shortAddress(dangerPending.to)}</span>
+              </p>
+            </>
+          ),
+        };
+      case "airdrop-sweep":
+        return {
+          title: dc.titles.airdropSweep,
+          consequence: dc.consequences.airdropSweep,
+          phrase: ADMIN_DANGER_PHRASES.airdropSweep,
+          confirmLabel: ADMIN_COPY.actions.sweep,
+          details: (
+            <>
+              <p>
+                Campaign{" "}
+                <span className="admin-num">
+                  {dangerPending.row.title ?? dangerPending.row.linkedSymbol ?? `#${dangerPending.row.id}`}
+                </span>
+              </p>
+              <p>
+                Remaining{" "}
+                <span className="admin-num">{dangerPending.row.remainingBnb}</span>
+              </p>
+            </>
+          ),
+        };
+      case "delete-promo":
+        return {
+          title: dc.titles.deletePromo,
+          consequence: dc.consequences.deletePromo,
+          phrase: ADMIN_DANGER_PHRASES.deletePromo,
+          confirmLabel: ADMIN_COPY.actions.delete,
+          details: (
+            <p>
+              Campaign <span className="admin-num">{dangerPending.title}</span>
+            </p>
+          ),
+        };
+    }
+  }, [dangerPending]);
 
   const readySweeps = airdrops.filter((r) => r.canSweep);
   const treasuryBnb = isSolanaChainFamily
@@ -1080,6 +1319,22 @@ export function AdminPanel() {
         airdropAdmin={airdropAdmin ?? ADMIN_ADDRESS}
         onUpdated={() => void load()}
       />
+      {dangerModalProps ? (
+        <AdminDangerConfirmModal
+          open={Boolean(dangerPending)}
+          title={dangerModalProps.title}
+          consequence={dangerModalProps.consequence}
+          details={dangerModalProps.details}
+          phrase={dangerModalProps.phrase}
+          confirmLabel={dangerModalProps.confirmLabel}
+          busy={dangerBusy || curveRecoverBusy || adminTxPending}
+          onCancel={() => {
+            if (dangerBusy) return;
+            setDangerPending(null);
+          }}
+          onConfirm={() => void executeDangerConfirm()}
+        />
+      ) : null}
 
       <AdminLayout
         activeTab={activeTab}
@@ -1748,7 +2003,7 @@ export function AdminPanel() {
                 <AdminBtn
                   size="sm"
                   danger
-                  onClick={() => void onSweepAllPendingFees()}
+                  onClick={() => void requestSweepAllPendingFees()}
                   disabled={
                     adminTxPending ||
                     pendingFeesLoading ||
@@ -1832,7 +2087,7 @@ export function AdminPanel() {
                         <AdminBtn
                           size="sm"
                           danger
-                          onClick={() => void onSweepPendingFee(r)}
+                          onClick={() => void requestSweepPendingFee(r)}
                           disabled={adminTxPending || !withdrawTo.trim()}
                         >
                           {busy
@@ -2013,7 +2268,7 @@ export function AdminPanel() {
                   cell: (t) => (
                     <AdminBtn
                       size="sm"
-                      onClick={() => void onDeletePromoTask(t.taskKey, t.title)}
+                      onClick={() => void requestDeletePromoTask(t.taskKey, t.title)}
                       disabled={deletingKey === t.taskKey}
                     >
                       {deletingKey === t.taskKey

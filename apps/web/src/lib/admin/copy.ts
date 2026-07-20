@@ -47,6 +47,40 @@ export const ADMIN_COPY = {
     refreshList: "Refresh list",
   },
 
+  dangerConfirm: {
+    stepLabel: "Step {step} of {total}",
+    continue: "Continue",
+    back: "Back",
+    cancel: "Cancel",
+    working: "Working…",
+    typeLabel: "Type {phrase} to confirm",
+    titles: {
+      curveRecover: "Recover escrow",
+      resumeTrading: "Resume trading",
+      pendingFee: "Sweep pending fee",
+      pendingFeesAll: "Sweep all pending fees",
+      withdrawProtocol: "Withdraw protocol fees",
+      airdropSweep: "Recover airdrop escrow",
+      deletePromo: "Remove campaign",
+    },
+    consequences: {
+      curveRecover:
+        "Drains withdrawable liquidity to the recipient, then clears the trading halt. This cannot be undone.",
+      resumeTrading:
+        "Clears the global emergency halt so buys and sells work again. Does not move funds.",
+      pendingFee:
+        "Moves this owner’s unclaimed fees from the liquidity vault to the recipient. The owner can no longer claim.",
+      pendingFeesAll:
+        "Sweeps every pending creator/referrer fee PDA to the recipient. Owners can no longer claim.",
+      withdrawProtocol:
+        "Sends protocol-treasury SOL to the recipient. Keep rent on the PDA; this cannot be reversed on-chain.",
+      airdropSweep:
+        "Sweeps remaining airdrop escrow to the campaign owner / recovery path. Irreversible once confirmed.",
+      deletePromo:
+        "Removes this promo task from Rewards. Users keep points already earned.",
+    },
+  },
+
   pages: {
     dashboard: {
       title: "Dashboard",
