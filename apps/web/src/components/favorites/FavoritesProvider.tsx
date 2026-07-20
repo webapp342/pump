@@ -20,6 +20,7 @@ import {
 } from "@/lib/local-first/user-local-store";
 import { useOpenConnectModal } from "@/hooks/useOpenConnectModal";
 import { useActiveWalletAddress } from "@/hooks/useActiveWalletAddress";
+import { addressCacheKey } from "@/lib/address";
 
 type FavoritesContextValue = {
   favorites: Set<string>;
@@ -33,7 +34,7 @@ type FavoritesContextValue = {
 const FavoritesContext = createContext<FavoritesContextValue | null>(null);
 
 function normalizeFavoriteKey(tokenAddress: string): string {
-  return tokenAddress.toLowerCase();
+  return addressCacheKey(tokenAddress) ?? tokenAddress.trim();
 }
 
 function tokensMapFromList(tokens: TokenListItem[]): Map<string, TokenListItem> {

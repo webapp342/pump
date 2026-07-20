@@ -19,8 +19,11 @@ export const SOLANA_WALLET_RENT_EXEMPT_LAMPORTS = 890_880n;
 /** Referrer binding PDA rent (matches on-chain set_referrer CreateAccount). */
 export const SOLANA_REFERRER_BINDING_RENT_LAMPORTS = 1_500_000n;
 
-/** Pending creator/referrer fees PDA rent (matches programs PENDING_FEES_RENT_LAMPORTS). */
-export const SOLANA_PENDING_FEES_RENT_LAMPORTS = 1_200_000n;
+/**
+ * Pending creator/referrer fees PDA funding.
+ * 48-byte network minimum is 1_224_960 lamports; program funds 1_300_000.
+ */
+export const SOLANA_PENDING_FEES_RENT_LAMPORTS = 1_300_000n;
 
 /**
  * Slack for fee schedule drift between getFeeForMessage and the signed tx.

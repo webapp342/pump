@@ -7,6 +7,7 @@ import { PumpIcon, faArrowDown, faArrowUp, faClock, faExternalLink, faWellness }
 import { UserAvatarForAddress } from "@/components/user/UserAvatarForAddress";
 import { PctChange } from "@/components/ui/PctChange";
 import { ACTIVITY_PAGE_SIZE } from "@/lib/activity-page-size";
+import { normalizeRouteAddressKey } from "@/lib/address";
 import { PumpSubscriptPrice } from "@/components/ui/PumpSubscriptPrice";
 import { formatAge, formatArenaQuoteUsd } from "@/lib/arena-board-format";
 import {
@@ -204,10 +205,10 @@ function mapApiHoldersToRows(holders: TokenHolderSnapshot[]): HolderRow[] {
 function mergeHolderRows(existing: HolderRow[], incoming: HolderRow[]): HolderRow[] {
   const byAddress = new Map<string, HolderRow>();
   for (const row of existing) {
-    byAddress.set(row.address.toLowerCase(), row);
+    byAddress.set(normalizeRouteAddressKey(row.address), row);
   }
   for (const row of incoming) {
-    byAddress.set(row.address.toLowerCase(), row);
+    byAddress.set(normalizeRouteAddressKey(row.address), row);
   }
   return [...byAddress.values()].sort((a, b) => b.netTokens - a.netTokens);
 }
@@ -428,9 +429,16 @@ export function TradeTape({
   }, [hasMoreTrades, loadingMoreTrades, tokenAddress, tradeOffset]);
 
   const fetchHoldersPage = useCallback(
-    async (offset: number, append: boolean) => {
+    async (offset: number, append: boolean, options?: { fresh?: boolean }) => {
+      const fresh = options?.fresh === true;
+      const qs = new URLSearchParams({
+        limit: String(ACTIVITY_PAGE_SIZE),
+        offset: String(offset),
+      });
+      // Bust in-memory API cache after trades — SSR refresh already bypasses it.
+      if (fresh) qs.set("fresh", "1");
       const response = await fetch(
-        `/api/tokens/${tokenAddress}/holders?limit=${ACTIVITY_PAGE_SIZE}&offset=${offset}`,
+        `/api/tokens/${tokenAddress}/holders?${qs.toString()}`,
         { cache: "no-store" }
       );
       const body = (await response.json()) as {
@@ -505,16 +513,23 @@ export function TradeTape({
   }, [fetchHoldersPage, initialHolders?.length, tokenAddress]);
 
   useEffect(() => {
-    if (tab !== "holders" || !wsConnected) return;
+    if (tab !== "holders") return;
+    // Immediate fresh pull when opening the tab (SSR snapshot can be stale vs live trades).
+    void fetchHoldersPage(0, false, { fresh: true });
+    if (!wsConnected) return;
     const timer = window.setInterval(() => {
-      void fetchHoldersPage(0, false);
-    }, 30_000);
+      void fetchHoldersPage(0, false, { fresh: true });
+    }, 15_000);
     return () => window.clearInterval(timer);
   }, [fetchHoldersPage, tab, tokenAddress, wsConnected]);
 
   useEffect(() => {
     if (holdersRefreshKey <= 0) return;
-    void fetchHoldersPage(0, false);
+    // Indexer writes positions before WS fan-out; still give a short settle window.
+    const timer = window.setTimeout(() => {
+      void fetchHoldersPage(0, false, { fresh: true });
+    }, 400);
+    return () => window.clearTimeout(timer);
   }, [fetchHoldersPage, holdersRefreshKey]);
 
   const tapeTabs = mobileStickyHead ? MOBILE_TAPE_TABS : DESKTOP_TAPE_TABS;

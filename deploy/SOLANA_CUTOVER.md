@@ -30,7 +30,10 @@ sudo systemctl stop pump-indexer pump-airdrop-keeper || true
 sudo systemctl disable pump-indexer pump-airdrop-keeper || true
 
 # 4) Optional: stop Alto bundler (Kernel not used on Solana)
-pm2 stop alto 2>/dev/null || true
+pm2 stop alto pump-alto 2>/dev/null || true
+
+# Or one-shot script:
+# bash deploy/vm/solana-cutover-cleanup.sh
 
 # 5) Re-run deploy or wait for next push
 ./deploy/tma-deploy.sh

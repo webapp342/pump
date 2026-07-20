@@ -198,7 +198,7 @@ Redis Pub/Sub → pump-realtime → Browser WS rooms → delta patches
 ## 5. Bilinçli olarak YAPILMAYACAKLAR (tek VM)
 
 - Kafka cluster — ops + latency; Redis Streams yeterli
-- ClickHouse / TimescaleDB — erken
+- ClickHouse / TimescaleDB as **primary** OLTP — erken; CH sadece history gate sonrası (hybrid)
 - RisingWave / Materialize — VM RAM
 - Client-only sayfalar — slogan ile çelişir
 - Her trade'de full MV refresh

@@ -1,3 +1,4 @@
+import { dbStorageAddress } from "@/lib/address";
 import { getLaunchpadReadPool, getLaunchpadWritePool } from "@/lib/db/pool";
 import {
   BONDING_TOKEN_SUPPLY_HUMAN,
@@ -63,7 +64,7 @@ function mapAnnouncement(
  */
 export async function fetchTokenMcapSnapshot(tokenAddress: string): Promise<SnapshotRow | null> {
   const db = getLaunchpadReadPool();
-  const token = tokenAddress.toLowerCase();
+  const token = dbStorageAddress(tokenAddress);
   const result = await db.query<SnapshotRow>(
     `
     SELECT
@@ -104,8 +105,8 @@ export async function createTokenAnnouncement(
   message?: string | null
 ): Promise<TokenAnnouncementRow> {
   const db = getLaunchpadWritePool();
-  const announcer = announcerAddress.toLowerCase();
-  const token = tokenAddress.toLowerCase();
+  const announcer = dbStorageAddress(announcerAddress);
+  const token = dbStorageAddress(tokenAddress);
   const note = sanitizeAnnounceMessage(message);
 
   const snapshot = await fetchTokenMcapSnapshot(token);
@@ -198,7 +199,7 @@ export async function listTokenAnnouncements(
   limit = 40
 ): Promise<TokenAnnouncementRow[]> {
   const db = getLaunchpadReadPool();
-  const token = tokenAddress.toLowerCase();
+  const token = dbStorageAddress(tokenAddress);
   const capped = Math.min(Math.max(limit, 1), 100);
 
   const result = await db.query<AnnouncementDbRow>(
@@ -219,12 +220,14 @@ export async function listTokenAnnouncements(
       address: row.announcer_address,
     }))
   );
-  const nameByAddress = new Map(named.map((n) => [n.address.toLowerCase(), n.displayUsername]));
+  const nameByAddress = new Map(
+    named.map((n) => [dbStorageAddress(n.address), n.displayUsername])
+  );
 
   return result.rows.map((row) => ({
     ...mapAnnouncement(row),
     announcerDisplayUsername:
-      nameByAddress.get(row.announcer_address) ??
+      nameByAddress.get(dbStorageAddress(row.announcer_address)) ??
       resolveDisplayUsername(row.announcer_address, null),
   }));
 }
@@ -234,7 +237,7 @@ export async function listAnnouncementsByUser(
   limit = 50
 ): Promise<PortfolioAnnouncementRow[]> {
   const db = getLaunchpadReadPool();
-  const announcer = announcerAddress.toLowerCase();
+  const announcer = dbStorageAddress(announcerAddress);
   const capped = Math.min(Math.max(limit, 1), 100);
 
   const result = await db.query<

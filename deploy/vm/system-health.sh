@@ -233,24 +233,30 @@ else
   append_check "pump_realtime" "Realtime (WS srv)" "down" "HTTP probe failed" "$probe" "pm2=$pm2_status dist=$dist_ok" "${http_ms:-0}" "$logs_json" "$timings_json"
 fi
 
-# --- Alto bundler (SCW create / trade — /api/bundler/rpc upstream) ---
-BUNDLER_RPC="${BUNDLER_RPC_URL:-http://127.0.0.1:4337/rpc}"
-probe="POST ${BUNDLER_RPC} eth_chainId"
-pm2_status="$(pm2_field pump-alto status)"
-logs_json="$(logs_to_json "$(pm2_logs pump-alto)")"
-listening="no"; port_listening 4337 && listening="yes"
-alto_started="$(now_ms_fn)"
-alto_out="$(curl -sf -X POST "$BUNDLER_RPC" \
-  -H 'content-type: application/json' \
-  -d '{"jsonrpc":"2.0","id":1,"method":"eth_chainId","params":[]}' 2>/dev/null || true)"
-alto_ms=$(( $(now_ms_fn) - alto_started ))
-timings_json="$(make_timings "{\"rpc\":${alto_ms}}")"
-if [[ -n "$alto_out" && "$alto_out" == *"result"* ]]; then
-  append_check "pump_alto" "Alto bundler" "healthy" "RPC OK · ${alto_ms}ms · port 4337" "$probe" "pm2=$pm2_status" "$alto_ms" "$logs_json" "$timings_json"
-elif [[ "$pm2_status" == "online" && "$listening" == "yes" ]]; then
-  append_check "pump_alto" "Alto bundler" "degraded" "PM2 online · RPC failed · ${alto_ms}ms" "$probe" "${alto_out:-no response}" "$alto_ms" "$logs_json" "$timings_json"
+# --- Alto bundler (EVM SCW only — skipped when CHAIN_FAMILY=solana) ---
+CHAIN_FAMILY="$(grep -E '^NEXT_PUBLIC_CHAIN_FAMILY=' "$APP_DIR/.env" 2>/dev/null | cut -d= -f2- | tr -d '"' | tr -d "'" || true)"
+CHAIN_FAMILY="${CHAIN_FAMILY:-$(grep -E '^CHAIN_FAMILY=' "$APP_DIR/.env" 2>/dev/null | cut -d= -f2- | tr -d '"' | tr -d "'" || true)}"
+if [[ "${CHAIN_FAMILY,,}" == "solana" ]]; then
+  append_check "pump_alto" "Alto bundler" "healthy" "skipped · Solana cutover (no ERC-4337)" "n/a" "CHAIN_FAMILY=solana" "0" "[]" "{}"
 else
-  append_check "pump_alto" "Alto bundler" "down" "SCW create/trade 502 until Alto runs" "$probe" "pm2=$pm2_status port4337=$listening" "$alto_ms" "$logs_json" "$timings_json"
+  BUNDLER_RPC="${BUNDLER_RPC_URL:-http://127.0.0.1:4337/rpc}"
+  probe="POST ${BUNDLER_RPC} eth_chainId"
+  pm2_status="$(pm2_field pump-alto status)"
+  logs_json="$(logs_to_json "$(pm2_logs pump-alto)")"
+  listening="no"; port_listening 4337 && listening="yes"
+  alto_started="$(now_ms_fn)"
+  alto_out="$(curl -sf -X POST "$BUNDLER_RPC" \
+    -H 'content-type: application/json' \
+    -d '{"jsonrpc":"2.0","id":1,"method":"eth_chainId","params":[]}' 2>/dev/null || true)"
+  alto_ms=$(( $(now_ms_fn) - alto_started ))
+  timings_json="$(make_timings "{\"rpc\":${alto_ms}}")"
+  if [[ -n "$alto_out" && "$alto_out" == *"result"* ]]; then
+    append_check "pump_alto" "Alto bundler" "healthy" "RPC OK · ${alto_ms}ms · port 4337" "$probe" "pm2=$pm2_status" "$alto_ms" "$logs_json" "$timings_json"
+  elif [[ "$pm2_status" == "online" && "$listening" == "yes" ]]; then
+    append_check "pump_alto" "Alto bundler" "degraded" "PM2 online · RPC failed · ${alto_ms}ms" "$probe" "${alto_out:-no response}" "$alto_ms" "$logs_json" "$timings_json"
+  else
+    append_check "pump_alto" "Alto bundler" "down" "SCW create/trade 502 until Alto runs" "$probe" "pm2=$pm2_status port4337=$listening" "$alto_ms" "$logs_json" "$timings_json"
+  fi
 fi
 
 # --- WebSocket (realtime backend — direct; nginx /ws proxies here) ---
@@ -271,30 +277,34 @@ else
   append_check "websocket" "WebSocket (realtime)" "down" "Smoke test failed · ${ws_ms}ms" "$probe" "$(echo "$ws_out" | tail -3 | tr '\n' ' ')" "$ws_ms" "$logs_json" "$timings_json"
 fi
 
-# --- Indexer ---
-probe="systemctl + indexer_state query"
-logs_json="$(logs_to_json "$(service_logs pump-indexer)")"
-idx_started="$(now_ms_fn)"
-idx_active="$(systemctl is-active pump-indexer 2>/dev/null || echo inactive)"
-systemctl_ms=$(( $(now_ms_fn) - idx_started ))
-query_started="$(now_ms_fn)"
-indexer_info="$(sudo -u postgres psql -d pump_db -tAc "SELECT key, last_block_number, EXTRACT(EPOCH FROM (now()-updated_at))::int FROM indexer_state ORDER BY updated_at DESC LIMIT 1" 2>/dev/null | tr '|' ' ' || true)"
-indexer_mode="$(journalctl -u pump-indexer -n 80 --no-pager 2>/dev/null | grep 'launchpad indexer ready' | tail -1 | sed -n 's/.*mode=\([^,]*\).*/\1/p' || true)"
-indexer_detail="${indexer_info}${indexer_mode:+ · mode=${indexer_mode}}"
-query_ms=$(( $(now_ms_fn) - query_started ))
-timings_json="$(make_timings "{\"systemctl\":${systemctl_ms},\"dbQuery\":${query_ms}}")"
-if [[ "$idx_active" == "active" ]]; then
-  age="$(echo "$indexer_info" | awk '{print $NF}')"
-  status="healthy"; summary="active · db query ${query_ms}ms${indexer_mode:+ · ${indexer_mode}}"
-  if [[ -n "$age" && "$age" -gt 600 ]]; then status="down"; summary="stale ${age}s · db ${query_ms}ms"; fi
-  if [[ -n "$age" && "$age" -gt 180 && "$age" -le 600 ]]; then status="degraded"; summary="slow ${age}s · db ${query_ms}ms"; fi
-  if [[ -z "$indexer_mode" ]]; then
-    status="degraded"
-    summary="active · missing mode= in log (run indexer-deploy)"
-  fi
-  append_check "pump_indexer" "Indexer" "$status" "$summary" "$probe" "$indexer_detail" "$query_ms" "$logs_json" "$timings_json"
+# --- Indexer (EVM) ---
+if [[ "${CHAIN_FAMILY,,}" == "solana" ]]; then
+  append_check "pump_indexer" "Indexer (EVM)" "healthy" "skipped · Solana cutover" "n/a" "CHAIN_FAMILY=solana" "0" "[]" "{}"
 else
-  append_check "pump_indexer" "Indexer" "down" "systemd=$idx_active" "$probe" "$indexer_info" "$query_ms" "$logs_json" "$timings_json"
+  probe="systemctl + indexer_state query"
+  logs_json="$(logs_to_json "$(service_logs pump-indexer)")"
+  idx_started="$(now_ms_fn)"
+  idx_active="$(systemctl is-active pump-indexer 2>/dev/null || echo inactive)"
+  systemctl_ms=$(( $(now_ms_fn) - idx_started ))
+  query_started="$(now_ms_fn)"
+  indexer_info="$(sudo -u postgres psql -d pump_db -tAc "SELECT key, last_block_number, EXTRACT(EPOCH FROM (now()-updated_at))::int FROM indexer_state ORDER BY updated_at DESC LIMIT 1" 2>/dev/null | tr '|' ' ' || true)"
+  indexer_mode="$(journalctl -u pump-indexer -n 80 --no-pager 2>/dev/null | grep 'launchpad indexer ready' | tail -1 | sed -n 's/.*mode=\([^,]*\).*/\1/p' || true)"
+  indexer_detail="${indexer_info}${indexer_mode:+ · mode=${indexer_mode}}"
+  query_ms=$(( $(now_ms_fn) - query_started ))
+  timings_json="$(make_timings "{\"systemctl\":${systemctl_ms},\"dbQuery\":${query_ms}}")"
+  if [[ "$idx_active" == "active" ]]; then
+    age="$(echo "$indexer_info" | awk '{print $NF}')"
+    status="healthy"; summary="active · db query ${query_ms}ms${indexer_mode:+ · ${indexer_mode}}"
+    if [[ -n "$age" && "$age" -gt 600 ]]; then status="down"; summary="stale ${age}s · db ${query_ms}ms"; fi
+    if [[ -n "$age" && "$age" -gt 180 && "$age" -le 600 ]]; then status="degraded"; summary="slow ${age}s · db ${query_ms}ms"; fi
+    if [[ -z "$indexer_mode" ]]; then
+      status="degraded"
+      summary="active · missing mode= in log (run indexer-deploy)"
+    fi
+    append_check "pump_indexer" "Indexer" "$status" "$summary" "$probe" "$indexer_detail" "$query_ms" "$logs_json" "$timings_json"
+  else
+    append_check "pump_indexer" "Indexer" "down" "systemd=$idx_active" "$probe" "$indexer_info" "$query_ms" "$logs_json" "$timings_json"
+  fi
 fi
 
 # --- Solana indexer (production) ---
@@ -313,21 +323,27 @@ if [[ "$idx_sol_active" == "active" ]]; then
   if [[ -n "$age" && "$age" -gt 600 ]]; then status="down"; summary="stale ${age}s · db ${query_ms}ms"; fi
   if [[ -n "$age" && "$age" -gt 180 && "$age" -le 600 ]]; then status="degraded"; summary="slow ${age}s · db ${query_ms}ms"; fi
   append_check "pump_indexer_sol" "Indexer (Solana)" "$status" "$summary" "$probe" "${indexer_sol_info:-n/a}" "$query_ms" "$logs_json" "$timings_json"
+elif [[ "${CHAIN_FAMILY,,}" == "solana" ]]; then
+  append_check "pump_indexer_sol" "Indexer (Solana)" "down" "systemd=$idx_sol_active · required on Solana" "$probe" "${indexer_sol_info:-n/a}" "$query_ms" "$logs_json" "$timings_json"
 else
-  append_check "pump_indexer_sol" "Indexer (Solana)" "down" "systemd=$idx_sol_active" "$probe" "${indexer_sol_info:-n/a}" "$query_ms" "$logs_json" "$timings_json"
+  append_check "pump_indexer_sol" "Indexer (Solana)" "healthy" "skipped · EVM chain" "$probe" "${indexer_sol_info:-n/a}" "$query_ms" "$logs_json" "$timings_json"
 fi
 
 # --- Airdrop keeper ---
-probe="systemctl is-active pump-airdrop-keeper"
-logs_json="$(logs_to_json "$(service_logs pump-airdrop-keeper)")"
-keeper_started="$(now_ms_fn)"
-keeper_active="$(systemctl is-active pump-airdrop-keeper 2>/dev/null || echo inactive)"
-keeper_ms=$(( $(now_ms_fn) - keeper_started ))
-timings_json="$(make_timings "{\"systemctl\":${keeper_ms}}")"
-if [[ "$keeper_active" == "active" ]]; then
-  append_check "pump_airdrop_keeper" "Airdrop keeper" "healthy" "active · ${keeper_ms}ms" "$probe" "" "$keeper_ms" "$logs_json" "$timings_json"
+if [[ "${CHAIN_FAMILY,,}" == "solana" ]]; then
+  append_check "pump_airdrop_keeper" "Airdrop keeper" "healthy" "skipped · Solana cutover" "n/a" "CHAIN_FAMILY=solana" "0" "[]" "{}"
 else
-  append_check "pump_airdrop_keeper" "Airdrop keeper" "down" "systemd=$keeper_active · ${keeper_ms}ms" "$probe" "" "$keeper_ms" "$logs_json" "$timings_json"
+  probe="systemctl is-active pump-airdrop-keeper"
+  logs_json="$(logs_to_json "$(service_logs pump-airdrop-keeper)")"
+  keeper_started="$(now_ms_fn)"
+  keeper_active="$(systemctl is-active pump-airdrop-keeper 2>/dev/null || echo inactive)"
+  keeper_ms=$(( $(now_ms_fn) - keeper_started ))
+  timings_json="$(make_timings "{\"systemctl\":${keeper_ms}}")"
+  if [[ "$keeper_active" == "active" ]]; then
+    append_check "pump_airdrop_keeper" "Airdrop keeper" "healthy" "active · ${keeper_ms}ms" "$probe" "" "$keeper_ms" "$logs_json" "$timings_json"
+  else
+    append_check "pump_airdrop_keeper" "Airdrop keeper" "down" "systemd=$keeper_active · ${keeper_ms}ms" "$probe" "" "$keeper_ms" "$logs_json" "$timings_json"
+  fi
 fi
 
 # --- Static assets ---

@@ -1,0 +1,43 @@
+# Self-hosted ClickHouse (OLAP) — chart/trade history only.
+# PG remains source of truth for positions, wallets, auth.
+#
+# Enable dual-write in indexer-sol .env:
+#   CLICKHOUSE_URL=http://127.0.0.1:8123
+#   CLICKHOUSE_DUAL_WRITE=true
+#   CLICKHOUSE_DATABASE=pump
+#
+# Default: do NOT start on small VMs until chart P95 / table size gate trips.
+#   docker compose -f deploy/clickhouse/docker-compose.yml up -d
+#   docker compose -f deploy/clickhouse/docker-compose.yml exec clickhouse clickhouse-client --queries-file /docker-entrypoint-initdb.d/01_schema.sql
+
+services:
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.12
+    container_name: pump-clickhouse
+    restart: unless-stopped
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    environment:
+      CLICKHOUSE_DB: pump
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: ""
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
+    volumes:
+      - pump_clickhouse_data:/var/lib/clickhouse
+      - ./init:/docker-entrypoint-initdb.d:ro
+      - ./config/memory.xml:/etc/clickhouse-server/config.d/memory.xml:ro
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    mem_limit: 2g
+    cpus: "2.0"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8123/ping"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pump_clickhouse_data:

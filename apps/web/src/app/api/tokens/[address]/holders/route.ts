@@ -9,7 +9,12 @@ import {
 } from "@/lib/db/launchpad";
 import { isSolanaChainFamily } from "@/config/chain-family";
 import { fetchOnChainTokenBalancesForHolders } from "@/lib/portfolio-onchain";
-import { getHoldersCache, holdersCacheKey, setHoldersCache } from "@/lib/holders-cache";
+import {
+  getHoldersCache,
+  holdersCacheKey,
+  invalidateHoldersCache,
+  setHoldersCache,
+} from "@/lib/holders-cache";
 
 type RouteContext = { params: Promise<{ address: string }> };
 
@@ -47,10 +52,17 @@ export async function GET(request: NextRequest, context: RouteContext) {
 
   const limit = parseLimit(request.nextUrl.searchParams.get("limit"));
   const offset = parseOffset(request.nextUrl.searchParams.get("offset"));
+  const fresh =
+    request.nextUrl.searchParams.get("fresh") === "1" ||
+    request.nextUrl.searchParams.get("fresh") === "true";
 
   try {
+    if (fresh) {
+      invalidateHoldersCache(tokenAddress);
+    }
+
     const cacheKey = holdersCacheKey(tokenAddress, limit, offset);
-    const cached = getHoldersCache<HolderResponse>(cacheKey);
+    const cached = fresh ? null : getHoldersCache<HolderResponse>(cacheKey);
     if (cached) {
       const total = await countTokenHolders(tokenAddress);
       return NextResponse.json(
@@ -63,7 +75,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
             hasMore: offset + cached.length < total,
           },
         },
-        { headers: { "Cache-Control": "private, max-age=15" } }
+        { headers: { "Cache-Control": "private, max-age=5" } }
       );
     }
 
@@ -109,7 +121,11 @@ export async function GET(request: NextRequest, context: RouteContext) {
           hasMore: offset + data.length < total,
         },
       },
-      { headers: { "Cache-Control": "private, max-age=15" } }
+      {
+        headers: {
+          "Cache-Control": fresh ? "no-store" : "private, max-age=5",
+        },
+      }
     );
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";

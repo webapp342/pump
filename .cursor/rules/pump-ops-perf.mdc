@@ -23,3 +23,12 @@ Update `docs/perf-baseline.md` after running `deploy/vm/system-health.sh` and `p
 - Zero → favorites/portfolio/cross-device slow
 - Edge WS → concurrent WS > 2000 or WS P95 > 100 ms
 - PG 18 pg_trickle → CPU > 70% driven by MV refresh
+- ClickHouse OLAP → chart/trades history P95 degraded (PG stays positions SoT)
+
+## Solana cutover (VM)
+
+```bash
+bash /var/www/pump/tma/deploy/vm/solana-cutover-cleanup.sh
+```
+
+Stops EVM indexer + Alto; enables `pump-indexer-sol`. Health skips Alto/EVM when `CHAIN_FAMILY=solana`.

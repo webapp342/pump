@@ -38,6 +38,10 @@ Not pump.fun fee recipients — **our** Base EVM model:
 | Referrer share | **1000 bps of fee** | Accrues pending when binding exists |
 | Protocol | Remainder of fee | → protocol treasury |
 
+Pending fee PDAs are funded with **1,300,000 lamports**. The 48-byte
+rent-exempt minimum is currently 1,224,960 lamports; funding below it makes
+non-dust trades fail at runtime when the first claimable fee is accrued.
+
 ## Network costs (not platform fees)
 
 | Action | Typical cost | Notes |

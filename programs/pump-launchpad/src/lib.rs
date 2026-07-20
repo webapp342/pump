@@ -67,7 +67,9 @@ const LIQUIDITY_RENT_LAMPORTS: u64 = 890_880;
 const PROTOCOL_TREASURY_RENT_LAMPORTS: u64 = 890_880;
 const GLOBAL_RENT_LAMPORTS: u64 = 2_600_000;
 const CURVE_RENT_LAMPORTS: u64 = 1_948_800;
-const PENDING_FEES_RENT_LAMPORTS: u64 = 1_200_000;
+// 48-byte PendingFees rent minimum is 1_224_960 lamports on Solana.
+// Keep a small buffer so newly created fee PDAs are always rent-exempt.
+const PENDING_FEES_RENT_LAMPORTS: u64 = 1_300_000;
 
 #[repr(C)]
 #[derive(Clone, Copy, Pod, Zeroable)]

@@ -16,30 +16,30 @@
 | **3** PgBouncer, PM2 2×2, read URL, watchBlocks | ✅ VM’de aktif | |
 | **4** Bonding machine + local-first | ✅ kod | Zero / Edge / PG18 → **ertelendi** |
 
-**Şu an faz:** Post-Tier 4 — ölçüm disiplini + UX cilası. Büyük infra (Zero, Edge WS, PG 18) **gerekli değil** (VM metrikleri aşağıda).
+**Şu an faz:** Solana cutover + P/L ledger tutarlılığı. Büyük infra (Zero, Edge WS, PG 18) **SLO kapısı olmadan açılmaz**. ClickHouse = opsiyonel OLAP (kapalı default).
 
 ---
 
-## Son VM snapshot — 2026-06-18
+## Solana cutover (VM)
 
-`bash deploy/vm/system-health.sh` + dış API probu.
+```bash
+bash /var/www/pump/tma/deploy/vm/solana-cutover-cleanup.sh
+# stops/disables pump-indexer + pump-airdrop-keeper; removes Alto from PM2;
+# enables pump-indexer-sol
+```
 
-| Metrik | Değer | SLO hedefi | Durum |
-|--------|-------|------------|--------|
-| CPU (8 core) | ~1% | — | ✅ |
-| RAM | ~14% kullanım | — | ✅ |
-| Disk `/` | ~7% | — | ✅ |
-| `/api/health` (public) | ~2.2 ms | — | ✅ |
-| `/api/tokens` (public) | ~2.1 ms | P95 < 80 ms | ✅ |
-| TMA local health | 7 ms | — | ✅ |
-| PostgreSQL SELECT 1 | 66 ms | — | ✅ |
-| WS smoke (1 conn) | 14 ms | P95 < 50 ms | ✅ |
-| PG aktif bağlantı | 13 | — | ✅ |
-| PM2 | 2× pump-tma + 2× pump-realtime | Tier 3 | ✅ |
-| PgBouncer | active `:6432` | Tier 3 | ✅ |
-| Indexer | `watchBlocks(wss://…)` · bloklar canlı | — | ✅ |
+Health: `system-health.sh` skips Alto / EVM indexer / airdrop keeper when `NEXT_PUBLIC_CHAIN_FAMILY=solana`.
 
-**system-health `overall: degraded` uyarısı:** Indexer log parse (`mode=` satırı) — indexer gerçekte sağlıklı. `journalctl -u pump-indexer -n 5` ile doğrula.
+**P/L / cost basis (indexer-sol):**
+
+```bash
+cd /var/www/pump/tma
+npm run backfill-cost-basis -w @pump/indexer-sol
+npm run check-position-invariants -w @pump/indexer-sol
+npm run check-chart-parity -w @pump/indexer-sol
+```
+
+**ClickHouse (self-hosted, off by default):** [`deploy/clickhouse/README.md`](../deploy/clickhouse/README.md) — enable only when chart history P95 / table growth gate trips. Positions stay in PostgreSQL.
 
 ### Açık env flag’leri (doğrulandı)
 
@@ -51,20 +51,15 @@
 - `USE_MV_TOKEN_STATS`
 - `PGBOUNCER_ENABLED=true`
 - `LAUNCHPAD_DATABASE_READ_URL`
+- `NEXT_PUBLIC_CHAIN_FAMILY=solana` *(prod cutover)*
 
-**Indexer** (`/var/www/pump/Indexer/.env`):
+**Indexer Solana** (`apps/indexer-sol/.env`):
 
 - `INCREMENTAL_BOARD_STATS=true`
-- `INDEXER_USE_WS_BLOCKS=true`
 - `REDIS_PUBLISH_ENABLED`
-- `MV_REFRESH_ENABLED=true` *(CPU düşükken OK; %50+ olunca gözden geçir)*
+- `CLICKHOUSE_DUAL_WRITE` — leave unset/false until CH gate
 
-**Bundler (Alto, VM):**
-
-- `BUNDLER_RPC_URL=http://127.0.0.1:4337/rpc` — no `PIMLICO_API_KEY`
-- `BUNDLER_CHAIN_RPC_URL` — paid Alchemy/PAYG on VM only (not dataseed)
-- Health: `bash deploy/bundler/alto/health.sh`
-- Docs: `.cursor/docs/self-hosted-bundler-2026.md`
+**Bundler (Alto):** Solana’da **kullanılmaz** — `solana-cutover-cleanup.sh` ile PM2’den kaldır. EVM rollback için unit/docs duruyor.
 
 **Admin console (MetaMask, `/admin/`):**
 
@@ -91,9 +86,9 @@ ssh -p 22022 root@104.207.64.115 \
 # 3) Dışarıdan API (Windows)
 curl.exe -w "tokens_ms=%{time_total}\n" -o NUL "http://104.207.64.115/api/tokens?limit=50&filter=new"
 
-# 4) Indexer canlı mı
+# 4) Indexer canlı mı (Solana)
 ssh -p 22022 root@104.207.64.115 \
-  "journalctl -u pump-indexer -n 5 --no-pager"
+  "journalctl -u pump-indexer-sol -n 5 --no-pager"
 ```
 
 **UI:** Admin cüzdan → **System Health** (`/api/admin/system-health`).
@@ -123,6 +118,9 @@ VM 2026-06-18 ölçümüne göre **hiçbiri acil değil**:
 | **A) Rocicorp Zero** | Favorites/portfolio/cross-device sync yavaş | API ~2 ms · local-first kodda → ⏸️ |
 | **B) Edge WS** | WS > 2000 veya global WS P95 > 100 ms | WS 14 ms · CPU %1 → ⏸️ |
 | **C) PG 18 + pg_trickle** | MV refresh CPU yiyor | CPU %1 · incremental stats açık → ⏸️ |
+| **D) ClickHouse OLAP** | Chart history / trades scan P95 bozulunca | Compose hazır · dual-write off → ⏸️ |
+
+**Kilitli hybrid:** PostgreSQL = OLTP (positions, wallets, auth). ClickHouse = yalnızca trades/OHLCV history. Tüm DB’yi CH’ye taşımak yok.
 
 Karar vermeden önce bu dosyadaki SLO tablosuna bak.
 
@@ -140,6 +138,7 @@ Karar vermeden önce bu dosyadaki SLO tablosuna bak.
 
 | Tarih | Not |
 |-------|-----|
+| 2026-07-20 | Solana P/L cost-basis USD parity; Alto/EVM health skip; CH compose scaffold (dual-write off). |
 | 2026-06-18 | İlk playbook snapshot. Tier 3 VM doğrulandı. Adım 3 ertelendi. Deploy fix `7dc6be5` (airdrops prerender). |
 
 ---

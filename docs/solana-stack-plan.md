@@ -6,13 +6,13 @@ After local toolchain install (WSL: Solana CLI + Anchor). What is left to reach 
 
 | Layer | Status |
 |-------|--------|
-| PostgreSQL | Prod + migrations; `solana_wallets` AES encryption |
+| PostgreSQL | Prod + migrations; `solana_wallets` AES encryption; **positions SoT** |
 | Self-hosted Ed25519 wallet | API + deposit/withdraw UI |
-| Anchor programs | `pump-factory` / `pump-curve` / `pump-treasury` (source) |
-| Redis + WS | EVM path via `apps/realtime` |
-| Go | Installed on host (`go1.25`) — unused for Solana yet |
-| Docker | Available for ClickHouse / RPC sidecars |
-| Node indexer-sol | Decode + core PG writes (RPC `onLogs`) |
+| Pinocchio / Anchor programs | `programs/pump-launchpad` (feel parity) |
+| Redis + WS | `apps/realtime` shared with Solana publish |
+| Go | Host `go1.25` — Yellowstone consumer later |
+| Docker ClickHouse | Compose + schema scaffold; dual-write **off** |
+| Node indexer-sol | Decode + PG writes + USD cost basis + optional CH HTTP insert |
 
 ## Install gate (local / WSL) — status 2026-07-19
 
@@ -53,12 +53,28 @@ cd /mnt/c/Users/DARK/Desktop/pump-tma/programs && anchor deploy
 2. Reuse `apps/realtime` channels (or `solana:*` prefix)
 3. Target: board price + callout push &lt;1ms after Redis write
 
-### D — Analytics (ClickHouse)
+### D — Analytics (ClickHouse) — scaffold ready, gate closed
 
-1. Docker Compose: ClickHouse (+ optional Keep)
-2. Schema: trades, OHLCV rolls (1s/1m/…)
-3. Dual-write from Go indexer: PG (source of truth for wallets/positions) + CH (history/charts)
-4. Chart API reads CH; TradingView-style endpoints
+**Locked decision (2026-07-20):** Hybrid only.
+
+| Store | Owns |
+|-------|------|
+| PostgreSQL | wallets, `user_positions` (frozen USD cost basis), favorites, auth, claims |
+| Redis + WS | hot board / portfolio deltas |
+| ClickHouse (optional) | `trades_raw` + candle MVs for history scale |
+
+1. Compose: [`deploy/clickhouse/docker-compose.yml`](../deploy/clickhouse/docker-compose.yml) (mem_limit 2g)
+2. Schema: [`deploy/clickhouse/init/01_schema.sql`](../deploy/clickhouse/init/01_schema.sql)
+3. Dual-write: `apps/indexer-sol` → `enqueueTradeClickHouse` when `CLICKHOUSE_DUAL_WRITE=true`
+4. Chart API → CH only after gate; live buckets stay Redis/PG
+
+**Do not** move positions into ClickHouse.
+
+### Cost-basis / chart parity (indexer-sol)
+
+- Trade-time SOL/USD via Binance/CoinGecko cache → `trades.native_usd_rate` + `remaining_cost_basis_usd`
+- Candles write `close_usd` / `native_usd_rate` (spot OHLC)
+- Ops: `npm run backfill-cost-basis|check-position-invariants|check-chart-parity -w @pump/indexer-sol`
 
 ### E — Signing (decision fork)
 

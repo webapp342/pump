@@ -13,7 +13,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createPublicClient, http, parseUnits, type Address } from "viem";
-import { useReadContract, useAccount } from "wagmi";
+import { useReadContract } from "wagmi";
+import { useActiveWalletAddress } from "@/hooks/useActiveWalletAddress";
 import type { TokenHolderSnapshot, TokenDetail, TradeItem } from "@/lib/db/launchpad";
 import {
   bondingCurveManagerAbi,
@@ -293,7 +294,7 @@ export function TokenDetailLive({
   const tradePrefillCapturedRef = useRef(false);
   const searchParams = useSearchParams();
   const router = useRouter();
-  const { address, isConnected } = useAccount();
+  const { address, isConnected } = useActiveWalletAddress();
   const { solanaAddress } = usePumpWallet();
   const isSolanaLive = isSolanaChainFamily;
 
@@ -704,9 +705,9 @@ export function TokenDetailLive({
         missionKeys: [MISSION_KEYS.dailySwap],
       });
 
-      if (address) {
+      if (address && !isSolanaLive) {
         scheduleTradeWalletBalanceRefresh(queryClient, {
-          address,
+          address: address as Address,
           tokenAddress: streamAddress as Address,
         });
       }
@@ -714,7 +715,7 @@ export function TokenDetailLive({
       await applyOptimisticFromReceipt(payload);
       void fetchLive();
     },
-    [address, applyOptimisticFromReceipt, fetchLive, queryClient, streamAddress]
+    [address, applyOptimisticFromReceipt, fetchLive, isSolanaLive, queryClient, streamAddress]
   );
 
   useEffect(() => {

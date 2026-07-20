@@ -8,6 +8,9 @@ import {
   readBoardStatsForPublish,
 } from "./board-stats.js";
 import { upsertCandlesAfterTrade } from "./candles.js";
+import { enqueueTradeClickHouse } from "./clickhouse.js";
+import { fetchIndexerNativeUsdRate } from "./native-usd.js";
+import { applyTradeToPositionCost } from "./position-cost.js";
 import { publishTrade, publishWalletTrade } from "./redis-publish.js";
 import {
   asBigInt,
@@ -244,6 +247,19 @@ export class SolanaEventHandlers {
     const tradeEventId = eventId(event.signature, event.logIndex);
     const blockTime = new Date();
     const mcap = marketCapSolFromSpot(markPrice);
+    const nativeUsdRate = await fetchIndexerNativeUsdRate();
+    const nativeUsdRateValue =
+      nativeUsdRate != null && nativeUsdRate > 0 ? nativeUsdRate : null;
+
+    const priorSpotRow = await this.context.launchpadPool.query<{
+      last_price_zug: string | null;
+    }>(
+      `SELECT last_price_zug::text FROM bonding_states WHERE token_address = $1`,
+      [mint]
+    );
+    const priorSpot = Number(priorSpotRow.rows[0]?.last_price_zug ?? 0);
+    const spotBefore =
+      Number.isFinite(priorSpot) && priorSpot > 0 ? priorSpot : Number(markPrice);
 
     const inserted = await withTransaction(
       this.context.launchpadPool,
@@ -289,7 +305,7 @@ export class SolanaEventHandlers {
             event.logIndex,
             String(event.slot),
             blockTime,
-            null,
+            nativeUsdRateValue,
           ]
         );
 
@@ -325,7 +341,8 @@ export class SolanaEventHandlers {
           solAmount,
           feeLamports,
           tokenAmount,
-          decimals
+          decimals,
+          nativeUsdRateValue
         );
 
         const bonding = await client.query<{
@@ -359,7 +376,6 @@ export class SolanaEventHandlers {
         const feeSol = Number(lamportsToSol(feeLamports));
         const tradeNetZug = String(Math.max(0, grossSol - feeSol));
         const spotNum = Number(markPrice);
-        const spotBefore = spotNum > 0 ? spotNum * 0.999 : spotNum;
 
         await upsertBoardStatsAfterTrade(client, {
           tokenAddress: mint,
@@ -383,13 +399,31 @@ export class SolanaEventHandlers {
           spotAfter: spotNum,
           volumeZug: Math.max(0, grossSol - feeSol),
           buyVolumeZug: isBuy ? Math.max(0, grossSol - feeSol) : 0,
+          nativeUsdRate: nativeUsdRateValue,
         });
 
-        return { tradeId, bonding: b, candleUpdates };
+        return { tradeId, bonding: b, candleUpdates, nativeUsdRate: nativeUsdRateValue };
       }
     );
 
     if (inserted) {
+      enqueueTradeClickHouse({
+        event_id: tradeEventId,
+        token_address: mint,
+        trader_address: trader,
+        side,
+        sol_amount: Number(lamportsToSol(solAmount)),
+        token_amount: Number(tokenAmountToDecimal(tokenAmount, decimals)),
+        price_sol: Number(executionPrice),
+        spot_price_sol: Number(markPrice),
+        fee_sol: Number(lamportsToSol(feeLamports)),
+        tx_hash: event.signature,
+        log_index: event.logIndex,
+        slot: Number(event.slot),
+        block_time: blockTime,
+        native_usd_rate: inserted.nativeUsdRate,
+      });
+
       const boardExtra = await readBoardStatsForPublish(
         this.context.launchpadPool,
         mint
@@ -409,6 +443,10 @@ export class SolanaEventHandlers {
           txHash: event.signature,
           logIndex: event.logIndex,
           blockTime: blockTime.toISOString(),
+          nativeUsdRate:
+            inserted.nativeUsdRate != null && inserted.nativeUsdRate > 0
+              ? String(inserted.nativeUsdRate)
+              : undefined,
         },
         bonding: {
           reserveZug: inserted.bonding.reserve_zug,
@@ -575,12 +613,12 @@ export class SolanaEventHandlers {
     solAmount: bigint,
     feeLamports: bigint,
     tokenAmount: bigint,
-    decimals: number
+    decimals: number,
+    nativeUsdRate: number | null
   ): Promise<void> {
-    const sol = Number(lamportsToSol(solAmount));
+    const grossSol = Number(lamportsToSol(solAmount));
     const fee = Number(lamportsToSol(feeLamports));
     const tokens = Number(tokenAmountToDecimal(tokenAmount, decimals));
-    const netSol = Math.max(0, sol - fee);
 
     const existing = await client.query<{
       token_balance: string;
@@ -588,6 +626,8 @@ export class SolanaEventHandlers {
       total_sold_zug: string;
       remaining_cost_basis_zug: string;
       realized_pnl_zug: string;
+      remaining_cost_basis_usd: string;
+      realized_pnl_usd: string;
     }>(
       `
         SELECT
@@ -595,7 +635,9 @@ export class SolanaEventHandlers {
           total_bought_zug::text,
           total_sold_zug::text,
           COALESCE(remaining_cost_basis_zug, 0)::text AS remaining_cost_basis_zug,
-          realized_pnl_zug::text
+          realized_pnl_zug::text,
+          COALESCE(remaining_cost_basis_usd, 0)::text AS remaining_cost_basis_usd,
+          COALESCE(realized_pnl_usd, 0)::text AS realized_pnl_usd
         FROM user_positions
         WHERE token_address = $1 AND address = $2
       `,
@@ -603,25 +645,25 @@ export class SolanaEventHandlers {
     );
 
     const row = existing.rows[0];
-    let balance = Number(row?.token_balance ?? 0);
-    const oldBalance = balance;
-    let bought = Number(row?.total_bought_zug ?? 0);
-    let sold = Number(row?.total_sold_zug ?? 0);
-    let cost = Number(row?.remaining_cost_basis_zug ?? 0);
-    let realized = Number(row?.realized_pnl_zug ?? 0);
+    const prior = {
+      tokenBalance: Number(row?.token_balance ?? 0),
+      totalBought: Number(row?.total_bought_zug ?? 0),
+      totalSold: Number(row?.total_sold_zug ?? 0),
+      remainingCostBasis: Number(row?.remaining_cost_basis_zug ?? 0),
+      realizedPnl: Number(row?.realized_pnl_zug ?? 0),
+      remainingCostBasisUsd: Number(row?.remaining_cost_basis_usd ?? 0),
+      realizedPnlUsd: Number(row?.realized_pnl_usd ?? 0),
+    };
+    const oldBalance = prior.tokenBalance;
 
-    if (isBuy) {
-      balance += tokens;
-      bought += sol;
-      cost += netSol;
-    } else {
-      const sellFrac = balance > 0 ? Math.min(1, tokens / balance) : 1;
-      const costReleased = cost * sellFrac;
-      cost = Math.max(0, cost - costReleased);
-      realized += netSol - costReleased;
-      balance = Math.max(0, balance - tokens);
-      sold += sol;
-    }
+    const next = applyTradeToPositionCost(
+      prior,
+      isBuy,
+      grossSol,
+      fee,
+      tokens,
+      nativeUsdRate
+    );
 
     await client.query(
       `
@@ -633,28 +675,34 @@ export class SolanaEventHandlers {
           total_sold_zug,
           remaining_cost_basis_zug,
           realized_pnl_zug,
+          remaining_cost_basis_usd,
+          realized_pnl_usd,
           updated_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, now())
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, now())
         ON CONFLICT (token_address, address) DO UPDATE
         SET token_balance = EXCLUDED.token_balance,
             total_bought_zug = EXCLUDED.total_bought_zug,
             total_sold_zug = EXCLUDED.total_sold_zug,
             remaining_cost_basis_zug = EXCLUDED.remaining_cost_basis_zug,
             realized_pnl_zug = EXCLUDED.realized_pnl_zug,
+            remaining_cost_basis_usd = EXCLUDED.remaining_cost_basis_usd,
+            realized_pnl_usd = EXCLUDED.realized_pnl_usd,
             updated_at = now()
       `,
       [
         mint,
         trader,
-        String(balance),
-        String(bought),
-        String(sold),
-        String(cost),
-        String(realized),
+        String(next.tokenBalance),
+        String(next.totalBought),
+        String(next.totalSold),
+        String(next.remainingCostBasis),
+        String(next.realizedPnl),
+        String(next.remainingCostBasisUsd),
+        String(next.realizedPnlUsd),
       ]
     );
 
-    await this.updateHolderCountIncremental(client, mint, oldBalance, balance);
+    await this.updateHolderCountIncremental(client, mint, oldBalance, next.tokenBalance);
   }
 
   private async updateHolderCountIncremental(

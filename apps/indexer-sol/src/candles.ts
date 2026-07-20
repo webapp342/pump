@@ -37,6 +37,8 @@ export type TradeCandleInput = {
   spotAfter: number;
   volumeZug: number;
   buyVolumeZug: number;
+  /** Trade-time SOL/USD — frozen into close_usd / native_usd_rate. */
+  nativeUsdRate?: number | null;
 };
 
 export function bucketTimestamp(blockTime: Date, interval: CandleInterval): Date {
@@ -74,7 +76,8 @@ async function upsertIntervalCandle(
   spotBefore: number,
   spotAfter: number,
   volumeZug: number,
-  buyVolumeZug: number
+  buyVolumeZug: number,
+  nativeUsdRate: number | null
 ): Promise<CandleWsUpdatePayload | null> {
   if (spotAfter <= 0 || !Number.isFinite(spotAfter)) return null;
 
@@ -101,6 +104,8 @@ async function upsertIntervalCandle(
   const high = Math.max(...prices);
   const low = Math.min(...prices);
   const close = spotAfter;
+  const closeUsd =
+    nativeUsdRate != null && nativeUsdRate > 0 ? spotAfter * nativeUsdRate : null;
 
   const result = await client.query<{
     open_zug: string;
@@ -123,8 +128,10 @@ async function upsertIntervalCandle(
         volume_zug,
         buy_volume_zug,
         trade_count,
+        close_usd,
+        native_usd_rate,
         updated_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 1, now())
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 1, $10, $11, now())
       ON CONFLICT (token_address, candle_interval, bucket_ts) DO UPDATE SET
         high_zug = GREATEST(token_candles.high_zug, EXCLUDED.high_zug),
         low_zug = LEAST(token_candles.low_zug, EXCLUDED.low_zug),
@@ -132,6 +139,8 @@ async function upsertIntervalCandle(
         volume_zug = token_candles.volume_zug + EXCLUDED.volume_zug,
         buy_volume_zug = token_candles.buy_volume_zug + EXCLUDED.buy_volume_zug,
         trade_count = token_candles.trade_count + 1,
+        close_usd = EXCLUDED.close_usd,
+        native_usd_rate = EXCLUDED.native_usd_rate,
         updated_at = now()
       RETURNING
         open_zug::text,
@@ -152,6 +161,8 @@ async function upsertIntervalCandle(
       String(close),
       String(volumeZug),
       String(buyVolumeZug),
+      closeUsd,
+      nativeUsdRate,
     ]
   );
 
@@ -180,6 +191,12 @@ export async function upsertCandlesAfterTrade(
 
   const wsIntervals = new Set(wsCandleIntervals());
   const updates: CandleWsUpdatePayload[] = [];
+  const rate =
+    input.nativeUsdRate != null &&
+    Number.isFinite(input.nativeUsdRate) &&
+    input.nativeUsdRate > 0
+      ? input.nativeUsdRate
+      : null;
 
   for (const interval of CANDLE_INTERVALS) {
     const update = await upsertIntervalCandle(
@@ -189,7 +206,8 @@ export async function upsertCandlesAfterTrade(
       input.spotBefore,
       input.spotAfter,
       input.volumeZug,
-      input.buyVolumeZug
+      input.buyVolumeZug,
+      rate
     );
     if (update && wsIntervals.has(interval)) {
       updates.push(update);
