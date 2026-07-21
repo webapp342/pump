@@ -378,14 +378,9 @@ export function PriceChart({
 
     mainSeries.update(candleToMainChartPoint(chartStyleRef.current, candle) as never);
 
-    // Keep our incremental tracking in sync so a subsequent derive doesn't force a disruptive setData.
-    const prevC = renderedCandlesRef.current;
-    const newLast = candle;
-    renderedCandlesRef.current = prevC.length === 0 || prevC[prevC.length-1]!.time < newLast.time
-      ? [...prevC, newLast]
-      : [...prevC.slice(0, -1), newLast];
+    // Force the next derive pass to setData (gap-fill + optimistic) — avoids desynced incremental tail.
+    renderedFingerprintRef.current = "";
 
-    // Scroll the live edge into view for the trader
     const ts = chartRef.current?.timeScale();
     if (ts) ts.scrollToRealTime();
   }, [actorOptimisticSpot, ready, timeInterval, candleUnitScale]);
@@ -421,6 +416,7 @@ export function PriceChart({
       update,
       priceScale: 1,
     });
+    renderedFingerprintRef.current = "";
   }, [liveCandleUpdates, timeInterval, seriesState.source, tokenAddress, wsConnected]);
 
   const chartSeriesState = useMemo(() => {

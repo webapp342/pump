@@ -77,14 +77,12 @@ export function chartSeriesReducer(
         action.update,
         action.priceScale
       );
-      const close = Number(action.update.close) * action.priceScale;
       return {
         ...state,
-        candles:
-          Number.isFinite(close) && close > 0
-            ? sanitizeTailCandleSeries(merged.candles, close)
-            : merged.candles,
+        candles: merged.candles,
         volumes: merged.volumes,
+        /** WS may insert buckets — re-gap on next derive. */
+        gapFilledByApi: false,
       };
     }
     case "apply_actor": {
@@ -143,15 +141,23 @@ export function deriveChartSeries(input: DeriveChartSeriesInput): {
   /** Volume stays native — MCAP axis scale must not inflate histogram. */
   let volumes = state.volumes;
 
+  const liveMarkScaled =
+    liveOnChainSpotBnb != null && liveOnChainSpotBnb > 0
+      ? liveOnChainSpotBnb * priceScale
+      : undefined;
+
+  const hasTemporalGaps =
+    state.interval != null && seriesHasTemporalGaps(state.candles, state.interval);
+
   const needsClientGapFill =
-    (!state.gapFilledByApi && state.source === "trades") ||
-    (!state.gapFilledByApi &&
-      state.interval != null &&
-      seriesHasTemporalGaps(state.candles, state.interval));
+    state.source === "trades" ||
+    hasTemporalGaps ||
+    !state.gapFilledByApi;
 
   if (needsClientGapFill && state.interval) {
     const filled = fillGapsForStoredCandles(candles, volumes, displayInterval, {
       endTimeMs,
+      anchorPrice: liveMarkScaled,
     });
     candles = filled.candles;
     volumes = filled.volumes;
@@ -220,8 +226,9 @@ export function canSafeIncrementalUpdate(prev: CandleBar[], next: CandleBar[]): 
 export function needsFullCandleResync(prev: CandleBar[], next: CandleBar[]): boolean {
   if (prev.length === 0 || next.length === 0) return true;
   if (next.length < prev.length) return true;
+  if (next.length !== prev.length) return true;
   const n = Math.min(prev.length, next.length);
-  for (let i = 1; i < n; i++) {
+  for (let i = 0; i < n; i++) {
     if (prev[i]!.time !== next[i]!.time) return true;
   }
   return false;

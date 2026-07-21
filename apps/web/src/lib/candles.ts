@@ -611,6 +611,42 @@ export function wsCandleUpdateToBars(
   };
 }
 
+function intervalSecFor(interval: CandleInterval): number {
+  return (CANDLE_INTERVALS.find((i) => i.id === interval)?.ms ?? 60_000) / 1000;
+}
+
+/** Flat carry-forward buckets when WS/indexer jumps ahead in time. */
+function appendFlatBucketsThrough(
+  candles: CandleBar[],
+  volumes: VolumeBar[],
+  fromExclusiveSec: number,
+  toInclusiveSec: number,
+  flatPrice: number,
+  interval: CandleInterval
+): { candles: CandleBar[]; volumes: VolumeBar[] } {
+  const step = intervalSecFor(interval);
+  if (!Number.isFinite(flatPrice) || flatPrice <= 0) {
+    return { candles, volumes };
+  }
+  const nextCandles = candles.slice();
+  const nextVolumes = volumes.slice();
+  for (let t = fromExclusiveSec + step; t < toInclusiveSec; t += step) {
+    nextCandles.push({
+      time: t,
+      open: flatPrice,
+      high: flatPrice,
+      low: flatPrice,
+      close: flatPrice,
+    });
+    nextVolumes.push({
+      time: t,
+      value: 0,
+      color: volumeBarColor(0, 0),
+    });
+  }
+  return { candles: nextCandles, volumes: nextVolumes };
+}
+
 /** Patch or append a live WS candle bucket without full setData rebuild. */
 export function mergeWsCandleUpdate(
   candles: CandleBar[],
@@ -622,7 +658,8 @@ export function mergeWsCandleUpdate(
   if (!Number.isFinite(raw.close) || raw.close <= 0) {
     return { candles, volumes };
   }
-  const candle = sanitizeCandleOhlc(raw, raw.close);
+  const interval = update.interval as CandleInterval;
+  const candle = sanitizeTailCandleOhlc(raw, raw.close);
 
   if (candles.length === 0) {
     return { candles: [candle], volumes: [volume] };
@@ -634,18 +671,33 @@ export function mergeWsCandleUpdate(
       return { candles, volumes };
     }
     const priorClose = last.close;
-    const patched = sanitizeCandleOhlc(
+    let nextCandles = candles.slice();
+    let nextVolumes = volumes.slice();
+    if (candle.time - last.time > intervalSecFor(interval)) {
+      const padded = appendFlatBucketsThrough(
+        nextCandles,
+        nextVolumes,
+        last.time,
+        candle.time,
+        priorClose,
+        interval
+      );
+      nextCandles = padded.candles;
+      nextVolumes = padded.volumes;
+    }
+    const openBase = priorClose;
+    const patched = sanitizeTailCandleOhlc(
       {
         ...candle,
-        open: priorClose,
-        high: Math.max(candle.high, priorClose),
-        low: Math.min(candle.low, priorClose),
+        open: openBase,
+        high: Math.max(candle.high, openBase, candle.close),
+        low: Math.min(candle.low, openBase, candle.close),
       },
       candle.close
     );
     return {
-      candles: [...candles, patched],
-      volumes: [...volumes, volume],
+      candles: [...nextCandles, patched],
+      volumes: [...nextVolumes, volume],
     };
   }
 
@@ -660,16 +712,12 @@ export function mergeWsCandleUpdate(
     const close = candle.close;
     const highCandidate = Math.max(existing.high, candle.high, close);
     const lowCandidate = Math.min(existing.low, candle.low, close);
-    nextCandles[idx] = sanitizeCandleOhlc(
+    nextCandles[idx] = sanitizeTailCandleOhlc(
       {
         time: candle.time,
         open: existing.open,
-        high: isSpotMoveSane(close, highCandidate)
-          ? highCandidate
-          : Math.max(existing.high, close),
-        low: isSpotMoveSane(close, lowCandidate)
-          ? lowCandidate
-          : Math.min(existing.low, close),
+        high: highCandidate,
+        low: lowCandidate,
         close,
       },
       close
@@ -685,8 +733,13 @@ export function mergeWsCandleUpdate(
     }
     const nextCandles = candles.slice();
     const nextVolumes = volumes.slice();
-    nextCandles[nextCandles.length - 1] = sanitizeCandleOhlc(
-      { ...candle, open: last.open },
+    nextCandles[nextCandles.length - 1] = sanitizeTailCandleOhlc(
+      {
+        ...candle,
+        open: last.open,
+        high: Math.max(last.high, candle.high, candle.close),
+        low: Math.min(last.low, candle.low, candle.close),
+      },
       candle.close
     );
     if (nextVolumes.length > 0) {
@@ -796,7 +849,7 @@ export function applyActorOptimisticCandleBucket(
     const existing = candles[idx]!;
     const priorClose = idx > 0 ? candles[idx - 1]!.close : undefined;
     const open = coherentOpenForBar(existing.open, after, before > 0 ? before : priorClose);
-    const merged = sanitizeCandleOhlc(
+    const merged = sanitizeTailCandleOhlc(
       {
         time: bucketSec,
         open,
@@ -814,9 +867,33 @@ export function applyActorOptimisticCandleBucket(
   }
 
   if (!last || bucketSec > last.time) {
+    let nextCandles = candles.slice();
+    let nextVolumes = volumes.slice();
+    if (last && bucketSec - last.time > intervalSecFor(interval)) {
+      const padded = appendFlatBucketsThrough(
+        nextCandles,
+        nextVolumes,
+        last.time,
+        bucketSec,
+        last.close,
+        interval
+      );
+      nextCandles = padded.candles;
+      nextVolumes = padded.volumes;
+    }
+    const priorClose = last?.close ?? patched.open;
+    const opened = sanitizeTailCandleOhlc(
+      {
+        ...patched,
+        open: priorClose,
+        high: Math.max(patched.high, priorClose, patched.close),
+        low: Math.min(patched.low, priorClose, patched.close),
+      },
+      patched.close
+    );
     return {
-      candles: [...candles, patched],
-      volumes: [...volumes, volBar],
+      candles: [...nextCandles, opened],
+      volumes: [...nextVolumes, volBar],
     };
   }
 
@@ -825,7 +902,7 @@ export function applyActorOptimisticCandleBucket(
     const open = coherentOpenForBar(last.open, after, before > 0 ? before : priorClose);
     const nextCandles = candles.slice();
     const nextVolumes = volumes.slice();
-    nextCandles[nextCandles.length - 1] = sanitizeCandleOhlc(
+    nextCandles[nextCandles.length - 1] = sanitizeTailCandleOhlc(
       {
         time: last.time,
         open,
@@ -920,16 +997,37 @@ export function sanitizeCandleOhlc(bar: CandleBar, anchor: number): CandleBar {
   return { time: bar.time, open, high, low, close };
 }
 
+/**
+ * Live-tail sanitize — fixes decade-scale garbage only; keeps real intra-bucket trade wicks
+ * (sell dip + buy recovery in the same 5m bucket must not collapse to a flat body).
+ */
+export function sanitizeTailCandleOhlc(bar: CandleBar, anchor: number): CandleBar {
+  if (!Number.isFinite(anchor) || anchor <= 0) return bar;
+
+  const pickMag = (p: number, fallback: number): number => {
+    if (!Number.isFinite(p) || p <= 0) return fallback;
+    if (pricesSameMagnitude(p, anchor)) return p;
+    const rescaled = rescalePriceToAnchor(p, anchor);
+    return pricesSameMagnitude(rescaled, anchor) ? rescaled : fallback;
+  };
+
+  const close = pickMag(bar.close, anchor);
+  const open = pickMag(bar.open, close);
+  const high = Math.max(pickMag(bar.high, close), open, close);
+  const low = Math.min(pickMag(bar.low, close), open, close);
+  return { time: bar.time, open, high, low, close };
+}
+
 export function sanitizeCandleSeries(candles: CandleBar[], anchor: number): CandleBar[] {
   if (candles.length === 0 || !Number.isFinite(anchor) || anchor <= 0) return candles;
   return candles.map((c) => sanitizeCandleOhlc(c, anchor));
 }
 
-/** Sanitize only the live tail — avoid collapsing historical OHLC against the header mark. */
+/** Sanitize only the live tail — magnitude drift only, preserve trade wicks. */
 export function sanitizeTailCandleSeries(candles: CandleBar[], anchor: number): CandleBar[] {
   if (candles.length === 0 || !Number.isFinite(anchor) || anchor <= 0) return candles;
   const next = candles.slice();
-  next[next.length - 1] = sanitizeCandleOhlc(next[next.length - 1]!, anchor);
+  next[next.length - 1] = sanitizeTailCandleOhlc(next[next.length - 1]!, anchor);
   return next;
 }
 
@@ -1028,7 +1126,7 @@ export function pinTailCandleToLiveMark(
   const low = Math.min(existing.low, open, close);
 
   const nextCandles = candles.slice();
-  nextCandles[targetIdx] = sanitizeCandleOhlc(
+  nextCandles[targetIdx] = sanitizeTailCandleOhlc(
     {
       time: existing.time,
       open,
