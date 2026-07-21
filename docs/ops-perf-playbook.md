@@ -127,7 +127,7 @@ VM 2026-06-18 ölçümüne göre **hiçbiri acil değil**:
 | **A) Rocicorp Zero** | Favorites/portfolio/cross-device sync yavaş | API ~2 ms · local-first kodda → ⏸️ |
 | **B) Edge WS** | WS > 2000 veya global WS P95 > 100 ms | WS 14 ms · CPU %1 → ⏸️ |
 | **C) PG 18 + pg_trickle** | MV refresh CPU yiyor | CPU %1 · incremental stats açık → ⏸️ |
-| **D) ClickHouse OLAP** | Chart history / trades scale | **Activate:** `bash deploy/vm/enable-clickhouse.sh` |
+| **D) ClickHouse OLAP** | Chart history / trades scale | **Activate:** `enable-clickhouse.sh` + `candles_spot` authoritative OHLC — [`ultra-fast-ui-phases.md`](./ultra-fast-ui-phases.md) |
 
 **Kilitli hybrid:** PostgreSQL = OLTP (positions, wallets, auth). ClickHouse = yalnızca trades/OHLCV history. Tüm DB’yi CH’ye taşımak yok.
 

@@ -2,14 +2,19 @@
 
 Enterprise pump.fun-style charts: **native OHLC authoritative**, **USD display-only**.
 
-## Data flow
+## Data flow (2026-07)
 
 ```
-Trade → indexer upsert token_candles (native spot OHLC)
-      → Redis WS candleUpdates (1m,5m default)
-      → GET /api/candles → gap_fill_candles SQL → Redis cache 5s
-      → PriceChart: extend live tail + Lightweight Charts formatters (× nativeUsd)
+Trade → indexer compute OHLC once
+      → CH candles_spot (authoritative chart history)
+      → Redis hot tail + pub/sub WS
+      → GET /api/candles → CH candles_spot → merge Redis tail → gap-fill
+      → PriceChart: WS live + Lightweight Charts formatters
 ```
+
+Legacy `candles_5m` MV (min/max spot) is **fallback only** when `candles_spot` empty.
+
+See also: [`docs/ultra-fast-ui-phases.md`](../docs/ultra-fast-ui-phases.md)
 
 ## Rules
 

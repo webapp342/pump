@@ -12,6 +12,8 @@ import { enqueueTradeClickHouse } from "./clickhouse.js";
 import { fetchIndexerNativeUsdRate } from "./native-usd.js";
 import { applyTradeToPositionCost } from "./position-cost.js";
 import { publishTrade, publishWalletTrade } from "./redis-publish.js";
+import { enqueueCandlesClickHouse } from "./clickhouse-candles.js";
+import { pushHotTapeTrade, writeHotCandleUpdates } from "./redis-hot-cache.js";
 import {
   asBigInt,
   asBool,
@@ -424,6 +426,10 @@ export class SolanaEventHandlers {
         native_usd_rate: inserted.nativeUsdRate,
       });
 
+      const candleUpdates = inserted.candleUpdates ?? [];
+      enqueueCandlesClickHouse(mint, candleUpdates);
+      void writeHotCandleUpdates(mint, candleUpdates);
+
       const boardExtra = await readBoardStatsForPublish(
         this.context.launchpadPool,
         mint
@@ -460,6 +466,19 @@ export class SolanaEventHandlers {
           volume24hZug: boardExtra?.volume24hZug,
           traders24h: boardExtra?.traders24h,
         },
+      });
+
+      void pushHotTapeTrade(mint, {
+        id: inserted.tradeId,
+        side,
+        traderAddress: trader,
+        zugAmount: lamportsToSol(solAmount),
+        feeZug: lamportsToSol(feeLamports),
+        tokenAmount: tokenAmountToDecimal(tokenAmount, decimals),
+        priceZug: executionPrice,
+        txHash: event.signature,
+        logIndex: event.logIndex,
+        blockTime: blockTime.toISOString(),
       });
 
       const positionRow = await this.context.launchpadPool.query<{

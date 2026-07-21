@@ -80,6 +80,15 @@ done
 
 log "Applying schema…"
 docker exec -i pump-clickhouse clickhouse-client --multiquery < "$SCHEMA_FILE"
+if [[ -f "${TMA_DIR}/deploy/clickhouse/init/02_candles_spot.sql" ]]; then
+  log "Applying candles_spot authoritative schema…"
+  docker exec -i pump-clickhouse clickhouse-client --multiquery < "${TMA_DIR}/deploy/clickhouse/init/02_candles_spot.sql"
+fi
+SCHEMA_SPOT="${TMA_DIR}/deploy/clickhouse/init/02_candles_spot.sql"
+if [[ -f "$SCHEMA_SPOT" ]]; then
+  log "Applying candles_spot schema…"
+  docker exec -i pump-clickhouse clickhouse-client --multiquery < "$SCHEMA_SPOT"
+fi
 
 upsert_env() {
   local file="$1" key="$2" value="$3"
@@ -126,7 +135,9 @@ if [[ -f "$INDEXER_ENV" ]]; then
   set +a
 fi
 npm run backfill-clickhouse-trades -w @pump/indexer-sol 2>/dev/null || \
-  log "WARN: backfill failed — after deploy run: npm run backfill-clickhouse-trades -w @pump/indexer-sol"
+  log "WARN: trades backfill failed — run: npm run backfill-clickhouse-trades -w @pump/indexer-sol"
+npm run backfill-clickhouse-candles -w @pump/indexer-sol 2>/dev/null || \
+  log "WARN: candles_spot backfill failed — run: npm run backfill-clickhouse-candles -w @pump/indexer-sol"
 
 log "Verify:"
 curl -sf "http://127.0.0.1:8123/ping" && echo " clickhouse ping ok"

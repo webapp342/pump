@@ -5,9 +5,11 @@ import {
   CANDLE_INTERVALS,
   DEFAULT_CHART_INTERVAL,
   fillGapsForStoredCandles,
+  mergeWsCandleUpdate,
   seriesHasTemporalGaps,
   storedCandlesToBars,
   type CandleInterval,
+  type CandleWsUpdate,
 } from "@/lib/candles";
 import { listTokenCandlesFromClickHouse } from "@/lib/clickhouse/candles";
 import {
@@ -18,12 +20,22 @@ import {
   listTradesForChart,
 } from "@/lib/db/launchpad";
 import { readCandleCache, writeCandleCache } from "@/lib/redis/candle-cache";
+import { readHotCandleUpdate } from "@/lib/redis/hot-cache";
 
 type RouteContext = { params: Promise<{ address: string }> };
 
 const VALID_INTERVALS = new Set(CANDLE_INTERVALS.map((i) => i.id));
 const DEFAULT_LIMIT = 1000;
 const MAX_LIMIT = 4000;
+
+function mergeHotTail(
+  candles: ReturnType<typeof storedCandlesToBars>,
+  hot: CandleWsUpdate | null
+): ReturnType<typeof storedCandlesToBars> {
+  if (!hot) return candles;
+  const merged = mergeWsCandleUpdate(candles.candles, candles.volumes, hot, 1);
+  return { candles: merged.candles, volumes: merged.volumes };
+}
 
 export async function GET(request: NextRequest, context: RouteContext) {
   const { address } = await context.params;
@@ -66,10 +78,12 @@ export async function GET(request: NextRequest, context: RouteContext) {
       );
     }
 
-    // Prefer ClickHouse history when enabled (falls back to PG on miss/error).
+    const hotTail = await readHotCandleUpdate(address, interval);
+
     const fromCh = await listTokenCandlesFromClickHouse(address, interval, limit);
-    if (fromCh && fromCh.length > 0) {
-      const raw = storedCandlesToBars(fromCh);
+    if (fromCh && fromCh.rows.length > 0) {
+      let raw = storedCandlesToBars(fromCh.rows);
+      raw = mergeHotTail(raw, hotTail);
       const { candles, volumes } = fillGapsForStoredCandles(
         raw.candles,
         raw.volumes,
@@ -84,10 +98,10 @@ export async function GET(request: NextRequest, context: RouteContext) {
           source: "db" as const,
           gapFilled: true,
           gapFill: "ts" as const,
-          bucketCount: fromCh.length,
+          bucketCount: fromCh.rows.length,
           frozen: false,
           status: token.status,
-          olap: "clickhouse" as const,
+          olap: fromCh.source,
         };
         void writeCandleCache(address, interval, {
           candles,
@@ -129,6 +143,8 @@ export async function GET(request: NextRequest, context: RouteContext) {
         raw = storedCandlesToBars(stored);
       }
 
+      raw = mergeHotTail(raw, hotTail);
+
       const { candles, volumes } = fillGapsForStoredCandles(
         raw.candles,
         raw.volumes,
@@ -150,6 +166,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
           bucketCount: stored.length,
           frozen: false,
           status: token.status,
+          olap: "postgres" as const,
         };
 
         void writeCandleCache(address, interval, {
@@ -170,7 +187,6 @@ export async function GET(request: NextRequest, context: RouteContext) {
           }
         );
       }
-      // Stored rows with invalid/zero closes — rebuild from trades instead.
     }
 
     const trades = await listTradesForChart(address);
@@ -190,6 +206,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
           tradeCount: trades.length,
           frozen: false,
           status: token.status,
+          olap: "trades_replay" as const,
         },
       },
       {

@@ -1,4 +1,4 @@
-import type { CandleInterval } from "@/lib/candles";
+import type { CandleInterval, CandleWsUpdate } from "@/lib/candles";
 import type { StoredTokenCandleRow } from "@/lib/db/launchpad";
 import { clickhouseCandlesEnabled, clickhouseQueryJson } from "@/lib/clickhouse/client";
 
@@ -16,11 +16,67 @@ type ChCandleRow = {
   low_sol: number;
   close_sol: number;
   volume_sol: number;
+  buy_volume_sol: number;
   trade_count: number;
 };
 
-/** Deep history from ClickHouse AggregatingMergeTree rollups (spot SOL). */
-export async function listTokenCandlesFromClickHouse(
+export type ClickHouseCandleSource = "candles_spot" | "candles_mv";
+
+function mapChRows(rows: ChCandleRow[]): StoredTokenCandleRow[] {
+  return rows.map((row) => ({
+    bucketSec: Number(row.bucket_sec),
+    openZug: String(row.open_sol),
+    highZug: String(row.high_sol),
+    lowZug: String(row.low_sol),
+    closeZug: String(row.close_sol),
+    volumeZug: String(row.volume_sol),
+    buyVolumeZug: String(row.buy_volume_sol ?? 0),
+    tradeCount: Number(row.trade_count) || 0,
+  }));
+}
+
+/** Indexer-authoritative spot OHLC (ReplacingMergeTree — same semantics as PG token_candles). */
+export async function listTokenCandlesFromClickHouseSpot(
+  tokenAddress: string,
+  interval: CandleInterval,
+  limit = 1000
+): Promise<StoredTokenCandleRow[] | null> {
+  if (!clickhouseCandlesEnabled()) return null;
+
+  const capped = Math.min(Math.max(limit, 1), 4000);
+  const addr = tokenAddress.replace(/'/g, "\\'");
+
+  try {
+    const rows = await clickhouseQueryJson<ChCandleRow>(
+      `
+      SELECT
+        toUnixTimestamp(bucket_start) AS bucket_sec,
+        argMax(open_sol, updated_at) AS open_sol,
+        argMax(high_sol, updated_at) AS high_sol,
+        argMax(low_sol, updated_at) AS low_sol,
+        argMax(close_sol, updated_at) AS close_sol,
+        argMax(volume_sol, updated_at) AS volume_sol,
+        argMax(buy_volume_sol, updated_at) AS buy_volume_sol,
+        argMax(trade_count, updated_at) AS trade_count
+      FROM candles_spot
+      WHERE token_address = '${addr}'
+        AND candle_interval = '${interval}'
+      GROUP BY bucket_start
+      ORDER BY bucket_start DESC
+      LIMIT ${capped}
+      `
+    );
+
+    if (rows.length === 0) return [];
+    return mapChRows(rows);
+  } catch (error) {
+    console.warn("[clickhouse] candles_spot query failed", error);
+    return null;
+  }
+}
+
+/** Legacy MV rollups (min/max spot) — fallback only when candles_spot empty. */
+export async function listTokenCandlesFromClickHouseMv(
   tokenAddress: string,
   interval: CandleInterval,
   limit = 1000
@@ -42,6 +98,7 @@ export async function listTokenCandlesFromClickHouse(
         minMerge(low_sol) AS low_sol,
         argMaxMerge(close_sol) AS close_sol,
         sumMerge(volume_sol) AS volume_sol,
+        0 AS buy_volume_sol,
         countMerge(trade_count) AS trade_count
       FROM ${table}
       WHERE token_address = '${addr}'
@@ -52,19 +109,29 @@ export async function listTokenCandlesFromClickHouse(
     );
 
     if (rows.length === 0) return [];
-
-    return rows.map((row) => ({
-      bucketSec: Number(row.bucket_sec),
-      openZug: String(row.open_sol),
-      highZug: String(row.high_sol),
-      lowZug: String(row.low_sol),
-      closeZug: String(row.close_sol),
-      volumeZug: String(row.volume_sol),
-      buyVolumeZug: "0",
-      tradeCount: Number(row.trade_count) || 0,
-    }));
+    return mapChRows(rows);
   } catch (error) {
-    console.warn("[clickhouse] candles query failed — falling back to PG", error);
+    console.warn("[clickhouse] candles MV query failed", error);
     return null;
   }
+}
+
+/** Deep history — prefer authoritative candles_spot, MV fallback. */
+export async function listTokenCandlesFromClickHouse(
+  tokenAddress: string,
+  interval: CandleInterval,
+  limit = 1000
+): Promise<{ rows: StoredTokenCandleRow[]; source: ClickHouseCandleSource } | null> {
+  const spot = await listTokenCandlesFromClickHouseSpot(tokenAddress, interval, limit);
+  if (spot && spot.length > 0) {
+    return { rows: spot, source: "candles_spot" };
+  }
+  const mv = await listTokenCandlesFromClickHouseMv(tokenAddress, interval, limit);
+  if (mv && mv.length > 0) {
+    return { rows: mv, source: "candles_mv" };
+  }
+  if (spot && spot.length === 0) {
+    return { rows: [], source: "candles_spot" };
+  }
+  return null;
 }
