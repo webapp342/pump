@@ -334,9 +334,8 @@ export function buildCandlesFromTrades(
 
   let startSec = sortedTimes[0]!;
   const lastTradeSec = sortedTimes[sortedTimes.length - 1]!;
-  const endBucketMs = Math.floor(endTimeMs / intervalMs) * intervalMs;
-  const liveEndSec = Math.floor(endBucketMs / 1000);
-  const endSec = Math.max(lastTradeSec, liveEndSec);
+  // Only fill holes between trades — do not invent an empty live bucket (phantom wicks).
+  const endSec = lastTradeSec;
 
   const span = Math.floor((endSec - startSec) / intervalSec) + 1;
   if (span > MAX_CANDLES) {
@@ -436,7 +435,10 @@ export function storedCandlesToBars(
   return { candles, volumes };
 }
 
-/** Gap-fill flat candles between stored buckets (pump.fun style). */
+/** Gap-fill flat candles between stored buckets (pump.fun style).
+ * Only fills holes between the first and last *traded* bucket — never invents an
+ * empty "live" candle ahead of the last trade (that created phantom wicks).
+ */
 export function fillGapsForStoredCandles(
   candles: CandleBar[],
   volumes: VolumeBar[],
@@ -446,6 +448,11 @@ export function fillGapsForStoredCandles(
     maxGapBarsAfterLastTrade?: number;
     /** Live bonding mark — gap-fill forward close is validated against this. */
     anchorPrice?: number;
+    /**
+     * When true, also append flat bars from last trade through wall-clock live bucket.
+     * Default false — empty live buckets must not appear as shadow-only candles.
+     */
+    extendToLive?: boolean;
   } = {}
 ): { candles: CandleBar[]; volumes: VolumeBar[] } {
   if (candles.length === 0) return { candles, volumes };
@@ -460,7 +467,10 @@ export function fillGapsForStoredCandles(
   const lastTradeSec = sortedTimes[sortedTimes.length - 1]!;
   const endBucketMs = Math.floor(endTimeMs / intervalMs) * intervalMs;
   const liveEndSec = Math.floor(endBucketMs / 1000);
-  const endSec = Math.max(lastTradeSec, liveEndSec);
+  const endSec =
+    options.extendToLive === true
+      ? Math.max(lastTradeSec, liveEndSec)
+      : lastTradeSec;
 
   let startSec = sortedTimes[0]!;
   const span = Math.floor((endSec - startSec) / intervalSec) + 1;
@@ -494,7 +504,7 @@ export function fillGapsForStoredCandles(
       continue;
     }
     if (lastClose == null) continue;
-    // Always carry forward last close — pump.fun flat line between trades.
+    // Carry forward last close between traded buckets only.
     const flat = coherentGapClose(lastClose, anchorPrice);
     nextCandles.push({
       time: t,
@@ -719,18 +729,40 @@ export function mergeWsCandleUpdate(
     const nextCandles = candles.slice();
     const nextVolumes = volumes.slice();
     const close = candle.close;
-    const highCandidate = Math.max(existing.high, candle.high, close);
-    const lowCandidate = Math.min(existing.low, candle.low, close);
-    nextCandles[idx] = sanitizeTailCandleOhlc(
-      {
-        time: candle.time,
-        open: existing.open,
-        high: highCandidate,
-        low: lowCandidate,
-        close,
-      },
-      close
-    );
+    const priorVol = idx < volumes.length ? volumes[idx]!.value : 0;
+    const priorClose = idx > 0 ? candles[idx - 1]!.close : undefined;
+
+    // Synthetic/empty placeholder (volume 0) → replace with real trade OHLC.
+    // Do not keep a phantom high from a flat carry-forward bar.
+    if (priorVol <= 0 && volume.value > 0) {
+      const open =
+        priorClose != null && priorClose > 0 && isSpotMoveSane(priorClose, close)
+          ? priorClose
+          : candle.open;
+      nextCandles[idx] = sanitizeTailCandleOhlc(
+        {
+          time: candle.time,
+          open,
+          high: Math.max(candle.high, open, close),
+          low: Math.min(candle.low, open, close),
+          close,
+        },
+        close
+      );
+    } else {
+      const highCandidate = Math.max(existing.high, candle.high, close);
+      const lowCandidate = Math.min(existing.low, candle.low, close);
+      nextCandles[idx] = sanitizeTailCandleOhlc(
+        {
+          time: candle.time,
+          open: existing.open,
+          high: highCandidate,
+          low: lowCandidate,
+          close,
+        },
+        close
+      );
+    }
     if (idx < nextVolumes.length) nextVolumes[idx] = volume;
     else nextVolumes.push(volume);
     return { candles: nextCandles, volumes: nextVolumes };

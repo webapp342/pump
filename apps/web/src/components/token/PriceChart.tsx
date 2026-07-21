@@ -731,7 +731,7 @@ export function PriceChart({
     });
   }, [priceFormat]);
 
-  // Push candle data — setData on structural changes; series.update() for live tail.
+  // Push candle data — prefer setData so LWC never leaves ghost wicks from update().
   useEffect(() => {
     if (!ready || !mainSeriesRef.current) return;
 
@@ -766,13 +766,24 @@ export function PriceChart({
       return;
     }
 
+    const lastChanged =
+      prevCandles.length > 0 &&
+      nextCandles.length > 0 &&
+      (prevCandles[prevCandles.length - 1]!.time !== nextCandles[nextCandles.length - 1]!.time ||
+        prevCandles[prevCandles.length - 1]!.open !== nextCandles[nextCandles.length - 1]!.open ||
+        prevCandles[prevCandles.length - 1]!.high !== nextCandles[nextCandles.length - 1]!.high ||
+        prevCandles[prevCandles.length - 1]!.low !== nextCandles[nextCandles.length - 1]!.low ||
+        prevCandles[prevCandles.length - 1]!.close !== nextCandles[nextCandles.length - 1]!.close);
+
     const needsFullSet =
       shouldFitViewportRef.current ||
       fingerprint !== renderedFingerprintRef.current ||
       prevCandles.length === 0 ||
       seriesHasTemporalGaps(nextCandles, timeInterval) ||
       !canIncrementalChartPatch(prevCandles, nextCandles) ||
-      needsFullCandleResync(prevCandles, nextCandles);
+      needsFullCandleResync(prevCandles, nextCandles) ||
+      // New or rewritten tail bar — full setData avoids wick ghosts from series.update().
+      lastChanged;
 
     if (needsFullSet) {
       applyFullSeries();

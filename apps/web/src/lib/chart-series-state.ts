@@ -1,6 +1,5 @@
 import {
   applyActorOptimisticCandleBucket,
-  extendSeriesToLiveBucket,
   fillGapsForStoredCandles,
   mergeWsCandleUpdate,
   sanitizeTailCandleSeries,
@@ -142,9 +141,9 @@ export type DeriveChartSeriesInput = {
 };
 
 /**
- * Native OHLC from DB/WS only — do not pin bonding-curve mark onto the live bar.
- * Pinning made one tab look broken (wick needle / floating dojis) while a refresh
- * (clean API candles) looked fine; every viewer should share the same OHLC source.
+ * Native OHLC from DB/WS only.
+ * - No bonding-mark pin onto the live bar (wick needles / flat dojis).
+ * - No empty wall-clock "live" candle — only buckets that exist from trades/API.
  */
 export function deriveChartSeries(input: DeriveChartSeriesInput): {
   candles: CandleBar[];
@@ -185,22 +184,12 @@ export function deriveChartSeries(input: DeriveChartSeriesInput): {
     const filled = fillGapsForStoredCandles(candles, volumes, displayInterval, {
       endTimeMs,
       anchorPrice: liveMarkScaled,
+      extendToLive: false,
     });
     candles = filled.candles;
     volumes = filled.volumes;
-  } else {
-    const extended = extendSeriesToLiveBucket(
-      candles,
-      volumes,
-      displayInterval,
-      endTimeMs
-    );
-    candles = extended.candles;
-    volumes = extended.volumes;
   }
-
-  // Do not rewrite the live bar to bonding-curve mark (causes wick needles / flat dojis
-  // when one tab's mark races ahead of indexer OHLC). OHLC stays DB/WS-only.
+  // else: keep API/WS series as-is — do not append empty live buckets
 
   if (actorOptimisticSpot) {
     const patched = applyActorOptimisticCandleBucket(

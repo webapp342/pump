@@ -211,10 +211,11 @@ function tradeBucketOhlc(
   spotBefore: number,
   spotAfter: number,
   priorClose: number | null,
-  isNewBucket: boolean
+  _isNewBucket: boolean
 ): { open: number; high: number; low: number; close: number } {
   const spotOpen = resolveSpotOpen(spotBefore, spotAfter, priorClose);
-  const open = priorClose ?? (isNewBucket ? spotAfter : spotOpen);
+  // Continuity: prefer prior close; else this trade's open touch (never force open=close).
+  const open = priorClose != null && priorClose > 0 ? priorClose : spotOpen;
   const touch = wickTouchPrice(spotBefore, spotAfter, spotOpen);
   const prices = [open, touch, spotAfter];
   return {
