@@ -58,15 +58,15 @@ export function preserveLiveTailOverFetch(
 
   if (idx >= 0) {
     const fetched = candles[idx]!;
+    // Live open-bucket SSOT: never let a slower HTTP/CH row rewrite open/close.
     candles[idx] = {
       time: fetched.time,
-      open: fetched.open > 0 ? fetched.open : liveTail.open,
+      open: liveTail.open > 0 ? liveTail.open : fetched.open,
       high: Math.max(fetched.high, liveTail.high),
       low: Math.min(
         fetched.low > 0 ? fetched.low : liveTail.low,
         liveTail.low > 0 ? liveTail.low : fetched.low
       ),
-      // Prefer live close until CH/hot absorb the same print.
       close: liveTail.close > 0 ? liveTail.close : fetched.close,
     };
     if (liveVol && idx < volumes.length) {

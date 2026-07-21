@@ -768,7 +768,13 @@ export function mergeWsCandleUpdate(
       nextCandles = padded.candles;
       nextVolumes = padded.volumes;
     }
-    const openBase = priorClose;
+    // Indexer open = first print in the bucket (SSOT). Only stitch to prior close when
+    // they already meet within 1% — blind open=priorClose turned a solid first buy into
+    // a needle after series.update() (see Bitquery bar-continuity: presentation-only).
+    const tradeOpen = candle.open > 0 ? candle.open : candle.close;
+    const openBase = isBarContinuityMatch(priorClose, tradeOpen)
+      ? priorClose
+      : tradeOpen;
     const patched = sanitizeTailCandleOhlc(
       {
         ...candle,
@@ -799,10 +805,13 @@ export function mergeWsCandleUpdate(
     // Synthetic/empty placeholder (volume 0) → replace with real trade OHLC.
     // Do not keep a phantom high from a flat carry-forward bar.
     if (priorVol <= 0 && volume.value > 0) {
+      const tradeOpen = candle.open > 0 ? candle.open : close;
       const open =
-        priorClose != null && priorClose > 0 && isSpotMoveSane(priorClose, close)
+        priorClose != null &&
+        priorClose > 0 &&
+        isBarContinuityMatch(priorClose, tradeOpen)
           ? priorClose
-          : candle.open;
+          : tradeOpen;
       nextCandles[idx] = sanitizeTailCandleOhlc(
         {
           time: candle.time,
@@ -1046,6 +1055,22 @@ export function isSpotMoveSane(previous: number, next: number): boolean {
   if (pricesSameMagnitude(previous, next)) return true;
   const ratio = next / previous;
   return ratio <= SPOT_JUMP_REJECT_RATIO && ratio >= 1 / SPOT_JUMP_REJECT_RATIO;
+}
+
+/**
+ * Prior close vs first-trade open already meet (≤1%).
+ * Only then stitch open←priorClose for LWC; wider gaps must keep trade open
+ * or the client invents needle wicks after a correct first paint.
+ */
+const BAR_CONTINUITY_MATCH_RATIO = 1.01;
+
+export function isBarContinuityMatch(priorClose: number, tradeOpen: number): boolean {
+  if (!Number.isFinite(priorClose) || !Number.isFinite(tradeOpen)) return false;
+  if (!(priorClose > 0) || !(tradeOpen > 0)) return false;
+  const ratio = priorClose / tradeOpen;
+  return (
+    ratio <= BAR_CONTINUITY_MATCH_RATIO && ratio >= 1 / BAR_CONTINUITY_MATCH_RATIO
+  );
 }
 
 function coherentOpenForBar(
