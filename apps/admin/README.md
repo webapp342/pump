@@ -44,20 +44,24 @@ No PM2 — nginx serves `admin-console/dist/`.
 
 ## Data wipe (Environment)
 
-Admin **Reset data** calls `wipe_launchpad_app_data()` (migration `052`).
+Admin **Reset data** calls `wipe_launchpad_app_data()` (migration `052`), then purges
+Rewards XP/`users` on the incentive connection (leaderboard SSOT).
 
 | Kept | Wiped |
 |------|--------|
-| `launchpad_tasks` (promoted campaigns + system missions) | `users` (XP / points) |
+| `launchpad_tasks` (promoted campaigns + system missions) | `users` (XP / points) — **Rewards Leaderboard source** |
 | `contract_registry` | `points_inventory` / `points_redemptions` (claimed perks) |
 | `platform_settings` | `launchpad_user_*_completions` (finished challenges) |
 | `admin_todos` | `referral_invite_xp_claims`, airdrop + rewards leaderboard tables |
 | | tokens / trades / positions / wallets / `indexer_state` |
 
-Apply on VM if wipe is outdated:
+If Season leaderboard still shows an old `0x…` row after wipe: `VM1_MAIN_DB_URL` was a
+different database than `LAUNCHPAD_DATABASE_URL`. Point both at `pump_db`, redeploy, wipe again.
 
 ```bash
 sudo -u postgres psql -d pump_db -f db/migrations/052_wipe_launchpad_app_data_comprehensive.sql
+# optional hard clear:
+sudo -u postgres psql -d pump_db -c "TRUNCATE users, points_audit_log, points_inventory, points_redemptions RESTART IDENTITY CASCADE;"
 ```
 
 ## Auth

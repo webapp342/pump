@@ -437,7 +437,7 @@ export const ADMIN_COPY = {
     description:
       "Destructive clean-start for this environment. Wipes users, XP, perks, challenge progress, airdrop/rewards leaderboards, and indexed trading data. Keeps promoted campaigns and mission definitions (launchpad_tasks). On-chain contracts and balances are not modified.",
     warning:
-      "Deletes app users, XP, claimed perks, completed challenges, airdrop/rewards leaderboard rows, and indexed market data. Task definitions and promo campaigns stay.",
+      "Deletes app users, XP, claimed perks, completed challenges, airdrop/rewards leaderboard rows, and indexed market data. Task definitions and promo campaigns stay. Rewards Season rankings are cleared from the same DB the leaderboard reads.",
     preservedTitle: "Kept",
     wipedTitle: "Deleted",
     confirmLabel: "Type WIPE PUMP DATA to enable",

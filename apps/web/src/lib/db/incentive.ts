@@ -13,9 +13,13 @@ import { dbStorageAddress, normalizeUserStorageAddress } from "@/lib/address";
 let pool: Pool | null = null;
 
 export function getIncentivePool(): Pool {
-  const url = process.env.VM1_MAIN_DB_URL;
+  // Prefer LAUNCHPAD_DATABASE_URL so rewards/XP share the same DB as admin wipe.
+  // VM1_MAIN_DB_URL remains a legacy alias (must point at the same pump_db).
+  const url =
+    process.env.LAUNCHPAD_DATABASE_URL?.trim() ||
+    process.env.VM1_MAIN_DB_URL?.trim();
   if (!url) {
-    throw new Error("VM1_MAIN_DB_URL is required");
+    throw new Error("LAUNCHPAD_DATABASE_URL (or VM1_MAIN_DB_URL) is required");
   }
 
   if (!pool) {
