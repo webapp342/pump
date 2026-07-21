@@ -434,8 +434,10 @@ export const ADMIN_COPY = {
 
   wipe: {
     title: "Reset data",
-    description: "Destructive maintenance for this environment. On-chain contracts and balances are not modified.",
-    warning: "Deletes indexed app data. On-chain state unchanged.",
+    description:
+      "Destructive clean-start for this environment. Wipes users, XP, perks, challenge progress, airdrop/rewards leaderboards, and indexed trading data. Keeps promoted campaigns and mission definitions (launchpad_tasks). On-chain contracts and balances are not modified.",
+    warning:
+      "Deletes app users, XP, claimed perks, completed challenges, airdrop/rewards leaderboard rows, and indexed market data. Task definitions and promo campaigns stay.",
     preservedTitle: "Kept",
     wipedTitle: "Deleted",
     confirmLabel: "Type WIPE PUMP DATA to enable",
@@ -446,7 +448,7 @@ export const ADMIN_COPY = {
     successWithWarning:
       "Data wiped, but indexer restart could not be confirmed — run systemctl restart manually if needed.",
     finalConfirm:
-      "Last chance: wipe all application data (contract registry rows are re-synced from .env addresses after wipe)?",
+      "Last chance: wipe all application data (users/XP/perks/airdrop leaderboards)? Promoted campaigns and mission definitions are kept. Contract registry re-syncs from .env.",
     indexerNote: "",
   },
 } as const;

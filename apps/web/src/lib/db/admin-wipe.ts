@@ -10,6 +10,7 @@ export {
 export type WipeAppDataResult = {
   ok: true;
   preserved: string[];
+  truncated?: string[];
 };
 
 export async function readIndexerCursor(): Promise<{

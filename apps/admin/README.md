@@ -42,6 +42,24 @@ bash deploy/admin-console-build.sh
 
 No PM2 — nginx serves `admin-console/dist/`.
 
+## Data wipe (Environment)
+
+Admin **Reset data** calls `wipe_launchpad_app_data()` (migration `052`).
+
+| Kept | Wiped |
+|------|--------|
+| `launchpad_tasks` (promoted campaigns + system missions) | `users` (XP / points) |
+| `contract_registry` | `points_inventory` / `points_redemptions` (claimed perks) |
+| `platform_settings` | `launchpad_user_*_completions` (finished challenges) |
+| `admin_todos` | `referral_invite_xp_claims`, airdrop + rewards leaderboard tables |
+| | tokens / trades / positions / wallets / `indexer_state` |
+
+Apply on VM if wipe is outdated:
+
+```bash
+sudo -u postgres psql -d pump_db -f db/migrations/052_wipe_launchpad_app_data_comprehensive.sql
+```
+
 ## Auth
 
 - UI: MetaMask + `NEXT_PUBLIC_ADMIN_ADDRESS`

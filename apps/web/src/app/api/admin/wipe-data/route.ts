@@ -66,7 +66,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           error:
-            "Wipe function not installed. Run migrations 018–020 as postgres.",
+            "Wipe function not installed. Run db/migrations/052_wipe_launchpad_app_data_comprehensive.sql as postgres.",
         },
         { status: 503 }
       );

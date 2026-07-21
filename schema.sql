@@ -260,44 +260,76 @@ CREATE FUNCTION public.wipe_launchpad_app_data() RETURNS jsonb
     LANGUAGE plpgsql SECURITY DEFINER
     SET search_path TO 'public'
     AS $$
+DECLARE
+  wipe_tables text[] := ARRAY[
+    'airdrop_task_completions',
+    'airdrop_saves',
+    'airdrop_claims',
+    'airdrop_allocations',
+    'airdrop_participants',
+    'airdrop_social_tasks',
+    'airdrops',
+    'points_inventory',
+    'points_redemptions',
+    'points_audit_log',
+    'launchpad_user_daily_completions',
+    'launchpad_user_task_completions',
+    'launchpad_points_sync_log',
+    'referral_invite_xp_claims',
+    'user_trade_stats',
+    'user_hold_stats',
+    'user_position_lots',
+    'referrer_network_stats',
+    'user_volumes',
+    'king_history',
+    'token_board_stats',
+    'kol_callout_requests',
+    'kol_profiles',
+    'push_subscriptions',
+    'push_preferences',
+    'creator_follows',
+    'creator_fee_claims',
+    'referrer_fee_claims',
+    'referral_bindings',
+    'deep_links',
+    'token_announcements',
+    'token_favorites',
+    'token_media',
+    'token_candles',
+    'trades',
+    'user_positions',
+    'bonding_states',
+    'tokens',
+    'telegram_wallets',
+    'oauth_wallets',
+    'email_wallets',
+    'solana_wallets',
+    'users',
+    'indexer_state'
+  ];
+  t text;
+  existing text[] := ARRAY[]::text[];
+  truncated text[] := ARRAY[]::text[];
+  sql text;
 BEGIN
-  TRUNCATE TABLE
-    public.airdrop_task_completions,
-    public.airdrop_saves,
-    public.airdrop_claims,
-    public.airdrop_allocations,
-    public.airdrop_participants,
-    public.airdrop_social_tasks,
-    public.airdrops,
-    public.bonding_states,
-    public.creator_fee_claims,
-    public.referrer_fee_claims,
-    public.referral_bindings,
-    public.creator_follows,
-    public.deep_links,
-    public.king_history,
-    public.launchpad_points_sync_log,
-    public.launchpad_user_daily_completions,
-    public.launchpad_user_task_completions,
-    public.points_audit_log,
-    public.push_subscriptions,
-    public.push_preferences,
-    public.trades,
-    public.token_candles,
-    public.token_favorites,
-    public.token_media,
-    public.user_positions,
-    public.user_volumes,
-    public.tokens,
-    public.users,
-    public.telegram_wallets,
-    public.oauth_wallets,
-    public.email_wallets,
-    public.indexer_state
-  RESTART IDENTITY CASCADE;
+  FOREACH t IN ARRAY wipe_tables LOOP
+    IF to_regclass(format('public.%I', t)) IS NOT NULL THEN
+      existing := array_append(existing, format('public.%I', t));
+      truncated := array_append(truncated, t);
+    END IF;
+  END LOOP;
 
-  REFRESH MATERIALIZED VIEW public.mv_token_trade_stats;
-  REFRESH MATERIALIZED VIEW public.mv_token_price_anchors;
+  IF cardinality(existing) > 0 THEN
+    sql := 'TRUNCATE TABLE ' || array_to_string(existing, ', ') || ' RESTART IDENTITY CASCADE';
+    EXECUTE sql;
+  END IF;
+
+  IF to_regclass('public.mv_token_trade_stats') IS NOT NULL THEN
+    REFRESH MATERIALIZED VIEW public.mv_token_trade_stats;
+  END IF;
+  IF to_regclass('public.mv_token_price_anchors') IS NOT NULL THEN
+    REFRESH MATERIALIZED VIEW public.mv_token_price_anchors;
+  END IF;
 
   RETURN jsonb_build_object(
     'ok', true,
@@ -306,7 +338,8 @@ BEGIN
       'launchpad_tasks',
       'platform_settings',
       'admin_todos'
-    )
+    ),
+    'truncated', to_jsonb(truncated)
   );
 END;
 $$;
