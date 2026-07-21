@@ -3,9 +3,15 @@
  *
  *   npm run backfill-clickhouse-candles -w @pump/indexer-sol
  */
-import "dotenv/config";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import dotenv from "dotenv";
 import pg from "pg";
 import { enqueueCandlesClickHouse } from "./clickhouse-candles.js";
+
+// Load apps/indexer-sol/.env when run from monorepo root (VM: node dist/…).
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: path.join(__dirname, "../.env") });
 
 const pool = new pg.Pool({ connectionString: process.env.LAUNCHPAD_DATABASE_URL });
 const BATCH = 500;

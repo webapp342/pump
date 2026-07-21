@@ -59,8 +59,15 @@
 
 ```bash
 docker exec -i pump-clickhouse clickhouse-client --multiquery < deploy/clickhouse/init/02_candles_spot.sql
-npm run backfill-clickhouse-candles -w @pump/indexer-sol
+bash deploy/vm/backfill-clickhouse-candles.sh
 systemctl restart pump-indexer-sol && pm2 reload pump-tma --update-env
+```
+
+Verify CH table exists (empty output on CREATE = success):
+
+```bash
+docker exec pump-clickhouse clickhouse-client -q "SHOW TABLES FROM pump LIKE 'candles_spot'"
+docker exec pump-clickhouse clickhouse-client -q "SELECT count() FROM pump.candles_spot"
 ```
 
 ---

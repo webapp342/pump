@@ -135,9 +135,9 @@ if [[ -f "$INDEXER_ENV" ]]; then
   set +a
 fi
 npm run backfill-clickhouse-trades -w @pump/indexer-sol 2>/dev/null || \
-  log "WARN: trades backfill failed — run: npm run backfill-clickhouse-trades -w @pump/indexer-sol"
-npm run backfill-clickhouse-candles -w @pump/indexer-sol 2>/dev/null || \
-  log "WARN: candles_spot backfill failed — run: npm run backfill-clickhouse-candles -w @pump/indexer-sol"
+  log "WARN: trades backfill failed — run: bash deploy/vm/backfill-clickhouse-candles.sh (trades: node apps/indexer-sol/dist/backfill-clickhouse-trades.js)"
+bash "${TMA_DIR}/deploy/vm/backfill-clickhouse-candles.sh" 2>/dev/null || \
+  log "WARN: candles_spot backfill failed — run: bash deploy/vm/backfill-clickhouse-candles.sh"
 
 log "Verify:"
 curl -sf "http://127.0.0.1:8123/ping" && echo " clickhouse ping ok"
