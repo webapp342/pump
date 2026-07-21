@@ -1,7 +1,10 @@
 import type pg from "pg";
 import type { CandleWsUpdatePayload } from "./redis-types.js";
 import { queryLatestCandleClose } from "./clickhouse-query.js";
-import { readHotCandleUpdate } from "./redis-hot-cache.js";
+import {
+  readHotCandleUpdate,
+  writeHotCandleUpdates,
+} from "./redis-hot-cache.js";
 
 export const CANDLE_INTERVALS = ["5m", "15m", "1h", "4h"] as const;
 export type CandleInterval = (typeof CANDLE_INTERVALS)[number];
@@ -226,8 +229,18 @@ function tradeBucketOhlc(
   };
 }
 
-/** CH + Redis path when SKIP_PG_TOKEN_CANDLES=true (no PG token_candles write/read). */
-async function computeIntervalCandleSkipPg(
+/** Process-local tip — same indexer never waits on Redis RTT to merge the next trade. */
+const liveTipCache = new Map<string, CandleWsUpdatePayload>();
+
+function liveTipKey(tokenAddress: string, interval: string): string {
+  return `${tokenAddress}:${interval}`;
+}
+
+/**
+ * Live OHLC tip for one interval: L1 memory → Redis hot → CH prior close on new bucket.
+ * Does not touch PostgreSQL (enterprise dual-path: live never waits on PG).
+ */
+async function computeIntervalCandleLive(
   input: TradeCandleInput,
   interval: CandleInterval,
   spotBefore: number,
@@ -239,7 +252,10 @@ async function computeIntervalCandleSkipPg(
 
   const bucketTs = bucketTimestamp(input.blockTime, interval);
   const bucketSec = Math.floor(bucketTs.getTime() / 1000);
-  const existingHot = await readHotCandleUpdate(input.tokenAddress, interval);
+  const tipKey = liveTipKey(input.tokenAddress, interval);
+  const existingHot =
+    liveTipCache.get(tipKey) ??
+    (await readHotCandleUpdate(input.tokenAddress, interval));
   const isNewBucket = !existingHot || existingHot.time !== bucketSec;
 
   const priorClose = isNewBucket
@@ -289,11 +305,18 @@ async function computeIntervalCandleSkipPg(
   };
 }
 
-async function computeCandlesSkipPg(input: TradeCandleInput): Promise<CandleWsUpdatePayload[]> {
-  const updates: CandleWsUpdatePayload[] = [];
+/**
+ * Compute OHLC once for the live path (memory + Redis hot). No PG.
+ * Callers must `commitLiveCandleUpdates` before the next trade on this mint.
+ */
+export async function computeLiveCandleUpdates(
+  input: TradeCandleInput
+): Promise<CandleWsUpdatePayload[]> {
+  if (!incrementalCandlesEnabled()) return [];
 
+  const updates: CandleWsUpdatePayload[] = [];
   for (const interval of CANDLE_INTERVALS) {
-    const update = await computeIntervalCandleSkipPg(
+    const update = await computeIntervalCandleLive(
       input,
       interval,
       input.spotBefore,
@@ -305,13 +328,105 @@ async function computeCandlesSkipPg(input: TradeCandleInput): Promise<CandleWsUp
       updates.push(update);
     }
   }
-
   return updates;
 }
 
+/** Seal live tip in L1 + Redis so the next trade merges the same SSOT. */
+export async function commitLiveCandleUpdates(
+  tokenAddress: string,
+  updates: CandleWsUpdatePayload[]
+): Promise<void> {
+  for (const update of updates) {
+    liveTipCache.set(liveTipKey(tokenAddress, update.interval), update);
+  }
+  await writeHotCandleUpdates(tokenAddress, updates);
+}
+
 /**
- * Compute + persist OHLC for every chart interval.
- * Callers dual-write ALL updates to CH/Redis; WS may still filter for bandwidth.
+ * Durable PG mirror of already-computed live OHLC (absolute values — same SSOT).
+ * Fire-and-forget after WS/Redis; never block the live tip.
+ */
+export async function persistCandleUpdatesToPg(
+  pool: pg.Pool,
+  tokenAddress: string,
+  updates: CandleWsUpdatePayload[],
+  nativeUsdRate?: number | null
+): Promise<void> {
+  if (skipPgTokenCandles() || updates.length === 0) return;
+
+  const rate =
+    nativeUsdRate != null && Number.isFinite(nativeUsdRate) && nativeUsdRate > 0
+      ? nativeUsdRate
+      : null;
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    for (const update of updates) {
+      const close = Number(update.close);
+      const closeUsd = rate != null && close > 0 ? close * rate : null;
+      await client.query(
+        `
+          INSERT INTO token_candles (
+            token_address,
+            candle_interval,
+            bucket_ts,
+            open_zug,
+            high_zug,
+            low_zug,
+            close_zug,
+            volume_zug,
+            buy_volume_zug,
+            trade_count,
+            close_usd,
+            native_usd_rate,
+            updated_at
+          ) VALUES (
+            $1, $2, to_timestamp($3), $4, $5, $6, $7, $8, $9, $10, $11, $12, now()
+          )
+          ON CONFLICT (token_address, candle_interval, bucket_ts) DO UPDATE SET
+            open_zug = EXCLUDED.open_zug,
+            high_zug = EXCLUDED.high_zug,
+            low_zug = EXCLUDED.low_zug,
+            close_zug = EXCLUDED.close_zug,
+            volume_zug = EXCLUDED.volume_zug,
+            buy_volume_zug = EXCLUDED.buy_volume_zug,
+            trade_count = EXCLUDED.trade_count,
+            close_usd = EXCLUDED.close_usd,
+            native_usd_rate = EXCLUDED.native_usd_rate,
+            updated_at = now()
+        `,
+        [
+          tokenAddress,
+          update.interval,
+          update.time,
+          update.open,
+          update.high,
+          update.low,
+          update.close,
+          update.volume,
+          update.buyVolume,
+          update.tradeCount,
+          closeUsd,
+          rate,
+        ]
+      );
+    }
+    await client.query("COMMIT");
+  } catch (error) {
+    await client.query("ROLLBACK");
+    console.warn(
+      "[indexer-sol] persistCandleUpdatesToPg failed:",
+      error instanceof Error ? error.message : error
+    );
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * @deprecated Prefer computeLiveCandleUpdates + commitLiveCandleUpdates + persistCandleUpdatesToPg.
+ * Kept for scripts/backfill that still hold a PG client mid-transaction.
  */
 export async function upsertCandlesAfterTrade(
   client: pg.PoolClient,
@@ -320,7 +435,7 @@ export async function upsertCandlesAfterTrade(
   if (!incrementalCandlesEnabled()) return [];
 
   if (skipPgTokenCandles()) {
-    return computeCandlesSkipPg(input);
+    return computeLiveCandleUpdates(input);
   }
 
   const updates: CandleWsUpdatePayload[] = [];

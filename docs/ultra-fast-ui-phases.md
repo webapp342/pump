@@ -42,6 +42,10 @@
 
 \* `token_candles` PG writes optional (parity ops); chart **read path** never hits PG.
 
+**Live vs durable (ingest dual-path):** after a trade TX commits positions/bonding,
+indexer computes OHLC once (memory + Redis hot), **awaits Redis tip + WS publish**,
+then enqueues ClickHouse / optional PG candle mirror without blocking the tip.
+
 ---
 
 ## Phase 1 — Chart truth pipeline (P0) ✅ implementing

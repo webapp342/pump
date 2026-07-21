@@ -7,13 +7,17 @@ import {
   upsertBoardStatsAfterTrade,
   readBoardStatsForPublish,
 } from "./board-stats.js";
-import { upsertCandlesAfterTrade } from "./candles.js";
+import {
+  commitLiveCandleUpdates,
+  computeLiveCandleUpdates,
+  persistCandleUpdatesToPg,
+} from "./candles.js";
 import { enqueueTradeClickHouse } from "./clickhouse.js";
 import { fetchIndexerNativeUsdRate } from "./native-usd.js";
 import { applyTradeToPositionCost } from "./position-cost.js";
 import { publishTrade, publishWalletTrade } from "./redis-publish.js";
 import { enqueueCandlesClickHouse } from "./clickhouse-candles.js";
-import { pushHotTapeTrade, writeHotCandleUpdates } from "./redis-hot-cache.js";
+import { pushHotTapeTrade } from "./redis-hot-cache.js";
 import {
   FIRST_SMART_BUY_MIN_LAMPORTS,
   VOLUME_MONSTER_MIN_SOL,
@@ -410,48 +414,35 @@ export class SolanaEventHandlers {
           traderAddress: trader,
         });
 
-        const candleUpdates = await upsertCandlesAfterTrade(client, {
-          tokenAddress: mint,
-          blockTime,
-          isBuy,
-          spotBefore,
-          spotAfter: spotNum,
-          volumeZug: Math.max(0, grossSol - feeSol),
-          buyVolumeZug: isBuy ? Math.max(0, grossSol - feeSol) : 0,
+        // Dual-path: OHLC lives outside this TX (Redis/WS first, PG/CH after).
+        return {
+          tradeId,
+          bonding: b,
           nativeUsdRate: nativeUsdRateValue,
-        });
-
-        return { tradeId, bonding: b, candleUpdates, nativeUsdRate: nativeUsdRateValue };
+          volumeZug: Math.max(0, grossSol - feeSol),
+          spotAfter: spotNum,
+        };
       }
     );
 
     if (inserted) {
-      enqueueTradeClickHouse({
-        event_id: tradeEventId,
-        token_address: mint,
-        trader_address: trader,
-        side,
-        sol_amount: Number(lamportsToSol(solAmount)),
-        token_amount: Number(tokenAmountToDecimal(tokenAmount, decimals)),
-        price_sol: Number(executionPrice),
-        spot_price_sol: Number(markPrice),
-        fee_sol: Number(lamportsToSol(feeLamports)),
-        tx_hash: event.signature,
-        log_index: event.logIndex,
-        slot: Number(event.slot),
-        block_time: blockTime,
-        native_usd_rate: inserted.nativeUsdRate,
-      });
+      const candleInput = {
+        tokenAddress: mint,
+        blockTime,
+        isBuy,
+        spotBefore,
+        spotAfter: inserted.spotAfter,
+        volumeZug: inserted.volumeZug,
+        buyVolumeZug: isBuy ? inserted.volumeZug : 0,
+        nativeUsdRate: inserted.nativeUsdRate,
+      };
 
-      const candleUpdates = inserted.candleUpdates ?? [];
-      // Persist ALL intervals to CH + Redis hot (SSOT); WS gets the same set by default.
-      enqueueCandlesClickHouse(mint, candleUpdates);
-      void writeHotCandleUpdates(mint, candleUpdates);
-
-      const boardExtra = await readBoardStatsForPublish(
-        this.context.launchpadPool,
-        mint
-      );
+      // LIVE PATH: compute once → seal hot tip → WS (never wait on PG candles).
+      const [candleUpdates, boardExtra] = await Promise.all([
+        computeLiveCandleUpdates(candleInput),
+        readBoardStatsForPublish(this.context.launchpadPool, mint),
+      ]);
+      await commitLiveCandleUpdates(mint, candleUpdates);
       await publishTrade({
         type: "trade",
         tokenAddress: mint,
@@ -485,7 +476,6 @@ export class SolanaEventHandlers {
           traders24h: boardExtra?.traders24h,
         },
       });
-
       void pushHotTapeTrade(mint, {
         id: inserted.tradeId,
         side,
@@ -498,6 +488,31 @@ export class SolanaEventHandlers {
         logIndex: event.logIndex,
         blockTime: blockTime.toISOString(),
       });
+
+      // DURABLE PATH: CH + optional PG mirror (same OHLC payload; must not block tip).
+      enqueueTradeClickHouse({
+        event_id: tradeEventId,
+        token_address: mint,
+        trader_address: trader,
+        side,
+        sol_amount: Number(lamportsToSol(solAmount)),
+        token_amount: Number(tokenAmountToDecimal(tokenAmount, decimals)),
+        price_sol: Number(executionPrice),
+        spot_price_sol: Number(markPrice),
+        fee_sol: Number(lamportsToSol(feeLamports)),
+        tx_hash: event.signature,
+        log_index: event.logIndex,
+        slot: Number(event.slot),
+        block_time: blockTime,
+        native_usd_rate: inserted.nativeUsdRate,
+      });
+      enqueueCandlesClickHouse(mint, candleUpdates);
+      void persistCandleUpdatesToPg(
+        this.context.launchpadPool,
+        mint,
+        candleUpdates,
+        inserted.nativeUsdRate
+      );
 
       const positionRow = await this.context.launchpadPool.query<{
         token_balance: string;
