@@ -380,6 +380,10 @@ export async function getReferralInviteXpStatus(
  * Claim 50 XP per unclaimed successful invite.
  * App-level (not the legacy SQL fn) so Solana base58 case is preserved —
  * `claim_referral_invite_xp` historically used lower() and returned 0 invites.
+ *
+ * Do NOT run DDL (ALTER) inside this transaction — a permission error aborts the
+ * whole TX and yields "current transaction is aborted…" on later statements.
+ * Drop EVM CHECKs via migration 051 as postgres.
  */
 export async function claimReferralInviteXp(
   referrerAddress: string
@@ -390,20 +394,6 @@ export async function claimReferralInviteXp(
 
   try {
     await client.query("BEGIN");
-
-    // Best-effort: drop EVM-era lowercase CHECKs (noop if already gone / no privs).
-    try {
-      await client.query(`
-        ALTER TABLE public.referral_invite_xp_claims
-          DROP CONSTRAINT IF EXISTS referral_invite_xp_claims_referrer_check
-      `);
-      await client.query(`
-        ALTER TABLE public.referral_invite_xp_claims
-          DROP CONSTRAINT IF EXISTS referral_invite_xp_claims_invitee_check
-      `);
-    } catch {
-      /* pump_app may lack ALTER — migration 051 must be applied as postgres */
-    }
 
     await client.query(
       `
@@ -476,7 +466,11 @@ export async function claimReferralInviteXp(
     await client.query("COMMIT");
     return { claimedInvites, pointsAwarded };
   } catch (error) {
-    await client.query("ROLLBACK");
+    try {
+      await client.query("ROLLBACK");
+    } catch {
+      /* already aborted / closed */
+    }
     const message = error instanceof Error ? error.message : String(error);
     if (/referral_invite_xp_claims_(referrer|invitee)_check/i.test(message)) {
       throw new Error(
