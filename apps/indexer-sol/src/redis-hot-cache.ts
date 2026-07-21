@@ -42,6 +42,24 @@ export function hotTapeKey(tokenAddress: string): string {
   return `pump:hot:tape:${roomKey(tokenAddress)}`;
 }
 
+/** Latest OHLC bucket for merge when SKIP_PG_TOKEN_CANDLES=true. */
+export async function readHotCandleUpdate(
+  tokenAddress: string,
+  interval: string
+): Promise<CandleWsUpdatePayload | null> {
+  const client = getRedis();
+  if (!client) return null;
+
+  try {
+    if (client.status !== "ready") await client.connect();
+    const raw = await client.get(hotCandleKey(tokenAddress, interval));
+    if (!raw) return null;
+    return JSON.parse(raw) as CandleWsUpdatePayload;
+  } catch {
+    return null;
+  }
+}
+
 /** Latest OHLC bucket per interval — used by web chart API for tail merge. */
 export async function writeHotCandleUpdates(
   tokenAddress: string,
@@ -75,6 +93,7 @@ type TapeEntry = {
   side: string;
   traderAddress: string;
   zugAmount: string;
+  feeZug?: string;
   tokenAmount: string;
   priceZug: string;
   txHash: string;
@@ -94,6 +113,7 @@ export async function pushHotTapeTrade(
     side: trade.side,
     traderAddress: trade.traderAddress,
     zugAmount: trade.zugAmount,
+    feeZug: trade.feeZug,
     tokenAmount: trade.tokenAmount,
     priceZug: trade.priceZug,
     txHash: trade.txHash,

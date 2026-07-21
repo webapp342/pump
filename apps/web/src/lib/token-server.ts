@@ -7,8 +7,8 @@ import {
   listTokenCandlesFromDb,
   listTokenCandlesGapFilledFromDb,
   listTokenHolders,
-  listTradesForToken,
 } from "@/lib/db/launchpad";
+import { listTapeTradesForToken } from "@/lib/tape-trades";
 import { normalizeAddressParam } from "@/lib/address";
 import {
   readTokenSnapshotCache,
@@ -116,9 +116,9 @@ async function fetchTokenDetailBundleCached(
     }
   }
 
-  const [token, trades, holders, initialCandles] = await Promise.all([
+  const [token, tapeResult, holders, initialCandles] = await Promise.all([
     getTokenByAddress(normalized),
-    listTradesForToken(normalized, ACTIVITY_PAGE_SIZE, 0),
+    listTapeTradesForToken(normalized, ACTIVITY_PAGE_SIZE, 0),
     listTokenHolders(normalized, ACTIVITY_PAGE_SIZE, 0),
     fetchInitialChartCandles(normalized),
   ]);
@@ -126,7 +126,13 @@ async function fetchTokenDetailBundleCached(
   if (!token) return null;
 
   const market = buildTokenMarketSnapshot(token);
-  const bundle: TokenDetailBundle = { token, trades, holders, market, initialCandles };
+  const bundle: TokenDetailBundle = {
+    token,
+    trades: tapeResult.trades,
+    holders,
+    market,
+    initialCandles,
+  };
 
   if (useRedisArenaCache()) {
     await writeTokenSnapshotCache(normalized, bundle);

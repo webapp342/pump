@@ -45,6 +45,8 @@ cd /var/www/pump/tma
 npm run backfill-cost-basis -w @pump/indexer-sol
 npm run check-position-invariants -w @pump/indexer-sol
 npm run check-chart-parity -w @pump/indexer-sol
+# Or daily cron: bash deploy/vm/check-chart-parity.sh
+# 7 consecutive green days → SKIP_PG_TOKEN_CANDLES=true (see ultra-fast-ui-phases.md)
 ```
 
 ### Açık env flag’leri (doğrulandı)

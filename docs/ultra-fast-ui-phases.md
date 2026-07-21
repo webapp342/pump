@@ -88,9 +88,35 @@ docker exec pump-clickhouse clickhouse-client -q "SELECT count() FROM pump.candl
 
 ## Phase 3 — PG load reduction (P1)
 
-1. `SKIP_PG_TOKEN_CANDLES=true` — indexer skips PG candle INSERT (CH + Redis only) after parity green 7d.
-2. Fix `gap_fill_candles()` — Solana base58 (no `lower()`).
+**Gate:** Do **not** set `SKIP_PG_TOKEN_CANDLES=true` until the [7-day green parity](#7-day-green-parity-gate) ritual passes.
+
+1. `SKIP_PG_TOKEN_CANDLES=true` — indexer skips PG candle INSERT (CH + Redis only).
+2. Fix `gap_fill_candles()` — Solana base58 (no `lower()`) ✅ migration 048.
 3. Tape pagination: page 1 Redis, older pages CH `trades_raw`.
+
+```bash
+# After 7 green days only:
+# apps/indexer-sol/.env → SKIP_PG_TOKEN_CANDLES=true
+systemctl restart pump-indexer-sol
+```
+
+---
+
+## 7-day green parity gate
+
+Before turning off PG `token_candles` writes, prove CH authoritative path matches bonding spot for a full week.
+
+| Step | Command / check |
+|------|-----------------|
+| Daily cron | `bash deploy/vm/check-chart-parity.sh` |
+| Green day | Exit **0**, log line `YYYY-MM-DD green` in `/var/log/pump/chart-parity-streak.log` |
+| Compared | `compared_ch > 0` (CH candles_spot has live buckets) |
+| Drift | `drift_pg=0` and `drift_ch=0` (spot vs 5m close ≤ 10 bps) |
+| Wicks | `wick_violations=0` (live bucket `low/close ≥ 0.25`) |
+| Prerequisites | `enable-clickhouse.sh` done · `USE_CLICKHOUSE_CANDLES=true` · indexer dual-write on |
+| Enable skip | **7 consecutive** green days → `SKIP_PG_TOKEN_CANDLES=true` + restart indexer |
+
+One red day resets the counter. Keep PG writes until the streak completes — PG remains rollback / audit path.
 
 ---
 
@@ -138,7 +164,7 @@ Chart rules: native OHLC in store; USD = `× nativeUsd` in formatter only; wick 
 |-------|--------|
 | 1 Chart truth (CH candles_spot) | ✅ code shipped |
 | 2 Redis hot tail + tape ring | ✅ code shipped |
-| 3 PG load reduction (`SKIP_PG_TOKEN_CANDLES`) | planned |
-| 4 API polish (arena Redis-first) | planned |
-| 5 Observability | planned |
+| 3 PG load reduction (`SKIP_PG_TOKEN_CANDLES`) | ✅ code shipped · **env off until 7d green** |
+| 4 API polish (tape Redis page-1, arena cache) | ✅ code shipped |
+| 5 Observability (CH parity + olap logs) | ✅ code shipped |
 | 6 Scale gates | deferred |

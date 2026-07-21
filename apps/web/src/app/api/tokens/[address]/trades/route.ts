@@ -5,8 +5,8 @@ import { normalizeAddressParam } from "@/lib/address";
 import {
   countTradesForToken,
   getTokenByAddress,
-  listTradesForToken,
 } from "@/lib/db/launchpad";
+import { listTapeTradesForToken } from "@/lib/tape-trades";
 
 type RouteContext = { params: Promise<{ address: string }> };
 
@@ -38,8 +38,8 @@ export async function GET(request: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: "Token not found" }, { status: 404 });
     }
 
-    const [trades, total] = await Promise.all([
-      listTradesForToken(tokenAddress, limit, offset),
+    const [{ trades, source }, total] = await Promise.all([
+      listTapeTradesForToken(tokenAddress, limit, offset),
       countTradesForToken(tokenAddress),
     ]);
 
@@ -51,6 +51,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
           offset,
           total,
           hasMore: offset + trades.length < total,
+          tapeSource: source,
         },
       },
       { headers: { "Cache-Control": "private, max-age=5" } }

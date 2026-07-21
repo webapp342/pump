@@ -88,3 +88,29 @@ export function logChartWsMerge(details: {
     })
   );
 }
+
+export type ChartOlapSource =
+  | "candles_spot"
+  | "candles_mv"
+  | "postgres"
+  | "trades_replay"
+  | "cache";
+
+export function logChartOlapSource(details: {
+  tokenAddress: string;
+  interval: string;
+  olap: ChartOlapSource;
+  bucketCount?: number;
+  cached?: boolean;
+}): void {
+  if (process.env.NODE_ENV === "test") return;
+  if (process.env.NODE_ENV === "production" && details.cached) return;
+
+  console.info(
+    JSON.stringify({
+      event: "chart_olap_source",
+      at: new Date().toISOString(),
+      ...details,
+    })
+  );
+}

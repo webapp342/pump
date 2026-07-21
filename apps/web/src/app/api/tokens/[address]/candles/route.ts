@@ -21,6 +21,7 @@ import {
 } from "@/lib/db/launchpad";
 import { readCandleCache, writeCandleCache } from "@/lib/redis/candle-cache";
 import { readHotCandleUpdate } from "@/lib/redis/hot-cache";
+import { logChartOlapSource, type ChartOlapSource } from "@/lib/chart-observability";
 
 type RouteContext = { params: Promise<{ address: string }> };
 
@@ -56,6 +57,13 @@ export async function GET(request: NextRequest, context: RouteContext) {
 
     const cached = await readCandleCache(address, interval);
     if (cached && Date.now() - cached.cachedAt < 5_000) {
+      logChartOlapSource({
+        tokenAddress: address,
+        interval,
+        olap: "cache",
+        bucketCount: cached.candles.length,
+        cached: true,
+      });
       return NextResponse.json(
         {
           data: {
@@ -110,6 +118,12 @@ export async function GET(request: NextRequest, context: RouteContext) {
           source: "db",
           gapFilled: true,
           gapFill: "ts",
+        });
+        logChartOlapSource({
+          tokenAddress: address,
+          interval,
+          olap: fromCh.source as ChartOlapSource,
+          bucketCount: fromCh.rows.length,
         });
         return NextResponse.json(
           { data: payload },
@@ -178,6 +192,13 @@ export async function GET(request: NextRequest, context: RouteContext) {
           gapFill,
         });
 
+        logChartOlapSource({
+          tokenAddress: address,
+          interval,
+          olap: "postgres",
+          bucketCount: stored.length,
+        });
+
         return NextResponse.json(
           { data: payload },
           {
@@ -192,6 +213,13 @@ export async function GET(request: NextRequest, context: RouteContext) {
     const trades = await listTradesForChart(address);
     const { candles, volumes } = buildCandlesFromTrades(trades, interval, 1, {
       fillGaps: true,
+    });
+
+    logChartOlapSource({
+      tokenAddress: address,
+      interval,
+      olap: "trades_replay",
+      bucketCount: candles.length,
     });
 
     return NextResponse.json(

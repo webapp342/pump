@@ -1,5 +1,7 @@
 import type pg from "pg";
 import type { CandleWsUpdatePayload } from "./redis-types.js";
+import { queryLatestCandleClose } from "./clickhouse-query.js";
+import { readHotCandleUpdate } from "./redis-hot-cache.js";
 
 export const CANDLE_INTERVALS = ["5m", "15m", "1h", "4h"] as const;
 export type CandleInterval = (typeof CANDLE_INTERVALS)[number];
@@ -16,6 +18,11 @@ export function incrementalCandlesEnabled(): boolean {
   if (value === "false") return false;
   if (value === "true") return true;
   return process.env.INCREMENTAL_BOARD_STATS !== "false";
+}
+
+/** When true: OHLC → ClickHouse + Redis only (no PG token_candles). Enable after 7d green parity. */
+export function skipPgTokenCandles(): boolean {
+  return process.env.SKIP_PG_TOKEN_CANDLES === "true";
 }
 
 export function wsCandleIntervals(): CandleInterval[] {
@@ -190,11 +197,109 @@ async function upsertIntervalCandle(
   };
 }
 
+function resolveSpotOpen(spotBefore: number, spotAfter: number, priorClose: number | null): number {
+  let spotOpen = spotBefore > 0 && Number.isFinite(spotBefore) ? spotBefore : spotAfter;
+  if (spotAfter > 0 && spotOpen > 0) {
+    const ratio = spotOpen / spotAfter;
+    if (ratio > 4 || ratio < 1 / 4) {
+      spotOpen = priorClose != null && priorClose > 0 ? priorClose : spotAfter;
+    }
+  }
+  return spotOpen;
+}
+
+/** CH + Redis path when SKIP_PG_TOKEN_CANDLES=true (no PG token_candles write/read). */
+async function computeIntervalCandleSkipPg(
+  input: TradeCandleInput,
+  interval: CandleInterval,
+  spotBefore: number,
+  spotAfter: number,
+  volumeZug: number,
+  buyVolumeZug: number
+): Promise<CandleWsUpdatePayload | null> {
+  if (spotAfter <= 0 || !Number.isFinite(spotAfter)) return null;
+
+  const bucketTs = bucketTimestamp(input.blockTime, interval);
+  const bucketSec = Math.floor(bucketTs.getTime() / 1000);
+  const existingHot = await readHotCandleUpdate(input.tokenAddress, interval);
+  const isNewBucket = !existingHot || existingHot.time !== bucketSec;
+
+  const priorClose = isNewBucket
+    ? await queryLatestCandleClose(input.tokenAddress, interval)
+    : null;
+  const spotOpen = resolveSpotOpen(spotBefore, spotAfter, priorClose);
+
+  let open: number;
+  let high: number;
+  let low: number;
+  let close: number;
+  let volume: number;
+  let buyVolume: number;
+  let tradeCount: number;
+
+  if (isNewBucket) {
+    open = priorClose ?? spotAfter;
+    const prices = [open, spotOpen, spotAfter];
+    high = Math.max(...prices);
+    low = Math.min(...prices);
+    close = spotAfter;
+    volume = volumeZug;
+    buyVolume = buyVolumeZug;
+    tradeCount = 1;
+  } else {
+    open = Number(existingHot!.open);
+    high = Math.max(Number(existingHot!.high), spotOpen, spotAfter);
+    low = Math.min(Number(existingHot!.low), spotOpen, spotAfter);
+    close = spotAfter;
+    volume = Number(existingHot!.volume) + volumeZug;
+    buyVolume = Number(existingHot!.buyVolume) + buyVolumeZug;
+    tradeCount = existingHot!.tradeCount + 1;
+  }
+
+  return {
+    interval,
+    time: bucketSec,
+    open: String(open),
+    high: String(high),
+    low: String(low),
+    close: String(close),
+    volume: String(volume),
+    buyVolume: String(buyVolume),
+    tradeCount,
+    isNewBucket,
+  };
+}
+
+async function computeCandlesSkipPg(input: TradeCandleInput): Promise<CandleWsUpdatePayload[]> {
+  const wsIntervals = new Set(wsCandleIntervals());
+  const updates: CandleWsUpdatePayload[] = [];
+
+  for (const interval of CANDLE_INTERVALS) {
+    const update = await computeIntervalCandleSkipPg(
+      input,
+      interval,
+      input.spotBefore,
+      input.spotAfter,
+      input.volumeZug,
+      input.buyVolumeZug
+    );
+    if (update && wsIntervals.has(interval)) {
+      updates.push(update);
+    }
+  }
+
+  return updates;
+}
+
 export async function upsertCandlesAfterTrade(
   client: pg.PoolClient,
   input: TradeCandleInput
 ): Promise<CandleWsUpdatePayload[]> {
   if (!incrementalCandlesEnabled()) return [];
+
+  if (skipPgTokenCandles()) {
+    return computeCandlesSkipPg(input);
+  }
 
   const wsIntervals = new Set(wsCandleIntervals());
   const updates: CandleWsUpdatePayload[] = [];
