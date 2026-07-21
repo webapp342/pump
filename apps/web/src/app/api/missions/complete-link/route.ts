@@ -21,6 +21,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Task not found" }, { status: 404 });
     }
 
+    if (result.status === "SKIPPED" && result.pointsAwarded === 0) {
+      return NextResponse.json(
+        { error: "Task is inactive or already completed" },
+        { status: 409 }
+      );
+    }
+
     const snapshot = await getMissionsForAddress(address);
 
     return NextResponse.json({

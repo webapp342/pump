@@ -43,6 +43,24 @@ function formatTodoWhen(iso: string): string {
   }
 }
 
+function formatTodoWhenRelative(iso: string): string {
+  try {
+    const diffMs = Date.now() - new Date(iso).getTime();
+    if (!Number.isFinite(diffMs)) return formatTodoWhen(iso);
+    const sec = Math.floor(diffMs / 1000);
+    if (sec < 60) return "just now";
+    const min = Math.floor(sec / 60);
+    if (min < 60) return `${min}m ago`;
+    const hr = Math.floor(min / 60);
+    if (hr < 48) return `${hr}h ago`;
+    const day = Math.floor(hr / 24);
+    if (day < 14) return `${day}d ago`;
+    return new Date(iso).toLocaleDateString();
+  } catch {
+    return iso;
+  }
+}
+
 function AdminTodoDetailModal({
   todo,
   busy,
@@ -123,6 +141,7 @@ export function AdminTodosTab() {
   const [dragOverId, setDragOverId] = useState<string | null>(null);
 
   const [newTitle, setNewTitle] = useState("");
+  const [newBody, setNewBody] = useState("");
   const [newPriority, setNewPriority] = useState<AdminTodoPriority>("medium");
   const [creating, setCreating] = useState(false);
 
@@ -216,11 +235,16 @@ export function AdminTodosTab() {
       const res = await adminFetch("/api/admin/todos", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: newTitle.trim(), priority: newPriority }),
+        body: JSON.stringify({
+          title: newTitle.trim(),
+          body: newBody.trim() || undefined,
+          priority: newPriority,
+        }),
       });
       const json = (await res.json()) as { error?: string };
       if (!res.ok) throw new Error(json.error ?? "Failed to create todo");
       setNewTitle("");
+      setNewBody("");
       setNewPriority("medium");
       await load();
     } catch (err) {
@@ -319,7 +343,6 @@ export function AdminTodosTab() {
     <>
       <AdminBlock
         title={ADMIN_COPY.todos.listTitle}
-        description={ADMIN_COPY.todos.listDesc}
         actions={
           <AdminBtn size="sm" onClick={() => void load()} disabled={loading}>
             {loading ? ADMIN_COPY.todos.loading : ADMIN_COPY.actions.refresh}
@@ -327,6 +350,8 @@ export function AdminTodosTab() {
         }
       >
     <div className="admin-todos-shell">
+        <p className="admin-todos-hint">{ADMIN_COPY.todos.listDesc}</p>
+
         <div className="admin-todos-shell-bar">
           <div className="admin-todos-filters" role="tablist" aria-label="Todo filters">
             {(
@@ -380,37 +405,51 @@ export function AdminTodosTab() {
           </div>
         </div>
 
-        <form className="admin-todos-prompt" onSubmit={(e) => void onCreate(e)}>
-          <span className="admin-todos-prompt-prefix" aria-hidden>
-            +
-          </span>
-          <input
-            className="admin-todos-prompt-input"
-            value={newTitle}
-            onChange={(e) => setNewTitle(e.target.value)}
-            placeholder={ADMIN_COPY.todos.placeholders.title}
-            maxLength={200}
-          />
-          <select
-            className="admin-todos-prompt-pri"
-            value={newPriority}
-            onChange={(e) => setNewPriority(e.target.value as AdminTodoPriority)}
-            aria-label={ADMIN_COPY.todos.fields.priority}
-          >
-            {PRIORITY_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.short}
-              </option>
-            ))}
-          </select>
-          <button
-            type="submit"
-            className="admin-todos-prompt-add"
-            disabled={creating || !newTitle.trim()}
-          >
-            <PumpIcon icon={faPlus} className="h-3.5 w-3.5" />
-            {creating ? "…" : ADMIN_COPY.todos.add}
-          </button>
+        <form className="admin-todos-compose" onSubmit={(e) => void onCreate(e)}>
+          <div className="admin-todos-compose-fields">
+            <label className="admin-todos-compose-label">
+              <span className="admin-todos-compose-label-text">{ADMIN_COPY.todos.fields.title}</span>
+              <input
+                className="admin-todos-compose-input"
+                value={newTitle}
+                onChange={(e) => setNewTitle(e.target.value)}
+                placeholder={ADMIN_COPY.todos.placeholders.title}
+                maxLength={200}
+              />
+            </label>
+            <label className="admin-todos-compose-label">
+              <span className="admin-todos-compose-label-text">{ADMIN_COPY.todos.fields.notes}</span>
+              <textarea
+                className="admin-todos-compose-textarea"
+                value={newBody}
+                onChange={(e) => setNewBody(e.target.value)}
+                placeholder={ADMIN_COPY.todos.placeholders.notes}
+                rows={2}
+              />
+            </label>
+          </div>
+          <div className="admin-todos-compose-actions">
+            <select
+              className="admin-todos-compose-pri"
+              value={newPriority}
+              onChange={(e) => setNewPriority(e.target.value as AdminTodoPriority)}
+              aria-label={ADMIN_COPY.todos.fields.priority}
+            >
+              {PRIORITY_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+            <button
+              type="submit"
+              className="admin-todos-compose-submit"
+              disabled={creating || !newTitle.trim()}
+            >
+              <PumpIcon icon={faPlus} className="h-4 w-4" />
+              {creating ? ADMIN_COPY.todos.creating : ADMIN_COPY.todos.add}
+            </button>
+          </div>
         </form>
 
         {error ? <AdminAlert>{error}</AdminAlert> : null}
@@ -429,24 +468,30 @@ export function AdminTodosTab() {
 
               if (editing) {
                 return (
-                  <li key={todo.id} className="admin-todo-row admin-todo-row--edit">
-                    <input
-                      className="admin-todos-prompt-input"
-                      value={editTitle}
-                      onChange={(e) => setEditTitle(e.target.value)}
-                      maxLength={200}
-                      autoFocus
-                    />
-                    <textarea
-                      className="admin-todo-edit-notes"
-                      value={editBody}
-                      onChange={(e) => setEditBody(e.target.value)}
-                      placeholder={ADMIN_COPY.todos.placeholders.notes}
-                      rows={2}
-                    />
+                  <li key={todo.id} className="admin-todo-card admin-todo-card--edit">
+                    <label className="admin-todos-compose-label">
+                      <span className="admin-todos-compose-label-text">{ADMIN_COPY.todos.fields.title}</span>
+                      <input
+                        className="admin-todos-compose-input"
+                        value={editTitle}
+                        onChange={(e) => setEditTitle(e.target.value)}
+                        maxLength={200}
+                        autoFocus
+                      />
+                    </label>
+                    <label className="admin-todos-compose-label">
+                      <span className="admin-todos-compose-label-text">{ADMIN_COPY.todos.fields.notes}</span>
+                      <textarea
+                        className="admin-todos-compose-textarea"
+                        value={editBody}
+                        onChange={(e) => setEditBody(e.target.value)}
+                        placeholder={ADMIN_COPY.todos.placeholders.notes}
+                        rows={4}
+                      />
+                    </label>
                     <div className="admin-todo-edit-bar">
                       <select
-                        className="admin-todos-prompt-pri"
+                        className="admin-todos-compose-pri"
                         value={editPriority}
                         onChange={(e) => setEditPriority(e.target.value as AdminTodoPriority)}
                       >
@@ -458,11 +503,11 @@ export function AdminTodosTab() {
                       </select>
                       <button
                         type="button"
-                        className="admin-todos-row-btn"
+                        className="admin-todos-row-btn admin-todos-row-btn--primary"
                         disabled={busy || !editTitle.trim()}
                         onClick={() => void saveEdit(todo.id)}
                       >
-                        <PumpIcon icon={faCheck} className="h-3.5 w-3.5" />
+                        <PumpIcon icon={faCheck} className="h-4 w-4" />
                         {ADMIN_COPY.todos.save}
                       </button>
                       <button
@@ -471,7 +516,7 @@ export function AdminTodosTab() {
                         disabled={busy}
                         onClick={() => setEditingId(null)}
                       >
-                        <PumpIcon icon={faX} className="h-3.5 w-3.5" />
+                        <PumpIcon icon={faX} className="h-4 w-4" />
                         {ADMIN_COPY.actions.close}
                       </button>
                     </div>
@@ -482,7 +527,7 @@ export function AdminTodosTab() {
               return (
                 <li
                   key={todo.id}
-                  className={`admin-todo-row${todo.isCompleted ? " admin-todo-row--done" : ""}${dragging ? " admin-todo-row--drag" : ""}${over ? " admin-todo-row--over" : ""}`}
+                  className={`admin-todo-card${todo.isCompleted ? " admin-todo-card--done" : ""}${dragging ? " admin-todo-card--drag" : ""}${over ? " admin-todo-card--over" : ""}`}
                   draggable={!busy}
                   onDragStart={(e) => {
                     setDragId(todo.id);
@@ -504,41 +549,50 @@ export function AdminTodosTab() {
                     void onDrop(todo.id);
                   }}
                 >
-                  <button
-                    type="button"
-                    className="admin-todo-grip"
-                    aria-label={ADMIN_COPY.todos.drag}
-                    tabIndex={-1}
-                  >
-                    <PumpIcon icon={faGripVertical} className="h-3.5 w-3.5" />
-                  </button>
+                  <div className="admin-todo-card-lead">
+                    <button
+                      type="button"
+                      className="admin-todo-grip"
+                      aria-label={ADMIN_COPY.todos.drag}
+                      tabIndex={-1}
+                    >
+                      <PumpIcon icon={faGripVertical} className="h-4 w-4" />
+                    </button>
 
-                  <label className="admin-todo-check admin-todo-check--compact">
-                    <input
-                      type="checkbox"
-                      checked={todo.isCompleted}
-                      disabled={busy}
-                      onChange={(e) => void patchTodo(todo.id, { isCompleted: e.target.checked })}
-                    />
-                    <span className="admin-todo-check-box" aria-hidden />
-                  </label>
-
-                  <span className={priorityClass(todo.priority)} title={todo.priority}>
-                    {priorityShort(todo.priority)}
-                  </span>
+                    <label className="admin-todo-check">
+                      <input
+                        type="checkbox"
+                        checked={todo.isCompleted}
+                        disabled={busy}
+                        onChange={(e) => void patchTodo(todo.id, { isCompleted: e.target.checked })}
+                      />
+                      <span className="admin-todo-check-box" aria-hidden />
+                    </label>
+                  </div>
 
                   <button
                     type="button"
-                    className="admin-todo-line admin-todo-line--open"
+                    className="admin-todo-card-body"
                     onClick={() => openView(todo)}
                   >
-                    <span className="admin-todo-line-title">{todo.title}</span>
+                    <div className="admin-todo-card-head">
+                      <span className={priorityClass(todo.priority)} title={todo.priority}>
+                        {priorityShort(todo.priority)}
+                      </span>
+                      <span className="admin-todo-card-time" title={formatTodoWhen(todo.updatedAt)}>
+                        Updated {formatTodoWhenRelative(todo.updatedAt)}
+                      </span>
+                    </div>
+                    <span className="admin-todo-card-title">{todo.title}</span>
                     {todo.body ? (
-                      <span className="admin-todo-line-note">{todo.body}</span>
+                      <span className="admin-todo-card-preview">{todo.body}</span>
+                    ) : null}
+                    {!todo.body && todo.title.length > 100 ? (
+                      <span className="admin-todo-card-more">{ADMIN_COPY.todos.expandNotes} →</span>
                     ) : null}
                   </button>
 
-                  <div className="admin-todo-row-actions">
+                  <div className="admin-todo-card-actions">
                     <button
                       type="button"
                       className="admin-todos-row-btn admin-todos-row-btn--icon"

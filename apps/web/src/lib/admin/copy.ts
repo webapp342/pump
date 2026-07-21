@@ -397,7 +397,7 @@ export const ADMIN_COPY = {
     loading: "Loading todos…",
     empty: "No todos in this view yet.",
     listTitle: "Tasks",
-    listDesc: "Drag to reorder (switches to manual). Reset to sort by priority anytime.",
+    listDesc: "Drag tasks to reorder (switches to manual sort). Use notes for long specs — keep titles short.",
     deleteConfirm: "Delete this todo permanently?",
     moveUp: "Move up",
     moveDown: "Move down",

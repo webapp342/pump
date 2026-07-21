@@ -8,7 +8,7 @@ import {
   type ActiveLaunchPin,
 } from "@/lib/points-perk-effects";
 import type { ActivatePerkResult, PointsInventoryItem } from "@/lib/points-inventory-types";
-import { normalizeUserStorageAddress } from "@/lib/address";
+import { dbStorageAddress, normalizeUserStorageAddress } from "@/lib/address";
 
 let pool: Pool | null = null;
 
@@ -203,7 +203,7 @@ export async function ensureFirstSmartBuyAward(
   trade: FirstSmartBuyAwardInput
 ): Promise<boolean> {
   const db = getIncentivePool();
-  const normalized = address.toLowerCase();
+  const normalized = dbStorageAddress(address);
 
   const existing = await db.query(
     `
@@ -242,7 +242,7 @@ export async function getReferralInviteXpStatus(
   referrerAddress: string
 ): Promise<ReferralInviteXpStatus> {
   const db = getIncentivePool();
-  const normalized = referrerAddress.toLowerCase();
+  const normalized = dbStorageAddress(referrerAddress);
 
   const result = await db.query<{
     total_successful: string;
@@ -282,7 +282,7 @@ export async function claimReferralInviteXp(
   referrerAddress: string
 ): Promise<{ claimedInvites: number; pointsAwarded: number }> {
   const db = getIncentivePool();
-  const normalized = referrerAddress.toLowerCase();
+  const normalized = dbStorageAddress(referrerAddress);
 
   const result = await db.query<{ claimed_invites: number; points_awarded: number }>(
     `
@@ -305,7 +305,7 @@ export async function claimReferralInviteXp(
  */
 export async function ensureVolumeMonsterAward(address: string): Promise<boolean> {
   const db = getIncentivePool();
-  const normalized = address.toLowerCase();
+  const normalized = dbStorageAddress(address);
   const client = await db.connect();
 
   try {
@@ -629,7 +629,7 @@ export async function completeAdminLinkTask(
   taskKey: string
 ): Promise<CompleteAdminLinkTaskResult> {
   const db = getIncentivePool();
-  const normalized = address.toLowerCase();
+  const normalized = dbStorageAddress(address);
 
   const taskResult = await db.query<{ is_active: boolean; target_url: string }>(
     `
@@ -693,7 +693,7 @@ export async function redeemMarketItem(input: {
   metadata?: Record<string, unknown>;
 }): Promise<RedeemPointsResult> {
   const db = getIncentivePool();
-  const normalized = input.address.toLowerCase();
+  const normalized = dbStorageAddress(input.address);
 
   try {
     const result = await db.query<{
@@ -788,7 +788,7 @@ export async function getPointsInventory(
         ORDER BY created_at DESC, id DESC
         LIMIT 50
       `,
-      [address.toLowerCase()]
+      [dbStorageAddress(address)]
     );
     return result.rows.map((row) => ({
       id: Number(row.id),
@@ -816,7 +816,7 @@ export async function countUsableMarketItems(
           AND status = 'active'
           AND (expires_at IS NULL OR expires_at > now())
       `,
-      [address.toLowerCase(), itemId]
+      [dbStorageAddress(address), itemId]
     );
     return Number(result.rows[0]?.n ?? 0);
   } catch {
@@ -1044,7 +1044,7 @@ export async function hasAirdropWeightBoost(
           AND metadata->>'airdrop_id' = $2
         LIMIT 1
       `,
-      [address.toLowerCase(), airdropId.trim()]
+      [dbStorageAddress(address), airdropId.trim()]
     );
     return result.rows.length > 0;
   } catch {

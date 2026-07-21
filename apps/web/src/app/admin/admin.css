@@ -1476,14 +1476,22 @@
   }
 }
 
-/* Ops todo list — nested inside admin-card */
+/* Ops todo list — card rows, readable density */
 .admin-todos-shell {
-  font-size: var(--text-caption);
-  line-height: 1.4;
+  font-size: var(--text-body-sm, 0.8125rem);
+  line-height: 1.45;
   border: none;
   border-radius: 0;
   background: transparent;
   overflow: hidden;
+}
+
+.admin-todos-hint {
+  margin: 0;
+  padding: 0.625rem 1rem 0;
+  font-size: 0.75rem;
+  line-height: 1.45;
+  color: rgb(var(--pump-muted));
 }
 
 .admin-todos-shell-bar {
@@ -1491,7 +1499,7 @@
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: 10px;
   padding: 0.75rem 1rem;
   border-bottom: 1px solid rgb(var(--pump-border) / 0.22);
   background: rgb(var(--pump-bg) / 0.25);
@@ -1499,175 +1507,228 @@
 
 .admin-todos-sort-toggle {
   display: inline-flex;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 5px;
+  border: 1px solid rgb(var(--pump-border) / 0.35);
+  border-radius: var(--radius-md, 6px);
   overflow: hidden;
 }
 
 .admin-todos-sort-btn {
   border: 0;
   background: transparent;
-  color: var(--pump-muted);
-  padding: 4px 8px;
-  font-size: 11px;
+  color: rgb(var(--pump-muted));
+  padding: 6px 10px;
+  font-size: 0.75rem;
   font-weight: 600;
   cursor: pointer;
+  min-height: 32px;
 }
 
 .admin-todos-sort-btn:hover {
-  color: var(--pump-text);
-  background: rgba(255, 255, 255, 0.04);
+  color: rgb(var(--pump-text));
+  background: rgb(var(--pump-surface) / 0.5);
 }
 
 .admin-todos-sort-btn--active {
-  color: var(--pump-text);
-  background: rgba(255, 193, 7, 0.12);
+  color: rgb(var(--pump-text));
+  background: rgb(var(--pump-accent) / 0.12);
 }
 
 .admin-todos-filters {
   display: inline-flex;
   flex-wrap: wrap;
-  gap: 4px;
+  gap: 6px;
 }
 
 .admin-todos-filter {
   border: 1px solid transparent;
   background: transparent;
-  color: var(--pump-muted);
-  border-radius: 4px;
-  padding: 3px 8px;
-  font-size: 11px;
+  color: rgb(var(--pump-muted));
+  border-radius: var(--radius-md, 6px);
+  padding: 6px 10px;
+  font-size: 0.75rem;
   font-weight: 600;
   cursor: pointer;
+  min-height: 32px;
 }
 
 .admin-todos-filter:hover {
-  color: var(--pump-text);
+  color: rgb(var(--pump-text));
+  background: rgb(var(--pump-surface) / 0.35);
 }
 
 .admin-todos-filter--active {
-  color: var(--pump-text);
-  border-color: rgba(255, 193, 7, 0.3);
-  background: rgba(255, 193, 7, 0.08);
+  color: rgb(var(--pump-text));
+  border-color: rgb(var(--pump-accent) / 0.35);
+  background: rgb(var(--pump-accent) / 0.1);
 }
 
-.admin-todos-prompt {
+.admin-todos-compose {
   display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 8px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  flex-direction: column;
+  gap: 10px;
+  margin: 0.75rem 1rem 1rem;
+  padding: 12px 14px;
+  border: 1px solid rgb(var(--pump-border) / 0.35);
+  border-radius: var(--radius-md, 8px);
+  background: rgb(var(--pump-bg) / 0.45);
 }
 
-.admin-todos-prompt-prefix {
-  color: rgba(255, 193, 7, 0.85);
-  font-weight: 700;
-  width: 14px;
-  text-align: center;
-  flex-shrink: 0;
+.admin-todos-compose-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
-.admin-todos-prompt-input {
-  flex: 1;
-  min-width: 0;
-  border: 0;
-  background: transparent;
-  color: var(--pump-text);
+.admin-todos-compose-label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.admin-todos-compose-label-text {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgb(var(--pump-muted));
+}
+
+.admin-todos-compose-input,
+.admin-todos-compose-textarea {
+  width: 100%;
+  border: 1px solid rgb(var(--pump-border) / 0.35);
+  border-radius: var(--radius-md, 6px);
+  background: rgb(var(--pump-bg));
+  color: rgb(var(--pump-text));
   font: inherit;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  padding: 8px 10px;
   outline: none;
 }
 
-.admin-todos-prompt-input::placeholder {
-  color: var(--pump-muted);
+.admin-todos-compose-input:focus,
+.admin-todos-compose-textarea:focus {
+  border-color: rgb(var(--pump-accent) / 0.45);
+  box-shadow: 0 0 0 2px rgb(var(--pump-accent) / 0.12);
 }
 
-.admin-todos-prompt-pri {
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 4px;
-  background: rgba(0, 0, 0, 0.25);
-  color: var(--pump-text);
+.admin-todos-compose-textarea {
+  resize: vertical;
+  min-height: 3.25rem;
+}
+
+.admin-todos-compose-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.admin-todos-compose-pri {
+  border: 1px solid rgb(var(--pump-border) / 0.35);
+  border-radius: var(--radius-md, 6px);
+  background: rgb(var(--pump-bg));
+  color: rgb(var(--pump-text));
   font: inherit;
-  font-size: 11px;
-  padding: 2px 4px;
-  flex-shrink: 0;
+  font-size: 0.8125rem;
+  padding: 8px 10px;
+  min-height: 36px;
 }
 
-.admin-todos-prompt-add {
+.admin-todos-compose-submit {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 4px;
-  background: rgba(255, 255, 255, 0.04);
-  color: var(--pump-text);
+  gap: 6px;
+  border: 1px solid rgb(var(--pump-accent) / 0.45);
+  border-radius: var(--radius-md, 6px);
+  background: rgb(var(--pump-accent) / 0.14);
+  color: rgb(var(--pump-text));
   font: inherit;
-  font-size: 11px;
-  padding: 3px 8px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  padding: 8px 14px;
+  min-height: 36px;
   cursor: pointer;
-  flex-shrink: 0;
 }
 
-.admin-todos-prompt-add:hover:not(:disabled) {
-  background: rgba(255, 193, 7, 0.1);
-  border-color: rgba(255, 193, 7, 0.25);
+.admin-todos-compose-submit:hover:not(:disabled) {
+  background: rgb(var(--pump-accent) / 0.22);
 }
 
-.admin-todos-prompt-add:disabled {
+.admin-todos-compose-submit:disabled {
   opacity: 0.45;
   cursor: not-allowed;
 }
 
 .admin-todos-shell-empty {
   margin: 0;
-  padding: 14px 10px;
-  color: var(--pump-muted);
+  padding: 1.25rem 1rem 1.5rem;
+  color: rgb(var(--pump-muted));
+  text-align: center;
 }
 
 .admin-todos-shell-list {
   list-style: none;
   margin: 0;
-  padding: 0;
+  padding: 0.5rem 1rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
   max-height: min(70vh, 720px);
   overflow-y: auto;
 }
 
-.admin-todo-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-height: 30px;
-  padding: 2px 6px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+.admin-todo-card {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 10px;
+  align-items: start;
+  padding: 12px 12px 12px 10px;
+  border: 1px solid rgb(var(--pump-border) / 0.28);
+  border-radius: var(--radius-md, 8px);
+  background: rgb(var(--pump-surface) / 0.35);
+  transition: border-color 0.12s ease, background 0.12s ease;
 }
 
-.admin-todo-row:last-child {
-  border-bottom: 0;
+.admin-todo-card:hover {
+  border-color: rgb(var(--pump-border) / 0.45);
+  background: rgb(var(--pump-surface) / 0.55);
 }
 
-.admin-todo-row:hover {
-  background: rgba(255, 255, 255, 0.03);
+.admin-todo-card--done {
+  opacity: 0.72;
 }
 
-.admin-todo-row--done .admin-todo-line-title {
+.admin-todo-card--done .admin-todo-card-title {
   text-decoration: line-through;
-  color: var(--pump-muted);
+  color: rgb(var(--pump-muted));
 }
 
-.admin-todo-row--drag {
-  opacity: 0.45;
+.admin-todo-card--drag {
+  opacity: 0.5;
 }
 
-.admin-todo-row--over {
-  background: rgba(255, 193, 7, 0.08);
-  box-shadow: inset 0 1px 0 rgba(255, 193, 7, 0.35);
+.admin-todo-card--over {
+  border-color: rgb(var(--pump-accent) / 0.55);
+  box-shadow: inset 0 0 0 1px rgb(var(--pump-accent) / 0.25);
 }
 
-.admin-todo-row--edit {
+.admin-todo-card--edit {
+  display: flex;
   flex-direction: column;
-  align-items: stretch;
-  gap: 6px;
-  padding: 8px;
-  background: rgba(255, 255, 255, 0.02);
+  gap: 10px;
+  padding: 14px;
+  background: rgb(var(--pump-bg) / 0.55);
+}
+
+.admin-todo-card-lead {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding-top: 2px;
 }
 
 .admin-todo-grip {
@@ -1676,36 +1737,66 @@
   justify-content: center;
   border: 0;
   background: transparent;
-  color: var(--pump-muted);
-  padding: 0;
-  width: 16px;
+  color: rgb(var(--pump-muted));
+  padding: 4px;
+  min-width: 28px;
+  min-height: 28px;
   cursor: grab;
-  flex-shrink: 0;
+  border-radius: 4px;
+}
+
+.admin-todo-grip:hover {
+  color: rgb(var(--pump-text));
+  background: rgb(var(--pump-bg) / 0.6);
 }
 
 .admin-todo-grip:active {
   cursor: grabbing;
 }
 
-.admin-todo-check--compact {
+.admin-todo-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   margin: 0;
-  flex-shrink: 0;
+  min-width: 28px;
+  min-height: 28px;
+  cursor: pointer;
 }
 
-.admin-todo-check--compact .admin-todo-check-box {
-  width: 14px;
-  height: 14px;
+.admin-todo-check input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.admin-todo-check-box {
+  display: block;
+  width: 18px;
+  height: 18px;
+  border: 1.5px solid rgb(var(--pump-border) / 0.65);
+  border-radius: 4px;
+  background: rgb(var(--pump-bg));
+}
+
+.admin-todo-check input:checked + .admin-todo-check-box {
+  border-color: rgb(var(--pump-accent));
+  background: rgb(var(--pump-accent) / 0.85);
+  box-shadow: inset 0 0 0 2px rgb(var(--pump-bg));
 }
 
 .admin-todo-pri {
   flex-shrink: 0;
-  width: 2.25rem;
-  text-align: center;
-  font-size: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.5rem;
+  font-size: 0.625rem;
   font-weight: 700;
-  letter-spacing: 0.02em;
-  border-radius: 3px;
-  padding: 1px 0;
+  letter-spacing: 0.04em;
+  border-radius: 4px;
+  padding: 3px 6px;
 }
 
 .admin-todo-pri--urgent {
@@ -1728,13 +1819,12 @@
   background: rgba(34, 197, 94, 0.1);
 }
 
-.admin-todo-line {
-  flex: 1;
+.admin-todo-card-body {
   min-width: 0;
   display: flex;
-  align-items: baseline;
-  gap: 8px;
-  overflow: hidden;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
   border: 0;
   background: transparent;
   padding: 0;
@@ -1744,102 +1834,119 @@
   cursor: pointer;
 }
 
-.admin-todo-line:hover .admin-todo-line-title {
+.admin-todo-card-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.admin-todo-card-time {
+  font-size: 0.6875rem;
+  color: rgb(var(--pump-muted));
+}
+
+.admin-todo-card-title {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  width: 100%;
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.4;
+  color: rgb(var(--pump-text));
+  word-break: break-word;
+}
+
+.admin-todo-card-body:hover .admin-todo-card-title {
   color: rgb(var(--pump-accent));
 }
 
-.admin-todo-line-title {
-  color: var(--pump-text);
-  white-space: nowrap;
+.admin-todo-card-preview {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
   overflow: hidden;
-  text-overflow: ellipsis;
+  width: 100%;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: rgb(var(--pump-muted));
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
-.admin-todo-line-note {
-  color: var(--pump-muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  font-size: 11px;
+.admin-todo-card-more {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: rgb(var(--pump-accent));
 }
 
-.admin-todo-line-note::before {
-  content: "·";
-  margin-right: 8px;
-  opacity: 0.5;
-}
-
-.admin-todo-row-actions {
-  display: inline-flex;
-  gap: 2px;
-  flex-shrink: 0;
-  opacity: 0;
-  transition: opacity 0.12s ease;
-}
-
-.admin-todo-row:hover .admin-todo-row-actions,
-.admin-todo-row:focus-within .admin-todo-row-actions {
-  opacity: 1;
+.admin-todo-card-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 2px;
 }
 
 .admin-todos-row-btn {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 4px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 4px;
-  background: rgba(0, 0, 0, 0.2);
-  color: var(--pump-text);
+  border: 1px solid rgb(var(--pump-border) / 0.35);
+  border-radius: var(--radius-md, 6px);
+  background: rgb(var(--pump-bg) / 0.65);
+  color: rgb(var(--pump-text));
   font: inherit;
-  font-size: 11px;
-  padding: 2px 6px;
+  font-size: 0.75rem;
+  padding: 6px 8px;
+  min-width: 36px;
+  min-height: 36px;
   cursor: pointer;
 }
 
+.admin-todos-row-btn--primary {
+  border-color: rgb(var(--pump-accent) / 0.4);
+  background: rgb(var(--pump-accent) / 0.12);
+  font-weight: 600;
+}
+
 .admin-todos-row-btn--icon {
-  padding: 2px 4px;
+  padding: 6px;
 }
 
 .admin-todos-row-btn--danger:hover {
-  border-color: rgba(239, 68, 68, 0.35);
+  border-color: rgba(239, 68, 68, 0.45);
   color: #fca5a5;
-}
-
-.admin-todo-edit-notes {
-  width: 100%;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 4px;
-  background: rgba(0, 0, 0, 0.2);
-  color: var(--pump-text);
-  font: inherit;
-  padding: 6px 8px;
-  resize: vertical;
-  min-height: 3rem;
+  background: rgba(239, 68, 68, 0.08);
 }
 
 .admin-todo-edit-bar {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 8px;
   align-items: center;
+  justify-content: flex-end;
 }
 
 .admin-todo-modal {
-  max-width: 32rem;
+  max-width: 36rem;
 }
 
 .admin-todo-modal-head {
   display: flex;
   align-items: flex-start;
-  gap: 8px;
+  gap: 10px;
   min-width: 0;
 }
 
 .admin-todo-modal-title {
   margin: 0;
-  font-size: var(--text-body-sm);
+  font-size: 1rem;
   font-weight: 600;
-  line-height: 1.35;
+  line-height: 1.4;
   color: rgb(var(--pump-text));
   word-break: break-word;
 }
@@ -1847,44 +1954,55 @@
 .admin-todo-modal-body {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
 }
 
 .admin-todo-modal-meta {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  font-size: 11px;
+  gap: 4px;
+  font-size: 0.75rem;
   color: rgb(var(--pump-muted));
 }
 
 .admin-todo-modal-notes {
   margin: 0;
-  max-height: min(50vh, 20rem);
+  max-height: min(50vh, 24rem);
   overflow: auto;
   white-space: pre-wrap;
   word-break: break-word;
-  font-size: 12px;
-  line-height: 1.5;
+  font-size: 0.875rem;
+  line-height: 1.55;
   color: rgb(var(--pump-text));
   border: 1px solid rgb(var(--pump-border) / 0.25);
   border-radius: var(--radius-md);
   background: rgb(var(--pump-bg));
-  padding: 10px 12px;
+  padding: 12px 14px;
 }
 
 .admin-todo-modal-empty {
   margin: 0;
-  font-size: 12px;
+  font-size: 0.8125rem;
   color: rgb(var(--pump-muted));
 }
 
 .admin-todo-modal-foot {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 8px;
   border-top: 1px solid rgb(var(--pump-border) / 0.3);
-  padding: 10px 14px;
+  padding: 12px 14px;
+}
+
+/* Legacy aliases — keep old class names harmless if cached */
+.admin-todo-row,
+.admin-todo-line,
+.admin-todo-line-title,
+.admin-todo-line-note,
+.admin-todos-prompt,
+.admin-todo-edit-notes,
+.admin-todo-row-actions {
+  /* superseded by admin-todo-card* / admin-todos-compose* */
 }
 
 .admin-fee-exempt-modal {
