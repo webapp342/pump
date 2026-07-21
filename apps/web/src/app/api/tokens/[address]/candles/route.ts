@@ -5,6 +5,7 @@ import {
   CANDLE_INTERVALS,
   DEFAULT_CHART_INTERVAL,
   fillGapsForStoredCandles,
+  repairBondingNeedleOpens,
   seriesHasTemporalGaps,
   storedCandlesToBars,
   upsertHotCandleTail,
@@ -33,11 +34,23 @@ function mergeHotTail(
   candles: ReturnType<typeof storedCandlesToBars>,
   hot: CandleWsUpdate | null
 ): ReturnType<typeof storedCandlesToBars> {
-  if (!hot) return candles;
+  if (!hot) {
+    return {
+      candles: repairBondingNeedleOpens(candles.candles),
+      volumes: candles.volumes,
+    };
+  }
   // Redis hot tip is the open-bucket SSOT — replace that timestamp entirely.
-  // mergeWsCandleUpdate kept CH `existing.open` (often prior-close stitch) and
-  // turned solid trader tips into needles for spectators / refresh / TF switch.
   return upsertHotCandleTail(candles.candles, candles.volumes, hot, 1);
+}
+
+function withRepairedOpens(
+  series: ReturnType<typeof fillGapsForStoredCandles>
+): ReturnType<typeof fillGapsForStoredCandles> {
+  return {
+    candles: repairBondingNeedleOpens(series.candles),
+    volumes: series.volumes,
+  };
 }
 
 export async function GET(request: NextRequest, context: RouteContext) {
@@ -67,11 +80,11 @@ export async function GET(request: NextRequest, context: RouteContext) {
         volumes: cached.volumes,
       };
       raw = mergeHotTail(raw, hotTail);
-      const { candles, volumes } = fillGapsForStoredCandles(
-        raw.candles,
-        raw.volumes,
-        interval,
-        { endTimeMs: Date.now(), extendToLive: false }
+      const { candles, volumes } = withRepairedOpens(
+        fillGapsForStoredCandles(raw.candles, raw.volumes, interval, {
+          endTimeMs: Date.now(),
+          extendToLive: false,
+        })
       );
       logChartOlapSource({
         tokenAddress: address,
@@ -106,11 +119,11 @@ export async function GET(request: NextRequest, context: RouteContext) {
     if (fromCh && fromCh.rows.length > 0) {
       let raw = storedCandlesToBars(fromCh.rows);
       raw = mergeHotTail(raw, hotTail);
-      const { candles, volumes } = fillGapsForStoredCandles(
-        raw.candles,
-        raw.volumes,
-        interval,
-        { endTimeMs: Date.now(), extendToLive: false }
+      const { candles, volumes } = withRepairedOpens(
+        fillGapsForStoredCandles(raw.candles, raw.volumes, interval, {
+          endTimeMs: Date.now(),
+          extendToLive: false,
+        })
       );
       if (candles.length > 0) {
         const payload = {
@@ -173,11 +186,11 @@ export async function GET(request: NextRequest, context: RouteContext) {
 
       raw = mergeHotTail(raw, hotTail);
 
-      const { candles, volumes } = fillGapsForStoredCandles(
-        raw.candles,
-        raw.volumes,
-        interval,
-        { endTimeMs: Date.now(), extendToLive: false }
+      const { candles, volumes } = withRepairedOpens(
+        fillGapsForStoredCandles(raw.candles, raw.volumes, interval, {
+          endTimeMs: Date.now(),
+          extendToLive: false,
+        })
       );
       if (candles.length > 0) {
         if (gapFill === "sql" && seriesHasTemporalGaps(candles, interval)) {

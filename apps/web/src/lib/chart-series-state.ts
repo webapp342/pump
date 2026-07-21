@@ -2,6 +2,7 @@ import {
   applyActorOptimisticCandleBucket,
   fillGapsForStoredCandles,
   mergeWsCandleUpdate,
+  repairBondingNeedleOpens,
   sanitizeTailCandleSeries,
   scaleCandleBars,
   seriesHasTemporalGaps,
@@ -76,7 +77,10 @@ export function preserveLiveTailOverFetch(
         color: liveVol.value >= volumes[idx]!.value ? liveVol.color : volumes[idx]!.color,
       };
     }
-    return { candles, volumes };
+    return {
+      candles: repairBondingNeedleOpens(candles),
+      volumes,
+    };
   }
 
   const fetchTail = candles[candles.length - 1]!;
@@ -85,7 +89,10 @@ export function preserveLiveTailOverFetch(
     if (liveVol) volumes.push(liveVol);
   }
 
-  return { candles, volumes };
+  return {
+    candles: repairBondingNeedleOpens(candles),
+    volumes,
+  };
 }
 
 function applyActorBucketExtremes(
@@ -250,6 +257,8 @@ export function deriveChartSeries(input: DeriveChartSeriesInput): {
     volumes = filled.volumes;
   }
   // else: keep API/WS series as-is — do not append empty live buckets
+
+  candles = repairBondingNeedleOpens(candles);
 
   if (actorOptimisticSpot) {
     const patched = applyActorOptimisticCandleBucket(

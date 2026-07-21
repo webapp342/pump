@@ -80,14 +80,8 @@ export function synthesizeCandleUpdatesFromSpot(input: {
   for (const { id, ms } of CANDLE_INTERVALS) {
     const bucketSec = Math.floor(input.blockTimeMs / ms) * (ms / 1000);
     const prior = input.priorCloseByInterval?.[id];
-    const open =
-      prior != null &&
-      prior > 0 &&
-      Number.isFinite(prior) &&
-      isSpotMoveSane(prior, before) &&
-      isSpotMoveSane(prior, after)
-        ? prior
-        : before;
+    void prior;
+    const open = before;
     const high = Math.max(open, before, after);
     const low = Math.min(open, before, after);
     out.push({
@@ -340,12 +334,8 @@ export function buildCandlesFromTrades(
         (p) => p > 0 && isSpotMoveSane(p, closePrice)
       );
       const touches = saneTouches.length > 0 ? saneTouches : [closePrice];
-      const open =
-        priorClose != null &&
-        isSpotMoveSane(priorClose, spotOpen) &&
-        isSpotMoveSane(priorClose, closePrice)
-          ? priorClose
-          : spotOpen;
+      // First print opens the bucket — do not stitch prior close (needle bug).
+      const open = spotOpen;
       buckets.set(bucketSec, {
         open,
         high: Math.max(open, ...touches),
@@ -768,13 +758,10 @@ export function mergeWsCandleUpdate(
       nextCandles = padded.candles;
       nextVolumes = padded.volumes;
     }
-    // Indexer open = first print in the bucket (SSOT). Only stitch to prior close when
-    // they already meet within 1% — blind open=priorClose turned a solid first buy into
-    // a needle after series.update() (see Bitquery bar-continuity: presentation-only).
+    // Bonding SSOT: keep indexer/WS open — never stitch to prior close.
+    // prior-close continuity invented needles for refresh/spectator (LWC body≠wick).
     const tradeOpen = candle.open > 0 ? candle.open : candle.close;
-    const openBase = isBarContinuityMatch(priorClose, tradeOpen)
-      ? priorClose
-      : tradeOpen;
+    const openBase = tradeOpen;
     const patched = sanitizeTailCandleOhlc(
       {
         ...candle,
@@ -806,12 +793,7 @@ export function mergeWsCandleUpdate(
     // Do not keep a phantom high from a flat carry-forward bar.
     if (priorVol <= 0 && volume.value > 0) {
       const tradeOpen = candle.open > 0 ? candle.open : close;
-      const open =
-        priorClose != null &&
-        priorClose > 0 &&
-        isBarContinuityMatch(priorClose, tradeOpen)
-          ? priorClose
-          : tradeOpen;
+      const open = tradeOpen;
       nextCandles[idx] = sanitizeTailCandleOhlc(
         {
           time: candle.time,
@@ -823,23 +805,28 @@ export function mergeWsCandleUpdate(
         close
       );
     } else {
-      // Live tip may correct a stale CH open (prior-close stitch). Prefer incoming open
-      // when existing open was continuity-stitched to prior close but the tip disagrees.
+      // Prefer live tip open when it disagrees with a stitched CH open.
       const tradeOpen = candle.open > 0 ? candle.open : close;
       const stitchedOpen =
         priorClose != null &&
         priorClose > 0 &&
         isBarContinuityMatch(existing.open, priorClose) &&
         !isBarContinuityMatch(existing.open, tradeOpen);
-      const open = stitchedOpen ? tradeOpen : existing.open;
+      let open = stitchedOpen ? tradeOpen : existing.open;
+      // Bonding buy-climb: lower wick with green body ⇒ false open (repair).
+      const lowCandidate = Math.min(existing.low, candle.low, close);
       const highCandidate = Math.max(existing.high, candle.high, close, open);
-      const lowCandidate = Math.min(existing.low, candle.low, close, open);
+      if (close >= open && lowCandidate < open) {
+        const body = Math.abs(close - open);
+        const lowerWick = open - lowCandidate;
+        if (lowerWick > body * 1.5) open = lowCandidate;
+      }
       nextCandles[idx] = sanitizeTailCandleOhlc(
         {
           time: candle.time,
           open,
-          high: highCandidate,
-          low: lowCandidate,
+          high: Math.max(highCandidate, open),
+          low: Math.min(lowCandidate, open),
           close,
         },
         close
@@ -907,13 +894,19 @@ export function upsertHotCandleTail(
     nextCandles[idx] = candle;
     if (idx < nextVolumes.length) nextVolumes[idx] = volume;
     else nextVolumes.push(volume);
-    return { candles: nextCandles, volumes: nextVolumes };
+    return {
+      candles: repairBondingNeedleOpens(nextCandles),
+      volumes: nextVolumes,
+    };
   }
 
   if (nextCandles.length === 0 || candle.time > nextCandles[nextCandles.length - 1]!.time) {
     nextCandles.push(candle);
     nextVolumes.push(volume);
-    return { candles: nextCandles, volumes: nextVolumes };
+    return {
+      candles: repairBondingNeedleOpens(nextCandles),
+      volumes: nextVolumes,
+    };
   }
 
   // Rare: hot bucket older than tip — insert in time order.
@@ -921,7 +914,10 @@ export function upsertHotCandleTail(
   if (insertAt < 0) insertAt = nextCandles.length;
   nextCandles.splice(insertAt, 0, candle);
   nextVolumes.splice(insertAt, 0, volume);
-  return { candles: nextCandles, volumes: nextVolumes };
+  return {
+    candles: repairBondingNeedleOpens(nextCandles),
+    volumes: nextVolumes,
+  };
 }
 
 /** Trader-only optimistic candle patch (client-side; not broadcast on WS). */
@@ -1114,11 +1110,6 @@ export function isSpotMoveSane(previous: number, next: number): boolean {
   return ratio <= SPOT_JUMP_REJECT_RATIO && ratio >= 1 / SPOT_JUMP_REJECT_RATIO;
 }
 
-/**
- * Prior close vs first-trade open already meet (≤1%).
- * Only then stitch open←priorClose for LWC; wider gaps must keep trade open
- * or the client invents needle wicks after a correct first paint.
- */
 const BAR_CONTINUITY_MATCH_RATIO = 1.01;
 
 export function isBarContinuityMatch(priorClose: number, tradeOpen: number): boolean {
@@ -1128,6 +1119,35 @@ export function isBarContinuityMatch(priorClose: number, tradeOpen: number): boo
   return (
     ratio <= BAR_CONTINUITY_MATCH_RATIO && ratio >= 1 / BAR_CONTINUITY_MATCH_RATIO
   );
+}
+
+/**
+ * Repair false lower-wick needles on green bars (bonding buy-climb).
+ * Open was often prior-close-stitched while low kept the real first print — trader WS
+ * looked solid, refresh/API/MV spectators saw a needle (Bitquery continuity is
+ * presentation-only and must not rewrite bonding economics).
+ */
+export function repairBondingNeedleOpens(candles: CandleBar[]): CandleBar[] {
+  if (candles.length === 0) return candles;
+  let changed = false;
+  const next = candles.map((c, i) => {
+    if (!(c.close >= c.open) || !(c.low < c.open)) return c;
+    const body = Math.abs(c.close - c.open);
+    const lowerWick = c.open - c.low;
+    const prevClose = i > 0 ? candles[i - 1]!.close : null;
+    const stitched =
+      prevClose != null && prevClose > 0 && isBarContinuityMatch(c.open, prevClose);
+    if (!stitched && lowerWick <= body * 1.5) return c;
+    changed = true;
+    const open = c.low;
+    return {
+      ...c,
+      open,
+      high: Math.max(c.high, open, c.close),
+      low: Math.min(c.low, open, c.close),
+    };
+  });
+  return changed ? next : candles;
 }
 
 function coherentOpenForBar(

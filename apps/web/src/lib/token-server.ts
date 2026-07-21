@@ -17,6 +17,7 @@ import {
 import { useRedisArenaCache } from "@/lib/db/perf-flags";
 import {
   fillGapsForStoredCandles,
+  repairBondingNeedleOpens,
   upsertHotCandleTail,
   storedCandlesToBars,
   DEFAULT_CHART_INTERVAL,
@@ -58,7 +59,9 @@ function mergeHotTailBars(
   volumes: VolumeBar[],
   hot: CandleWsUpdate | null
 ): { candles: CandleBar[]; volumes: VolumeBar[] } {
-  if (!hot) return { candles, volumes };
+  if (!hot) {
+    return { candles: repairBondingNeedleOpens(candles), volumes };
+  }
   return upsertHotCandleTail(candles, volumes, hot, 1);
 }
 

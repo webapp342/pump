@@ -1,6 +1,5 @@
 import type pg from "pg";
 import type { CandleWsUpdatePayload } from "./redis-types.js";
-import { queryLatestCandleClose } from "./clickhouse-query.js";
 import {
   readHotCandleUpdate,
   writeHotCandleUpdates,
@@ -199,18 +198,6 @@ function isSpotRatioSane(a: number, b: number): boolean {
   return ratio <= 4 && ratio >= 1 / 4;
 }
 
-/** Continuity stitch only when prior close already meets first print (≤1%). */
-const BAR_CONTINUITY_MATCH_RATIO = 1.01;
-
-function isBarContinuityMatch(priorClose: number, tradeOpen: number): boolean {
-  if (!(priorClose > 0) || !(tradeOpen > 0)) return false;
-  if (!Number.isFinite(priorClose) || !Number.isFinite(tradeOpen)) return false;
-  const ratio = priorClose / tradeOpen;
-  return (
-    ratio <= BAR_CONTINUITY_MATCH_RATIO && ratio >= 1 / BAR_CONTINUITY_MATCH_RATIO
-  );
-}
-
 function resolveSpotOpen(spotBefore: number, spotAfter: number, priorClose: number | null): number {
   let spotOpen = spotBefore > 0 && Number.isFinite(spotBefore) ? spotBefore : spotAfter;
   if (spotAfter > 0 && spotOpen > 0 && !isSpotRatioSane(spotOpen, spotAfter)) {
@@ -243,15 +230,12 @@ function tradeBucketOhlc(
   priorClose: number | null,
   _isNewBucket: boolean
 ): { open: number; high: number; low: number; close: number } {
-  const spotOpen = resolveSpotOpen(spotBefore, spotAfter, priorClose);
-  // Match web client: only stitch open←priorClose when they already meet within 1%.
-  // Wider gaps kept the first trade open so Redis/CH/API spectators match the trader tip.
-  const open =
-    priorClose != null &&
-    priorClose > 0 &&
-    isBarContinuityMatch(priorClose, spotOpen)
-      ? priorClose
-      : spotOpen;
+  // Bonding SSOT: open = first print (spotBefore), never prior-close stitch.
+  // Bitquery-style open←priorClose is presentation-only and invents needle wicks
+  // when refresh/API spectators load Redis/CH (trader WS tip looked fine).
+  void priorClose;
+  const spotOpen = resolveSpotOpen(spotBefore, spotAfter, null);
+  const open = spotOpen;
   const touch = wickTouchPrice(spotBefore, spotAfter, spotOpen);
   const prices = [open, touch, spotAfter];
   return {
@@ -260,6 +244,13 @@ function tradeBucketOhlc(
     low: Math.min(...prices),
     close: spotAfter,
   };
+}
+
+/** Buy-only bonding bucket cannot wick below open — price only rises on buys. */
+function sealBuyOnlyOpen(open: number, low: number, volume: number, buyVolume: number): number {
+  if (!(volume > 0) || buyVolume < volume * 0.999) return open;
+  if (low > 0 && low < open) return low;
+  return open;
 }
 
 /** Process-local tip — same indexer never waits on Redis RTT to merge the next trade. */
@@ -291,10 +282,6 @@ async function computeIntervalCandleLive(
     (await readHotCandleUpdate(input.tokenAddress, interval));
   const isNewBucket = !existingHot || existingHot.time !== bucketSec;
 
-  const priorClose = isNewBucket
-    ? await queryLatestCandleClose(input.tokenAddress, interval)
-    : null;
-
   let open: number;
   let high: number;
   let low: number;
@@ -304,7 +291,7 @@ async function computeIntervalCandleLive(
   let tradeCount: number;
 
   if (isNewBucket) {
-    const ohlc = tradeBucketOhlc(spotBefore, spotAfter, priorClose, true);
+    const ohlc = tradeBucketOhlc(spotBefore, spotAfter, null, true);
     open = ohlc.open;
     high = ohlc.high;
     low = ohlc.low;
@@ -323,6 +310,11 @@ async function computeIntervalCandleLive(
     buyVolume = Number(existingHot!.buyVolume) + buyVolumeZug;
     tradeCount = existingHot!.tradeCount + 1;
   }
+
+  // Repair poisoned Redis tips + enforce bonding invariant for buy-only buckets.
+  open = sealBuyOnlyOpen(open, low, volume, buyVolume);
+  high = Math.max(high, open, close);
+  low = Math.min(low, open, close);
 
   return {
     interval,
