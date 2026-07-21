@@ -30,6 +30,7 @@ import {
 } from "@/lib/airdrop-board-format";
 import { AdminDangerConfirmModal } from "@/components/admin/AdminDangerConfirmModal";
 import { ADMIN_DANGER_PHRASES } from "@/lib/admin/danger-confirm";
+import { AdminAirdropCreateFeeModal } from "@/components/admin/AdminAirdropCreateFeeModal";
 import { AdminAirdropSweepTable, type SweepRow } from "@/components/admin/AdminAirdropSweepTable";
 import { AdminEnterpriseTable } from "@/components/admin/AdminEnterpriseTable";
 import { AdminCreatorShareModal } from "@/components/admin/AdminCreatorShareModal";
