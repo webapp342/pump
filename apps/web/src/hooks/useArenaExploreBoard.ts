@@ -25,6 +25,7 @@ import type { ArenaTradeWsPayload } from "@/lib/arena-live-delta";
 import { patchArenaTokenList } from "@/lib/arena-live-delta";
 import type { AirdropListItem } from "@/lib/db/airdrops";
 import { collectOpenAirdropLinkedTokens } from "@/lib/airdrop-linked-tokens";
+import { addressCacheKey } from "@/lib/address";
 import {
   arenaBoardQueryKey,
   fetchArenaBoard,
@@ -347,7 +348,10 @@ export function useArenaExploreBoard(options: UseArenaExploreBoardOptions = {}) 
 
   useEffect(() => {
     if (!tokens?.length) return;
-    const favSnapshots = tokens.filter((token) => favorites.has(token.address.toLowerCase()));
+    const favSnapshots = tokens.filter((token) => {
+      const key = addressCacheKey(token.address);
+      return key != null && favorites.has(key);
+    });
     if (favSnapshots.length) upsertFavoriteSnapshots(favSnapshots);
   }, [tokens, favorites, upsertFavoriteSnapshots]);
 
@@ -544,7 +548,8 @@ export function useArenaExploreBoard(options: UseArenaExploreBoardOptions = {}) 
         return false;
       }
       if (activeFilter === "favorites") {
-        return favorites.has(token.address.toLowerCase());
+        const key = addressCacheKey(token.address);
+        return key != null && favorites.has(key);
       }
       if (SERVER_BOARD_FILTERS.has(activeFilter)) {
         return true;

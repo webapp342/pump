@@ -162,7 +162,11 @@ export function FavoritesProvider({ children }: { children: React.ReactNode }) {
     const unsub = subscribeUserBootstrap(address, (data) => {
       if (cancelled) return;
       bootstrapped = true;
-      const next = new Set(data.favorites.map((item) => item.toLowerCase()));
+      const next = new Set(
+        data.favorites
+          .map((item) => normalizeFavoriteKey(item))
+          .filter((item) => item.length > 0)
+      );
       setFavorites(next);
       if (useLocalFirstReads()) {
         setLocalFavorites(address, [...next]);
@@ -180,7 +184,11 @@ export function FavoritesProvider({ children }: { children: React.ReactNode }) {
           });
           const body = (await response.json()) as { data?: string[]; error?: string };
           if (!cancelled && response.ok && Array.isArray(body.data)) {
-            const next = new Set(body.data.map((item) => item.toLowerCase()));
+            const next = new Set(
+              body.data
+                .map((item) => normalizeFavoriteKey(item))
+                .filter((item) => item.length > 0)
+            );
             setFavorites(next);
             if (useLocalFirstReads()) {
               setLocalFavorites(address, [...next]);

@@ -28,6 +28,7 @@ import type { ArenaTradeWsPayload } from "@/lib/arena-live-delta";
 import { patchArenaTokenList } from "@/lib/arena-live-delta";
 import type { AirdropListItem } from "@/lib/db/airdrops";
 import { collectOpenAirdropLinkedTokens } from "@/lib/airdrop-linked-tokens";
+import { addressCacheKey } from "@/lib/address";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   arenaBoardQueryKey,
@@ -150,10 +151,12 @@ function matchesBoardFilter(
     return Math.abs(token.change24hPct ?? 0) >= 1;
   }
   if (filter === "favorites") {
-    return favorites.has(token.address.toLowerCase());
+    const key = addressCacheKey(token.address);
+    return key != null && favorites.has(key);
   }
   if (filter === "hasAirdrop") {
-    return airdropTokenAddresses.has(token.address.toLowerCase());
+    const key = addressCacheKey(token.address);
+    return key != null && airdropTokenAddresses.has(key);
   }
   return true;
 }
@@ -769,7 +772,8 @@ export function ArenaListClient({
         return false;
       }
       if (activeFilter === "favorites") {
-        return favorites.has(token.address.toLowerCase());
+        const key = addressCacheKey(token.address);
+        return key != null && favorites.has(key);
       }
       if (SERVER_BOARD_FILTERS.has(activeFilter)) {
         return true;

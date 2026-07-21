@@ -3,6 +3,8 @@
  * Full Rocicorp Zero sync is Tier 4+ future; this gives 0ms hydration today.
  */
 
+import { addressCacheKey } from "@/lib/address";
+
 const FAVORITES_PREFIX = "pump:lf:favorites:";
 const FAVORITE_TOKENS_PREFIX = "pump:lf:favorite-tokens:";
 const PORTFOLIO_PREFIX = "pump:lf:portfolio:";
@@ -16,7 +18,21 @@ type StoredPayload<T> = {
 };
 
 function storageKey(prefix: string, address: string): string {
-  return `${prefix}${address.toLowerCase()}`;
+  // Never lowercase Solana base58 — case is part of the address.
+  const key = addressCacheKey(address) ?? address.trim();
+  return `${prefix}${key}`;
+}
+
+function canonicalizeAddressList(addresses: string[]): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const item of addresses) {
+    const key = addressCacheKey(item) ?? item.trim();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    out.push(key);
+  }
+  return out;
 }
 
 function readJson<T>(key: string): T | null {
@@ -47,14 +63,13 @@ function writeJson<T>(key: string, data: T): void {
 }
 
 export function getLocalFavorites(address: string): string[] | null {
-  return readJson<string[]>(storageKey(FAVORITES_PREFIX, address));
+  const raw = readJson<string[]>(storageKey(FAVORITES_PREFIX, address));
+  if (!raw) return null;
+  return canonicalizeAddressList(raw);
 }
 
 export function setLocalFavorites(address: string, favorites: string[]): void {
-  writeJson(
-    storageKey(FAVORITES_PREFIX, address),
-    favorites.map((item) => item.toLowerCase())
-  );
+  writeJson(storageKey(FAVORITES_PREFIX, address), canonicalizeAddressList(favorites));
 }
 
 export function getLocalFavoriteTokens(address: string): Record<string, unknown>[] | null {

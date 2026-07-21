@@ -1,5 +1,6 @@
 import { getAirdropDisplayStatus, isPromotableAirdropStatus } from "@/lib/airdrop-status";
 import type { AirdropListItem } from "@/lib/db/airdrops";
+import { addressCacheKey } from "@/lib/address";
 
 /** Linked tokens with upcoming or qualifying airdrop (arena gift icon). */
 export function collectOpenAirdropLinkedTokens(airdrops: AirdropListItem[]): Set<string> {
@@ -14,7 +15,8 @@ export function collectOpenAirdropLinkedTokens(airdrops: AirdropListItem[]): Set
     });
     if (!isPromotableAirdropStatus(displayStatus)) continue;
 
-    addresses.add(airdrop.linkedToken.toLowerCase());
+    const key = addressCacheKey(airdrop.linkedToken);
+    if (key) addresses.add(key);
   }
 
   return addresses;

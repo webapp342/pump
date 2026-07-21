@@ -1,6 +1,7 @@
 import type { ArenaCardsSortKey } from "@/lib/arena-cards-prefs";
 import type { BoardFilter } from "@/lib/arena-filters";
 import type { ArenaFilterCounts, KothSummary, TokenListItem } from "@/lib/db/launchpad";
+import { addressCacheKey } from "@/lib/address";
 
 export const SIDEBAR_FILTER_ITEMS = [
   ["favorites", null],
@@ -115,10 +116,12 @@ export function matchesBoardFilter(
     return Math.abs(token.change24hPct ?? 0) >= 1;
   }
   if (filter === "favorites") {
-    return favorites.has(token.address.toLowerCase());
+    const key = addressCacheKey(token.address);
+    return key != null && favorites.has(key);
   }
   if (filter === "hasAirdrop") {
-    return airdropTokenAddresses.has(token.address.toLowerCase());
+    const key = addressCacheKey(token.address);
+    return key != null && airdropTokenAddresses.has(key);
   }
   return true;
 }
