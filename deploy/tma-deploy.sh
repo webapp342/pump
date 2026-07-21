@@ -83,6 +83,23 @@ if [[ -f "$MIG_047" ]]; then
   fi
 fi
 
+# Solana points / referral claim (base58 case) — required for Referral Invites XP claim
+for mig in \
+  049_launchpad_wallet_address_normalize.sql \
+  050_repair_solana_points_inventory_address.sql \
+  051_claim_referral_invite_xp_solana.sql
+do
+  MIG_PATH="$REPO_ROOT/db/migrations/$mig"
+  if [[ -f "$MIG_PATH" ]]; then
+    log "Applying migration $mig (idempotent)"
+    if sudo -u postgres psql -d pump_db -v ON_ERROR_STOP=1 -f "$MIG_PATH"; then
+      log "Migration $mig OK"
+    else
+      log "WARN: migration $mig failed — check postgres permissions"
+    fi
+  fi
+done
+
 log "Building Next.js (@pump/web)"
 npm run build -w @pump/web
 

@@ -24,6 +24,16 @@ export async function POST(request: NextRequest) {
 
     const result = await claimReferralInviteXp(address);
     if (result.claimedInvites === 0 || result.pointsAwarded === 0) {
+      // Status said claimable but write awarded 0 — usually stale UI or address CHECK / case mismatch.
+      if (before.claimableCount > 0) {
+        return NextResponse.json(
+          {
+            error:
+              "Claim failed while invites were pending. Refresh Rewards, then retry. If it persists, migration 051 may be missing on the database.",
+          },
+          { status: 409 }
+        );
+      }
       return NextResponse.json({ error: "Nothing to claim yet" }, { status: 400 });
     }
 

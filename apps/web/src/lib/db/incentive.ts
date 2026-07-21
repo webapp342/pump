@@ -376,25 +376,117 @@ export async function getReferralInviteXpStatus(
   };
 }
 
+/**
+ * Claim 50 XP per unclaimed successful invite.
+ * App-level (not the legacy SQL fn) so Solana base58 case is preserved —
+ * `claim_referral_invite_xp` historically used lower() and returned 0 invites.
+ */
 export async function claimReferralInviteXp(
   referrerAddress: string
 ): Promise<{ claimedInvites: number; pointsAwarded: number }> {
   const db = getIncentivePool();
   const normalized = dbStorageAddress(referrerAddress);
+  const client = await db.connect();
 
-  const result = await db.query<{ claimed_invites: number; points_awarded: number }>(
-    `
-      SELECT claimed_invites, points_awarded
-      FROM claim_referral_invite_xp($1)
-    `,
-    [normalized]
-  );
+  try {
+    await client.query("BEGIN");
 
-  const row = result.rows[0];
-  return {
-    claimedInvites: Number(row?.claimed_invites ?? 0),
-    pointsAwarded: Number(row?.points_awarded ?? 0),
-  };
+    // Best-effort: drop EVM-era lowercase CHECKs (noop if already gone / no privs).
+    try {
+      await client.query(`
+        ALTER TABLE public.referral_invite_xp_claims
+          DROP CONSTRAINT IF EXISTS referral_invite_xp_claims_referrer_check
+      `);
+      await client.query(`
+        ALTER TABLE public.referral_invite_xp_claims
+          DROP CONSTRAINT IF EXISTS referral_invite_xp_claims_invitee_check
+      `);
+    } catch {
+      /* pump_app may lack ALTER — migration 051 must be applied as postgres */
+    }
+
+    await client.query(
+      `
+        INSERT INTO users (address, last_active)
+        VALUES ($1, now())
+        ON CONFLICT (address) DO UPDATE SET last_active = now()
+      `,
+      [normalized]
+    );
+
+    const pending = await client.query<{ invitee_address: string }>(
+      `
+        SELECT rb.invitee_address
+        FROM referral_bindings rb
+        LEFT JOIN referral_invite_xp_claims c ON c.invitee_address = rb.invitee_address
+        WHERE rb.referrer_address = $1
+          AND c.invitee_address IS NULL
+        ORDER BY rb.bound_at ASC
+      `,
+      [normalized]
+    );
+
+    let claimedInvites = 0;
+    let pointsAwarded = 0;
+
+    for (const row of pending.rows) {
+      const invitee = row.invitee_address;
+      const inserted = await client.query(
+        `
+          INSERT INTO referral_invite_xp_claims (
+            referrer_address, invitee_address, points_awarded
+          ) VALUES ($1, $2, $3)
+          ON CONFLICT (invitee_address) DO NOTHING
+        `,
+        [normalized, invitee, REFERRAL_INVITE_XP_PER_INVITE]
+      );
+      if ((inserted.rowCount ?? 0) === 0) continue;
+
+      claimedInvites += 1;
+      pointsAwarded += REFERRAL_INVITE_XP_PER_INVITE;
+
+      await client.query(
+        `
+          INSERT INTO points_audit_log (
+            address, points_awarded, task_type, tx_hash, metadata
+          ) VALUES ($1, $2, $3, $4, $5::jsonb)
+        `,
+        [
+          normalized,
+          REFERRAL_INVITE_XP_PER_INVITE,
+          REFERRAL_INVITE_XP_KEY,
+          `claim:referral:${invitee}`,
+          JSON.stringify({ invitee, source: "referral_invite_claim_app" }),
+        ]
+      );
+    }
+
+    if (pointsAwarded > 0) {
+      await client.query(
+        `
+          UPDATE users
+          SET points = COALESCE(points, 0) + $2,
+              last_active = now()
+          WHERE address = $1
+        `,
+        [normalized, pointsAwarded]
+      );
+    }
+
+    await client.query("COMMIT");
+    return { claimedInvites, pointsAwarded };
+  } catch (error) {
+    await client.query("ROLLBACK");
+    const message = error instanceof Error ? error.message : String(error);
+    if (/referral_invite_xp_claims_(referrer|invitee)_check/i.test(message)) {
+      throw new Error(
+        "Referral claim blocked by Solana address CHECKs — apply db/migrations/051_claim_referral_invite_xp_solana.sql on pump_db"
+      );
+    }
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 /**
