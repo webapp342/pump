@@ -17,12 +17,16 @@ import {
 import { useRedisArenaCache } from "@/lib/db/perf-flags";
 import {
   fillGapsForStoredCandles,
+  mergeWsCandleUpdate,
   storedCandlesToBars,
   DEFAULT_CHART_INTERVAL,
   type CandleBar,
   type CandleInterval,
+  type CandleWsUpdate,
   type VolumeBar,
 } from "@/lib/candles";
+import { listTokenCandlesFromClickHouse } from "@/lib/clickhouse/candles";
+import { readHotCandleUpdate } from "@/lib/redis/hot-cache";
 import { buildTokenMarketSnapshot, type TokenMarketSnapshot } from "@/lib/token-market-snapshot";
 
 export type TokenDetailPayload = {
@@ -49,11 +53,59 @@ export type TokenDetailBundle = TokenDetailPayload & {
 const SSR_CHART_INTERVAL: CandleInterval = DEFAULT_CHART_INTERVAL;
 const SSR_CHART_LIMIT = 1000;
 
+function mergeHotTailBars(
+  candles: CandleBar[],
+  volumes: VolumeBar[],
+  hot: CandleWsUpdate | null
+): { candles: CandleBar[]; volumes: VolumeBar[] } {
+  if (!hot) return { candles, volumes };
+  return mergeWsCandleUpdate(candles, volumes, hot, 1);
+}
+
 async function fetchInitialChartCandles(
   normalized: string
 ): Promise<InitialChartCandles | undefined> {
+  const hotTail = await readHotCandleUpdate(normalized, SSR_CHART_INTERVAL);
+
+  const fromCh = await listTokenCandlesFromClickHouse(
+    normalized,
+    SSR_CHART_INTERVAL,
+    SSR_CHART_LIMIT
+  );
+  if (fromCh && fromCh.rows.length > 0) {
+    let raw = storedCandlesToBars(fromCh.rows);
+    raw = mergeHotTailBars(raw.candles, raw.volumes, hotTail);
+    const filled = fillGapsForStoredCandles(raw.candles, raw.volumes, SSR_CHART_INTERVAL, {
+      endTimeMs: Date.now(),
+      extendToLive: false,
+    });
+    if (filled.candles.length > 0) {
+      return {
+        interval: SSR_CHART_INTERVAL,
+        candles: filled.candles,
+        volumes: filled.volumes,
+        source: "db",
+        gapFilledByApi: true,
+      };
+    }
+  }
+
   const stored = await listTokenCandlesFromDb(normalized, SSR_CHART_INTERVAL, SSR_CHART_LIMIT);
-  if (stored.length === 0) return undefined;
+  if (stored.length === 0) {
+    if (hotTail) {
+      const seeded = mergeHotTailBars([], [], hotTail);
+      if (seeded.candles.length > 0) {
+        return {
+          interval: SSR_CHART_INTERVAL,
+          candles: seeded.candles,
+          volumes: seeded.volumes,
+          source: "db",
+          gapFilledByApi: true,
+        };
+      }
+    }
+    return undefined;
+  }
 
   if (await isGapFillCandlesSqlAvailable()) {
     try {
@@ -63,12 +115,13 @@ async function fetchInitialChartCandles(
         SSR_CHART_LIMIT
       );
       if (gapFilled.length > 0) {
-        const bars = storedCandlesToBars(gapFilled);
+        let bars = storedCandlesToBars(gapFilled);
+        bars = mergeHotTailBars(bars.candles, bars.volumes, hotTail);
         const filled = fillGapsForStoredCandles(
           bars.candles,
           bars.volumes,
           SSR_CHART_INTERVAL,
-          { endTimeMs: Date.now() }
+          { endTimeMs: Date.now(), extendToLive: false }
         );
         return {
           interval: SSR_CHART_INTERVAL,
@@ -83,9 +136,11 @@ async function fetchInitialChartCandles(
     }
   }
 
-  const raw = storedCandlesToBars(stored);
+  let raw = storedCandlesToBars(stored);
+  raw = mergeHotTailBars(raw.candles, raw.volumes, hotTail);
   const filled = fillGapsForStoredCandles(raw.candles, raw.volumes, SSR_CHART_INTERVAL, {
     endTimeMs: Date.now(),
+    extendToLive: false,
   });
   return {
     interval: SSR_CHART_INTERVAL,

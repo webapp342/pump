@@ -56,22 +56,36 @@ export async function GET(request: NextRequest, context: RouteContext) {
     }
 
     const cached = await readCandleCache(address, interval);
+    const hotTail = await readHotCandleUpdate(address, interval);
+
+    // Cache hit still merges Redis hot tail — never serve stale OHLC without live bucket.
     if (cached && Date.now() - cached.cachedAt < 5_000) {
+      let raw = {
+        candles: cached.candles,
+        volumes: cached.volumes,
+      };
+      raw = mergeHotTail(raw, hotTail);
+      const { candles, volumes } = fillGapsForStoredCandles(
+        raw.candles,
+        raw.volumes,
+        interval,
+        { endTimeMs: Date.now(), extendToLive: false }
+      );
       logChartOlapSource({
         tokenAddress: address,
         interval,
         olap: "cache",
-        bucketCount: cached.candles.length,
+        bucketCount: candles.length,
         cached: true,
       });
       return NextResponse.json(
         {
           data: {
-            candles: cached.candles,
-            volumes: cached.volumes,
+            candles,
+            volumes,
             interval: cached.interval,
             source: cached.source,
-            gapFilled: cached.gapFilled,
+            gapFilled: true,
             gapFill: cached.gapFill,
             cached: true,
             frozen: false,
@@ -80,13 +94,11 @@ export async function GET(request: NextRequest, context: RouteContext) {
         },
         {
           headers: {
-            "Cache-Control": "private, max-age=2, stale-while-revalidate=5",
+            "Cache-Control": "private, max-age=1, stale-while-revalidate=3",
           },
         }
       );
     }
-
-    const hotTail = await readHotCandleUpdate(address, interval);
 
     const fromCh = await listTokenCandlesFromClickHouse(address, interval, limit);
     if (fromCh && fromCh.rows.length > 0) {
@@ -96,7 +108,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
         raw.candles,
         raw.volumes,
         interval,
-        { endTimeMs: Date.now() }
+        { endTimeMs: Date.now(), extendToLive: false }
       );
       if (candles.length > 0) {
         const payload = {
@@ -163,7 +175,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
         raw.candles,
         raw.volumes,
         interval,
-        { endTimeMs: Date.now() }
+        { endTimeMs: Date.now(), extendToLive: false }
       );
       if (candles.length > 0) {
         if (gapFill === "sql" && seriesHasTemporalGaps(candles, interval)) {

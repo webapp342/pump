@@ -444,6 +444,7 @@ export class SolanaEventHandlers {
       });
 
       const candleUpdates = inserted.candleUpdates ?? [];
+      // Persist ALL intervals to CH + Redis hot (SSOT); WS gets the same set by default.
       enqueueCandlesClickHouse(mint, candleUpdates);
       void writeHotCandleUpdates(mint, candleUpdates);
 
@@ -454,7 +455,7 @@ export class SolanaEventHandlers {
       await publishTrade({
         type: "trade",
         tokenAddress: mint,
-        candleUpdates: inserted.candleUpdates,
+        candleUpdates,
         trade: {
           id: inserted.tradeId,
           side,

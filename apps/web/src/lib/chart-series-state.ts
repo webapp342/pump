@@ -36,6 +36,58 @@ export type ActorBucketExtremes = {
   high: number;
 };
 
+/**
+ * HTTP history must never clobber a fresher WS tip (CH insert is async).
+ * Enterprise dual-path: ClickHouse/API = history, WS = open bucket SSOT.
+ */
+export function preserveLiveTailOverFetch(
+  fetchedCandles: CandleBar[],
+  fetchedVolumes: VolumeBar[],
+  liveCandles: CandleBar[],
+  liveVolumes: VolumeBar[]
+): { candles: CandleBar[]; volumes: VolumeBar[] } {
+  if (liveCandles.length === 0 || fetchedCandles.length === 0) {
+    return { candles: fetchedCandles, volumes: fetchedVolumes };
+  }
+
+  const liveTail = liveCandles[liveCandles.length - 1]!;
+  const liveVol = liveVolumes[liveVolumes.length - 1];
+  const candles = fetchedCandles.slice();
+  const volumes = fetchedVolumes.slice();
+  const idx = candles.findIndex((c) => c.time === liveTail.time);
+
+  if (idx >= 0) {
+    const fetched = candles[idx]!;
+    candles[idx] = {
+      time: fetched.time,
+      open: fetched.open > 0 ? fetched.open : liveTail.open,
+      high: Math.max(fetched.high, liveTail.high),
+      low: Math.min(
+        fetched.low > 0 ? fetched.low : liveTail.low,
+        liveTail.low > 0 ? liveTail.low : fetched.low
+      ),
+      // Prefer live close until CH/hot absorb the same print.
+      close: liveTail.close > 0 ? liveTail.close : fetched.close,
+    };
+    if (liveVol && idx < volumes.length) {
+      volumes[idx] = {
+        ...volumes[idx]!,
+        value: Math.max(volumes[idx]!.value, liveVol.value),
+        color: liveVol.value >= volumes[idx]!.value ? liveVol.color : volumes[idx]!.color,
+      };
+    }
+    return { candles, volumes };
+  }
+
+  const fetchTail = candles[candles.length - 1]!;
+  if (liveTail.time > fetchTail.time) {
+    candles.push(liveTail);
+    if (liveVol) volumes.push(liveVol);
+  }
+
+  return { candles, volumes };
+}
+
 function applyActorBucketExtremes(
   candles: CandleBar[],
   extremes: ActorBucketExtremes | null | undefined,
@@ -83,16 +135,22 @@ export function chartSeriesReducer(
     case "reset":
       return initialChartSeriesState;
     case "set_fetched": {
+      const preserved = preserveLiveTailOverFetch(
+        action.candles,
+        action.volumes,
+        state.candles,
+        state.volumes
+      );
       return {
-        candles: action.candles,
-        volumes: action.volumes,
+        candles: preserved.candles,
+        volumes: preserved.volumes,
         source: action.source,
         interval: action.interval,
         gapFilledByApi: action.gapFilledByApi ?? action.source === "db",
       };
     }
     case "merge_ws": {
-      if (state.source !== "db" || state.candles.length === 0) return state;
+      if (state.candles.length === 0) return state;
       const merged = mergeWsCandleUpdate(
         state.candles,
         state.volumes,
@@ -103,6 +161,8 @@ export function chartSeriesReducer(
         ...state,
         candles: merged.candles,
         volumes: merged.volumes,
+        /** Live WS OHLC is authoritative for the open bucket. */
+        source: "db",
         /** WS may insert buckets — re-gap on next derive. */
         gapFilledByApi: false,
       };
@@ -265,4 +325,23 @@ export function mergeWsCandleUpdates(
     byKey.set(`${item.interval}:${item.time}`, item);
   }
   return [...byKey.values()];
+}
+
+/** All buckets for an interval, oldest → newest (safe for sequential merge_ws). */
+export function candleUpdatesForIntervalSorted(
+  updates: CandleWsUpdate[],
+  interval: CandleInterval
+): CandleWsUpdate[] {
+  return updates
+    .filter((item) => item.interval === interval)
+    .sort((a, b) => a.time - b.time);
+}
+
+/** Newest open-bucket update for an interval — never `.find()` (that picks the oldest). */
+export function latestCandleUpdateForInterval(
+  updates: CandleWsUpdate[],
+  interval: CandleInterval
+): CandleWsUpdate | null {
+  const sorted = candleUpdatesForIntervalSorted(updates, interval);
+  return sorted.length > 0 ? sorted[sorted.length - 1]! : null;
 }

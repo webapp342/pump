@@ -24,6 +24,7 @@ import {
 import {
   resolveLatestSpotPriceBnb,
   sortTradesChronologically,
+  synthesizeCandleUpdatesFromSpot,
   type CandleWsUpdate,
 } from "@/lib/candles";
 import { PumpSubscriptPrice } from "@/components/ui/PumpSubscriptPrice";
@@ -494,8 +495,26 @@ export function TokenDetailLive({
             setLatestWsBonding(payload.bonding);
           }
           setDbTrades((prev) => prependTradeIfNew(prev, tradeItem));
-          if (payload.candleUpdates?.length) {
-            const updates = payload.candleUpdates as CandleWsUpdate[];
+          let updates = (payload.candleUpdates ?? []) as CandleWsUpdate[];
+          // Dual-path: if indexer omitted candleUpdates, synthesize tip from bonding spot
+          // so chart never waits on HTTP poll while tape already moved.
+          if (updates.length === 0) {
+            const spot = payload.bonding
+              ? Number(
+                  payload.bonding.spotPriceZug ?? payload.bonding.lastPriceZug ?? 0
+                )
+              : Number(tradeItem.spotPriceBnb ?? 0);
+            const gross = Number(tradeItem.nativeAmount);
+            const fee = Number(tradeItem.feeBnb ?? 0);
+            const volumeNative = Math.max(0, gross - fee);
+            updates = synthesizeCandleUpdatesFromSpot({
+              spotAfter: spot,
+              volumeNative,
+              isBuy: tradeItem.side === "BUY",
+              blockTimeMs: new Date(tradeItem.blockTime).getTime(),
+            });
+          }
+          if (updates.length > 0) {
             setLiveCandleUpdates((prev) => mergeWsCandleUpdates(prev, updates));
             for (const update of updates) {
               logChartWsMerge({

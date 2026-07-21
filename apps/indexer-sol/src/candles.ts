@@ -14,10 +14,9 @@ const INTERVAL_MS: Record<CandleInterval, number> = {
 };
 
 export function incrementalCandlesEnabled(): boolean {
-  const value = process.env.INCREMENTAL_CANDLES;
-  if (value === "false") return false;
-  if (value === "true") return true;
-  return process.env.INCREMENTAL_BOARD_STATS !== "false";
+  // Chart SSOT requires per-trade OHLC — only allow explicit off for emergency.
+  if (process.env.INCREMENTAL_CANDLES === "false") return false;
+  return true;
 }
 
 /** When true: OHLC → ClickHouse + Redis only (no PG token_candles). Enable after 7d green parity. */
@@ -26,7 +25,8 @@ export function skipPgTokenCandles(): boolean {
 }
 
 export function wsCandleIntervals(): CandleInterval[] {
-  const raw = process.env.CANDLE_WS_INTERVALS ?? "5m";
+  // Enterprise default: publish every display interval so chart never waits on HTTP poll.
+  const raw = process.env.CANDLE_WS_INTERVALS ?? "5m,15m,1h,4h";
   const allowed = new Set(
     raw
       .split(",")
@@ -290,7 +290,6 @@ async function computeIntervalCandleSkipPg(
 }
 
 async function computeCandlesSkipPg(input: TradeCandleInput): Promise<CandleWsUpdatePayload[]> {
-  const wsIntervals = new Set(wsCandleIntervals());
   const updates: CandleWsUpdatePayload[] = [];
 
   for (const interval of CANDLE_INTERVALS) {
@@ -302,7 +301,7 @@ async function computeCandlesSkipPg(input: TradeCandleInput): Promise<CandleWsUp
       input.volumeZug,
       input.buyVolumeZug
     );
-    if (update && wsIntervals.has(interval)) {
+    if (update) {
       updates.push(update);
     }
   }
@@ -310,6 +309,10 @@ async function computeCandlesSkipPg(input: TradeCandleInput): Promise<CandleWsUp
   return updates;
 }
 
+/**
+ * Compute + persist OHLC for every chart interval.
+ * Callers dual-write ALL updates to CH/Redis; WS may still filter for bandwidth.
+ */
 export async function upsertCandlesAfterTrade(
   client: pg.PoolClient,
   input: TradeCandleInput
@@ -320,7 +323,6 @@ export async function upsertCandlesAfterTrade(
     return computeCandlesSkipPg(input);
   }
 
-  const wsIntervals = new Set(wsCandleIntervals());
   const updates: CandleWsUpdatePayload[] = [];
   const rate =
     input.nativeUsdRate != null &&
@@ -340,10 +342,18 @@ export async function upsertCandlesAfterTrade(
       input.buyVolumeZug,
       rate
     );
-    if (update && wsIntervals.has(interval)) {
+    if (update) {
       updates.push(update);
     }
   }
 
   return updates;
+}
+
+/** Subset of candle updates to fan out on the trade WS (default: all intervals). */
+export function filterCandleUpdatesForWs(
+  updates: CandleWsUpdatePayload[]
+): CandleWsUpdatePayload[] {
+  const allowed = new Set(wsCandleIntervals());
+  return updates.filter((u) => allowed.has(u.interval as CandleInterval));
 }

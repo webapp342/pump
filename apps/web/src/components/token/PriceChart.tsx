@@ -15,7 +15,6 @@ import { PumpIcon } from "@/components/icons/PumpIcon";
 import { faChevronDown } from "@/lib/pump-icons";
 import {
   applyCandleSeriesPriceFormat,
-  buildCandlesFromTrades,
   CANDLE_INTERVALS,
   DEFAULT_CHART_INTERVAL,
   resolveChartPriceFormat,
@@ -40,6 +39,7 @@ import type { TradeItem } from "@/lib/db/launchpad";
 import type { InitialChartCandles } from "@/lib/token-server";
 import {
   canSafeIncrementalUpdate,
+  candleUpdatesForIntervalSorted,
   chartSeriesReducer,
   deriveChartSeries,
   incrementalPatchStartIndex,
@@ -78,8 +78,9 @@ type PriceChartProps = {
   onCurrencyChange?: (currency: "usd" | "mcap") => void;
 };
 
-const POLL_MS = 4_000;
-const WS_FALLBACK_POLL_MS = 30_000;
+const POLL_MS = 2_000;
+/** WS tip is live; poll only reconciles CH history (ObsessionDB dual-path). */
+const WS_RECONCILE_POLL_MS = 12_000;
 const DEFAULT_VISIBLE_CANDLES = 120;
 /** Minimum Y-axis span so micro-cap moves don't fill the entire chart height. */
 const MIN_CHART_PRICE_RANGE_RATIO = 0.04;
@@ -197,9 +198,9 @@ export function PriceChart({
   symbol: _symbol,
   status: _status,
   initialCandles,
-  curveSnapshot,
+  curveSnapshot: _curveSnapshot,
   liveCandleUpdates = [],
-  fallbackTrades = [],
+  fallbackTrades: _fallbackTrades = [],
   wsConnected = false,
   bnbUsd = null,
   liveOnChainSpotBnb = null,
@@ -242,6 +243,9 @@ export function PriceChart({
   const candleUnitScale =
     currency === "mcap" ? DEFAULT_TOKEN_TOTAL_SUPPLY : 1;
 
+  const liveCandleUpdatesRef = useRef(liveCandleUpdates);
+  liveCandleUpdatesRef.current = liveCandleUpdates;
+
   const fetchCandles = useCallback(async () => {
     const intervalAtFetch = timeInterval;
     const mark = markChartFetchStart(tokenAddress, intervalAtFetch);
@@ -271,6 +275,20 @@ export function PriceChart({
         interval: intervalAtFetch,
         gapFilledByApi: body.data?.gapFilled ?? false,
       });
+      // Re-apply every WS bucket for this interval (oldest→newest) so poll never drops the tip.
+      const liveUpdates = candleUpdatesForIntervalSorted(
+        liveCandleUpdatesRef.current,
+        intervalAtFetch
+      );
+      if (liveUpdates.length > 0 && candles.length > 0) {
+        for (const live of liveUpdates) {
+          dispatchSeries({
+            type: "merge_ws",
+            update: live,
+            priceScale: 1,
+          });
+        }
+      }
       if (typeof performance !== "undefined") {
         performance.mark(`${mark}_end`);
       }
@@ -321,7 +339,7 @@ export function PriceChart({
 
   useEffect(() => {
     if (frozen) return;
-    const pollMs = wsConnected ? WS_FALLBACK_POLL_MS : POLL_MS;
+    const pollMs = wsConnected ? WS_RECONCILE_POLL_MS : POLL_MS;
     const timer = setInterval(() => void fetchCandles(), pollMs);
     return () => clearInterval(timer);
   }, [fetchCandles, frozen, wsConnected]);
@@ -340,62 +358,87 @@ export function PriceChart({
   }, [frozen, seriesState.candles, nowMs]);
 
   useEffect(() => {
-    if (seriesState.source !== "db" || liveCandleUpdates.length === 0) return;
-    const update = liveCandleUpdates.find((item) => item.interval === timeInterval);
-    if (!update) return;
+    if (liveCandleUpdates.length === 0) return;
+    const updates = candleUpdatesForIntervalSorted(liveCandleUpdates, timeInterval);
+    if (updates.length === 0) return;
+    const tip = updates[updates.length - 1]!;
     logChartWsLag({
       tokenAddress,
-      interval: update.interval,
-      bucketSec: update.time,
-      lagMs: Date.now() - update.time * 1000,
+      interval: tip.interval,
+      bucketSec: tip.time,
+      lagMs: Date.now() - tip.time * 1000,
       wsConnected,
     });
-    dispatchSeries({
-      type: "merge_ws",
-      update,
-      priceScale: 1,
-    });
-    renderedFingerprintRef.current = "";
-  }, [liveCandleUpdates, timeInterval, seriesState.source, tokenAddress, wsConnected]);
-
-  const chartSeriesState = useMemo(() => {
-    if (seriesState.candles.length > 0 || fallbackTrades.length === 0) {
-      return seriesState;
+    for (const update of updates) {
+      dispatchSeries({
+        type: "merge_ws",
+        update,
+        priceScale: 1,
+      });
     }
-    const virtualZugReserve = curveSnapshot?.virtualZugReserve
-      ? BigInt(curveSnapshot.virtualZugReserve)
-      : undefined;
-    const virtualTokenReserve = curveSnapshot?.virtualTokenReserve
-      ? BigInt(curveSnapshot.virtualTokenReserve)
-      : undefined;
-    const { candles, volumes } = buildCandlesFromTrades(
-      fallbackTrades,
-      timeInterval,
-      /** Always native spot — `deriveChartSeries` applies MCAP scale once. */
-      1,
-      {
-        fillGaps: true,
-        endTimeMs: chartEndTimeMs,
-        virtualZugReserve,
-        virtualTokenReserve,
+
+    // TradingView realtime path: series.update() paints tip immediately (<50ms),
+    // then React derive/setData reconciles full series.
+    const mainSeries = mainSeriesRef.current;
+    const update = tip;
+    if (ready && mainSeries) {
+      const scale = candleUnitScale;
+      const open = Number(update.open) * scale;
+      const high = Number(update.high) * scale;
+      const low = Number(update.low) * scale;
+      const close = Number(update.close) * scale;
+      if (Number.isFinite(close) && close > 0) {
+        const prev = renderedCandlesRef.current;
+        const last = prev.length > 0 ? prev[prev.length - 1] : null;
+        const painted =
+          last && last.time === update.time
+            ? {
+                time: update.time,
+                open: last.open > 0 ? last.open : open,
+                high: Math.max(last.high, high, close),
+                low: Math.min(
+                  last.low > 0 ? last.low : low,
+                  low > 0 ? low : last.low,
+                  close
+                ),
+                close,
+              }
+            : {
+                time: update.time,
+                open: open > 0 ? open : close,
+                high: Math.max(high, open, close),
+                low: Math.min(low > 0 ? low : close, open, close),
+                close,
+              };
+        try {
+          mainSeries.update(
+            candleToMainChartPoint(chartStyleRef.current, painted) as never
+          );
+          if (last && last.time === painted.time) {
+            const next = prev.slice();
+            next[next.length - 1] = painted;
+            renderedCandlesRef.current = next;
+          } else if (!last || painted.time > last.time) {
+            renderedCandlesRef.current = [...prev, painted];
+          }
+        } catch {
+          // Full setData in the derive effect heals ordering edge cases.
+        }
       }
-    );
-    if (candles.length === 0) return seriesState;
-    return {
-      candles,
-      volumes,
-      source: "trades" as const,
-      interval: timeInterval,
-      gapFilledByApi: false,
-    };
+    }
+
+    renderedFingerprintRef.current = "";
   }, [
-    seriesState,
-    fallbackTrades,
+    liveCandleUpdates,
     timeInterval,
-    chartEndTimeMs,
-    curveSnapshot?.virtualZugReserve,
-    curveSnapshot?.virtualTokenReserve,
+    tokenAddress,
+    wsConnected,
+    ready,
+    candleUnitScale,
   ]);
+
+  /** History from API/WS only — never rebuild OHLC from tape (diverges from indexer). */
+  const chartSeriesState = seriesState;
 
   const { candles, volumes } = useMemo(
     () =>

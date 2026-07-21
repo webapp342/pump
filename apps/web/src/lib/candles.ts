@@ -52,6 +52,52 @@ export type CandleWsUpdate = {
   isNewBucket: boolean;
 };
 
+/**
+ * Enterprise fallback when indexer omits `candleUpdates` on the trade WS fan-out.
+ * Builds the same bucket shape so chart tip never waits on HTTP poll (ObsessionDB dual-path).
+ */
+export function synthesizeCandleUpdatesFromSpot(input: {
+  spotAfter: number;
+  spotBefore?: number;
+  volumeNative: number;
+  isBuy: boolean;
+  blockTimeMs: number;
+  /** Prior closes by interval — open continuity for new buckets. */
+  priorCloseByInterval?: Partial<Record<CandleInterval, number>>;
+}): CandleWsUpdate[] {
+  const after = input.spotAfter;
+  if (!(after > 0) || !Number.isFinite(after)) return [];
+  const before =
+    input.spotBefore != null && input.spotBefore > 0 && Number.isFinite(input.spotBefore)
+      ? input.spotBefore
+      : after;
+  const volume = Math.max(0, input.volumeNative);
+  const buyVolume = input.isBuy ? volume : 0;
+  const out: CandleWsUpdate[] = [];
+
+  for (const { id, ms } of CANDLE_INTERVALS) {
+    const bucketSec = Math.floor(input.blockTimeMs / ms) * (ms / 1000);
+    const prior = input.priorCloseByInterval?.[id];
+    const open =
+      prior != null && prior > 0 && Number.isFinite(prior) ? prior : before;
+    const high = Math.max(open, before, after);
+    const low = Math.min(open, before, after);
+    out.push({
+      interval: id,
+      time: bucketSec,
+      open: String(open),
+      high: String(high),
+      low: String(low),
+      close: String(after),
+      volume: String(volume),
+      buyVolume: String(buyVolume),
+      tradeCount: 1,
+      isNewBucket: true,
+    });
+  }
+  return out;
+}
+
 export type StoredCandleSource = "db" | "trades";
 
 export type ChartTradePoint = {
