@@ -299,20 +299,21 @@ async function computeIntervalCandleLive(
     volume = volumeZug;
     buyVolume = buyVolumeZug;
     tradeCount = 1;
+    // First print only: buy-only bucket cannot open above its low.
+    open = sealBuyOnlyOpen(open, low, volume, buyVolume);
   } else {
     const spotOpen = resolveSpotOpen(spotBefore, spotAfter, null);
     const touch = wickTouchPrice(spotBefore, spotAfter, spotOpen);
+    // Open is immutable for the bucket lifetime — never reseal / never prior-close.
     open = Number(existingHot!.open);
-    high = Math.max(Number(existingHot!.high), touch, spotAfter);
-    low = Math.min(Number(existingHot!.low), touch, spotAfter);
+    high = Math.max(Number(existingHot!.high), touch, spotAfter, open);
+    low = Math.min(Number(existingHot!.low), touch, spotAfter, open);
     close = spotAfter;
     volume = Number(existingHot!.volume) + volumeZug;
     buyVolume = Number(existingHot!.buyVolume) + buyVolumeZug;
     tradeCount = existingHot!.tradeCount + 1;
   }
 
-  // Repair poisoned Redis tips + enforce bonding invariant for buy-only buckets.
-  open = sealBuyOnlyOpen(open, low, volume, buyVolume);
   high = Math.max(high, open, close);
   low = Math.min(low, open, close);
 

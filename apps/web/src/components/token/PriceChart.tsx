@@ -396,8 +396,8 @@ export function PriceChart({
           last && last.time === update.time
             ? {
                 time: update.time,
-                // Never raise open on the live tip (solid → needle regression).
-                open: last.open > 0 ? Math.min(last.open, open > 0 ? open : last.open) : open,
+                // Open frozen for bucket — never min/repair/raise.
+                open: last.open > 0 ? last.open : open > 0 ? open : close,
                 high: Math.max(last.high, high, close),
                 low: Math.min(
                   last.low > 0 ? last.low : low,
@@ -413,14 +413,6 @@ export function PriceChart({
                 low: Math.min(low > 0 ? low : close, open, close),
                 close,
               };
-        // Buy-climb seal: if we already have a lower wick under a green tip, open = low.
-        if (painted.close >= painted.open && painted.low < painted.open) {
-          const body = Math.abs(painted.close - painted.open);
-          const range = painted.high - painted.low;
-          if (range > 0 && body / range < 0.4) {
-            painted.open = painted.low;
-          }
-        }
         try {
           mainSeries.update(
             candleToMainChartPoint(chartStyleRef.current, painted) as never

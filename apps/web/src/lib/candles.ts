@@ -787,44 +787,33 @@ export function mergeWsCandleUpdate(
     const nextVolumes = volumes.slice();
     const close = candle.close;
     const priorVol = idx < volumes.length ? volumes[idx]!.value : 0;
-    const priorClose = idx > 0 ? candles[idx - 1]!.close : undefined;
 
     // Synthetic/empty placeholder (volume 0) → replace with real trade OHLC.
     // Do not keep a phantom high from a flat carry-forward bar.
     if (priorVol <= 0 && volume.value > 0) {
       const tradeOpen = candle.open > 0 ? candle.open : close;
-      const open = tradeOpen;
       nextCandles[idx] = sanitizeTailCandleOhlc(
         {
           time: candle.time,
-          open,
-          high: Math.max(candle.high, open, close),
-          low: Math.min(candle.low, open, close),
+          open: tradeOpen,
+          high: Math.max(candle.high, tradeOpen, close),
+          low: Math.min(candle.low, tradeOpen, close),
           close,
         },
         close
       );
     } else {
-      // Never raise open once set — raised open + kept low = needle after solid paint.
-      const tradeOpen = candle.open > 0 ? candle.open : close;
-      let open =
-        existing.open > 0 ? Math.min(existing.open, tradeOpen) : tradeOpen;
+      // OPEN IS IMMUTABLE once the bucket exists — min()/repair-to-low caused
+      // open to jump across paints (user: “openi karıştırıyor”).
+      const open = existing.open > 0 ? existing.open : candle.open > 0 ? candle.open : close;
       const lowCandidate = Math.min(existing.low, candle.low, close, open);
       const highCandidate = Math.max(existing.high, candle.high, close, open);
-      if (close >= open && lowCandidate < open) {
-        const body = Math.abs(close - open);
-        const range = highCandidate - lowCandidate;
-        const lowerWick = open - lowCandidate;
-        if (range > 0 && (body / range < 0.4 || lowerWick > body * 1.2)) {
-          open = lowCandidate;
-        }
-      }
       nextCandles[idx] = sanitizeTailCandleOhlc(
         {
           time: candle.time,
           open,
-          high: Math.max(highCandidate, open),
-          low: Math.min(lowCandidate, open),
+          high: highCandidate,
+          low: lowCandidate,
           close,
         },
         close
@@ -841,14 +830,7 @@ export function mergeWsCandleUpdate(
     }
     const nextCandles = candles.slice();
     const nextVolumes = volumes.slice();
-    const priorClose = candles.length > 1 ? candles[candles.length - 2]!.close : undefined;
-    const tradeOpen = candle.open > 0 ? candle.open : candle.close;
-    const stitchedOpen =
-      priorClose != null &&
-      priorClose > 0 &&
-      isBarContinuityMatch(last.open, priorClose) &&
-      !isBarContinuityMatch(last.open, tradeOpen);
-    const open = stitchedOpen ? tradeOpen : last.open;
+    const open = last.open > 0 ? last.open : candle.open > 0 ? candle.open : candle.close;
     nextCandles[nextCandles.length - 1] = sanitizeTailCandleOhlc(
       {
         ...candle,
@@ -943,11 +925,9 @@ export function createOptimisticCandleBar(
   const intervalMs = CANDLE_INTERVALS.find((i) => i.id === interval)?.ms ?? 60_000;
   const bucketSec = Math.floor(actor.blockTimeMs / intervalMs) * (intervalMs / 1000);
 
+  // Bonding: open = first print (spotBefore), never prior-close stitch.
+  void previousCloseHint;
   let open = before > 0 ? before : after;
-  if (previousCloseHint != null && previousCloseHint > 0) {
-    // Prefer the actual previous close in the series if provided (for correct open on new bar)
-    open = previousCloseHint;
-  }
   if (actor.side === "buy" && after < open) open = after;
   if (actor.side === "sell" && after > open) open = after;
 
@@ -988,13 +968,13 @@ export function applyActorOptimisticCandleBucket(
   const idx = candles.findIndex((c) => c.time === bucketSec);
   const last = candles[candles.length - 1];
 
-  // Determine the open we should use for this optimistic bar
-  let openBase = before > 0 ? before : after;
-  if (idx >= 0) {
-    openBase = candles[idx]!.open;
-  } else if (last) {
-    openBase = last.close;
-  }
+  // Existing bucket → freeze its open; new bucket → first print (spotBefore).
+  const openBase =
+    idx >= 0
+      ? candles[idx]!.open
+      : before > 0
+        ? before
+        : after;
 
   const opt = createOptimisticCandleBar(actor, interval, openBase, priceScale);
   if (!opt) return { candles, volumes };
@@ -1012,14 +992,13 @@ export function applyActorOptimisticCandleBucket(
 
   if (idx >= 0) {
     const existing = candles[idx]!;
-    const priorClose = idx > 0 ? candles[idx - 1]!.close : undefined;
-    const open = coherentOpenForBar(existing.open, after, before > 0 ? before : priorClose);
+    const open = existing.open > 0 ? existing.open : openBase;
     const merged = sanitizeTailCandleOhlc(
       {
         time: bucketSec,
         open,
-        high: Math.max(existing.high, patched.high),
-        low: Math.min(existing.low, patched.low),
+        high: Math.max(existing.high, patched.high, after, open),
+        low: Math.min(existing.low, patched.low, after, open),
         close: after,
       },
       after
@@ -1046,13 +1025,13 @@ export function applyActorOptimisticCandleBucket(
       nextCandles = padded.candles;
       nextVolumes = padded.volumes;
     }
-    const priorClose = last?.close ?? patched.open;
+    const open = patched.open > 0 ? patched.open : after;
     const opened = sanitizeTailCandleOhlc(
       {
         ...patched,
-        open: priorClose,
-        high: Math.max(patched.high, priorClose, patched.close),
-        low: Math.min(patched.low, priorClose, patched.close),
+        open,
+        high: Math.max(patched.high, open, patched.close),
+        low: Math.min(patched.low, open, patched.close),
       },
       patched.close
     );
@@ -1063,16 +1042,15 @@ export function applyActorOptimisticCandleBucket(
   }
 
   if (bucketSec === last.time) {
-    const priorClose = candles.length > 1 ? candles[candles.length - 2]!.close : undefined;
-    const open = coherentOpenForBar(last.open, after, before > 0 ? before : priorClose);
+    const open = last.open > 0 ? last.open : openBase;
     const nextCandles = candles.slice();
     const nextVolumes = volumes.slice();
     nextCandles[nextCandles.length - 1] = sanitizeTailCandleOhlc(
       {
         time: last.time,
         open,
-        high: Math.max(last.high, patched.high),
-        low: Math.min(last.low, patched.low),
+        high: Math.max(last.high, patched.high, after, open),
+        low: Math.min(last.low, patched.low, after, open),
         close: after,
       },
       after
@@ -1120,40 +1098,18 @@ export function isBarContinuityMatch(priorClose: number, tradeOpen: number): boo
 }
 
 /**
- * Repair false lower-wick needles on green bars (bonding buy-climb).
- * Open was often prior-close-stitched while low kept the real first print — trader WS
- * looked solid, refresh/API/MV spectators saw a needle (Bitquery continuity is
- * presentation-only and must not rewrite bonding economics).
+ * Historical display helper — DO NOT use on the live tip path.
+ * Rewriting open on every paint made open jump between screenshots.
+ * Live buckets: open is set once (first print) and must stay frozen.
  */
 export function repairBondingNeedleOpens(candles: CandleBar[]): CandleBar[] {
-  if (candles.length === 0) return candles;
-  let changed = false;
-  const next = candles.map((c, i) => {
-    if (!(c.close >= c.open) || !(c.low < c.open)) return c;
-    const body = Math.abs(c.close - c.open);
-    const range = c.high - c.low;
-    const lowerWick = c.open - c.low;
-    const prevClose = i > 0 ? candles[i - 1]!.close : null;
-    const stitched =
-      prevClose != null && prevClose > 0 && isBarContinuityMatch(c.open, prevClose);
-    // Doji/needle at top of range = classic false open (body tiny, long lower wick).
-    const needleShape = range > 0 && body / range < 0.4 && lowerWick > body;
-    if (!stitched && !needleShape && lowerWick <= body * 1.2) return c;
-    changed = true;
-    const open = c.low;
-    return {
-      ...c,
-      open,
-      high: Math.max(c.high, open, c.close),
-      low: Math.min(c.low, open, c.close),
-    };
-  });
-  return changed ? next : candles;
+  // Intentionally a no-op: mutating open client-side fought WS/hot SSOT and
+  // produced three different opens for the same 5m tip across refreshes.
+  return candles;
 }
 
 /**
- * After a correct live series.update(), reconcile/setData must not raise tip open
- * (that regression is the “solid then needle” bug).
+ * After a correct live series.update(), reconcile/setData must not raise tip open.
  */
 export function lockTipOpenAgainstRegression(
   next: CandleBar[],
@@ -1163,9 +1119,9 @@ export function lockTipOpenAgainstRegression(
   const n = next[next.length - 1]!;
   const p = painted[painted.length - 1]!;
   if (n.time !== p.time) return next;
-  if (!(p.open > 0) || !(n.open > p.open)) return next;
-  // Only lock when painted tip was a solid/recovering body from a lower open.
-  if (n.close < p.open && p.close < p.open) return next;
+  if (!(p.open > 0)) return next;
+  // Freeze to the first painted open for this bucket (neither raise nor lower).
+  if (n.open === p.open) return next;
   const copy = next.slice();
   copy[copy.length - 1] = {
     ...n,
@@ -1350,9 +1306,13 @@ export function pinTailCandleToLiveMark(
   }
 
   const close = liveMarkBnb;
-  const openSeed =
-    bucketVolume > 0 ? existing.open : (priorClose ?? existing.open);
-  const open = coherentOpenForBar(openSeed, close, priorClose);
+  // Live mark only moves close/high/low — never rewrite a traded bucket's open.
+  const open =
+    bucketVolume > 0
+      ? existing.open > 0
+        ? existing.open
+        : close
+      : coherentOpenForBar(existing.open, close, priorClose);
 
   // Mark already passed isSpotMoveSane vs body — safe to expand trade extremes to close.
   const high = Math.max(existing.high, open, close);
@@ -1392,9 +1352,8 @@ export function applyActorOptimisticSpotToCandles(
 
   const lastIdx = candles.length - 1;
   const last = candles[lastIdx]!;
-  const priorClose = lastIdx > 0 ? candles[lastIdx - 1]!.close : undefined;
   const close = spotAfterScaled;
-  const open = coherentOpenForBar(last.open, close, priorClose);
+  const open = last.open > 0 ? last.open : close;
 
   const patched = sanitizeCandleOhlc(
     {
