@@ -2,6 +2,7 @@ import {
   BONDING_TOKEN_SUPPLY_HUMAN,
   spotPriceBnbFromBondingDecimals,
 } from "@/lib/bonding-curve";
+import { routeAddressKeysEqual } from "@/lib/address";
 import type { TokenListItem } from "@/lib/db/launchpad";
 
 export type ArenaTradeWsPayload = {
@@ -85,8 +86,9 @@ export function patchTokenFromArenaTrade(
   token: TokenListItem,
   payload: ArenaTradeWsPayload
 ): TokenListItem | null {
-  const addr = payload.tokenAddress?.toLowerCase();
-  if (!addr || token.address.toLowerCase() !== addr) return null;
+  if (!payload.tokenAddress || !routeAddressKeysEqual(token.address, payload.tokenAddress)) {
+    return null;
+  }
 
   const bonding = payload.bonding;
   if (!bonding) return null;

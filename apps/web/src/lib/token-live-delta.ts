@@ -1,6 +1,7 @@
 import {
   BONDING_TOKEN_SUPPLY_HUMAN,
 } from "@/lib/bonding-curve";
+import { addressCacheKey, routeAddressKeysEqual, txHashKey } from "@/lib/address";
 import type { TokenDetail, TradeItem } from "@/lib/db/launchpad";
 import type { CandleWsUpdate } from "@/lib/candles";
 import { arenaWsSpotPriceBnb, type ArenaTradeWsPayload } from "@/lib/arena-live-delta";
@@ -26,7 +27,7 @@ export type TokenTradeWsPayload = {
 };
 
 function tradeKey(trade: Pick<TradeItem, "txHash" | "id">): string {
-  return `${trade.txHash.toLowerCase()}:${trade.id}`;
+  return `${txHashKey(trade.txHash)}:${trade.id}`;
 }
 
 /** Fill price from gross BNB / tokens (tape semantics; not WS mark price). */
@@ -47,17 +48,22 @@ export function wsPayloadToTradeItem(payload: TokenTradeWsPayload): TradeItem | 
   const gross = Number(trade.zugAmount);
   const fee = trade.feeZug != null ? Number(trade.feeZug) : 0;
   const net = Math.max(0, gross - fee);
+  const spotFromBonding =
+    payload.bonding != null ? arenaWsSpotPriceBnb(payload.bonding) : 0;
+  const traderKey = addressCacheKey(trade.traderAddress) ?? trade.traderAddress;
 
   return {
     id: trade.id || `${trade.txHash}:${trade.logIndex ?? 0}`,
     side: trade.side,
-    traderAddress: trade.traderAddress.toLowerCase(),
+    traderAddress: traderKey,
     nativeAmount: trade.zugAmount,
     feeBnb: trade.feeZug,
     netBnb: String(net),
     tokenAmount: trade.tokenAmount,
     priceBnb: fillPriceBnbFromWsTrade(trade),
-    txHash: trade.txHash.toLowerCase(),
+    /** Bonding mark — required so mergeLiveStats never falls back to EVM virtual replay. */
+    spotPriceBnb: spotFromBonding > 0 ? String(spotFromBonding) : undefined,
+    txHash: trade.txHash,
     blockTime: trade.blockTime,
     nativeUsdRate: trade.nativeUsdRate,
   };
@@ -73,13 +79,12 @@ export function patchTokenDetailFromWsTrade(
   token: TokenDetail,
   payload: TokenTradeWsPayload
 ): TokenDetail | null {
-  const addr = payload.tokenAddress?.toLowerCase();
-  if (!addr || token.address.toLowerCase() !== addr) return null;
+  if (!payload.tokenAddress || !routeAddressKeysEqual(token.address, payload.tokenAddress)) {
+    return null;
+  }
 
   const bonding = payload.bonding;
-  const spot = bonding
-    ? arenaWsSpotPriceBnb(bonding)
-    : 0;
+  const spot = bonding ? arenaWsSpotPriceBnb(bonding) : 0;
   const spotStr = spot > 0 ? String(spot) : token.lastPriceBnb;
   const mcapBnb =
     spot > 0

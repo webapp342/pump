@@ -1,5 +1,6 @@
 import { parseEther } from "viem";
 import { NATIVE_SYMBOL } from "@/config/chain";
+import { isSolanaChainFamily } from "@/config/chain-family";
 import type { TradeItem } from "@/lib/db/launchpad";
 import {
   DEFAULT_VIRTUAL_TOKEN_RESERVE,
@@ -117,24 +118,32 @@ export function buildTradeSpotTicks(
   return ticks;
 }
 
-/** Latest bonding-curve spot (BNB per token) after replaying trades chronologically. */
+/** Latest bonding-curve spot (BNB/token) after replaying trades chronologically. */
 export function resolveLatestSpotPriceBnb(trades: TradeItem[]): number | null {
   if (trades.length === 0) return null;
 
   const chronological = [...trades].sort(
     (a, b) => new Date(a.blockTime).getTime() - new Date(b.blockTime).getTime()
   );
-  const last = chronological[chronological.length - 1]!;
-  // Prefer indexer spot column (Solana-accurate) over EVM-default virtual replay.
-  const indexedSpot = Number(last.spotPriceBnb);
-  if (Number.isFinite(indexedSpot) && indexedSpot > 0) return indexedSpot;
 
-  const ticks = buildTradeSpotTicks(chronological);
-  const tick = ticks.get(last.id);
-  if (tick && tick.after > 0) return tick.after;
+  // Walk newest→oldest for an indexed bonding mark (WS / optimistic / DB).
+  for (let i = chronological.length - 1; i >= 0; i--) {
+    const indexedSpot = Number(chronological[i]!.spotPriceBnb);
+    if (Number.isFinite(indexedSpot) && indexedSpot > 0) return indexedSpot;
+  }
 
-  const exec = Number(last.priceBnb);
-  return Number.isFinite(exec) && exec > 0 ? exec : null;
+  // EVM-only fallback: replay with default virtuals. Solana callers must attach spotPriceBnb.
+  if (!isSolanaChainFamily) {
+    const last = chronological[chronological.length - 1]!;
+    const ticks = buildTradeSpotTicks(chronological);
+    const tick = ticks.get(last.id);
+    if (tick && tick.after > 0) return tick.after;
+
+    const exec = Number(last.priceBnb);
+    return Number.isFinite(exec) && exec > 0 ? exec : null;
+  }
+
+  return null;
 }
 
 function tradeVolumeBnb(trade: TradeItem): number {
@@ -1408,22 +1417,9 @@ export function chartPriceFormatFromBase(
     if (price === 0) return currency === "usd" || currency === "mcap" ? "$0" : "0";
     if (currency === "mcap") {
       if (usdRate == null) return "—";
-      // Series stores native MCAP (spot × supply). Guard against stale log ticks /
-      // double-scaled outliers — LWC can briefly pass magnitude-shifted coords.
-      const range = options?.candles?.length ? candleNativeRange(options.candles) : null;
-      let native = price;
-      if (range && (price > range.max * 50 || price < range.min * 0.02)) {
-        let adjusted = price;
-        for (let attempt = 0; attempt < 12 && adjusted > range.max * 2; attempt += 1) {
-          adjusted /= 10;
-        }
-        if (adjusted >= range.min * 0.25 && adjusted <= range.max * 4) {
-          native = adjusted;
-        } else {
-          return "—";
-        }
-      }
-      const usd = native * usdRate;
+      // Series stores native MCAP (spot × supply). Do NOT decade-shift labels —
+      // that falsely printed ~$223 while true MCAP was ~$2.2K during live pins.
+      const usd = price * usdRate;
       if (!Number.isFinite(usd) || usd <= 0) return "$0";
       if (usd >= 1_000_000_000) return `$${(usd / 1_000_000_000).toFixed(2)}B`;
       if (usd >= 1_000_000) return `$${(usd / 1_000_000).toFixed(2)}M`;

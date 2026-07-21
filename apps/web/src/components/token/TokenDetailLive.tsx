@@ -17,6 +17,7 @@ import { useReadContract } from "wagmi";
 import { useActiveWalletAddress } from "@/hooks/useActiveWalletAddress";
 import type { TokenHolderSnapshot, TokenDetail, TradeItem } from "@/lib/db/launchpad";
 import {
+  BONDING_TOKEN_SUPPLY_HUMAN,
   bondingCurveManagerAbi,
   bondingCurveSnapshotFromTuple,
 } from "@/lib/bonding-curve";
@@ -227,14 +228,33 @@ function mergeLiveStats(
 
   if (liveTrades.length > 0) {
     const chronological = sortTradesChronologically(liveTrades);
-    const spotPrice = resolveLatestSpotPriceBnb(chronological);
+    const last = chronological[chronological.length - 1]!;
+    // Only trust indexed/WS/optimistic bonding mark — never EVM virtual-reserve replay
+    // (Solana pump-feel virtuals ≠ DEFAULT_VIRTUAL_* and would collapse MCAP ~10×).
+    const indexedSpot = Number(last.spotPriceBnb);
+    const spotPrice =
+      Number.isFinite(indexedSpot) && indexedSpot > 0
+        ? indexedSpot
+        : resolveLatestSpotPriceBnb(chronological);
+    const baseSpot = Number(merged.lastPriceBnb);
+    const nextSpot =
+      spotPrice != null && spotPrice > 0
+        ? spotPrice
+        : Number.isFinite(baseSpot) && baseSpot > 0
+          ? baseSpot
+          : null;
+
     merged = {
       ...merged,
       tradeCount: Math.max(merged.tradeCount, chronological.length),
       lastPriceBnb:
-        spotPrice != null && spotPrice > 0
-          ? String(spotPrice)
-          : chronological[chronological.length - 1]?.priceBnb || merged.lastPriceBnb,
+        nextSpot != null && nextSpot > 0
+          ? String(nextSpot)
+          : merged.lastPriceBnb,
+      marketCapBnb:
+        nextSpot != null && nextSpot > 0
+          ? String(nextSpot * BONDING_TOKEN_SUPPLY_HUMAN)
+          : merged.marketCapBnb,
     };
   }
 
