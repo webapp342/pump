@@ -12,7 +12,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouter, useSearchParams } from "next/navigation";
-import { createPublicClient, http, parseUnits, type Address } from "viem";
+import { parseUnits, type Address } from "viem";
 import { useReadContract } from "wagmi";
 import { useActiveWalletAddress } from "@/hooks/useActiveWalletAddress";
 import type { TokenHolderSnapshot, TokenDetail, TradeItem } from "@/lib/db/launchpad";
@@ -22,18 +22,12 @@ import {
   bondingCurveSnapshotFromTuple,
 } from "@/lib/bonding-curve";
 import {
-  CANDLE_INTERVALS,
-  DEFAULT_CHART_INTERVAL,
   resolveLatestSpotPriceBnb,
   sortTradesChronologically,
-  type ActorOptimisticChartSpot,
   type CandleWsUpdate,
 } from "@/lib/candles";
 import { PumpSubscriptPrice } from "@/components/ui/PumpSubscriptPrice";
-import {
-  mergeWsCandleUpdates,
-  type ActorBucketExtremes,
-} from "@/lib/chart-series-state";
+import { mergeWsCandleUpdates } from "@/lib/chart-series-state";
 import { logChartWsMerge } from "@/lib/chart-observability";
 import type { InitialChartCandles } from "@/lib/token-server";
 import { buildTokenMarketSnapshot } from "@/lib/token-market-snapshot";
@@ -44,15 +38,10 @@ import {
 import { useBnbUsdPrice } from "@/hooks/useBnbUsdPrice";
 import { resolveDisplayNativeUsd, latestNativeUsdFromTrades } from "@/lib/native-usd-price";
 import {
-  applyTradeToToken,
-  blockTimeIsoFromUnixSeconds,
-  resolveTradeItemsFromReceipt,
   tokenFromCurve,
   type CurveTuple,
-  type ParsedTradeEvent,
 } from "@/lib/launchpad-events";
 import {
-  mergeTrades,
   MISSION_KEYS,
   listRecentOptimisticActivities,
   pushOptimisticActivity,
@@ -261,54 +250,6 @@ function mergeLiveStats(
   return merged;
 }
 
-const publicClient = createPublicClient({
-  chain: pumpChain,
-  transport: http(pumpChain.rpcUrls.default.http[0]),
-});
-
-function bucketSecForMs(blockTimeMs: number, intervalId = DEFAULT_CHART_INTERVAL): number {
-  const intervalMs =
-    CANDLE_INTERVALS.find((item) => item.id === intervalId)?.ms ?? 5 * 60_000;
-  return Math.floor(blockTimeMs / intervalMs) * (intervalMs / 1000);
-}
-
-function accumulateActorBucketExtremes(
-  prev: ActorBucketExtremes | null,
-  spotBefore: number,
-  spotAfter: number,
-  blockTimeMs: number
-): ActorBucketExtremes {
-  const bucketSec = bucketSecForMs(blockTimeMs);
-  const low = Math.min(spotBefore, spotAfter);
-  const high = Math.max(spotBefore, spotAfter);
-  if (prev && prev.bucketSec === bucketSec) {
-    return {
-      bucketSec,
-      low: Math.min(prev.low, low),
-      high: Math.max(prev.high, high),
-    };
-  }
-  return { bucketSec, low, high };
-}
-
-function wsUpdatesCoverActorExtremes(
-  updates: CandleWsUpdate[],
-  extremes: ActorBucketExtremes
-): boolean {
-  for (const update of updates) {
-    if (update.time !== extremes.bucketSec) continue;
-    const low = Number(update.low);
-    const high = Number(update.high);
-    if (!Number.isFinite(low) || !Number.isFinite(high) || low <= 0 || high <= 0) {
-      continue;
-    }
-    if (low <= extremes.low * 1.0001 && high >= extremes.high * 0.9999) {
-      return true;
-    }
-  }
-  return false;
-}
-
 export function TokenDetailLive({
   tokenAddress,
   symbol,
@@ -324,11 +265,6 @@ export function TokenDetailLive({
   const [dbTrades, setDbTrades] = useState(initialTrades);
   const [liveCandleUpdates, setLiveCandleUpdates] = useState<CandleWsUpdate[]>([]);
   const [holdersRefreshKey, setHoldersRefreshKey] = useState(0);
-  const [optimisticTrades, setOptimisticTrades] = useState<TradeItem[]>([]);
-  const [actorChartSpot, setActorChartSpot] = useState<ActorOptimisticChartSpot | null>(null);
-  const [actorBucketExtremes, setActorBucketExtremes] = useState<ActorBucketExtremes | null>(
-    null
-  );
   const [indexerSyncing, setIndexerSyncing] = useState(false);
   const [latestWsBonding, setLatestWsBonding] = useState<
     TokenTradeWsPayload["bonding"] | null
@@ -350,9 +286,6 @@ export function TokenDetailLive({
     if (!contentSynced) return;
     setToken(initialToken);
     setDbTrades(initialTrades);
-    setOptimisticTrades([]);
-    setActorChartSpot(null);
-    setActorBucketExtremes(null);
     setIndexerSyncing(false);
     setLatestWsBonding(null);
     hydratedRef.current = false;
@@ -394,9 +327,6 @@ export function TokenDetailLive({
 
   const burstUntilRef = useRef(0);
   const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const optimisticRef = useRef<TradeItem[]>([]);
-  optimisticRef.current = optimisticTrades;
-  const optimisticTokenSnapshotRef = useRef<TokenDetail | null>(null);
   const hydratedRef = useRef(false);
   /** Set when hidden quick-trade UserOp is submitted — prevents 5s fallback sheet. */
   const quickTradeDispatchedKeyRef = useRef<string | null>(null);
@@ -424,18 +354,10 @@ export function TokenDetailLive({
     }
   }, [searchParams, router, tokenAddress]);
 
-  const trades = useMemo(
-    () => mergeTrades(dbTrades, optimisticTrades),
-    [dbTrades, optimisticTrades]
-  );
-
-  /** Chart history from DB when indexed; optimistic only while indexer lags. */
-  const chartFallbackTrades = useMemo(
-    () => (dbTrades.length > 0 ? dbTrades : trades),
-    [dbTrades, trades]
-  );
-
-  const hasLivePending = optimisticTrades.length > 0 || indexerSyncing;
+  /** Chart + tape: indexed/WS only — no trader-only optimistic layer. */
+  const trades = dbTrades;
+  const chartFallbackTrades = dbTrades;
+  const hasLivePending = indexerSyncing;
   const tradeLocked = !contentSynced;
   const announceButtonDisabled = tradeLocked || announceBusy;
 
@@ -528,11 +450,8 @@ export function TokenDetailLive({
     : 100n;
 
   const marketSnapshot = useMemo(
-    () =>
-      buildTokenMarketSnapshot(liveToken, {
-        pendingSpotAfterBnb: actorChartSpot?.spotAfterBnb,
-      }),
-    [liveToken, actorChartSpot?.spotAfterBnb]
+    () => buildTokenMarketSnapshot(liveToken),
+    [liveToken]
   );
 
   const displayPrice = marketSnapshot.spotPriceBnb;
@@ -547,39 +466,15 @@ export function TokenDetailLive({
 
       if (!response.ok || !body.data) return;
 
-      const dbHashes = new Set(body.data.trades.map((t) => txHashKey(t.txHash)));
-      const stillPending = optimisticRef.current.some(
-        (t) => !dbHashes.has(txHashKey(t.txHash))
-      );
-
       removeOptimisticActivities(body.data.trades.map((t) => t.txHash));
 
       setDbTrades(body.data.trades);
-      setOptimisticTrades((prev) =>
-        prev.filter((t) => !dbHashes.has(txHashKey(t.txHash)))
-      );
-
-      if (stillPending) {
-        setIndexerSyncing(true);
-        void refetchCurve();
-        setToken((prev) => ({
-          ...body.data!.token,
-          name: body.data!.token.name || prev.name,
-          symbol: body.data!.token.symbol || prev.symbol,
-          creatorAddress: body.data!.token.creatorAddress || prev.creatorAddress,
-          creatorFollowerCount:
-            body.data!.token.creatorFollowerCount ?? prev.creatorFollowerCount ?? 0,
-          description: body.data!.token.description ?? prev.description,
-          socialLinks: body.data!.token.socialLinks ?? prev.socialLinks,
-        }));
-      } else {
-        setToken(body.data.token);
-        setIndexerSyncing(false);
-      }
+      setToken(body.data.token);
+      setIndexerSyncing(false);
     } catch {
       // Keep last good snapshot on transient errors.
     }
-  }, [streamAddress, refetchCurve]);
+  }, [streamAddress]);
 
   const fetchLiveRef = useRef(fetchLive);
   fetchLiveRef.current = fetchLive;
@@ -610,19 +505,9 @@ export function TokenDetailLive({
                 isNewBucket: update.isNewBucket,
               });
             }
-            setActorBucketExtremes((extremes) => {
-              if (extremes && wsUpdatesCoverActorExtremes(updates, extremes)) {
-                setActorChartSpot(null);
-                setIndexerSyncing(false);
-                return null;
-              }
-              return extremes;
-            });
+            setIndexerSyncing(false);
           }
           setToken((prev) => patchTokenDetailFromWsTrade(prev, payload) ?? prev);
-          setOptimisticTrades((prev) =>
-            prev.filter((t) => txHashKey(t.txHash) !== txHashKey(tradeItem.txHash))
-          );
           setHoldersRefreshKey((k) => k + 1);
         }
         continue;
@@ -664,129 +549,19 @@ export function TokenDetailLive({
     };
   }, [schedulePoll]);
 
-  const applyOptimisticFromReceipt = useCallback(
-    async (payload: TradeConfirmedPayload) => {
-      // Solana silent trades have no EVM receipt — keep optimistic row until DB/WS catches up.
-      if (!payload.receipt) {
-        if (isSolanaChainFamily) {
-          const pendingPrefix = "pending:";
-          setOptimisticTrades((prev) =>
-            prev.map((t) =>
-              t.txHash.startsWith(pendingPrefix)
-                ? { ...t, txHash: payload.txHash, id: payload.txHash }
-                : t
-            )
-          );
-          void refetchCurve();
-        }
-        return;
-      }
-      let blockTimeIso: string | undefined;
-      try {
-        const block = await publicClient.getBlock({
-          blockNumber: payload.receipt.blockNumber,
-        });
-        blockTimeIso = blockTimeIsoFromUnixSeconds(block.timestamp);
-      } catch {
-        // RPC hiccup — wall clock only as last resort.
-      }
-
-      const snapshotUsdRate =
-        bnbUsd != null && bnbUsd > 0 ? String(bnbUsd) : undefined;
-
-      const { items, parsed } = resolveTradeItemsFromReceipt(
-        payload.receipt,
-        payload.txHash,
-        streamAddress as `0x${string}`,
-        blockTimeIso,
-        snapshotUsdRate
-      );
-
-      if (parsed.length > 0) {
-        setOptimisticTrades((prev) => {
-          const without = prev.filter(
-            (t) => txHashKey(t.txHash) !== txHashKey(payload.txHash)
-          );
-          return [...items, ...without];
-        });
-        setToken((prev) =>
-          parsed.reduce((next, trade) => applyTradeToToken(next, trade), prev)
-        );
-        void refetchCurve();
-      } else {
-        try {
-          const curve = (await publicClient.readContract({
-            address: contracts.bondingCurveManager,
-            abi: bondingCurveManagerAbi,
-            functionName: "curves",
-            args: [streamAddress as `0x${string}`],
-          })) as CurveTuple;
-          setToken((prev) => tokenFromCurve(prev, curve));
-          void refetchCurve();
-        } catch {
-          // Fall back to DB polling only.
-        }
-      }
-    },
-    [streamAddress, refetchCurve, bnbUsd]
-  );
-
+  /** Burst poll after local trade — chart/tape wait for indexer/WS like everyone else. */
   const handleTradeOptimistic = useCallback(
-    (payload: TradeOptimisticPayload) => {
+    (_payload: TradeOptimisticPayload) => {
       burstUntilRef.current = Date.now() + BURST_DURATION_MS;
       setIndexerSyncing(true);
-      optimisticTokenSnapshotRef.current = token;
-      setActorChartSpot({
-        spotBeforeBnb: payload.spotBeforeBnb,
-        spotAfterBnb: payload.spotAfterBnb,
-        side: payload.side,
-        volumeBnb: Number(payload.tradeItem.netBnb ?? payload.tradeItem.nativeAmount ?? 0),
-        blockTimeMs: Date.now(),
-      });
-      setActorBucketExtremes((prev) =>
-        accumulateActorBucketExtremes(
-          prev,
-          payload.spotBeforeBnb,
-          payload.spotAfterBnb,
-          Date.now()
-        )
-      );
-      setOptimisticTrades((prev) => [
-        payload.tradeItem,
-        ...prev.filter((t) => t.txHash !== payload.pendingTxHash),
-      ]);
-      if (isSolanaLive) {
-        // Mark from quoted spot only — never mutate reserves from pump-feel synthetics
-        // (that resets the curve machine onto EVM default virtuals and spikes false MCAP).
-        setToken((prev) => ({
-          ...prev,
-          lastPriceBnb:
-            payload.spotAfterBnb > 0 ? String(payload.spotAfterBnb) : prev.lastPriceBnb,
-          tradeCount: prev.tradeCount + 1,
-          status: prev.status === "PAUSED" ? "PAUSED" : "BONDING",
-        }));
-      } else {
-        setToken((prev) => applyTradeToToken(prev, payload.syntheticTrade));
-      }
       void refetchCurve();
     },
-    [token, refetchCurve, isSolanaLive]
+    [refetchCurve]
   );
 
   const handleTradeOptimisticRollback = useCallback(
-    (payload: { pendingId: string }) => {
-      const pendingTxHash = `pending:${payload.pendingId}`;
-      setActorChartSpot(null);
-      setActorBucketExtremes(null);
-      setOptimisticTrades((prev) => {
-        const next = prev.filter(
-          (t) => txHashKey(t.txHash) !== txHashKey(pendingTxHash)
-        );
-        if (next.length === 0) {
-          optimisticTokenSnapshotRef.current = null;
-        }
-        return next;
-      });
+    (_payload: { pendingId: string }) => {
+      setIndexerSyncing(false);
       void refetchCurve();
       void fetchLive();
     },
@@ -806,22 +581,6 @@ export function TokenDetailLive({
     async (payload: TradeConfirmedPayload) => {
       burstUntilRef.current = Date.now() + BURST_DURATION_MS;
       setIndexerSyncing(true);
-      optimisticTokenSnapshotRef.current = null;
-
-      if (isSolanaChainFamily && !payload.receipt) {
-        // Promote pending:* → real signature so the tape stays visible until indexer lands.
-        setOptimisticTrades((prev) =>
-          prev.map((t) =>
-            t.txHash.startsWith("pending:")
-              ? { ...t, txHash: payload.txHash, id: payload.txHash }
-              : t
-          )
-        );
-      } else {
-        setOptimisticTrades((prev) =>
-          prev.filter((t) => !txHashKey(t.txHash).startsWith("pending:"))
-        );
-      }
 
       pushOptimisticActivity({
         txHash: payload.txHash,
@@ -838,10 +597,10 @@ export function TokenDetailLive({
         });
       }
 
-      await applyOptimisticFromReceipt(payload);
+      void refetchCurve();
       void fetchLive();
     },
-    [address, applyOptimisticFromReceipt, fetchLive, isSolanaLive, queryClient, streamAddress]
+    [address, fetchLive, isSolanaLive, queryClient, refetchCurve, streamAddress]
   );
 
   useEffect(() => {
@@ -868,75 +627,8 @@ export function TokenDetailLive({
 
     burstUntilRef.current = Date.now() + BURST_DURATION_MS;
     setIndexerSyncing(true);
-
-    // Solana signatures are not EVM receipts — skip receipt hydration.
-    if (isSolanaChainFamily) {
-      void fetchLive();
-      return;
-    }
-
-    void (async () => {
-      const snapshotUsdRate =
-        bnbUsd != null && bnbUsd > 0 ? String(bnbUsd) : undefined;
-
-      const receipts = await Promise.all(
-        pending.map(async (activity) => {
-          try {
-            const receipt = await publicClient.getTransactionReceipt({
-              hash: activity.txHash as `0x${string}`,
-            });
-            return { activity, receipt };
-          } catch {
-            return null;
-          }
-        })
-      );
-
-      const batchItems: TradeItem[] = [];
-      const parsedTrades: ParsedTradeEvent[] = [];
-      const dropHashes = new Set<string>();
-
-      for (const row of receipts) {
-        if (!row) continue;
-        dropHashes.add(txHashKey(row.activity.txHash));
-
-        let blockTimeIso: string | undefined;
-        try {
-          const block = await publicClient.getBlock({
-            blockNumber: row.receipt.blockNumber,
-          });
-          blockTimeIso = blockTimeIsoFromUnixSeconds(block.timestamp);
-        } catch {
-          // wall clock fallback inside tradeEventToItem
-        }
-
-        const { items, parsed } = resolveTradeItemsFromReceipt(
-          row.receipt,
-          row.activity.txHash,
-          streamAddress as `0x${string}`,
-          blockTimeIso,
-          snapshotUsdRate
-        );
-        batchItems.push(...items);
-        parsedTrades.push(...parsed);
-      }
-
-      if (batchItems.length > 0) {
-        setOptimisticTrades((prev) => {
-          const without = prev.filter(
-            (t) => !dropHashes.has(txHashKey(t.txHash))
-          );
-          return [...batchItems, ...without];
-        });
-        setToken((prev) =>
-          parsedTrades.reduce((next, trade) => applyTradeToToken(next, trade), prev)
-        );
-        void refetchCurve();
-      }
-
-      void fetchLive();
-    })();
-  }, [bnbUsd, fetchLive, initialTrades, refetchCurve, streamAddress]);
+    void fetchLive();
+  }, [fetchLive, initialTrades, streamAddress]);
 
   const seededNativeUsd = useMemo(
     () => latestNativeUsdFromTrades(trades),
@@ -1416,8 +1108,6 @@ export function TokenDetailLive({
                 symbol={liveToken.symbol}
                 status={liveToken.status}
                 initialCandles={initialCandles}
-                actorOptimisticSpot={actorChartSpot}
-                actorBucketExtremes={actorBucketExtremes}
                 curveSnapshot={tradeCurveSnapshot}
                 liveCandleUpdates={liveCandleUpdates}
                 fallbackTrades={chartFallbackTrades}

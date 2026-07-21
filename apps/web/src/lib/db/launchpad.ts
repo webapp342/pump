@@ -1659,6 +1659,146 @@ export async function getUserVolumeBnb(address: string): Promise<number> {
   return Number(result.rows[0]?.total_volume_zug ?? 0);
 }
 
+/**
+ * Rebuild user_volumes from trades (Solana indexer historically skipped this table).
+ * Idempotent — totals match SUM(trades.zug_amount).
+ */
+export async function syncUserVolumeFromTrades(address: string): Promise<number> {
+  const db = getLaunchpadWritePool();
+  const normalized = dbStorageAddress(address);
+
+  const agg = await db.query<{
+    total: string;
+    buy: string;
+    sell: string;
+    last_trade: Date | null;
+  }>(
+    `
+      SELECT
+        COALESCE(SUM(zug_amount), 0)::text AS total,
+        COALESCE(SUM(CASE WHEN side = 'BUY' THEN zug_amount ELSE 0 END), 0)::text AS buy,
+        COALESCE(SUM(CASE WHEN side = 'SELL' THEN zug_amount ELSE 0 END), 0)::text AS sell,
+        MAX(block_time) AS last_trade
+      FROM trades
+      WHERE trader_address = $1
+    `,
+    [normalized]
+  );
+
+  const total = Number(agg.rows[0]?.total ?? 0);
+  if (!(total > 0)) return 0;
+
+  await db.query(
+    `
+      INSERT INTO user_volumes (
+        address,
+        total_volume_zug,
+        buy_volume_zug,
+        sell_volume_zug,
+        last_trade_at,
+        updated_at
+      ) VALUES ($1, $2, $3, $4, COALESCE($5, now()), now())
+      ON CONFLICT (address) DO UPDATE
+      SET total_volume_zug = EXCLUDED.total_volume_zug,
+          buy_volume_zug = EXCLUDED.buy_volume_zug,
+          sell_volume_zug = EXCLUDED.sell_volume_zug,
+          last_trade_at = EXCLUDED.last_trade_at,
+          updated_at = now()
+    `,
+    [
+      normalized,
+      agg.rows[0].total,
+      agg.rows[0].buy,
+      agg.rows[0].sell,
+      agg.rows[0].last_trade,
+    ]
+  );
+
+  return total;
+}
+
+export type MissionTradeSource = {
+  eventId: string;
+  txHash: string;
+  tokenAddress: string;
+  side: string;
+  blockTime: Date;
+};
+
+/** Any trade by this wallet on the given UTC calendar day (for Daily Swap reconcile). */
+export async function getTradeOnUtcDate(
+  traderAddress: string,
+  utcDate: string
+): Promise<MissionTradeSource | null> {
+  const db = getLaunchpadReadPool();
+  const normalized = dbStorageAddress(traderAddress);
+
+  const result = await db.query<{
+    event_id: string;
+    tx_hash: string;
+    token_address: string;
+    side: string;
+    block_time: Date;
+  }>(
+    `
+      SELECT event_id, tx_hash, token_address, side, block_time
+      FROM trades
+      WHERE trader_address = $1
+        AND (block_time AT TIME ZONE 'UTC')::date = $2::date
+      ORDER BY block_time ASC, block_number ASC, log_index ASC
+      LIMIT 1
+    `,
+    [normalized, utcDate]
+  );
+
+  const row = result.rows[0];
+  if (!row) return null;
+  return {
+    eventId: row.event_id,
+    txHash: row.tx_hash,
+    tokenAddress: row.token_address,
+    side: row.side,
+    blockTime: row.block_time,
+  };
+}
+
+export type CreatorTokenSource = {
+  tokenAddress: string;
+  launchTxHash: string;
+  createdAt: Date;
+};
+
+/** Earliest token created by this wallet (for Deploy Meme reconcile). */
+export async function getCreatorTokenForMissions(
+  creatorAddress: string
+): Promise<CreatorTokenSource | null> {
+  const db = getLaunchpadReadPool();
+  const normalized = dbStorageAddress(creatorAddress);
+
+  const result = await db.query<{
+    address: string;
+    launch_tx_hash: string;
+    created_at: Date;
+  }>(
+    `
+      SELECT address, launch_tx_hash, created_at
+      FROM tokens
+      WHERE creator_address = $1
+      ORDER BY created_at ASC
+      LIMIT 1
+    `,
+    [normalized]
+  );
+
+  const row = result.rows[0];
+  if (!row) return null;
+  return {
+    tokenAddress: row.address,
+    launchTxHash: row.launch_tx_hash,
+    createdAt: row.created_at,
+  };
+}
+
 export const FIRST_SMART_BUY_MIN_BNB = 0.01;
 
 export type FirstSmartBuyTrade = {

@@ -3,6 +3,7 @@ import { createPool, getIndexerStartSlot, updateIndexerSlot } from "./db.js";
 import { extractEventsFromLogs } from "./decode.js";
 import { SolanaEventHandlers } from "./handlers.js";
 import { createEventSource, type SolanaLogBatch } from "./laserstream.js";
+import { PointsBridge } from "./points.js";
 import { eventId } from "./units.js";
 
 const pool = createPool(config.launchpadDatabaseUrl);
@@ -10,6 +11,7 @@ const handlers = new SolanaEventHandlers({
   launchpadPool: pool,
   chainId: config.chainId,
   tokenDecimals: config.tokenDecimals,
+  pointsBridge: new PointsBridge(pool),
 });
 
 /** Dedup when factory + curve onLogs both receive the same tx log set. */

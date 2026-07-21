@@ -3,7 +3,6 @@ import {
   extendSeriesToLiveBucket,
   fillGapsForStoredCandles,
   mergeWsCandleUpdate,
-  pinTailCandleToLiveMark,
   sanitizeTailCandleSeries,
   scaleCandleBars,
   seriesHasTemporalGaps,
@@ -37,32 +36,6 @@ export type ActorBucketExtremes = {
   low: number;
   high: number;
 };
-
-/** Keep tail wick extremes when a poll returns stale OHLC for the live bucket. */
-export function preserveTailWickExtremes(
-  fetched: CandleBar[],
-  previous: CandleBar[]
-): CandleBar[] {
-  if (fetched.length === 0 || previous.length === 0) return fetched;
-  const prevTail = previous[previous.length - 1]!;
-  const idx = fetched.findIndex((c) => c.time === prevTail.time);
-  if (idx < 0) return fetched;
-  const row = fetched[idx]!;
-  const merged: CandleBar = {
-    ...row,
-    high: Math.max(row.high, prevTail.high),
-    low: Math.min(row.low, prevTail.low),
-  };
-  if (
-    merged.high === row.high &&
-    merged.low === row.low
-  ) {
-    return fetched;
-  }
-  const next = fetched.slice();
-  next[idx] = merged;
-  return next;
-}
 
 function applyActorBucketExtremes(
   candles: CandleBar[],
@@ -111,12 +84,8 @@ export function chartSeriesReducer(
     case "reset":
       return initialChartSeriesState;
     case "set_fetched": {
-      const candles =
-        state.candles.length > 0
-          ? preserveTailWickExtremes(action.candles, state.candles)
-          : action.candles;
       return {
-        candles,
+        candles: action.candles,
         volumes: action.volumes,
         source: action.source,
         interval: action.interval,
@@ -173,8 +142,9 @@ export type DeriveChartSeriesInput = {
 };
 
 /**
- * Native OHLC from DB/WS + live tail pinned to on-chain spot.
- * USD = native × nativeUsd in chart formatters only.
+ * Native OHLC from DB/WS only — do not pin bonding-curve mark onto the live bar.
+ * Pinning made one tab look broken (wick needle / floating dojis) while a refresh
+ * (clean API candles) looked fine; every viewer should share the same OHLC source.
  */
 export function deriveChartSeries(input: DeriveChartSeriesInput): {
   candles: CandleBar[];
@@ -229,19 +199,8 @@ export function deriveChartSeries(input: DeriveChartSeriesInput): {
     volumes = extended.volumes;
   }
 
-  if (liveOnChainSpotBnb != null && liveOnChainSpotBnb > 0 && !actorOptimisticSpot) {
-    const pinned = pinTailCandleToLiveMark(
-      candles,
-      volumes,
-      liveOnChainSpotBnb * priceScale,
-      displayInterval,
-      endTimeMs
-    );
-    candles = pinned.candles;
-    volumes = pinned.volumes;
-    // Heal false needles already stuck in the live bucket (DB/WS LEAST lows).
-    candles = sanitizeTailCandleSeries(candles, liveOnChainSpotBnb * priceScale);
-  }
+  // Do not rewrite the live bar to bonding-curve mark (causes wick needles / flat dojis
+  // when one tab's mark races ahead of indexer OHLC). OHLC stays DB/WS-only.
 
   if (actorOptimisticSpot) {
     const patched = applyActorOptimisticCandleBucket(

@@ -3,6 +3,8 @@ import { NextResponse } from "next/server";
 import { NATIVE_SYMBOL } from "@/config/chain";
 import { normalizeAddressParam } from "@/lib/address";
 import {
+  ensureDailySwapAward,
+  ensureDeployMemeAward,
   ensureFirstSmartBuyAward,
   ensureVolumeMonsterAward,
   getMissionsForAddress,
@@ -11,12 +13,17 @@ import {
 } from "@/lib/db/incentive";
 import {
   FIRST_SMART_BUY_MIN_BNB,
+  getCreatorTokenForMissions,
   getFirstSmartBuyQualifyingTrade,
+  getTradeOnUtcDate,
   getUserVolumeBnb,
+  syncUserVolumeFromTrades,
 } from "@/lib/db/launchpad";
 
 const VOLUME_MONSTER_KEY = "LAUNCHPAD_VOLUME_MONSTER";
 const FIRST_SMART_BUY_KEY = "LAUNCHPAD_FIRST_SMART_BUY";
+const DAILY_SWAP_KEY = "LAUNCHPAD_DAILY_SWAP";
+const DEPLOY_MEME_KEY = "LAUNCHPAD_DEPLOY_MEME";
 const VOLUME_MONSTER_TARGET = 1;
 
 function attachReferralClaimMeta<T extends { taskKey: string; completed: boolean }>(
@@ -38,6 +45,9 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    // Solana indexer historically skipped user_volumes — rebuild before progress checks.
+    await syncUserVolumeFromTrades(address);
+
     let [snapshot, volumeBnb, referralStatus] = await Promise.all([
       getMissionsForAddress(address),
       getUserVolumeBnb(address),
@@ -45,12 +55,19 @@ export async function GET(request: NextRequest) {
     ]);
 
     let missionsChanged = false;
+    const todayUtc = snapshot.todayUtc;
 
     const smartBuyAlreadyDone = snapshot.missions.some(
       (mission) => mission.taskKey === FIRST_SMART_BUY_KEY && mission.completed
     );
     const volumeMonsterAlreadyDone = snapshot.missions.some(
       (mission) => mission.taskKey === VOLUME_MONSTER_KEY && mission.completed
+    );
+    const dailySwapAlreadyDone = snapshot.missions.some(
+      (mission) => mission.taskKey === DAILY_SWAP_KEY && mission.completed
+    );
+    const deployMemeAlreadyDone = snapshot.missions.some(
+      (mission) => mission.taskKey === DEPLOY_MEME_KEY && mission.completed
     );
 
     /** Expensive trade scan — skip when the award is already completed. */
@@ -63,6 +80,31 @@ export async function GET(request: NextRequest) {
           txHash: smartBuyTrade.txHash,
           tokenAddress: smartBuyTrade.tokenAddress,
           zugAmountBnb: smartBuyTrade.zugAmountBnb,
+        });
+        missionsChanged = missionsChanged || changed;
+      }
+    }
+
+    if (!dailySwapAlreadyDone) {
+      const todayTrade = await getTradeOnUtcDate(address, todayUtc);
+      if (todayTrade) {
+        const changed = await ensureDailySwapAward(address, {
+          eventId: todayTrade.eventId,
+          txHash: todayTrade.txHash,
+          tokenAddress: todayTrade.tokenAddress,
+          side: todayTrade.side,
+          completedDate: todayUtc,
+        });
+        missionsChanged = missionsChanged || changed;
+      }
+    }
+
+    if (!deployMemeAlreadyDone) {
+      const created = await getCreatorTokenForMissions(address);
+      if (created) {
+        const changed = await ensureDeployMemeAward(address, {
+          tokenAddress: created.tokenAddress,
+          launchTxHash: created.launchTxHash,
         });
         missionsChanged = missionsChanged || changed;
       }

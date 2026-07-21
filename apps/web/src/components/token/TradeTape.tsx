@@ -751,7 +751,6 @@ export function TradeTape({
             <ul className="token-trades-mobile__list" aria-label="Trades">
               {displayedTrades.map((trade) => {
                 const isBuy = trade.side === "BUY";
-                const isOptimistic = trade.id.startsWith("optimistic:");
                 const tradeNetUsd = tradeNetUsdForDisplay(trade, bnbUsd);
                 const mcapUsd = tradeMarketCapUsd(trade, bnbUsd);
                 const meta = displayNameLookup.get(identityLookupKey(trade.traderAddress));
@@ -764,9 +763,7 @@ export function TradeTape({
                 return (
                   <li
                     key={trade.id}
-                    className={`token-trades-mobile__row${
-                      isOptimistic ? " token-trades-mobile__row--optimistic" : ""
-                    }`}
+                    className="token-trades-mobile__row"
                   >
                     <button
                       type="button"
@@ -848,7 +845,6 @@ export function TradeTape({
               <tbody>
                 {displayedTrades.map((trade) => {
                   const isBuy = trade.side === "BUY";
-                  const isOptimistic = trade.id.startsWith("optimistic:");
                   const tradeNetUsd = tradeNetUsdForDisplay(trade, bnbUsd);
                   const sideTone = isBuy
                     ? "token-tape-table__amount--buy"
@@ -856,7 +852,7 @@ export function TradeTape({
                   return (
                     <tr
                       key={trade.id}
-                      className={tradeRowClass(trade.id, trade.side, isOptimistic)}
+                      className={tradeRowClass(trade.id, trade.side, false)}
                     >
                       <td className="token-tape-table__account">
                         <IdentityPill

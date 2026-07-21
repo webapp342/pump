@@ -18,10 +18,8 @@ import {
   buildCandlesFromTrades,
   CANDLE_INTERVALS,
   DEFAULT_CHART_INTERVAL,
-  createOptimisticCandleBar,
   resolveChartPriceFormat,
   seriesHasTemporalGaps,
-  type ActorOptimisticChartSpot,
   type CandleBar,
   type CandleInterval,
   type CandleWsUpdate,
@@ -47,7 +45,6 @@ import {
   incrementalPatchStartIndex,
   initialChartSeriesState,
   needsFullCandleResync,
-  type ActorBucketExtremes,
 } from "@/lib/chart-series-state";
 import {
   logChartFetchComplete,
@@ -64,15 +61,11 @@ type PriceChartProps = {
   status: string;
   /** SSR seed from token bundle (default 5m). */
   initialCandles?: InitialChartCandles;
-  /** Trader-only optimistic bucket (other viewers rely on WS). */
-  actorOptimisticSpot?: ActorOptimisticChartSpot | null;
-  /** Cumulative sell/buy wicks in the active bucket until indexer confirms. */
-  actorBucketExtremes?: ActorBucketExtremes | null;
   /** On-chain virtual reserves for spot replay fallback (pre-backfill). */
   curveSnapshot?: BondingCurveSnapshot;
   /** WS candle buckets from indexer (db source). */
   liveCandleUpdates?: CandleWsUpdate[];
-  /** Tape trades (DB + optimistic) — chart fallback before indexer candles land. */
+  /** Indexed tape trades — chart fallback before indexer candles land. */
   fallbackTrades?: TradeItem[];
   wsConnected?: boolean;
   bnbUsd?: number | null;
@@ -204,8 +197,6 @@ export function PriceChart({
   symbol: _symbol,
   status: _status,
   initialCandles,
-  actorOptimisticSpot = null,
-  actorBucketExtremes = null,
   curveSnapshot,
   liveCandleUpdates = [],
   fallbackTrades = [],
@@ -335,74 +326,18 @@ export function PriceChart({
     return () => clearInterval(timer);
   }, [fetchCandles, frozen, wsConnected]);
 
-  // When the actor (the trader on this page) submits a buy/sell, give INSTANT visual feedback on the chart.
-  // This follows the professional pattern: acting user sees optimistic candle update immediately via direct series.update(),
-  // while other viewers wait for the indexer WS. We still keep actor in derive for full rebuilds.
-  const lastOptimisticSigRef = useRef<string | null>(null);
-
-  useEffect(() => {
-    if (!actorOptimisticSpot) {
-      lastOptimisticSigRef.current = null;
-      return;
-    }
-    setNowMs(Date.now());
-
-    if (!ready || !mainSeriesRef.current) return;
-
-    const sig = `${actorOptimisticSpot.blockTimeMs}|${actorOptimisticSpot.spotAfterBnb}|${actorOptimisticSpot.side}`;
-    if (lastOptimisticSigRef.current === sig) return;
-    lastOptimisticSigRef.current = sig;
-
-    // Use the last rendered authoritative close as open hint for the optimistic bar (matches professional "continuation" candle).
-    const lastRendered = renderedCandlesRef.current.length > 0
-      ? renderedCandlesRef.current[renderedCandlesRef.current.length - 1]!
-      : undefined;
-
-    const opt = createOptimisticCandleBar(
-      actorOptimisticSpot,
-      timeInterval,
-      lastRendered?.close,
-      candleUnitScale
-    );
-    if (!opt) return;
-
-    // Merge into existing live bucket so we never drop a prior trade high/low (no ghost reset).
-    const candle =
-      lastRendered && lastRendered.time === opt.candle.time
-        ? {
-            time: opt.candle.time,
-            open: lastRendered.open,
-            high: Math.max(lastRendered.high, opt.candle.high),
-            low: Math.min(lastRendered.low, opt.candle.low),
-            close: opt.candle.close,
-          }
-        : opt.candle;
-
-    const mainSeries = mainSeriesRef.current;
-
-    mainSeries.update(candleToMainChartPoint(chartStyleRef.current, candle) as never);
-
-    // Force the next derive pass to setData (gap-fill + optimistic) — avoids desynced incremental tail.
-    renderedFingerprintRef.current = "";
-
-    const ts = chartRef.current?.timeScale();
-    if (ts) ts.scrollToRealTime();
-  }, [actorOptimisticSpot, ready, timeInterval, candleUnitScale]);
-
   useEffect(() => {
     if (frozen) return;
-    const tickMs = actorOptimisticSpot ? 1_000 : 2_000;
-    const timer = setInterval(() => setNowMs(Date.now()), tickMs);
+    const timer = setInterval(() => setNowMs(Date.now()), 2_000);
     return () => clearInterval(timer);
-  }, [frozen, actorOptimisticSpot]);
+  }, [frozen]);
 
   const chartEndTimeMs = useMemo(() => {
     if (frozen && seriesState.candles.length > 0) {
       return seriesState.candles[seriesState.candles.length - 1]!.time * 1000;
     }
-    const actorMs = actorOptimisticSpot?.blockTimeMs;
-    return actorMs != null ? Math.max(nowMs, actorMs) : nowMs;
-  }, [frozen, seriesState.candles, nowMs, actorOptimisticSpot?.blockTimeMs]);
+    return nowMs;
+  }, [frozen, seriesState.candles, nowMs]);
 
   useEffect(() => {
     if (seriesState.source !== "db" || liveCandleUpdates.length === 0) return;
@@ -470,8 +405,8 @@ export function PriceChart({
         priceScale: candleUnitScale,
         endTimeMs: chartEndTimeMs,
         liveOnChainSpotBnb: liveOnChainSpotBnb,
-        actorOptimisticSpot: actorOptimisticSpot,
-        actorBucketExtremes,
+        actorOptimisticSpot: null,
+        actorBucketExtremes: null,
       }),
     [
       chartSeriesState,
@@ -479,8 +414,6 @@ export function PriceChart({
       candleUnitScale,
       chartEndTimeMs,
       liveOnChainSpotBnb,
-      actorOptimisticSpot,
-      actorBucketExtremes,
     ]
   );
 

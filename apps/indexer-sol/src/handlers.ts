@@ -15,6 +15,11 @@ import { publishTrade, publishWalletTrade } from "./redis-publish.js";
 import { enqueueCandlesClickHouse } from "./clickhouse-candles.js";
 import { pushHotTapeTrade, writeHotCandleUpdates } from "./redis-hot-cache.js";
 import {
+  FIRST_SMART_BUY_MIN_LAMPORTS,
+  VOLUME_MONSTER_MIN_SOL,
+} from "./mission-thresholds.js";
+import { PointsBridge, TASK_KEYS } from "./points.js";
+import {
   asBigInt,
   asBool,
   asString,
@@ -38,6 +43,7 @@ export type HandlerContext = {
   launchpadPool: pg.Pool;
   chainId: number;
   tokenDecimals: number;
+  pointsBridge?: PointsBridge;
 };
 
 /**
@@ -182,6 +188,15 @@ export class SolanaEventHandlers {
       reserveZug: "0",
       tokenSold: "0",
       progressBps: 0,
+    });
+
+    await this.context.pointsBridge?.award({
+      address: creator,
+      taskKey: TASK_KEYS.deployMeme,
+      eventId: eventId(event.signature, event.logIndex),
+      txHash: event.signature,
+      blockTime,
+      metadata: { token: mint, source: "TokenCreated" },
     });
 
     console.log(
@@ -346,6 +361,8 @@ export class SolanaEventHandlers {
           decimals,
           nativeUsdRateValue
         );
+
+        await this.upsertUserVolume(client, trader, solAmount, isBuy);
 
         const bonding = await client.query<{
           reserve_zug: string;
@@ -535,6 +552,16 @@ export class SolanaEventHandlers {
         });
       }
 
+      await this.awardTradeMissions(
+        mint,
+        trader,
+        isBuy,
+        solAmount,
+        tradeEventId,
+        event.signature,
+        blockTime
+      );
+
       console.log(
         `[indexer-sol] Trade ${side} mint=${mint} trader=${trader} sol=${lamportsToSol(solAmount)}`
       );
@@ -722,6 +749,95 @@ export class SolanaEventHandlers {
     );
 
     await this.updateHolderCountIncremental(client, mint, oldBalance, next.tokenBalance);
+  }
+
+  private async upsertUserVolume(
+    client: pg.PoolClient,
+    trader: string,
+    solAmount: bigint,
+    isBuy: boolean
+  ): Promise<void> {
+    const volumeSol = lamportsToSol(solAmount);
+    await client.query(
+      `
+        INSERT INTO user_volumes (
+          address,
+          total_volume_zug,
+          buy_volume_zug,
+          sell_volume_zug,
+          last_trade_at,
+          updated_at
+        ) VALUES (
+          $1,
+          $2,
+          CASE WHEN $3 THEN $2::numeric ELSE 0 END,
+          CASE WHEN $3 THEN 0 ELSE $2::numeric END,
+          now(),
+          now()
+        )
+        ON CONFLICT (address) DO UPDATE
+        SET total_volume_zug = user_volumes.total_volume_zug + EXCLUDED.total_volume_zug,
+            buy_volume_zug = user_volumes.buy_volume_zug + EXCLUDED.buy_volume_zug,
+            sell_volume_zug = user_volumes.sell_volume_zug + EXCLUDED.sell_volume_zug,
+            last_trade_at = now(),
+            updated_at = now()
+      `,
+      [trader, volumeSol, isBuy]
+    );
+  }
+
+  private async awardTradeMissions(
+    token: string,
+    trader: string,
+    isBuy: boolean,
+    solAmount: bigint,
+    tradeEventId: string,
+    txHash: string,
+    blockTime: Date
+  ): Promise<void> {
+    if (!this.context.pointsBridge) return;
+
+    await this.context.pointsBridge.award({
+      address: trader,
+      taskKey: TASK_KEYS.dailySwap,
+      eventId: tradeEventId,
+      txHash,
+      blockTime,
+      daily: true,
+      metadata: { token, side: isBuy ? "BUY" : "SELL" },
+    });
+
+    if (isBuy && solAmount >= FIRST_SMART_BUY_MIN_LAMPORTS) {
+      const tokenResult = await this.context.launchpadPool.query<{
+        creator_address: string;
+      }>("SELECT creator_address FROM tokens WHERE address = $1", [token]);
+      const creator = tokenResult.rows[0]?.creator_address;
+
+      if (creator && creator !== trader) {
+        await this.context.pointsBridge.award({
+          address: trader,
+          taskKey: TASK_KEYS.firstSmartBuy,
+          eventId: tradeEventId,
+          txHash,
+          blockTime,
+          metadata: { token, side: "BUY", threshold_sol: "0.01" },
+        });
+      }
+    }
+
+    const volumeResult = await this.context.launchpadPool.query<{
+      total_volume_zug: string;
+    }>("SELECT total_volume_zug FROM user_volumes WHERE address = $1", [trader]);
+    if (Number(volumeResult.rows[0]?.total_volume_zug ?? 0) >= VOLUME_MONSTER_MIN_SOL) {
+      await this.context.pointsBridge.award({
+        address: trader,
+        taskKey: TASK_KEYS.volumeMonster,
+        eventId: `${trader}:volume-monster`,
+        txHash,
+        blockTime,
+        metadata: { threshold_sol: String(VOLUME_MONSTER_MIN_SOL) },
+      });
+    }
   }
 
   private async updateHolderCountIncremental(

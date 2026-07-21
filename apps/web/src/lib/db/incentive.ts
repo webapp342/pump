@@ -68,6 +68,8 @@ export type MissionsSnapshot = {
 
 const VOLUME_MONSTER_KEY = "LAUNCHPAD_VOLUME_MONSTER";
 const FIRST_SMART_BUY_KEY = "LAUNCHPAD_FIRST_SMART_BUY";
+const DAILY_SWAP_KEY = "LAUNCHPAD_DAILY_SWAP";
+const DEPLOY_MEME_KEY = "LAUNCHPAD_DEPLOY_MEME";
 export const REFERRAL_INVITE_XP_KEY = "LAUNCHPAD_REFERRAL_INVITE_XP";
 export const REFERRAL_INVITE_XP_PER_INVITE = 50;
 
@@ -231,6 +233,102 @@ export async function ensureFirstSmartBuyAward(
         source: "missions_api_reconcile",
         token: trade.tokenAddress,
         zug_amount_bnb: trade.zugAmountBnb,
+      }),
+    ]
+  );
+
+  return (awardResult.rows[0]?.points_awarded ?? 0) > 0;
+}
+
+/**
+ * Award Daily Swap when a same-day trade exists but indexer missed the points write.
+ */
+export async function ensureDailySwapAward(
+  address: string,
+  trade: {
+    eventId: string;
+    txHash: string;
+    tokenAddress: string;
+    side: string;
+    completedDate: string;
+  }
+): Promise<boolean> {
+  const db = getIncentivePool();
+  const normalized = dbStorageAddress(address);
+
+  const existing = await db.query(
+    `
+      SELECT 1
+      FROM launchpad_user_daily_completions
+      WHERE address = $1 AND task_key = $2 AND completed_date = $3::date
+      LIMIT 1
+    `,
+    [normalized, DAILY_SWAP_KEY, trade.completedDate]
+  );
+  if ((existing.rowCount ?? 0) > 0) return false;
+
+  const awardResult = await db.query<{ status: string; points_awarded: number }>(
+    `
+      SELECT status, points_awarded
+      FROM launchpad_award_points($1, $2, $3, $4, $5, $6::jsonb)
+    `,
+    [
+      normalized,
+      DAILY_SWAP_KEY,
+      `${DAILY_SWAP_KEY}:${trade.eventId}`,
+      trade.txHash,
+      trade.completedDate,
+      JSON.stringify({
+        source: "missions_api_reconcile",
+        token: trade.tokenAddress,
+        side: trade.side,
+      }),
+    ]
+  );
+
+  return (awardResult.rows[0]?.points_awarded ?? 0) > 0;
+}
+
+/**
+ * Award Deploy Meme when a created token exists but indexer missed the points write.
+ */
+export async function ensureDeployMemeAward(
+  address: string,
+  token: {
+    tokenAddress: string;
+    launchTxHash: string;
+    eventId?: string;
+  }
+): Promise<boolean> {
+  const db = getIncentivePool();
+  const normalized = dbStorageAddress(address);
+
+  const existing = await db.query(
+    `
+      SELECT 1
+      FROM launchpad_user_task_completions
+      WHERE address = $1 AND task_key = $2
+      LIMIT 1
+    `,
+    [normalized, DEPLOY_MEME_KEY]
+  );
+  if ((existing.rowCount ?? 0) > 0) return false;
+
+  const eventId = token.eventId ?? `${token.launchTxHash}:0`;
+  const awardResult = await db.query<{ status: string; points_awarded: number }>(
+    `
+      SELECT status, points_awarded
+      FROM launchpad_award_points($1, $2, $3, $4, $5, $6::jsonb)
+    `,
+    [
+      normalized,
+      DEPLOY_MEME_KEY,
+      `${DEPLOY_MEME_KEY}:${eventId}`,
+      token.launchTxHash,
+      null,
+      JSON.stringify({
+        source: "missions_api_reconcile",
+        token: token.tokenAddress,
       }),
     ]
   );
