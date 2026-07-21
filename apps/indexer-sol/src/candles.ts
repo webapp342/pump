@@ -199,12 +199,25 @@ function isSpotRatioSane(a: number, b: number): boolean {
   return ratio <= 4 && ratio >= 1 / 4;
 }
 
+/** Continuity stitch only when prior close already meets first print (≤1%). */
+const BAR_CONTINUITY_MATCH_RATIO = 1.01;
+
+function isBarContinuityMatch(priorClose: number, tradeOpen: number): boolean {
+  if (!(priorClose > 0) || !(tradeOpen > 0)) return false;
+  if (!Number.isFinite(priorClose) || !Number.isFinite(tradeOpen)) return false;
+  const ratio = priorClose / tradeOpen;
+  return (
+    ratio <= BAR_CONTINUITY_MATCH_RATIO && ratio >= 1 / BAR_CONTINUITY_MATCH_RATIO
+  );
+}
+
 function resolveSpotOpen(spotBefore: number, spotAfter: number, priorClose: number | null): number {
   let spotOpen = spotBefore > 0 && Number.isFinite(spotBefore) ? spotBefore : spotAfter;
   if (spotAfter > 0 && spotOpen > 0 && !isSpotRatioSane(spotOpen, spotAfter)) {
-    spotOpen = priorClose != null && priorClose > 0 && isSpotRatioSane(priorClose, spotAfter)
-      ? priorClose
-      : spotAfter;
+    spotOpen =
+      priorClose != null && priorClose > 0 && isSpotRatioSane(priorClose, spotAfter)
+        ? priorClose
+        : spotAfter;
   }
   return spotOpen;
 }
@@ -231,13 +244,12 @@ function tradeBucketOhlc(
   _isNewBucket: boolean
 ): { open: number; high: number; low: number; close: number } {
   const spotOpen = resolveSpotOpen(spotBefore, spotAfter, priorClose);
-  // Continuity only when prior close agrees with this trade’s start — otherwise
-  // open=priorClose + low=spotBefore draws a fake lower wick on the first print.
+  // Match web client: only stitch open←priorClose when they already meet within 1%.
+  // Wider gaps kept the first trade open so Redis/CH/API spectators match the trader tip.
   const open =
     priorClose != null &&
     priorClose > 0 &&
-    isSpotRatioSane(priorClose, spotBefore) &&
-    isSpotRatioSane(priorClose, spotAfter)
+    isBarContinuityMatch(priorClose, spotOpen)
       ? priorClose
       : spotOpen;
   const touch = wickTouchPrice(spotBefore, spotAfter, spotOpen);

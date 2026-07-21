@@ -823,12 +823,21 @@ export function mergeWsCandleUpdate(
         close
       );
     } else {
-      const highCandidate = Math.max(existing.high, candle.high, close);
-      const lowCandidate = Math.min(existing.low, candle.low, close);
+      // Live tip may correct a stale CH open (prior-close stitch). Prefer incoming open
+      // when existing open was continuity-stitched to prior close but the tip disagrees.
+      const tradeOpen = candle.open > 0 ? candle.open : close;
+      const stitchedOpen =
+        priorClose != null &&
+        priorClose > 0 &&
+        isBarContinuityMatch(existing.open, priorClose) &&
+        !isBarContinuityMatch(existing.open, tradeOpen);
+      const open = stitchedOpen ? tradeOpen : existing.open;
+      const highCandidate = Math.max(existing.high, candle.high, close, open);
+      const lowCandidate = Math.min(existing.low, candle.low, close, open);
       nextCandles[idx] = sanitizeTailCandleOhlc(
         {
           time: candle.time,
-          open: existing.open,
+          open,
           high: highCandidate,
           low: lowCandidate,
           close,
@@ -847,12 +856,20 @@ export function mergeWsCandleUpdate(
     }
     const nextCandles = candles.slice();
     const nextVolumes = volumes.slice();
+    const priorClose = candles.length > 1 ? candles[candles.length - 2]!.close : undefined;
+    const tradeOpen = candle.open > 0 ? candle.open : candle.close;
+    const stitchedOpen =
+      priorClose != null &&
+      priorClose > 0 &&
+      isBarContinuityMatch(last.open, priorClose) &&
+      !isBarContinuityMatch(last.open, tradeOpen);
+    const open = stitchedOpen ? tradeOpen : last.open;
     nextCandles[nextCandles.length - 1] = sanitizeTailCandleOhlc(
       {
         ...candle,
-        open: last.open,
-        high: Math.max(last.high, candle.high, candle.close),
-        low: Math.min(last.low, candle.low, candle.close),
+        open,
+        high: Math.max(last.high, candle.high, candle.close, open),
+        low: Math.min(last.low, candle.low, candle.close, open),
       },
       candle.close
     );
@@ -865,6 +882,46 @@ export function mergeWsCandleUpdate(
   }
 
   return { candles, volumes };
+}
+
+/**
+ * Redis hot tip → history series. Replaces the matching bucket entirely (open-bucket SSOT).
+ * Do not use mergeWsCandleUpdate here — that preserved CH open and created spectator needles.
+ */
+export function upsertHotCandleTail(
+  candles: CandleBar[],
+  volumes: VolumeBar[],
+  hot: CandleWsUpdate,
+  priceScale = 1
+): { candles: CandleBar[]; volumes: VolumeBar[] } {
+  const { candle: raw, volume } = wsCandleUpdateToBars(hot, priceScale);
+  if (!Number.isFinite(raw.close) || raw.close <= 0) {
+    return { candles, volumes };
+  }
+  const candle = sanitizeTailCandleOhlc(raw, raw.close);
+  const nextCandles = candles.slice();
+  const nextVolumes = volumes.slice();
+  const idx = nextCandles.findIndex((c) => c.time === candle.time);
+
+  if (idx >= 0) {
+    nextCandles[idx] = candle;
+    if (idx < nextVolumes.length) nextVolumes[idx] = volume;
+    else nextVolumes.push(volume);
+    return { candles: nextCandles, volumes: nextVolumes };
+  }
+
+  if (nextCandles.length === 0 || candle.time > nextCandles[nextCandles.length - 1]!.time) {
+    nextCandles.push(candle);
+    nextVolumes.push(volume);
+    return { candles: nextCandles, volumes: nextVolumes };
+  }
+
+  // Rare: hot bucket older than tip — insert in time order.
+  let insertAt = nextCandles.findIndex((c) => c.time > candle.time);
+  if (insertAt < 0) insertAt = nextCandles.length;
+  nextCandles.splice(insertAt, 0, candle);
+  nextVolumes.splice(insertAt, 0, volume);
+  return { candles: nextCandles, volumes: nextVolumes };
 }
 
 /** Trader-only optimistic candle patch (client-side; not broadcast on WS). */

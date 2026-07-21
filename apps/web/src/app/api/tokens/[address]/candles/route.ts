@@ -5,9 +5,9 @@ import {
   CANDLE_INTERVALS,
   DEFAULT_CHART_INTERVAL,
   fillGapsForStoredCandles,
-  mergeWsCandleUpdate,
   seriesHasTemporalGaps,
   storedCandlesToBars,
+  upsertHotCandleTail,
   type CandleInterval,
   type CandleWsUpdate,
 } from "@/lib/candles";
@@ -34,8 +34,10 @@ function mergeHotTail(
   hot: CandleWsUpdate | null
 ): ReturnType<typeof storedCandlesToBars> {
   if (!hot) return candles;
-  const merged = mergeWsCandleUpdate(candles.candles, candles.volumes, hot, 1);
-  return { candles: merged.candles, volumes: merged.volumes };
+  // Redis hot tip is the open-bucket SSOT — replace that timestamp entirely.
+  // mergeWsCandleUpdate kept CH `existing.open` (often prior-close stitch) and
+  // turned solid trader tips into needles for spectators / refresh / TF switch.
+  return upsertHotCandleTail(candles.candles, candles.volumes, hot, 1);
 }
 
 export async function GET(request: NextRequest, context: RouteContext) {
