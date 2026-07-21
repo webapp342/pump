@@ -67,10 +67,12 @@ export function synthesizeCandleUpdatesFromSpot(input: {
 }): CandleWsUpdate[] {
   const after = input.spotAfter;
   if (!(after > 0) || !Number.isFinite(after)) return [];
-  const before =
+  const rawBefore =
     input.spotBefore != null && input.spotBefore > 0 && Number.isFinite(input.spotBefore)
       ? input.spotBefore
       : after;
+  // Reject garbage before prints (same 4× rule as indexer) — avoids phantom lower wicks.
+  const before = isSpotMoveSane(rawBefore, after) ? rawBefore : after;
   const volume = Math.max(0, input.volumeNative);
   const buyVolume = input.isBuy ? volume : 0;
   const out: CandleWsUpdate[] = [];
@@ -79,7 +81,13 @@ export function synthesizeCandleUpdatesFromSpot(input: {
     const bucketSec = Math.floor(input.blockTimeMs / ms) * (ms / 1000);
     const prior = input.priorCloseByInterval?.[id];
     const open =
-      prior != null && prior > 0 && Number.isFinite(prior) ? prior : before;
+      prior != null &&
+      prior > 0 &&
+      Number.isFinite(prior) &&
+      isSpotMoveSane(prior, before) &&
+      isSpotMoveSane(prior, after)
+        ? prior
+        : before;
     const high = Math.max(open, before, after);
     const low = Math.min(open, before, after);
     out.push({
@@ -328,21 +336,31 @@ export function buildCandlesFromTrades(
     const existing = buckets.get(bucketSec);
     if (!existing) {
       const spotOpen = touchPrices[0] ?? closePrice;
+      const saneTouches = touchPrices.filter(
+        (p) => p > 0 && isSpotMoveSane(p, closePrice)
+      );
+      const touches = saneTouches.length > 0 ? saneTouches : [closePrice];
       const open =
-        priorClose != null
+        priorClose != null &&
+        isSpotMoveSane(priorClose, spotOpen) &&
+        isSpotMoveSane(priorClose, closePrice)
           ? priorClose
           : spotOpen;
       buckets.set(bucketSec, {
         open,
-        high: Math.max(open, ...touchPrices),
-        low: Math.min(open, ...touchPrices),
+        high: Math.max(open, ...touches),
+        low: Math.min(open, ...touches),
         close: closePrice,
         volume: point.volumeBnb,
         buyVol: point.isBuy ? point.volumeBnb : 0,
       });
     } else {
-      existing.high = Math.max(existing.high, ...touchPrices);
-      existing.low = Math.min(existing.low, ...touchPrices);
+      const saneTouches = touchPrices.filter(
+        (p) => p > 0 && isSpotMoveSane(p, closePrice)
+      );
+      const touches = saneTouches.length > 0 ? saneTouches : [closePrice];
+      existing.high = Math.max(existing.high, ...touches);
+      existing.low = Math.min(existing.low, ...touches);
       existing.close = closePrice;
       existing.volume += point.volumeBnb;
       if (point.isBuy) existing.buyVol += point.volumeBnb;

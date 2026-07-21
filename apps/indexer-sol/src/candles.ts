@@ -193,20 +193,34 @@ async function upsertIntervalCandle(
   };
 }
 
+function isSpotRatioSane(a: number, b: number): boolean {
+  if (!(a > 0) || !(b > 0) || !Number.isFinite(a) || !Number.isFinite(b)) return false;
+  const ratio = a / b;
+  return ratio <= 4 && ratio >= 1 / 4;
+}
+
 function resolveSpotOpen(spotBefore: number, spotAfter: number, priorClose: number | null): number {
   let spotOpen = spotBefore > 0 && Number.isFinite(spotBefore) ? spotBefore : spotAfter;
-  if (spotAfter > 0 && spotOpen > 0) {
-    const ratio = spotOpen / spotAfter;
-    if (ratio > 4 || ratio < 1 / 4) {
-      spotOpen = priorClose != null && priorClose > 0 ? priorClose : spotAfter;
-    }
+  if (spotAfter > 0 && spotOpen > 0 && !isSpotRatioSane(spotOpen, spotAfter)) {
+    spotOpen = priorClose != null && priorClose > 0 && isSpotRatioSane(priorClose, spotAfter)
+      ? priorClose
+      : spotAfter;
   }
   return spotOpen;
 }
 
-/** Wick extremes use raw spotBefore; spotOpen clamp is for body open only. */
+/**
+ * Wick touch for this trade. Never paint a garbage spotBefore that we already
+ * rejected for the body open — that created phantom “dipped then recovered” wicks.
+ */
 function wickTouchPrice(spotBefore: number, spotAfter: number, spotOpen: number): number {
-  if (spotBefore > 0 && Number.isFinite(spotBefore)) return spotBefore;
+  if (
+    spotBefore > 0 &&
+    Number.isFinite(spotBefore) &&
+    isSpotRatioSane(spotBefore, spotAfter)
+  ) {
+    return spotBefore;
+  }
   return spotOpen > 0 && Number.isFinite(spotOpen) ? spotOpen : spotAfter;
 }
 
@@ -217,8 +231,15 @@ function tradeBucketOhlc(
   _isNewBucket: boolean
 ): { open: number; high: number; low: number; close: number } {
   const spotOpen = resolveSpotOpen(spotBefore, spotAfter, priorClose);
-  // Continuity: prefer prior close; else this trade's open touch (never force open=close).
-  const open = priorClose != null && priorClose > 0 ? priorClose : spotOpen;
+  // Continuity only when prior close agrees with this trade’s start — otherwise
+  // open=priorClose + low=spotBefore draws a fake lower wick on the first print.
+  const open =
+    priorClose != null &&
+    priorClose > 0 &&
+    isSpotRatioSane(priorClose, spotBefore) &&
+    isSpotRatioSane(priorClose, spotAfter)
+      ? priorClose
+      : spotOpen;
   const touch = wickTouchPrice(spotBefore, spotAfter, spotOpen);
   const prices = [open, touch, spotAfter];
   return {
@@ -261,8 +282,6 @@ async function computeIntervalCandleLive(
   const priorClose = isNewBucket
     ? await queryLatestCandleClose(input.tokenAddress, interval)
     : null;
-  const spotOpen = resolveSpotOpen(spotBefore, spotAfter, priorClose);
-  const touch = wickTouchPrice(spotBefore, spotAfter, spotOpen);
 
   let open: number;
   let high: number;
@@ -282,6 +301,8 @@ async function computeIntervalCandleLive(
     buyVolume = buyVolumeZug;
     tradeCount = 1;
   } else {
+    const spotOpen = resolveSpotOpen(spotBefore, spotAfter, null);
+    const touch = wickTouchPrice(spotBefore, spotAfter, spotOpen);
     open = Number(existingHot!.open);
     high = Math.max(Number(existingHot!.high), touch, spotAfter);
     low = Math.min(Number(existingHot!.low), touch, spotAfter);
