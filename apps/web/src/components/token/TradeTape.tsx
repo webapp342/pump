@@ -7,7 +7,7 @@ import { PumpIcon, faArrowDown, faArrowUp, faClock, faExternalLink, faWellness }
 import { UserAvatarForAddress } from "@/components/user/UserAvatarForAddress";
 import { PnlCell } from "@/components/portfolio/PortfolioPnlCell";
 import { ACTIVITY_PAGE_SIZE } from "@/lib/activity-page-size";
-import { normalizeRouteAddressKey } from "@/lib/address";
+import { addressCacheKey, normalizeRouteAddressKey, routeAddressKeysEqual } from "@/lib/address";
 import { PumpSubscriptPrice } from "@/components/ui/PumpSubscriptPrice";
 import { formatAge, formatArenaQuoteUsd } from "@/lib/arena-board-format";
 import {
@@ -32,6 +32,10 @@ import { CreatorRewardsCard } from "@/components/creators/CreatorRewardsCard";
 import { TokenAnnouncementsPanel } from "@/components/token/TokenAnnouncementsPanel";
 
 type ActivityTab = "holders" | "trades" | "social" | "about";
+
+function identityLookupKey(address: string): string {
+  return addressCacheKey(address) ?? address;
+}
 
 export type TradeTapeTab = ActivityTab;
 
@@ -346,7 +350,6 @@ export function TradeTape({
   curveSnapshot?: BondingCurveSnapshot | null;
   protocolFeeBps?: bigint;
 }) {
-  const creatorKey = creatorAddress.toLowerCase();
   const [internalTab, setInternalTab] = useState<ActivityTab>("trades");
   const tab = activeTabProp ?? internalTab;
 
@@ -608,12 +611,12 @@ export function TradeTape({
                     curveSnapshot,
                     protocolFeeBps
                   );
-                  const meta = displayNameLookup.get(row.address.toLowerCase());
+                  const meta = displayNameLookup.get(identityLookupKey(row.address));
                   const label =
                     row.displayUsername ??
                     meta?.label ??
                     shortAddress(row.address, true);
-                  const isCreator = row.address.toLowerCase() === creatorKey;
+                  const isCreator = routeAddressKeysEqual(row.address, creatorAddress);
 
                   return (
                     <li key={row.address} className="token-holders-mobile__row">
@@ -705,13 +708,13 @@ export function TradeTape({
                             address={row.address}
                             displayUsername={
                               row.displayUsername ??
-                              displayNameLookup.get(row.address.toLowerCase())?.label
+                              displayNameLookup.get(identityLookupKey(row.address))?.label
                             }
                             hasStatusBadge={
-                              displayNameLookup.get(row.address.toLowerCase())
+                              displayNameLookup.get(identityLookupKey(row.address))
                                 ?.hasStatusBadge
                             }
-                            showCreatorBadge={row.address.toLowerCase() === creatorKey}
+                            showCreatorBadge={routeAddressKeysEqual(row.address, creatorAddress)}
                             onAddressClick={onAddressClick}
                           />
                         </td>
@@ -751,12 +754,12 @@ export function TradeTape({
                 const isOptimistic = trade.id.startsWith("optimistic:");
                 const tradeNetUsd = tradeNetUsdForDisplay(trade, bnbUsd);
                 const mcapUsd = tradeMarketCapUsd(trade, bnbUsd);
-                const meta = displayNameLookup.get(trade.traderAddress.toLowerCase());
+                const meta = displayNameLookup.get(identityLookupKey(trade.traderAddress));
                 const label =
                   trade.traderDisplayUsername ??
                   meta?.label ??
                   shortAddress(trade.traderAddress, true);
-                const isCreator = trade.traderAddress.toLowerCase() === creatorKey;
+                const isCreator = routeAddressKeysEqual(trade.traderAddress, creatorAddress);
 
                 return (
                   <li
@@ -860,13 +863,13 @@ export function TradeTape({
                           address={trade.traderAddress}
                           displayUsername={
                             trade.traderDisplayUsername ??
-                            displayNameLookup.get(trade.traderAddress.toLowerCase())?.label
+                            displayNameLookup.get(identityLookupKey(trade.traderAddress))?.label
                           }
                           hasStatusBadge={
-                            displayNameLookup.get(trade.traderAddress.toLowerCase())
+                            displayNameLookup.get(identityLookupKey(trade.traderAddress))
                               ?.hasStatusBadge
                           }
-                          showCreatorBadge={trade.traderAddress.toLowerCase() === creatorKey}
+                          showCreatorBadge={routeAddressKeysEqual(trade.traderAddress, creatorAddress)}
                           onAddressClick={onAddressClick}
                         />
                       </td>

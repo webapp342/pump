@@ -105,19 +105,12 @@ async function upsertIntervalCandle(
   const priorClose = isNewBucket
     ? await readPriorBucketClose(client, input.tokenAddress, interval, bucketTs)
     : null;
-  let spotOpen = spotBefore > 0 && Number.isFinite(spotBefore) ? spotBefore : spotAfter;
-  // Reject garbage spotBefore (false lower wick) — same 4× guard as arena / web chart.
-  if (spotAfter > 0 && spotOpen > 0) {
-    const ratio = spotOpen / spotAfter;
-    if (ratio > 4 || ratio < 1 / 4) {
-      spotOpen = priorClose != null && priorClose > 0 ? priorClose : spotAfter;
-    }
-  }
-  const open = priorClose ?? (isNewBucket ? spotAfter : spotOpen);
-  const prices = [open, spotOpen, spotAfter];
-  const high = Math.max(...prices);
-  const low = Math.min(...prices);
-  const close = spotAfter;
+  const { open, high, low, close } = tradeBucketOhlc(
+    spotBefore,
+    spotAfter,
+    priorClose,
+    isNewBucket
+  );
   const closeUsd =
     nativeUsdRate != null && nativeUsdRate > 0 ? spotAfter * nativeUsdRate : null;
 
@@ -208,6 +201,30 @@ function resolveSpotOpen(spotBefore: number, spotAfter: number, priorClose: numb
   return spotOpen;
 }
 
+/** Wick extremes use raw spotBefore; spotOpen clamp is for body open only. */
+function wickTouchPrice(spotBefore: number, spotAfter: number, spotOpen: number): number {
+  if (spotBefore > 0 && Number.isFinite(spotBefore)) return spotBefore;
+  return spotOpen > 0 && Number.isFinite(spotOpen) ? spotOpen : spotAfter;
+}
+
+function tradeBucketOhlc(
+  spotBefore: number,
+  spotAfter: number,
+  priorClose: number | null,
+  isNewBucket: boolean
+): { open: number; high: number; low: number; close: number } {
+  const spotOpen = resolveSpotOpen(spotBefore, spotAfter, priorClose);
+  const open = priorClose ?? (isNewBucket ? spotAfter : spotOpen);
+  const touch = wickTouchPrice(spotBefore, spotAfter, spotOpen);
+  const prices = [open, touch, spotAfter];
+  return {
+    open,
+    high: Math.max(...prices),
+    low: Math.min(...prices),
+    close: spotAfter,
+  };
+}
+
 /** CH + Redis path when SKIP_PG_TOKEN_CANDLES=true (no PG token_candles write/read). */
 async function computeIntervalCandleSkipPg(
   input: TradeCandleInput,
@@ -228,6 +245,7 @@ async function computeIntervalCandleSkipPg(
     ? await queryLatestCandleClose(input.tokenAddress, interval)
     : null;
   const spotOpen = resolveSpotOpen(spotBefore, spotAfter, priorClose);
+  const touch = wickTouchPrice(spotBefore, spotAfter, spotOpen);
 
   let open: number;
   let high: number;
@@ -238,18 +256,18 @@ async function computeIntervalCandleSkipPg(
   let tradeCount: number;
 
   if (isNewBucket) {
-    open = priorClose ?? spotAfter;
-    const prices = [open, spotOpen, spotAfter];
-    high = Math.max(...prices);
-    low = Math.min(...prices);
-    close = spotAfter;
+    const ohlc = tradeBucketOhlc(spotBefore, spotAfter, priorClose, true);
+    open = ohlc.open;
+    high = ohlc.high;
+    low = ohlc.low;
+    close = ohlc.close;
     volume = volumeZug;
     buyVolume = buyVolumeZug;
     tradeCount = 1;
   } else {
     open = Number(existingHot!.open);
-    high = Math.max(Number(existingHot!.high), spotOpen, spotAfter);
-    low = Math.min(Number(existingHot!.low), spotOpen, spotAfter);
+    high = Math.max(Number(existingHot!.high), touch, spotAfter);
+    low = Math.min(Number(existingHot!.low), touch, spotAfter);
     close = spotAfter;
     volume = Number(existingHot!.volume) + volumeZug;
     buyVolume = Number(existingHot!.buyVolume) + buyVolumeZug;

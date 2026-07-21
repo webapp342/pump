@@ -209,7 +209,7 @@ async function upsertIntervalCandle(
     }
   }
   const open = priorClose ?? (isNewBucket ? spotAfter : spotOpen);
-  const ohlc = touchPrices(open, spotOpen, spotAfter);
+  const ohlc = touchPrices(open, spotBefore, spotAfter);
   const closeUsd =
     nativeUsdRate != null && nativeUsdRate > 0 ? spotAfter * nativeUsdRate : null;
 

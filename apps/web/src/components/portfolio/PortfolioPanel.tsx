@@ -1465,7 +1465,7 @@ export function PortfolioPanel({
     ? (ownDisplayUsername ?? resolveDisplayUsername(walletAddress, ownUsername))
     : resolveDisplayUsername(walletAddress, data.username);
   const hasStatusBadge = isOwnPortfolio
-    ? ownHasStatusBadge
+    ? ownHasStatusBadge || Boolean(data.hasStatusBadge)
     : Boolean(data.hasStatusBadge);
 
   const feesPending = pendingBnb > 0 || referralPendingBnb > 0;

@@ -32,6 +32,55 @@ export const initialChartSeriesState: ChartSeriesState = {
   gapFilledByApi: false,
 };
 
+export type ActorBucketExtremes = {
+  bucketSec: number;
+  low: number;
+  high: number;
+};
+
+/** Keep tail wick extremes when a poll returns stale OHLC for the live bucket. */
+export function preserveTailWickExtremes(
+  fetched: CandleBar[],
+  previous: CandleBar[]
+): CandleBar[] {
+  if (fetched.length === 0 || previous.length === 0) return fetched;
+  const prevTail = previous[previous.length - 1]!;
+  const idx = fetched.findIndex((c) => c.time === prevTail.time);
+  if (idx < 0) return fetched;
+  const row = fetched[idx]!;
+  const merged: CandleBar = {
+    ...row,
+    high: Math.max(row.high, prevTail.high),
+    low: Math.min(row.low, prevTail.low),
+  };
+  if (
+    merged.high === row.high &&
+    merged.low === row.low
+  ) {
+    return fetched;
+  }
+  const next = fetched.slice();
+  next[idx] = merged;
+  return next;
+}
+
+function applyActorBucketExtremes(
+  candles: CandleBar[],
+  extremes: ActorBucketExtremes | null | undefined,
+  priceScale: number
+): CandleBar[] {
+  if (!extremes || candles.length === 0) return candles;
+  const idx = candles.findIndex((c) => c.time === extremes.bucketSec);
+  if (idx < 0) return candles;
+  const row = candles[idx]!;
+  const low = Math.min(row.low, extremes.low * priceScale);
+  const high = Math.max(row.high, extremes.high * priceScale);
+  if (low === row.low && high === row.high) return candles;
+  const next = candles.slice();
+  next[idx] = { ...row, low, high };
+  return next;
+}
+
 export type ChartSeriesAction =
   | { type: "reset" }
   | {
@@ -61,14 +110,19 @@ export function chartSeriesReducer(
   switch (action.type) {
     case "reset":
       return initialChartSeriesState;
-    case "set_fetched":
+    case "set_fetched": {
+      const candles =
+        state.candles.length > 0
+          ? preserveTailWickExtremes(action.candles, state.candles)
+          : action.candles;
       return {
-        candles: action.candles,
+        candles,
         volumes: action.volumes,
         source: action.source,
         interval: action.interval,
         gapFilledByApi: action.gapFilledByApi ?? action.source === "db",
       };
+    }
     case "merge_ws": {
       if (state.source !== "db" || state.candles.length === 0) return state;
       const merged = mergeWsCandleUpdate(
@@ -114,6 +168,8 @@ export type DeriveChartSeriesInput = {
   /** Live bonding-curve spot from on-chain curves() — pins live bucket close. */
   liveOnChainSpotBnb: number | null;
   actorOptimisticSpot: ActorOptimisticChartSpot | null;
+  /** Cumulative in-flight bucket wicks (sell then buy in same bar). */
+  actorBucketExtremes?: ActorBucketExtremes | null;
 };
 
 /**
@@ -131,6 +187,7 @@ export function deriveChartSeries(input: DeriveChartSeriesInput): {
     endTimeMs,
     liveOnChainSpotBnb,
     actorOptimisticSpot,
+    actorBucketExtremes,
   } = input;
 
   if (state.interval !== displayInterval || state.candles.length === 0) {
@@ -196,12 +253,19 @@ export function deriveChartSeries(input: DeriveChartSeriesInput): {
     );
     const anchor = actorOptimisticSpot.spotAfterBnb * priceScale;
     return {
-      candles: sanitizeTailCandleSeries(patched.candles, anchor),
+      candles: applyActorBucketExtremes(
+        sanitizeTailCandleSeries(patched.candles, anchor),
+        actorBucketExtremes,
+        priceScale
+      ),
       volumes: patched.volumes,
     };
   }
 
-  return { candles, volumes };
+  return {
+    candles: applyActorBucketExtremes(candles, actorBucketExtremes, priceScale),
+    volumes,
+  };
 }
 
 /** True when lightweight-charts can patch tail buckets with series.update(). */

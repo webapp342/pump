@@ -47,6 +47,7 @@ import {
   incrementalPatchStartIndex,
   initialChartSeriesState,
   needsFullCandleResync,
+  type ActorBucketExtremes,
 } from "@/lib/chart-series-state";
 import {
   logChartFetchComplete,
@@ -65,6 +66,8 @@ type PriceChartProps = {
   initialCandles?: InitialChartCandles;
   /** Trader-only optimistic bucket (other viewers rely on WS). */
   actorOptimisticSpot?: ActorOptimisticChartSpot | null;
+  /** Cumulative sell/buy wicks in the active bucket until indexer confirms. */
+  actorBucketExtremes?: ActorBucketExtremes | null;
   /** On-chain virtual reserves for spot replay fallback (pre-backfill). */
   curveSnapshot?: BondingCurveSnapshot;
   /** WS candle buckets from indexer (db source). */
@@ -202,6 +205,7 @@ export function PriceChart({
   status: _status,
   initialCandles,
   actorOptimisticSpot = null,
+  actorBucketExtremes = null,
   curveSnapshot,
   liveCandleUpdates = [],
   fallbackTrades = [],
@@ -467,6 +471,7 @@ export function PriceChart({
         endTimeMs: chartEndTimeMs,
         liveOnChainSpotBnb: liveOnChainSpotBnb,
         actorOptimisticSpot: actorOptimisticSpot,
+        actorBucketExtremes,
       }),
     [
       chartSeriesState,
@@ -475,6 +480,7 @@ export function PriceChart({
       chartEndTimeMs,
       liveOnChainSpotBnb,
       actorOptimisticSpot,
+      actorBucketExtremes,
     ]
   );
 

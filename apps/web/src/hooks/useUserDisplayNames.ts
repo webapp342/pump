@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { addressCacheKey } from "@/lib/address";
 import { resolveDisplayUsername } from "@/lib/username";
 
 type DisplayMeta = {
@@ -10,8 +11,12 @@ type DisplayMeta = {
 
 const cache = new Map<string, DisplayMeta>();
 
+function lookupKey(address: string): string {
+  return addressCacheKey(address) ?? address.trim();
+}
+
 function cacheKey(address: string, compact: boolean): string {
-  return `${address.toLowerCase()}:${compact ? "1" : "0"}`;
+  return `${lookupKey(address)}:${compact ? "1" : "0"}`;
 }
 
 async function fetchDisplayMeta(
@@ -33,8 +38,7 @@ async function fetchDisplayMeta(
     throw new Error("Failed to load display names");
   }
   const out: Record<string, DisplayMeta> = {};
-  for (const [address, label] of Object.entries(body.data.displayNames)) {
-    const key = address.toLowerCase();
+  for (const [key, label] of Object.entries(body.data.displayNames)) {
     out[key] = {
       label,
       hasStatusBadge: Boolean(body.data.statusBadges?.[key]),
@@ -49,8 +53,8 @@ export function useUserDisplayNames(addresses: string[], compact = true) {
       [
         ...new Set(
           addresses
-            .map((address) => address.toLowerCase())
-            .filter((address) => /^0x[a-f0-9]{40}$/.test(address))
+            .map((address) => addressCacheKey(address))
+            .filter((address): address is string => address != null)
         ),
       ],
     [addresses]
@@ -118,7 +122,7 @@ export function invalidateDisplayNameCache(address?: string): void {
     cache.clear();
     return;
   }
-  const key = address.toLowerCase();
+  const key = lookupKey(address);
   for (const entry of [...cache.keys()]) {
     if (entry.startsWith(`${key}:`)) cache.delete(entry);
   }

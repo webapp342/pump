@@ -20,10 +20,19 @@ import {
   bondingCurveManagerAbi,
   bondingCurveSnapshotFromTuple,
 } from "@/lib/bonding-curve";
-import type { ActorOptimisticChartSpot, CandleWsUpdate } from "@/lib/candles";
+import {
+  CANDLE_INTERVALS,
+  DEFAULT_CHART_INTERVAL,
+  resolveLatestSpotPriceBnb,
+  sortTradesChronologically,
+  type ActorOptimisticChartSpot,
+  type CandleWsUpdate,
+} from "@/lib/candles";
 import { PumpSubscriptPrice } from "@/components/ui/PumpSubscriptPrice";
-import { resolveLatestSpotPriceBnb, sortTradesChronologically } from "@/lib/candles";
-import { mergeWsCandleUpdates } from "@/lib/chart-series-state";
+import {
+  mergeWsCandleUpdates,
+  type ActorBucketExtremes,
+} from "@/lib/chart-series-state";
 import { logChartWsMerge } from "@/lib/chart-observability";
 import type { InitialChartCandles } from "@/lib/token-server";
 import { buildTokenMarketSnapshot } from "@/lib/token-market-snapshot";
@@ -237,6 +246,49 @@ const publicClient = createPublicClient({
   transport: http(pumpChain.rpcUrls.default.http[0]),
 });
 
+function bucketSecForMs(blockTimeMs: number, intervalId = DEFAULT_CHART_INTERVAL): number {
+  const intervalMs =
+    CANDLE_INTERVALS.find((item) => item.id === intervalId)?.ms ?? 5 * 60_000;
+  return Math.floor(blockTimeMs / intervalMs) * (intervalMs / 1000);
+}
+
+function accumulateActorBucketExtremes(
+  prev: ActorBucketExtremes | null,
+  spotBefore: number,
+  spotAfter: number,
+  blockTimeMs: number
+): ActorBucketExtremes {
+  const bucketSec = bucketSecForMs(blockTimeMs);
+  const low = Math.min(spotBefore, spotAfter);
+  const high = Math.max(spotBefore, spotAfter);
+  if (prev && prev.bucketSec === bucketSec) {
+    return {
+      bucketSec,
+      low: Math.min(prev.low, low),
+      high: Math.max(prev.high, high),
+    };
+  }
+  return { bucketSec, low, high };
+}
+
+function wsUpdatesCoverActorExtremes(
+  updates: CandleWsUpdate[],
+  extremes: ActorBucketExtremes
+): boolean {
+  for (const update of updates) {
+    if (update.time !== extremes.bucketSec) continue;
+    const low = Number(update.low);
+    const high = Number(update.high);
+    if (!Number.isFinite(low) || !Number.isFinite(high) || low <= 0 || high <= 0) {
+      continue;
+    }
+    if (low <= extremes.low * 1.0001 && high >= extremes.high * 0.9999) {
+      return true;
+    }
+  }
+  return false;
+}
+
 export function TokenDetailLive({
   tokenAddress,
   symbol,
@@ -254,6 +306,9 @@ export function TokenDetailLive({
   const [holdersRefreshKey, setHoldersRefreshKey] = useState(0);
   const [optimisticTrades, setOptimisticTrades] = useState<TradeItem[]>([]);
   const [actorChartSpot, setActorChartSpot] = useState<ActorOptimisticChartSpot | null>(null);
+  const [actorBucketExtremes, setActorBucketExtremes] = useState<ActorBucketExtremes | null>(
+    null
+  );
   const [indexerSyncing, setIndexerSyncing] = useState(false);
   const [latestWsBonding, setLatestWsBonding] = useState<
     TokenTradeWsPayload["bonding"] | null
@@ -277,18 +332,12 @@ export function TokenDetailLive({
     setDbTrades(initialTrades);
     setOptimisticTrades([]);
     setActorChartSpot(null);
+    setActorBucketExtremes(null);
     setIndexerSyncing(false);
     setLatestWsBonding(null);
     hydratedRef.current = false;
   }, [contentSynced, tokenAddress, initialToken, initialTrades]);
-  useEffect(() => {
-    if (!actorChartSpot || liveCandleUpdates.length === 0) return;
-    const latest = [...liveCandleUpdates].sort((a, b) => b.time - a.time)[0];
-    if (latest && latest.time * 1000 >= actorChartSpot.blockTimeMs - 30_000) {
-      setActorChartSpot(null);
-      setIndexerSyncing(false);
-    }
-  }, [liveCandleUpdates, actorChartSpot]);
+
   const [copiedAddress, setCopiedAddress] = useState(false);
   const [profileAddress, setProfileAddress] = useState<string | null>(null);
   const [tradePrefill, setTradePrefill] = useState<TradePrefillConfig | null>(null);
@@ -541,15 +590,19 @@ export function TokenDetailLive({
                 isNewBucket: update.isNewBucket,
               });
             }
+            setActorBucketExtremes((extremes) => {
+              if (extremes && wsUpdatesCoverActorExtremes(updates, extremes)) {
+                setActorChartSpot(null);
+                setIndexerSyncing(false);
+                return null;
+              }
+              return extremes;
+            });
           }
           setToken((prev) => patchTokenDetailFromWsTrade(prev, payload) ?? prev);
           setOptimisticTrades((prev) =>
             prev.filter((t) => txHashKey(t.txHash) !== txHashKey(tradeItem.txHash))
           );
-          if (payload.candleUpdates?.length) {
-            setActorChartSpot(null);
-            setIndexerSyncing(false);
-          }
           setHoldersRefreshKey((k) => k + 1);
         }
         continue;
@@ -670,6 +723,14 @@ export function TokenDetailLive({
         volumeBnb: Number(payload.tradeItem.netBnb ?? payload.tradeItem.nativeAmount ?? 0),
         blockTimeMs: Date.now(),
       });
+      setActorBucketExtremes((prev) =>
+        accumulateActorBucketExtremes(
+          prev,
+          payload.spotBeforeBnb,
+          payload.spotAfterBnb,
+          Date.now()
+        )
+      );
       setOptimisticTrades((prev) => [
         payload.tradeItem,
         ...prev.filter((t) => t.txHash !== payload.pendingTxHash),
@@ -696,6 +757,7 @@ export function TokenDetailLive({
     (payload: { pendingId: string }) => {
       const pendingTxHash = `pending:${payload.pendingId}`;
       setActorChartSpot(null);
+      setActorBucketExtremes(null);
       setOptimisticTrades((prev) => {
         const next = prev.filter(
           (t) => txHashKey(t.txHash) !== txHashKey(pendingTxHash)
@@ -1335,6 +1397,7 @@ export function TokenDetailLive({
                 status={liveToken.status}
                 initialCandles={initialCandles}
                 actorOptimisticSpot={actorChartSpot}
+                actorBucketExtremes={actorBucketExtremes}
                 curveSnapshot={tradeCurveSnapshot}
                 liveCandleUpdates={liveCandleUpdates}
                 fallbackTrades={chartFallbackTrades}

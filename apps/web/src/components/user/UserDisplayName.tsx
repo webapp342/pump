@@ -1,5 +1,6 @@
 "use client";
 
+import { addressCacheKey } from "@/lib/address";
 import { resolveDisplayUsername } from "@/lib/username";
 import { useUserDisplayNames } from "@/hooks/useUserDisplayNames";
 
@@ -21,7 +22,8 @@ export function UserDisplayName({
 }: UserDisplayNameProps) {
   const needsLookup = username === undefined || hasStatusBadgeProp === undefined;
   const lookup = useUserDisplayNames(needsLookup ? [address] : [], compact);
-  const meta = lookup.get(address.toLowerCase());
+  const lookupKey = addressCacheKey(address) ?? address;
+  const meta = lookup.get(lookupKey);
 
   const label =
     username !== undefined
