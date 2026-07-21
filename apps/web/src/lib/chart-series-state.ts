@@ -57,24 +57,10 @@ export function preserveLiveTailOverFetch(
   const idx = candles.findIndex((c) => c.time === liveTail.time);
 
   if (idx >= 0) {
-    const fetched = candles[idx]!;
-    // Live open-bucket SSOT: never let a slower HTTP/CH row rewrite open/close.
-    candles[idx] = {
-      time: fetched.time,
-      open: liveTail.open > 0 ? liveTail.open : fetched.open,
-      high: Math.max(fetched.high, liveTail.high),
-      low: Math.min(
-        fetched.low > 0 ? fetched.low : liveTail.low,
-        liveTail.low > 0 ? liveTail.low : fetched.low
-      ),
-      close: liveTail.close > 0 ? liveTail.close : fetched.close,
-    };
+    // Live open-bucket SSOT: replace fetched tip entirely (open included).
+    candles[idx] = { ...liveTail };
     if (liveVol && idx < volumes.length) {
-      volumes[idx] = {
-        ...volumes[idx]!,
-        value: Math.max(volumes[idx]!.value, liveVol.value),
-        color: liveVol.value >= volumes[idx]!.value ? liveVol.color : volumes[idx]!.color,
-      };
+      volumes[idx] = { ...liveVol };
     }
     return {
       candles,

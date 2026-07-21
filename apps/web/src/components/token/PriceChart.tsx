@@ -17,7 +17,6 @@ import {
   applyCandleSeriesPriceFormat,
   CANDLE_INTERVALS,
   DEFAULT_CHART_INTERVAL,
-  lockTipOpenAgainstRegression,
   resolveChartPriceFormat,
   seriesHasTemporalGaps,
   type CandleBar,
@@ -395,12 +394,12 @@ export function PriceChart({
           last && last.time === update.time
             ? {
                 time: update.time,
-                // Open frozen for bucket — never min/repair/raise.
-                open: last.open > 0 ? last.open : open > 0 ? open : close,
-                high: Math.max(last.high, high, close),
+                // Indexer WS open is the only SSOT — never keep a stale client open.
+                open: open > 0 ? open : last.open > 0 ? last.open : close,
+                high: Math.max(high, open, close),
                 low: Math.min(
-                  last.low > 0 ? last.low : low,
-                  low > 0 ? low : last.low,
+                  low > 0 ? low : close,
+                  open > 0 ? open : close,
                   close
                 ),
                 close,
@@ -793,11 +792,8 @@ export function PriceChart({
     }
     applyCandleSeriesPriceFormat(mainSeries, priceFormat, candlesForChart);
 
-    // Tip open is immutable — lock against any React/state regression.
-    let nextCandles = lockTipOpenAgainstRegression(
-      candlesForChart,
-      renderedCandlesRef.current
-    );
+    // Series tip open comes from indexer WS/hot only — do not lock to a prior paint.
+    let nextCandles = candlesForChart;
     const nextVolumes = volumesForChart;
     const fingerprint = `${tokenAddress}|${timeInterval}|${currency}|${candleUnitScale}|${chartStyle}`;
     const prevCandles = renderedCandlesRef.current;

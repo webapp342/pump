@@ -198,15 +198,10 @@ function isSpotRatioSane(a: number, b: number): boolean {
   return ratio <= 4 && ratio >= 1 / 4;
 }
 
-function resolveSpotOpen(spotBefore: number, spotAfter: number, priorClose: number | null): number {
-  let spotOpen = spotBefore > 0 && Number.isFinite(spotBefore) ? spotBefore : spotAfter;
-  if (spotAfter > 0 && spotOpen > 0 && !isSpotRatioSane(spotOpen, spotAfter)) {
-    spotOpen =
-      priorClose != null && priorClose > 0 && isSpotRatioSane(priorClose, spotAfter)
-        ? priorClose
-        : spotAfter;
-  }
-  return spotOpen;
+function resolveSpotOpen(spotBefore: number, spotAfter: number, _priorClose: number | null): number {
+  // First print only — never invent open from prior close.
+  if (spotBefore > 0 && Number.isFinite(spotBefore)) return spotBefore;
+  return spotAfter;
 }
 
 /**
@@ -244,13 +239,6 @@ function tradeBucketOhlc(
     low: Math.min(...prices),
     close: spotAfter,
   };
-}
-
-/** Buy-only bonding bucket cannot wick below open — price only rises on buys. */
-function sealBuyOnlyOpen(open: number, low: number, volume: number, buyVolume: number): number {
-  if (!(volume > 0) || buyVolume < volume * 0.999) return open;
-  if (low > 0 && low < open) return low;
-  return open;
 }
 
 /** Process-local tip — same indexer never waits on Redis RTT to merge the next trade. */
@@ -299,8 +287,6 @@ async function computeIntervalCandleLive(
     volume = volumeZug;
     buyVolume = buyVolumeZug;
     tradeCount = 1;
-    // First print only: buy-only bucket cannot open above its low.
-    open = sealBuyOnlyOpen(open, low, volume, buyVolume);
   } else {
     const spotOpen = resolveSpotOpen(spotBefore, spotAfter, null);
     const touch = wickTouchPrice(spotBefore, spotAfter, spotOpen);
@@ -411,7 +397,7 @@ export async function persistCandleUpdatesToPg(
             $1, $2, to_timestamp($3), $4, $5, $6, $7, $8, $9, $10, $11, $12, now()
           )
           ON CONFLICT (token_address, candle_interval, bucket_ts) DO UPDATE SET
-            open_zug = EXCLUDED.open_zug,
+            open_zug = token_candles.open_zug,
             high_zug = EXCLUDED.high_zug,
             low_zug = EXCLUDED.low_zug,
             close_zug = EXCLUDED.close_zug,
