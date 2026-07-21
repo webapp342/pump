@@ -17,6 +17,8 @@ import {
   applyCandleSeriesPriceFormat,
   CANDLE_INTERVALS,
   DEFAULT_CHART_INTERVAL,
+  lockTipOpenAgainstRegression,
+  repairBondingNeedleOpens,
   resolveChartPriceFormat,
   seriesHasTemporalGaps,
   type CandleBar,
@@ -394,7 +396,8 @@ export function PriceChart({
           last && last.time === update.time
             ? {
                 time: update.time,
-                open: last.open > 0 ? last.open : open,
+                // Never raise open on the live tip (solid → needle regression).
+                open: last.open > 0 ? Math.min(last.open, open > 0 ? open : last.open) : open,
                 high: Math.max(last.high, high, close),
                 low: Math.min(
                   last.low > 0 ? last.low : low,
@@ -410,6 +413,14 @@ export function PriceChart({
                 low: Math.min(low > 0 ? low : close, open, close),
                 close,
               };
+        // Buy-climb seal: if we already have a lower wick under a green tip, open = low.
+        if (painted.close >= painted.open && painted.low < painted.open) {
+          const body = Math.abs(painted.close - painted.open);
+          const range = painted.high - painted.low;
+          if (range > 0 && body / range < 0.4) {
+            painted.open = painted.low;
+          }
+        }
         try {
           mainSeries.update(
             candleToMainChartPoint(chartStyleRef.current, painted) as never
@@ -791,7 +802,11 @@ export function PriceChart({
     }
     applyCandleSeriesPriceFormat(mainSeries, priceFormat, candlesForChart);
 
-    const nextCandles = candlesForChart;
+    // Lock tip open to the last live paint so reconcile/setData cannot raise it into a needle.
+    let nextCandles = lockTipOpenAgainstRegression(
+      repairBondingNeedleOpens(candlesForChart),
+      renderedCandlesRef.current
+    );
     const nextVolumes = volumesForChart;
     const fingerprint = `${tokenAddress}|${timeInterval}|${currency}|${candleUnitScale}|${chartStyle}`;
     const prevCandles = renderedCandlesRef.current;

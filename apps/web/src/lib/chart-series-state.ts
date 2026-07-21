@@ -166,7 +166,7 @@ export function chartSeriesReducer(
       );
       return {
         ...state,
-        candles: merged.candles,
+        candles: repairBondingNeedleOpens(merged.candles),
         volumes: merged.volumes,
         /** Live WS OHLC is authoritative for the open bucket. */
         source: "db",

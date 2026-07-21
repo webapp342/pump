@@ -805,21 +805,19 @@ export function mergeWsCandleUpdate(
         close
       );
     } else {
-      // Prefer live tip open when it disagrees with a stitched CH open.
+      // Never raise open once set — raised open + kept low = needle after solid paint.
       const tradeOpen = candle.open > 0 ? candle.open : close;
-      const stitchedOpen =
-        priorClose != null &&
-        priorClose > 0 &&
-        isBarContinuityMatch(existing.open, priorClose) &&
-        !isBarContinuityMatch(existing.open, tradeOpen);
-      let open = stitchedOpen ? tradeOpen : existing.open;
-      // Bonding buy-climb: lower wick with green body ⇒ false open (repair).
-      const lowCandidate = Math.min(existing.low, candle.low, close);
+      let open =
+        existing.open > 0 ? Math.min(existing.open, tradeOpen) : tradeOpen;
+      const lowCandidate = Math.min(existing.low, candle.low, close, open);
       const highCandidate = Math.max(existing.high, candle.high, close, open);
       if (close >= open && lowCandidate < open) {
         const body = Math.abs(close - open);
+        const range = highCandidate - lowCandidate;
         const lowerWick = open - lowCandidate;
-        if (lowerWick > body * 1.5) open = lowCandidate;
+        if (range > 0 && (body / range < 0.4 || lowerWick > body * 1.2)) {
+          open = lowCandidate;
+        }
       }
       nextCandles[idx] = sanitizeTailCandleOhlc(
         {
@@ -1133,11 +1131,14 @@ export function repairBondingNeedleOpens(candles: CandleBar[]): CandleBar[] {
   const next = candles.map((c, i) => {
     if (!(c.close >= c.open) || !(c.low < c.open)) return c;
     const body = Math.abs(c.close - c.open);
+    const range = c.high - c.low;
     const lowerWick = c.open - c.low;
     const prevClose = i > 0 ? candles[i - 1]!.close : null;
     const stitched =
       prevClose != null && prevClose > 0 && isBarContinuityMatch(c.open, prevClose);
-    if (!stitched && lowerWick <= body * 1.5) return c;
+    // Doji/needle at top of range = classic false open (body tiny, long lower wick).
+    const needleShape = range > 0 && body / range < 0.4 && lowerWick > body;
+    if (!stitched && !needleShape && lowerWick <= body * 1.2) return c;
     changed = true;
     const open = c.low;
     return {
@@ -1148,6 +1149,31 @@ export function repairBondingNeedleOpens(candles: CandleBar[]): CandleBar[] {
     };
   });
   return changed ? next : candles;
+}
+
+/**
+ * After a correct live series.update(), reconcile/setData must not raise tip open
+ * (that regression is the “solid then needle” bug).
+ */
+export function lockTipOpenAgainstRegression(
+  next: CandleBar[],
+  painted: CandleBar[]
+): CandleBar[] {
+  if (next.length === 0 || painted.length === 0) return next;
+  const n = next[next.length - 1]!;
+  const p = painted[painted.length - 1]!;
+  if (n.time !== p.time) return next;
+  if (!(p.open > 0) || !(n.open > p.open)) return next;
+  // Only lock when painted tip was a solid/recovering body from a lower open.
+  if (n.close < p.open && p.close < p.open) return next;
+  const copy = next.slice();
+  copy[copy.length - 1] = {
+    ...n,
+    open: p.open,
+    low: Math.min(n.low, p.low, p.open),
+    high: Math.max(n.high, p.high, n.close, p.open),
+  };
+  return copy;
 }
 
 function coherentOpenForBar(
