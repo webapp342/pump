@@ -9,6 +9,14 @@ const TABLE_BY_INTERVAL: Partial<Record<CandleInterval, string>> = {
   "4h": "candles_4h",
 };
 
+/** ClickHouse bucket expression — matches TradingView bar open time (interval start). */
+const BUCKET_EXPR: Record<CandleInterval, string> = {
+  "5m": "toStartOfFiveMinutes(block_time)",
+  "15m": "toStartOfFifteenMinutes(block_time)",
+  "1h": "toStartOfHour(block_time)",
+  "4h": "toStartOfInterval(block_time, INTERVAL 4 HOUR)",
+};
+
 type ChCandleRow = {
   bucket_sec: number;
   open_sol: number;
@@ -20,7 +28,7 @@ type ChCandleRow = {
   trade_count: number;
 };
 
-export type ClickHouseCandleSource = "candles_spot" | "candles_mv";
+export type ClickHouseCandleSource = "trades_raw" | "candles_mv" | "candles_spot";
 
 function mapChRows(rows: ChCandleRow[]): StoredTokenCandleRow[] {
   return rows.map((row) => ({
@@ -35,7 +43,64 @@ function mapChRows(rows: ChCandleRow[]): StoredTokenCandleRow[] {
   }));
 }
 
-/** Indexer-authoritative spot OHLC (ReplacingMergeTree — same semantics as PG token_candles). */
+/**
+ * History SSOT (research / ClickHouse OHLC pattern):
+ * open  = argMin(first print, timestamp)
+ * high  = max(price path)
+ * low   = min(price path)
+ * close = argMax(last print, timestamp)
+ *
+ * Bonding: first print = spot_before (fallback spot_after for legacy rows).
+ */
+export async function listTokenCandlesFromTradesRaw(
+  tokenAddress: string,
+  interval: CandleInterval,
+  limit = 1000
+): Promise<StoredTokenCandleRow[] | null> {
+  if (!clickhouseCandlesEnabled()) return null;
+  const bucketExpr = BUCKET_EXPR[interval];
+  if (!bucketExpr) return null;
+
+  const capped = Math.min(Math.max(limit, 1), 4000);
+  const addr = tokenAddress.replace(/'/g, "\\'");
+
+  // open_print / after_print — same economics as indexer live tip.
+  const openPrint =
+    "if(spot_before_sol > 0, spot_before_sol, spot_price_sol)";
+  const afterPrint = "spot_price_sol";
+  const touchHigh = `greatest(${openPrint}, ${afterPrint})`;
+  const touchLow = `least(${openPrint}, ${afterPrint})`;
+
+  try {
+    const rows = await clickhouseQueryJson<ChCandleRow>(
+      `
+      SELECT
+        toUnixTimestamp(${bucketExpr}) AS bucket_sec,
+        argMin(${openPrint}, block_time) AS open_sol,
+        max(${touchHigh}) AS high_sol,
+        min(${touchLow}) AS low_sol,
+        argMax(${afterPrint}, block_time) AS close_sol,
+        sum(sol_amount) AS volume_sol,
+        sumIf(sol_amount, side = 'buy') AS buy_volume_sol,
+        count() AS trade_count
+      FROM trades_raw
+      WHERE token_address = '${addr}'
+        AND spot_price_sol > 0
+      GROUP BY bucket_sec
+      ORDER BY bucket_sec DESC
+      LIMIT ${capped}
+      `
+    );
+
+    if (rows.length === 0) return [];
+    return mapChRows(rows);
+  } catch (error) {
+    console.warn("[clickhouse] trades_raw OHLC query failed", error);
+    return null;
+  }
+}
+
+/** Indexer-written spot OHLC (legacy / fallback when trades_raw empty). */
 export async function listTokenCandlesFromClickHouseSpot(
   tokenAddress: string,
   interval: CandleInterval,
@@ -75,7 +140,7 @@ export async function listTokenCandlesFromClickHouseSpot(
   }
 }
 
-/** Legacy MV rollups (min/max spot) — fallback only when candles_spot empty. */
+/** AggregatingMergeTree rollups from trades_raw (argMin/argMax) — secondary history. */
 export async function listTokenCandlesFromClickHouseMv(
   tokenAddress: string,
   interval: CandleInterval,
@@ -116,22 +181,34 @@ export async function listTokenCandlesFromClickHouseMv(
   }
 }
 
-/** Deep history — prefer authoritative candles_spot, MV fallback. */
+/**
+ * Deep history preference (enterprise chart SSOT):
+ * 1) trades_raw dynamic OHLC (argMin/argMax + spot_before)
+ * 2) candles_mv (same formula, pre-aggregated)
+ * 3) candles_spot (indexer dual-write fallback)
+ */
 export async function listTokenCandlesFromClickHouse(
   tokenAddress: string,
   interval: CandleInterval,
   limit = 1000
 ): Promise<{ rows: StoredTokenCandleRow[]; source: ClickHouseCandleSource } | null> {
-  const spot = await listTokenCandlesFromClickHouseSpot(tokenAddress, interval, limit);
-  if (spot && spot.length > 0) {
-    return { rows: spot, source: "candles_spot" };
+  const fromTrades = await listTokenCandlesFromTradesRaw(tokenAddress, interval, limit);
+  if (fromTrades && fromTrades.length > 0) {
+    return { rows: fromTrades, source: "trades_raw" };
   }
+
   const mv = await listTokenCandlesFromClickHouseMv(tokenAddress, interval, limit);
   if (mv && mv.length > 0) {
     return { rows: mv, source: "candles_mv" };
   }
-  if (spot && spot.length === 0) {
-    return { rows: [], source: "candles_spot" };
+
+  const spot = await listTokenCandlesFromClickHouseSpot(tokenAddress, interval, limit);
+  if (spot && spot.length > 0) {
+    return { rows: spot, source: "candles_spot" };
+  }
+
+  if (fromTrades && fromTrades.length === 0) {
+    return { rows: [], source: "trades_raw" };
   }
   return null;
 }

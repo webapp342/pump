@@ -40,11 +40,12 @@ bash deploy/vm/enable-clickhouse.sh
 This will:
 
 1. `docker compose up -d` ClickHouse (2GB mem cap)
-2. Apply `init/01_schema.sql` (trades_raw + 1m/5m/15m/1h/4h MVs)
-3. Patch `apps/indexer-sol/.env` — `CLICKHOUSE_*` + `REDIS_PUBLISH_ENABLED=true`
-4. Patch TMA `.env` — `USE_CLICKHOUSE_CANDLES=true`
-5. Restart indexer-sol + reload Next
-6. Backfill PG trades → CH
+2. Apply `init/01_schema.sql` (trades_raw + MVs), `02_candles_spot.sql`, `03_trades_raw_spot_before.sql`
+3. Chart history prefers **trades_raw argMin/argMax OHLC**; Redis hot tip for the open bucket
+4. Patch `apps/indexer-sol/.env` — `CLICKHOUSE_*` + `REDIS_PUBLISH_ENABLED=true`
+5. Patch TMA `.env` — `USE_CLICKHOUSE_CANDLES=true`
+6. Restart indexer-sol + reload Next
+7. Backfill PG trades → CH
 
 ## Verify
 

@@ -499,6 +499,7 @@ export class SolanaEventHandlers {
         token_amount: Number(tokenAmountToDecimal(tokenAmount, decimals)),
         price_sol: Number(executionPrice),
         spot_price_sol: Number(markPrice),
+        spot_before_sol: Number(spotBefore),
         fee_sol: Number(lamportsToSol(feeLamports)),
         tx_hash: event.signature,
         log_index: event.logIndex,

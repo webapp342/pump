@@ -20,6 +20,8 @@ export type TradeChRow = {
   token_amount: number;
   price_sol: number;
   spot_price_sol: number;
+  /** Bonding mark immediately before this trade — chart open / wick SSOT. */
+  spot_before_sol: number;
   fee_sol: number;
   tx_hash: string;
   log_index: number;
@@ -54,6 +56,7 @@ export function enqueueTradeClickHouse(row: TradeChRow): void {
     token_amount: row.token_amount,
     price_sol: row.price_sol,
     spot_price_sol: row.spot_price_sol,
+    spot_before_sol: row.spot_before_sol,
     fee_sol: row.fee_sol,
     tx_hash: row.tx_hash,
     log_index: row.log_index,

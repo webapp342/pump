@@ -89,6 +89,11 @@ if [[ -f "$SCHEMA_SPOT" ]]; then
   log "Applying candles_spot schema…"
   docker exec -i pump-clickhouse clickhouse-client --multiquery < "$SCHEMA_SPOT"
 fi
+SCHEMA_BEFORE="${TMA_DIR}/deploy/clickhouse/init/03_trades_raw_spot_before.sql"
+if [[ -f "$SCHEMA_BEFORE" ]]; then
+  log "Applying trades_raw spot_before_sol…"
+  docker exec -i pump-clickhouse clickhouse-client --multiquery < "$SCHEMA_BEFORE"
+fi
 
 upsert_env() {
   local file="$1" key="$2" value="$3"

@@ -2,7 +2,6 @@ import {
   applyActorOptimisticCandleBucket,
   fillGapsForStoredCandles,
   mergeWsCandleUpdate,
-  repairBondingNeedleOpens,
   sanitizeTailCandleSeries,
   scaleCandleBars,
   seriesHasTemporalGaps,
@@ -78,7 +77,7 @@ export function preserveLiveTailOverFetch(
       };
     }
     return {
-      candles: repairBondingNeedleOpens(candles),
+      candles,
       volumes,
     };
   }
@@ -90,7 +89,7 @@ export function preserveLiveTailOverFetch(
   }
 
   return {
-    candles: repairBondingNeedleOpens(candles),
+    candles,
     volumes,
   };
 }
@@ -166,7 +165,7 @@ export function chartSeriesReducer(
       );
       return {
         ...state,
-        candles: repairBondingNeedleOpens(merged.candles),
+        candles: merged.candles,
         volumes: merged.volumes,
         /** Live WS OHLC is authoritative for the open bucket. */
         source: "db",
@@ -257,8 +256,6 @@ export function deriveChartSeries(input: DeriveChartSeriesInput): {
     volumes = filled.volumes;
   }
   // else: keep API/WS series as-is — do not append empty live buckets
-
-  candles = repairBondingNeedleOpens(candles);
 
   if (actorOptimisticSpot) {
     const patched = applyActorOptimisticCandleBucket(

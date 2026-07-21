@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS pump.trades_raw
   token_amount Float64,
   price_sol Float64,
   spot_price_sol Float64,
+  spot_before_sol Float64 DEFAULT 0,
   fee_sol Float64,
   tx_hash String,
   log_index UInt32,

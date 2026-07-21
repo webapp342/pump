@@ -875,7 +875,7 @@ export function upsertHotCandleTail(
     if (idx < nextVolumes.length) nextVolumes[idx] = volume;
     else nextVolumes.push(volume);
     return {
-      candles: repairBondingNeedleOpens(nextCandles),
+      candles: nextCandles,
       volumes: nextVolumes,
     };
   }
@@ -884,7 +884,7 @@ export function upsertHotCandleTail(
     nextCandles.push(candle);
     nextVolumes.push(volume);
     return {
-      candles: repairBondingNeedleOpens(nextCandles),
+      candles: nextCandles,
       volumes: nextVolumes,
     };
   }
@@ -895,7 +895,7 @@ export function upsertHotCandleTail(
   nextCandles.splice(insertAt, 0, candle);
   nextVolumes.splice(insertAt, 0, volume);
   return {
-    candles: repairBondingNeedleOpens(nextCandles),
+    candles: nextCandles,
     volumes: nextVolumes,
   };
 }

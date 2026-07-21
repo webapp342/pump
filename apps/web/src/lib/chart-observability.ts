@@ -90,6 +90,7 @@ export function logChartWsMerge(details: {
 }
 
 export type ChartOlapSource =
+  | "trades_raw"
   | "candles_spot"
   | "candles_mv"
   | "postgres"

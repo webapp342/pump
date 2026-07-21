@@ -89,6 +89,7 @@ async function main(): Promise<void> {
       token_amount: Number(row.token_amount),
       price_sol: Number(row.price_zug),
       spot_price_sol: Number(row.spot_price_zug ?? row.price_zug),
+      spot_before_sol: Number(row.spot_price_zug ?? row.price_zug),
       fee_sol: Number(row.fee_zug),
       tx_hash: row.tx_hash,
       log_index: row.log_index,

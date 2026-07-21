@@ -1,53 +1,64 @@
-# Chart Architecture (2026-06)
+# Chart Architecture (2026-07)
 
-Enterprise pump.fun-style charts: **native OHLC authoritative**, **USD display-only**.
+Enterprise charts: **raw trades → OHLC**, **RAM live tip**, **Lightweight Charts `update()`**.
 
-## Data flow (2026-07)
+Aligned with TradingView LWC v5 docs + ClickHouse OHLC pattern
+(`argMin` / `argMax` / `toStartOfInterval`).
+
+## Data flow
 
 ```
-Trade → indexer compute OHLC once
-      → CH candles_spot (authoritative chart history)
-      → Redis hot tail + pub/sub WS
-      → GET /api/candles → CH candles_spot → merge Redis tail → gap-fill
-      → PriceChart: WS live + Lightweight Charts formatters
+Trade → indexer
+      ├── PG trades (positions truth)
+      ├── CH trades_raw (spot_before_sol + spot_price_sol, DateTime64 ms)
+      ├── RAM tip + Redis hot + WS  (open immutable for bucket)
+      └── optional dual-write candles_spot / PG token_candles (fallback only)
+
+HTTP GET /api/candles
+      → CH trades_raw GROUP BY interval
+           open  = argMin(first print, block_time)
+           high  = max(path)
+           low   = min(path)
+           close = argMax(last print, block_time)
+      → merge Redis hot tip (open bucket SSOT)
+      → gap-fill flat bars
+      → fallback: candles_mv → candles_spot → PG → tape replay
+
+PriceChart
+      → setData(history) once per interval/load
+      → series.update(tip) for live ticks (same time = replace tip)
+      → never rewrite tip open client-side
 ```
-
-Legacy `candles_5m` MV (min/max spot) is **fallback only** when `candles_spot` empty.
-
-See also: [`docs/ultra-fast-ui-phases.md`](../docs/ultra-fast-ui-phases.md)
 
 ## Rules
 
-| Layer | Stores | Updates when |
-|-------|--------|--------------|
-| `token_candles.*_zug` | Native spot OHLC | Trades only |
-| `close_usd` | Trade bucket USD snapshot | Trades (optional migration 027) |
-| Header / chart USD | `nativeMark × nativeUsd` | Oracle 2s (client), trades (native) |
-| Gap bars | SQL `gap_fill_candles` | Read-time flat at last close |
+| Layer | Role |
+|-------|------|
+| `trades_raw.spot_before_sol` | First print / open + wick touch |
+| `trades_raw.spot_price_sol` | Mark after trade / close |
+| Redis `pump:hot:candle:*` | Live open-bucket OHLC (open frozen) |
+| Client | No open stitch / repair; tip `update()` only |
 
 ## Client (do not)
 
-- Regap when API sent `gapFilled: true`
-- `pinTail` / `reconcile` native OHLC against header
-- Poll `curves()` for USD movement (use nativeUsd oracle)
+- Prior-close stitch on open
+- `Math.min` / repair-to-low on open
+- `setData` on every live tip tick
 
 ## Client (do)
 
-- `extendSeriesToLiveBucket` — append flat native buckets to now
-- WS `merge_ws` — patch single bucket
-- Actor optimistic — trader only, clear on WS confirm
-- `useBnbUsdPrice` — 2s refetch for USD formatter
+- `setData` on interval change / full history fetch
+- WS `series.update` for same-bucket tip
+- Actor optimistic — trader only; open frozen once set
 
-## VM deploy checklist
+## VM
 
 ```bash
-sudo -u postgres psql -d pump_db -f db/migrations/026_gap_fill_candles.sql
-sudo -u postgres psql -d pump_db -f db/migrations/027_token_candles_usd.sql
-# indexer .env: INCREMENTAL_CANDLES=true, CANDLE_WS_INTERVALS=1m,5m
-npm run backfill-candles --workspace @pump/indexer  # if needed
+docker exec -i pump-clickhouse clickhouse-client --multiquery \
+  < deploy/clickhouse/init/03_trades_raw_spot_before.sql
+systemctl restart pump-indexer-sol
+# optional: flush stale tips
+redis-cli --scan --pattern 'pump:hot:candle:*' | xargs -r redis-cli DEL
 ```
 
-## Tier C (future)
-
-- Timescale continuous aggregates: 1m → 5m → 1h MV-on-MV
-- Historical USD: backfill `close_usd` per bucket from Binance klines
+See also: [`docs/ultra-fast-ui-phases.md`](./ultra-fast-ui-phases.md)

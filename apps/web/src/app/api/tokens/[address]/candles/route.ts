@@ -5,7 +5,6 @@ import {
   CANDLE_INTERVALS,
   DEFAULT_CHART_INTERVAL,
   fillGapsForStoredCandles,
-  repairBondingNeedleOpens,
   seriesHasTemporalGaps,
   storedCandlesToBars,
   upsertHotCandleTail,
@@ -35,22 +34,16 @@ function mergeHotTail(
   hot: CandleWsUpdate | null
 ): ReturnType<typeof storedCandlesToBars> {
   if (!hot) {
-    return {
-      candles: repairBondingNeedleOpens(candles.candles),
-      volumes: candles.volumes,
-    };
+    return { candles: candles.candles, volumes: candles.volumes };
   }
-  // Redis hot tip is the open-bucket SSOT — replace that timestamp entirely.
+  // Redis RAM tip is the open-bucket SSOT — replace that timestamp entirely.
   return upsertHotCandleTail(candles.candles, candles.volumes, hot, 1);
 }
 
-function withRepairedOpens(
+function withGapFill(
   series: ReturnType<typeof fillGapsForStoredCandles>
 ): ReturnType<typeof fillGapsForStoredCandles> {
-  return {
-    candles: repairBondingNeedleOpens(series.candles),
-    volumes: series.volumes,
-  };
+  return series;
 }
 
 export async function GET(request: NextRequest, context: RouteContext) {
@@ -80,7 +73,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
         volumes: cached.volumes,
       };
       raw = mergeHotTail(raw, hotTail);
-      const { candles, volumes } = withRepairedOpens(
+      const { candles, volumes } = withGapFill(
         fillGapsForStoredCandles(raw.candles, raw.volumes, interval, {
           endTimeMs: Date.now(),
           extendToLive: false,
@@ -119,7 +112,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
     if (fromCh && fromCh.rows.length > 0) {
       let raw = storedCandlesToBars(fromCh.rows);
       raw = mergeHotTail(raw, hotTail);
-      const { candles, volumes } = withRepairedOpens(
+      const { candles, volumes } = withGapFill(
         fillGapsForStoredCandles(raw.candles, raw.volumes, interval, {
           endTimeMs: Date.now(),
           extendToLive: false,
@@ -186,7 +179,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
 
       raw = mergeHotTail(raw, hotTail);
 
-      const { candles, volumes } = withRepairedOpens(
+      const { candles, volumes } = withGapFill(
         fillGapsForStoredCandles(raw.candles, raw.volumes, interval, {
           endTimeMs: Date.now(),
           extendToLive: false,
