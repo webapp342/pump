@@ -53,7 +53,35 @@ export function captureReferrerFromUrl(): void {
   }
 }
 
-/** Referrer to pass on the next trade (first trade only, not yet bound on-chain). */
+const ZERO_EVM = "0x0000000000000000000000000000000000000000";
+
+function isSelfReferral(referrer: string, traderAddress: string): boolean {
+  if (isSolanaChainFamily) return referrer === traderAddress;
+  return referrer.toLowerCase() === traderAddress.toLowerCase();
+}
+
+function normalizeBoundReferrer(
+  boundReferrer: string | null | undefined
+): string | null {
+  if (!boundReferrer || boundReferrer === ZERO_EVM) return null;
+  if (isSolanaChainFamily) {
+    try {
+      const pk = new PublicKey(boundReferrer);
+      if (pk.equals(PublicKey.default)) return null;
+      return pk.toBase58();
+    } catch {
+      return null;
+    }
+  }
+  return boundReferrer.toLowerCase();
+}
+
+/**
+ * Referrer wallet for trades.
+ * - Solana: bound referrer must be passed on every trade for lifetime fee accrual.
+ * - EVM: bound referrer is optional (contract reads storage) but harmless on buyWithReferrer.
+ * - Stored ?ref= applies only before an on-chain bind exists.
+ */
 export function resolveTradeReferrer(params: {
   storedReferrer: string | null;
   boundReferrer: string | null | undefined;
@@ -61,18 +89,16 @@ export function resolveTradeReferrer(params: {
   traderAddress: string | undefined;
 }): string | null {
   const { storedReferrer, boundReferrer, hasTraded, traderAddress } = params;
-  if (!traderAddress || hasTraded) return null;
+  if (!traderAddress) return null;
 
-  const zeroEvm = "0x0000000000000000000000000000000000000000";
-  const bound =
-    boundReferrer && boundReferrer !== zeroEvm ? boundReferrer : null;
-  if (bound) return null;
-
-  if (!storedReferrer) return null;
-  if (isSolanaChainFamily) {
-    if (storedReferrer === traderAddress) return null;
-    return storedReferrer;
+  const bound = normalizeBoundReferrer(boundReferrer);
+  if (bound && !isSelfReferral(bound, traderAddress)) {
+    return bound;
   }
-  if (storedReferrer === traderAddress.toLowerCase()) return null;
-  return storedReferrer;
+
+  if (hasTraded) return null;
+  if (!storedReferrer) return null;
+  if (isSelfReferral(storedReferrer, traderAddress)) return null;
+  if (isSolanaChainFamily) return storedReferrer;
+  return storedReferrer.toLowerCase();
 }

@@ -233,3 +233,20 @@ export function decodePendingFees(data: Uint8Array): OnchainPendingFees {
     bump: readUInt8(data, 40),
   };
 }
+
+export type OnchainReferrerBinding = {
+  trader: PublicKey;
+  referrer: PublicKey;
+  bump: number;
+};
+
+export function decodeReferrerBinding(data: Uint8Array): OnchainReferrerBinding {
+  if (data.length < 65) {
+    throw new Error("ReferrerBinding account too small");
+  }
+  return {
+    trader: new PublicKey(data.subarray(0, 32)),
+    referrer: new PublicKey(data.subarray(32, 64)),
+    bump: readUInt8(data, 64),
+  };
+}

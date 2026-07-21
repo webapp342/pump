@@ -19,6 +19,7 @@ import { getSolanaConnection } from "@/lib/solana/transfer";
 import {
   decodeCurveAccount,
   decodeGlobalConfig,
+  decodeReferrerBinding,
   pdaCreatorFees,
   pdaCurve,
   pdaGlobal,
@@ -46,6 +47,8 @@ export type SolanaTradeMarket = {
   traderAtaExists: boolean | undefined;
   /** False when set_referrer must create the binding PDA. */
   referrerBindingExists: boolean | undefined;
+  /** On-chain bound referrer (lifetime fee recipient). */
+  boundReferrer: string | null | undefined;
   /** False when buy must CreateAccount the creator-fees PDA (paid by trader). */
   creatorFeesPdaExists: boolean | undefined;
   /** Base tx fee from RPC getFeeForMessage (no priority tip). */
@@ -110,9 +113,24 @@ async function fetchMarket(mintAddress: string, ownerAddress?: string) {
     creatorFeesPdaExists = feesInfo != null && feesInfo.lamports > 0;
   }
 
-  const referrerBindingExists = ownerAddress
-    ? bindingInfo != null && (bindingInfo.data?.length ?? 0) >= 65
-    : undefined;
+  let referrerBindingExists: boolean | undefined;
+  let boundReferrer: string | null | undefined;
+  if (ownerAddress) {
+    referrerBindingExists =
+      bindingInfo != null && (bindingInfo.data?.length ?? 0) >= 65;
+    if (bindingInfo?.data && bindingInfo.data.length >= 65) {
+      try {
+        const binding = decodeReferrerBinding(bindingInfo.data);
+        boundReferrer = binding.referrer.equals(PublicKey.default)
+          ? null
+          : binding.referrer.toBase58();
+      } catch {
+        boundReferrer = null;
+      }
+    } else {
+      boundReferrer = null;
+    }
+  }
 
   const bondingCurve: BondingCurveState | undefined = curve
     ? {
@@ -177,6 +195,7 @@ async function fetchMarket(mintAddress: string, ownerAddress?: string) {
       tokenSnapshot != null ? tokenRawToWei(tokenSnapshot.tokenRaw) : undefined,
     traderAtaExists: tokenSnapshot?.traderAtaExists,
     referrerBindingExists,
+    boundReferrer,
     creatorFeesPdaExists,
     buyTxFeeLamports,
     sellTxFeeLamports,
@@ -212,6 +231,7 @@ export function useSolanaTradeMarket(
     tokenBalanceWei: query.data?.tokenBalanceWei,
     traderAtaExists: query.data?.traderAtaExists,
     referrerBindingExists: query.data?.referrerBindingExists,
+    boundReferrer: query.data?.boundReferrer,
     creatorFeesPdaExists: query.data?.creatorFeesPdaExists,
     buyTxFeeLamports: query.data?.buyTxFeeLamports,
     sellTxFeeLamports: query.data?.sellTxFeeLamports,

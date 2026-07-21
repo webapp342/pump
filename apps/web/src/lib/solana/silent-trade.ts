@@ -26,6 +26,7 @@ import {
 } from "@/lib/solana/silent-session";
 import {
   decodeCurveAccount,
+  decodeReferrerBinding,
   launchpadProgramId,
   pdaCreatorFees,
   pdaCurve,
@@ -61,6 +62,37 @@ async function loadCurve(mint: PublicKey) {
     curvePda,
     curve: decodeCurveAccount(info.data),
   };
+}
+
+async function loadBoundReferrerWallet(trader: PublicKey): Promise<PublicKey | null> {
+  const [bindingPda] = pdaReferrerBinding(trader);
+  const info = await getSolanaConnection().getAccountInfo(bindingPda, "confirmed");
+  if (!info?.data || info.data.length < 65) return null;
+  try {
+    const binding = decodeReferrerBinding(info.data);
+    if (binding.referrer.equals(PublicKey.default) || binding.referrer.equals(trader)) {
+      return null;
+    }
+    return binding.referrer;
+  } catch {
+    return null;
+  }
+}
+
+async function resolveReferrerWallet(
+  trader: PublicKey,
+  referrerAddress: string | null | undefined
+): Promise<PublicKey> {
+  if (referrerAddress && referrerAddress !== trader.toBase58()) {
+    try {
+      const explicit = new PublicKey(referrerAddress);
+      if (!explicit.equals(trader)) return explicit;
+    } catch {
+      // fall through to on-chain binding
+    }
+  }
+  const bound = await loadBoundReferrerWallet(trader);
+  return bound ?? trader;
 }
 
 async function maybeSetReferrer(
@@ -184,11 +216,7 @@ export async function silentBuy(input: {
     throw new Error("Token vault is empty — this coin was not minted correctly. Create again.");
   }
 
-  const referrerWallet =
-    input.referrerAddress &&
-    input.referrerAddress !== trader.toBase58()
-      ? new PublicKey(input.referrerAddress)
-      : trader;
+  const referrerWallet = await resolveReferrerWallet(trader, input.referrerAddress);
 
   const traderAta = getAssociatedTokenAddressSync(mint, trader, false, TOKEN_PROGRAM_ID);
   const [creatorFeesPda] = pdaCreatorFees(curve.creator, programId);
@@ -267,11 +295,7 @@ export async function silentSell(input: {
 
   if (curve.paused) throw new Error("Trading paused");
 
-  const referrerWallet =
-    input.referrerAddress &&
-    input.referrerAddress !== trader.toBase58()
-      ? new PublicKey(input.referrerAddress)
-      : trader;
+  const referrerWallet = await resolveReferrerWallet(trader, input.referrerAddress);
 
   const traderAta = getAssociatedTokenAddressSync(mint, trader, false, TOKEN_PROGRAM_ID);
   const conn = getSolanaConnection();

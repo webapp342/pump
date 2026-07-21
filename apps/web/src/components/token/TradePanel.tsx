@@ -767,6 +767,12 @@ export function TradePanel({
     query: { enabled: !isSolanaTrade && Boolean(wagmiAddress) },
   });
 
+  const effectiveBoundReferrer = isSolanaTrade
+    ? solanaMarket.boundReferrer
+    : boundReferrer
+      ? String(boundReferrer)
+      : undefined;
+
   const localBuyQuoteOut = useMemo(() => {
     if (
       side !== "buy" ||
@@ -1023,7 +1029,7 @@ export function TradePanel({
         const txFee = solanaMarket.buyTxFeeLamports ?? fallbackTxFee;
         const tradeReferrer = resolveTradeReferrer({
           storedReferrer: readStoredReferrer(),
-          boundReferrer,
+          boundReferrer: effectiveBoundReferrer,
           hasTraded,
           traderAddress: address,
         });
@@ -1058,7 +1064,8 @@ export function TradePanel({
     solanaMarket.creatorFeesPdaExists,
     solanaMarket.buyTxFeeLamports,
     solanaMarket.sellTxFeeLamports,
-    boundReferrer,
+    solanaMarket.boundReferrer,
+    effectiveBoundReferrer,
     hasTraded,
     address,
     gasCostWei,
@@ -2342,7 +2349,7 @@ export function TradePanel({
   function resolvePendingTradeReferrer(): string | null {
     return resolveTradeReferrer({
       storedReferrer: readStoredReferrer(),
-      boundReferrer,
+      boundReferrer: effectiveBoundReferrer,
       hasTraded,
       traderAddress: address,
     });
