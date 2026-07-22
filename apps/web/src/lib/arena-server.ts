@@ -1,5 +1,5 @@
 import { cacheLife, cacheTag } from "next/cache";
-import { fetchNativeUsdPrice } from "@/lib/native-usd-price";
+import { fetchNativeUsdPrice } from "@/lib/native-usd-price-server";
 import { useRedisArenaCache } from "@/lib/db/perf-flags";
 import {
   readArenaHomeCache,

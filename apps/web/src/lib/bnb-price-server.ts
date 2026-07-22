@@ -1,4 +1,4 @@
-import { fetchNativeUsdPrice } from "@/lib/native-usd-price";
+import { fetchNativeUsdPrice } from "@/lib/native-usd-price-server";
 
 /** @deprecated Use fetchNativeUsdPrice — kept for legacy imports. Returns chain-native/USD (ETH on Base). */
 export async function fetchBnbUsdPrice(): Promise<{

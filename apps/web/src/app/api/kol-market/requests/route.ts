@@ -2,7 +2,7 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { normalizeAddressParam } from "@/lib/address";
 import { ensureDynamicRoute, searchParam } from "@/lib/api/route-dynamic";
-import { fetchNativeUsdPrice } from "@/lib/native-usd-price";
+import { fetchNativeUsdPrice } from "@/lib/native-usd-price-server";
 import { usdToNativeHuman } from "@/lib/kol-market-escrow";
 import {
   assertSponsorOwnsToken,

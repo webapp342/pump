@@ -1,3 +1,5 @@
+import "server-only";
+
 import { Redis } from "ioredis";
 import { CASHBACK_XP_THRESHOLD, REDIS_KEYS, parseSeasonMeta } from "@pump/xp";
 import { redisUrl, useRedisWeeklyXp } from "@/lib/db/perf-flags";

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { fetchNativeUsdPrice } from "@/lib/native-usd-price";
+import { fetchNativeUsdPrice } from "@/lib/native-usd-price-server";
 
 export async function GET() {
   const { nativeUsd, quote, source, pair, symbol } = await fetchNativeUsdPrice();

@@ -1,3 +1,5 @@
+import "server-only";
+
 import { Redis } from "ioredis";
 import { REDIS_KEYS } from "@pump/xp";
 import { redisUrl } from "@/lib/db/perf-flags";
