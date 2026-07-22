@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "prebuild": "npm run build -w @pump/solana-sdk",
+    "prebuild": "npm run build -w @pump/solana-sdk && npm run build -w @pump/xp",
     "build": "tsc -p tsconfig.json",
     "indexer": "node dist/indexer.js",
     "indexer:dev": "tsx src/indexer.ts",
@@ -24,6 +24,7 @@
   },
   "dependencies": {
     "@pump/solana-sdk": "*",
+    "@pump/xp": "*",
     "@solana/web3.js": "^1.98.4",
     "bs58": "^6.0.0",
     "dotenv": "^17.2.3",

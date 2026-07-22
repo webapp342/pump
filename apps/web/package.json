@@ -5,8 +5,8 @@
   "scripts": {
     "dev": "next dev -H 0.0.0.0 -p 3012",
     "dev:local": "next dev -H 0.0.0.0 -p 80",
-    "predev": "npm run build -w @pump/solana-sdk",
-    "prebuild": "npm run build -w @pump/solana-sdk",
+    "predev": "npm run build -w @pump/solana-sdk && npm run build -w @pump/xp",
+    "prebuild": "npm run build -w @pump/solana-sdk && npm run build -w @pump/xp",
     "build": "npm run pwa:icons && next build",
     "pwa:icons": "node scripts/generate-pwa-icons.mjs",
     "push:vapid": "node scripts/generate-vapid-keys.mjs",
@@ -26,6 +26,7 @@
     "@fortawesome/react-fontawesome": "^3.3.1",
     "@metaplex-foundation/mpl-token-metadata": "^2.13.0",
     "@pump/solana-sdk": "*",
+    "@pump/xp": "*",
     "@solana/spl-token": "^0.4.13",
     "@solana/web3.js": "^1.98.4",
     "@tanstack/react-query": "^5.84.1",

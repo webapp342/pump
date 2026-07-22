@@ -27,6 +27,18 @@ export function useRedisArenaCache(): boolean {
   return perfFlagEnabled("USE_REDIS_ARENA_CACHE");
 }
 
+/** Weekly XP ZSET reads (leaderboard + pre-trade cashback). */
+export function useRedisWeeklyXp(): boolean {
+  if (process.env.USE_REDIS_WEEKLY_XP === "false") return false;
+  if (process.env.USE_REDIS_WEEKLY_XP === "true") return true;
+  return Boolean(process.env.REDIS_URL?.trim());
+}
+
+/** F6 — skip PG token_candles mirror when CH parity green 7d. */
+export function skipPgTokenCandles(): boolean {
+  return process.env.SKIP_PG_TOKEN_CANDLES === "true";
+}
+
 export function redisUrl(): string | null {
   const url = process.env.REDIS_URL?.trim();
   return url || null;

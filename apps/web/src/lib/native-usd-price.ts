@@ -94,6 +94,21 @@ export async function fetchNativeUsdPrice(
 ): Promise<NativeUsdQuote> {
   const { pair, symbol } = nativeUsdPairForChain(chainId);
 
+  if (isSolanaChainFamily) {
+    const cached = await import("@/lib/redis/price-cache").then((m) =>
+      m.readRedisNativePrice()
+    );
+    if (cached) {
+      return {
+        nativeUsd: cached.nativeUsd,
+        quote: "USDT",
+        source: "cache",
+        pair,
+        symbol,
+      };
+    }
+  }
+
   if (cache && cache.pair === pair && Date.now() - cache.fetchedAt < CACHE_MS) {
     return {
       nativeUsd: cache.nativeUsd,

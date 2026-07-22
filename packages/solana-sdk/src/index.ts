@@ -9,6 +9,7 @@ export const PDA_SEEDS = {
   referrer: "referrer",
   creatorFees: "creator-fees",
   referrerFees: "referrer-fees",
+  cashbackFees: "cashback-fees",
 } as const;
 
 /**
@@ -39,6 +40,7 @@ export const IX = {
   emergencySweep: 8,
   emergencyClaimPendingFees: 9,
   setEmergencyHalt: 10,
+  claimCashbackFees: 11,
 } as const;
 
 export type SolanaCluster = "localnet" | "devnet" | "mainnet-beta";
@@ -185,19 +187,39 @@ export function encodeInitializeIx(defaults: PumpFeelDefaults = PUMP_FEEL_DEFAUL
   return instructionData(out);
 }
 
-export function encodeBuyIx(solInLamports: bigint, minTokenOut: bigint): Buffer {
-  const out = new Uint8Array(17);
+export function encodeBuyIx(
+  solInLamports: bigint,
+  minTokenOut: bigint,
+  userXp = 0
+): Buffer {
+  const out = new Uint8Array(userXp > 0 ? 21 : 17);
   let o = writeU8(out, 0, IX.buy);
   o = writeU64Le(out, o, solInLamports);
-  writeU64Le(out, o, minTokenOut);
+  o = writeU64Le(out, o, minTokenOut);
+  if (userXp > 0) {
+    writeU32Le(out, o, userXp);
+  }
   return instructionData(out);
 }
 
-export function encodeSellIx(tokenIn: bigint, minSolOut: bigint): Buffer {
-  const out = new Uint8Array(17);
+export function encodeSellIx(
+  tokenIn: bigint,
+  minSolOut: bigint,
+  userXp = 0
+): Buffer {
+  const out = new Uint8Array(userXp > 0 ? 21 : 17);
   let o = writeU8(out, 0, IX.sell);
   o = writeU64Le(out, o, tokenIn);
-  writeU64Le(out, o, minSolOut);
+  o = writeU64Le(out, o, minSolOut);
+  if (userXp > 0) {
+    writeU32Le(out, o, userXp);
+  }
+  return instructionData(out);
+}
+
+export function encodeClaimCashbackFeesIx(): Buffer {
+  const out = new Uint8Array(1);
+  writeU8(out, 0, IX.claimCashbackFees);
   return instructionData(out);
 }
 

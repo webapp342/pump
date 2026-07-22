@@ -16,6 +16,7 @@ import { enqueueTradeClickHouse } from "./clickhouse.js";
 import { fetchIndexerNativeUsdRate } from "./native-usd.js";
 import { applyTradeToPositionCost } from "./position-cost.js";
 import { publishTrade, publishWalletTrade } from "./redis-publish.js";
+import { enqueueCandlesChStream, enqueueTradeChStream } from "./redis-ch-stream.js";
 import { enqueueCandlesClickHouse } from "./clickhouse-candles.js";
 import { pushHotTapeTrade } from "./redis-hot-cache.js";
 import {
@@ -23,6 +24,8 @@ import {
   VOLUME_MONSTER_MIN_SOL,
 } from "./mission-thresholds.js";
 import { PointsBridge, TASK_KEYS } from "./points.js";
+import { awardWeeklyXp, lookupClanId } from "./weekly-xp.js";
+import { clickhouseViaRedisStream } from "./redis-ch-stream.js";
 import {
   asBigInt,
   asBool,
@@ -543,7 +546,7 @@ export class SolanaEventHandlers {
       });
 
       // DURABLE PATH: CH + optional PG mirror (same OHLC payload; must not block tip).
-      enqueueTradeClickHouse({
+      const chTradeRow = {
         event_id: tradeEventId,
         token_address: mint,
         trader_address: trader,
@@ -559,8 +562,33 @@ export class SolanaEventHandlers {
         slot: Number(event.slot),
         block_time: blockTime,
         native_usd_rate: inserted.nativeUsdRate,
-      });
-      enqueueCandlesClickHouse(mint, candleUpdates);
+      };
+      if (clickhouseViaRedisStream()) {
+        enqueueTradeChStream(chTradeRow);
+      } else {
+        enqueueTradeClickHouse(chTradeRow);
+      }
+      if (clickhouseViaRedisStream()) {
+        enqueueCandlesChStream(
+          candleUpdates.map((c) => ({
+            token_address: mint,
+            candle_interval: c.interval,
+            bucket_start: new Date(c.time * 1000)
+              .toISOString()
+              .replace("T", " ")
+              .replace("Z", ""),
+            open_sol: Number(c.open),
+            high_sol: Number(c.high),
+            low_sol: Number(c.low),
+            close_sol: Number(c.close),
+            volume_sol: Number(c.volume),
+            buy_volume_sol: Number(c.buyVolume),
+            trade_count: c.tradeCount,
+          }))
+        );
+      } else {
+        enqueueCandlesClickHouse(mint, candleUpdates);
+      }
       void persistCandleUpdatesToPg(
         this.context.launchpadPool,
         mint,
@@ -631,6 +659,14 @@ export class SolanaEventHandlers {
         event.signature,
         blockTime
       );
+
+      void lookupClanId(this.context.launchpadPool, trader).then((clanId) => {
+        awardWeeklyXp({
+          walletAddress: trader,
+          volumeSolNet: inserted.volumeZug,
+          clanId,
+        });
+      });
 
       console.log(
         `[indexer-sol] Trade ${side} mint=${mint} trader=${trader} sol=${lamportsToSol(solAmount)}`

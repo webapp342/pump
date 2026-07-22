@@ -24,7 +24,11 @@ const TOKEN_UNIT_9: u64 = 1_000_000_000;
 const REFERRER_SEED: &[u8] = b"referrer";
 const CREATOR_FEES_SEED: &[u8] = b"creator-fees";
 const REFERRER_FEES_SEED: &[u8] = b"referrer-fees";
+const CASHBACK_FEES_SEED: &[u8] = b"cashback-fees";
 const PROTOCOL_TREASURY_SEED: &[u8] = b"protocol-treasury";
+const CASHBACK_XP_THRESHOLD: u32 = 1000;
+/** 10% of protocol fee → trader cashback PDA when XP threshold met. */
+const CASHBACK_FEE_BPS: u64 = 1000;
 
 use bytemuck::{Pod, Zeroable};
 use pinocchio::{
@@ -66,6 +70,7 @@ const IX_CLAIM_REFERRER: u8 = 7;
 const IX_EMERGENCY_SWEEP: u8 = 8;
 const IX_EMERGENCY_CLAIM_PENDING: u8 = 9;
 const IX_SET_EMERGENCY_HALT: u8 = 10;
+const IX_CLAIM_CASHBACK: u8 = 11;
 
 const LIQUIDITY_RENT_LAMPORTS: u64 = 890_880;
 const PROTOCOL_TREASURY_RENT_LAMPORTS: u64 = 890_880;
@@ -176,6 +181,7 @@ fn process_instruction(
         IX_EMERGENCY_SWEEP => process_emergency_sweep(program_id, accounts),
         IX_EMERGENCY_CLAIM_PENDING => process_emergency_claim_pending(program_id, accounts),
         IX_SET_EMERGENCY_HALT => process_set_emergency_halt(program_id, accounts, rest),
+        IX_CLAIM_CASHBACK => process_claim_cashback_fees(program_id, accounts),
         _ => Err(ProgramError::InvalidInstructionData),
     }
 }
@@ -201,6 +207,23 @@ fn read_u64(data: &[u8], off: usize) -> Result<u64, ProgramError> {
         .try_into()
         .map_err(|_| ProgramError::InvalidInstructionData)?;
     Ok(u64::from_le_bytes(bytes))
+}
+
+fn read_u32(data: &[u8], off: usize) -> Result<u32, ProgramError> {
+    let bytes: [u8; 4] = data
+        .get(off..off + 4)
+        .ok_or(ProgramError::InvalidInstructionData)?
+        .try_into()
+        .map_err(|_| ProgramError::InvalidInstructionData)?;
+    Ok(u32::from_le_bytes(bytes))
+}
+
+fn read_user_xp(data: &[u8]) -> u32 {
+    if data.len() >= 20 {
+        read_u32(data, 16).unwrap_or(0)
+    } else {
+        0
+    }
 }
 
 fn read_u8(data: &[u8], off: usize) -> Result<u8, ProgramError> {
@@ -701,10 +724,12 @@ fn process_buy(program_id: &Pubkey, accounts: &[AccountInfo], data: &[u8]) -> Pr
         referrer_fees,
         referrer_binding,
         referrer_wallet,
+        accounts.get(14),
         program_id,
         &g,
         &c,
         quote.fee_lamports,
+        read_user_xp(data),
     )?;
     events::emit_fee_split(&c.mint, &c.creator, fees.0, fees.1, fees.2);
     let vault_base_after = vault_base.saturating_sub(quote.token_out);
@@ -833,10 +858,12 @@ fn process_sell(program_id: &Pubkey, accounts: &[AccountInfo], data: &[u8]) -> P
         referrer_fees,
         referrer_binding,
         referrer_wallet,
+        accounts.get(14),
         program_id,
         &g,
         &c,
         quote.fee_lamports,
+        read_user_xp(data),
     )?;
     events::emit_fee_split(&c.mint, &c.creator, fees.0, fees.1, fees.2);
     let vault_base_after = vault_base.saturating_add(token_in);
@@ -920,10 +947,12 @@ fn accrue_fees(
     referrer_fees: &AccountInfo,
     referrer_binding: &AccountInfo,
     referrer_wallet: &AccountInfo,
+    cashback_fees: Option<&AccountInfo>,
     program_id: &Pubkey,
     g: &GlobalConfig,
     c: &Curve,
     fee: u64,
+    user_xp: u32,
 ) -> Result<(u64, u64, u64), ProgramError> {
     if fee == 0 {
         return Ok((0, 0, 0));
@@ -949,11 +978,43 @@ fn accrue_fees(
         }
     }
 
-    let treasury_fee = fee
+    let mut treasury_fee = fee
         .checked_sub(creator_fee)
         .ok_or(ProgramError::InvalidAccountData)?
         .checked_sub(referrer_fee)
         .ok_or(ProgramError::InvalidAccountData)?;
+
+    let trader_key = pubkey_bytes(payer);
+    if user_xp >= CASHBACK_XP_THRESHOLD {
+        if let Some(cashback) = cashback_fees {
+            let cashback_fee = (fee as u128)
+                .checked_mul(CASHBACK_FEE_BPS as u128)
+                .ok_or(ProgramError::InvalidAccountData)?
+                .checked_div(BPS as u128)
+                .ok_or(ProgramError::InvalidAccountData)? as u64;
+            if cashback_fee > 0 && cashback_fee <= treasury_fee {
+                ensure_pending_fees(
+                    payer,
+                    cashback,
+                    program_id,
+                    CASHBACK_FEES_SEED,
+                    &trader_key,
+                )?;
+                let mut pending = load_pod::<PendingFees>(cashback)?;
+                if pending.owner != trader_key {
+                    return Err(ProgramError::InvalidAccountData);
+                }
+                pending.pending_lamports = pending
+                    .pending_lamports
+                    .checked_add(cashback_fee)
+                    .ok_or(ProgramError::InvalidAccountData)?;
+                write_pod(cashback, &pending)?;
+                treasury_fee = treasury_fee
+                    .checked_sub(cashback_fee)
+                    .ok_or(ProgramError::InvalidAccountData)?;
+            }
+        }
+    }
 
     if creator_fee > 0 {
         ensure_pending_fees(payer, creator_fees, program_id, CREATOR_FEES_SEED, &c.creator)?;
@@ -981,7 +1042,6 @@ fn accrue_fees(
         write_pod(referrer_fees, &pending)?;
     }
 
-    // Protocol share leaves liquidity immediately (Base → LaunchpadTreasury).
     if treasury_fee > 0 {
         *liquidity.try_borrow_mut_lamports()? -= treasury_fee;
         *protocol_treasury.try_borrow_mut_lamports()? += treasury_fee;
@@ -995,6 +1055,29 @@ fn process_claim_fees(
     accounts: &[AccountInfo],
     is_creator: bool,
 ) -> ProgramResult {
+    let seed = if is_creator {
+        CREATOR_FEES_SEED
+    } else {
+        REFERRER_FEES_SEED
+    };
+    let amount = claim_pending_fees(program_id, accounts, seed)?;
+    let [claimer, ..] = accounts else {
+        return Err(ProgramError::NotEnoughAccountKeys);
+    };
+    if is_creator {
+        events::emit_creator_fee_claimed(&pubkey_bytes(claimer), amount);
+    } else {
+        events::emit_referrer_fee_claimed(&pubkey_bytes(claimer), amount);
+    }
+    log!("pump:claim_fees");
+    Ok(())
+}
+
+fn claim_pending_fees(
+    program_id: &Pubkey,
+    accounts: &[AccountInfo],
+    seed: &[u8],
+) -> Result<u64, ProgramError> {
     let [claimer, global, liquidity, pending_fees] = accounts else {
         return Err(ProgramError::NotEnoughAccountKeys);
     };
@@ -1009,11 +1092,6 @@ fn process_claim_fees(
         return Err(ProgramError::InvalidAccountData);
     }
 
-    let seed = if is_creator {
-        CREATOR_FEES_SEED
-    } else {
-        REFERRER_FEES_SEED
-    };
     let (pda, _bump) = find_program_address(&[seed, claimer.key().as_ref()], program_id);
     if pending_fees.key() != &pda {
         return Err(ProgramError::InvalidSeeds);
@@ -1027,7 +1105,6 @@ fn process_claim_fees(
     if amount == 0 {
         return Err(ProgramError::Custom(1));
     }
-    // Keep rent-exempt floor on liquidity vault.
     if liquidity.lamports() < amount.saturating_add(LIQUIDITY_RENT_LAMPORTS) {
         return Err(ProgramError::InsufficientFunds);
     }
@@ -1038,12 +1115,12 @@ fn process_claim_fees(
     *liquidity.try_borrow_mut_lamports()? -= amount;
     *claimer.try_borrow_mut_lamports()? += amount;
 
-    if is_creator {
-        events::emit_creator_fee_claimed(&pubkey_bytes(claimer), amount);
-    } else {
-        events::emit_referrer_fee_claimed(&pubkey_bytes(claimer), amount);
-    }
-    log!("pump:claim_fees");
+    Ok(amount)
+}
+
+fn process_claim_cashback_fees(program_id: &Pubkey, accounts: &[AccountInfo]) -> ProgramResult {
+    claim_pending_fees(program_id, accounts, CASHBACK_FEES_SEED)?;
+    log!("pump:claim_cashback");
     Ok(())
 }
 
