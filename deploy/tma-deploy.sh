@@ -138,6 +138,13 @@ if [ ! -f "$REALTIME_DIR/dist/server.js" ]; then
   exit 1
 fi
 
+log "Building ch-flusher (@pump/ch-flusher)"
+npm run build -w @pump/ch-flusher
+if [ ! -f "$REPO_ROOT/apps/ch-flusher/dist/flusher.js" ]; then
+  log "ch-flusher build did not produce dist/flusher.js"
+  exit 1
+fi
+
 log "Reloading PM2 from ecosystem.config.cjs (applies cwd/script paths)"
 pm2 startOrRestart "$REPO_ROOT/ecosystem.config.cjs" --update-env
 
