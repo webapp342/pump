@@ -35,7 +35,13 @@ import {
   tokenRawToWei,
 } from "@/lib/solana/amount-scale";
 
-const POLL_MS = 4_000;
+export type SolanaTradeMarketOptions = {
+  /** When false, skip curve/vault RPC (use WS/DB live state). Default true. */
+  fetchCurve?: boolean;
+};
+
+const CURVE_POLL_MS = 4_000;
+const CURVE_POLL_WS_MS = 60_000;
 
 export type SolanaTradeMarket = {
   bondingCurve: BondingCurveState | undefined;
@@ -59,7 +65,11 @@ export type SolanaTradeMarket = {
   refetchBalances: () => Promise<void>;
 };
 
-async function fetchMarket(mintAddress: string, ownerAddress?: string) {
+async function fetchMarket(
+  mintAddress: string,
+  ownerAddress?: string,
+  fetchCurve = true
+) {
   const conn = getSolanaConnection();
   const mint = new PublicKey(mintAddress);
   const [globalPda] = pdaGlobal();
@@ -109,7 +119,7 @@ async function fetchMarket(mintAddress: string, ownerAddress?: string) {
   }
 
   let vaultTokenRaw = 0n;
-  if (curve) {
+  if (curve && fetchCurve) {
     const vaultBal = await conn
       .getTokenAccountBalance(curve.tokenVault, "confirmed")
       .catch(() => null);
@@ -142,20 +152,21 @@ async function fetchMarket(mintAddress: string, ownerAddress?: string) {
     }
   }
 
-  const bondingCurve: BondingCurveState | undefined = curve
-    ? {
-        reserveZug: 0n,
-        soldTokens: 0n,
-        virtualZugReserve: lamportsToWei(curve.virtualSolReserves),
-        virtualTokenReserve: tokenRawToWei(curve.virtualTokenReserves),
-        realTokenReserves: tokenRawToWei(curve.realTokenReserves),
-        realSolReserves: lamportsToWei(curve.realSolReserves),
-        complete: curve.complete !== 0,
-        vaultTokenReserves: tokenRawToWei(vaultTokenRaw),
-      }
-    : undefined;
+  const bondingCurve: BondingCurveState | undefined =
+    curve && fetchCurve
+      ? {
+          reserveZug: 0n,
+          soldTokens: 0n,
+          virtualZugReserve: lamportsToWei(curve.virtualSolReserves),
+          virtualTokenReserve: tokenRawToWei(curve.virtualTokenReserves),
+          realTokenReserves: tokenRawToWei(curve.realTokenReserves),
+          realSolReserves: lamportsToWei(curve.realSolReserves),
+          complete: curve.complete !== 0,
+          vaultTokenReserves: tokenRawToWei(vaultTokenRaw),
+        }
+      : undefined;
 
-  const graduated = (curve?.complete ?? 0) !== 0;
+  const graduated = fetchCurve ? (curve?.complete ?? 0) !== 0 : false;
   const paused = Boolean(
     (curve?.paused ?? 0) !== 0 || (global?.emergencyHalt ?? 0) !== 0
   );
@@ -215,17 +226,19 @@ async function fetchMarket(mintAddress: string, ownerAddress?: string) {
 export function useSolanaTradeMarket(
   mintAddress: string | undefined,
   ownerAddress: string | undefined,
-  enabled: boolean
+  enabled: boolean,
+  options?: SolanaTradeMarketOptions
 ): SolanaTradeMarket {
+  const fetchCurve = options?.fetchCurve !== false;
   const mintKey = addressCacheKey(mintAddress) ?? mintAddress;
   const ownerKey = addressCacheKey(ownerAddress) ?? ownerAddress;
 
   const query = useQuery({
-    queryKey: ["solana-trade-market", mintKey, ownerKey ?? ""],
-    queryFn: () => fetchMarket(mintKey!, ownerKey),
+    queryKey: ["solana-trade-market", mintKey, ownerKey ?? "", fetchCurve ? "curve" : "bal"],
+    queryFn: () => fetchMarket(mintKey!, ownerKey, fetchCurve),
     enabled: enabled && Boolean(mintKey),
-    refetchInterval: POLL_MS,
-    staleTime: 1_500,
+    refetchInterval: fetchCurve ? CURVE_POLL_MS : CURVE_POLL_WS_MS,
+    staleTime: fetchCurve ? 1_500 : 10_000,
     placeholderData: keepPreviousData,
   });
 

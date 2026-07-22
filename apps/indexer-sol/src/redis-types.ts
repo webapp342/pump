@@ -36,6 +36,11 @@ export type TradePublishPayload = {
     spotPriceZug?: string;
     lastPriceZug: string;
     progressBps: number;
+    /** Solana mode-switch: AMM phase (complete=1). */
+    graduated?: boolean;
+    curveComplete?: boolean;
+    /** Human whole tokens in vault ATA (for AMM quotes without UI RPC). */
+    vaultTokenReserve?: string;
     tradeCount: number;
     holderCount: number;
     volume24hZug?: string;

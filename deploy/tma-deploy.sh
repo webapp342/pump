@@ -89,7 +89,8 @@ for mig in \
   049_launchpad_wallet_address_normalize.sql \
   050_repair_solana_points_inventory_address.sql \
   051_claim_referral_invite_xp_solana.sql \
-  052_wipe_launchpad_app_data_comprehensive.sql
+  052_wipe_launchpad_app_data_comprehensive.sql \
+  053_tokens_graduated_bonding_complete.sql
 do
   MIG_PATH="$REPO_ROOT/db/migrations/$mig"
   if [[ -f "$MIG_PATH" ]]; then

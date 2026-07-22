@@ -168,11 +168,13 @@ export class SolanaEventHandlers {
           last_price_zug,
           virtual_zug_reserve,
           virtual_token_reserve,
+          vault_token_reserve,
           updated_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, now())
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, now())
         ON CONFLICT (token_address) DO UPDATE
         SET virtual_zug_reserve = EXCLUDED.virtual_zug_reserve,
             last_price_zug = COALESCE(NULLIF(bonding_states.last_price_zug, 0), EXCLUDED.last_price_zug),
+            vault_token_reserve = COALESCE(bonding_states.vault_token_reserve, EXCLUDED.vault_token_reserve),
             updated_at = now()
       `,
       [
@@ -182,6 +184,7 @@ export class SolanaEventHandlers {
         spot,
         lamportsToSol(virtualSol),
         tokenAmountToDecimal(virtualToken, decimals),
+        String(PUMP_FEEL_DEFAULTS.totalSupply / 10n ** BigInt(decimals)),
       ]
     );
 
@@ -334,6 +337,10 @@ export class SolanaEventHandlers {
 
         const tradeId = tradeIns.rows[0].id;
 
+        const tokenSoldHuman = tokenAmountToDecimal(soldTokens, decimals);
+        const tokenDeltaHuman = tokenAmountToDecimal(tokenAmount, decimals);
+        const tokenSoldNum = Number(tokenSoldHuman);
+
         await client.query(
           `
             UPDATE bonding_states
@@ -346,8 +353,17 @@ export class SolanaEventHandlers {
                     ELSE floor(($3::numeric / 793100000) * 10000)::integer
                   END
                 ),
-                last_price_zug = $4,
-                market_cap_zug = $5,
+                curve_complete = CASE
+                  WHEN $3::numeric >= 793100000 THEN true
+                  ELSE curve_complete
+                END,
+                vault_token_reserve = GREATEST(
+                  0,
+                  COALESCE(vault_token_reserve, 1000000000)
+                    + CASE WHEN $4 THEN -$5::numeric ELSE $5::numeric END
+                ),
+                last_price_zug = $6,
+                market_cap_zug = $7,
                 trade_count = trade_count + 1,
                 updated_at = now()
             WHERE token_address = $1
@@ -355,11 +371,32 @@ export class SolanaEventHandlers {
           [
             mint,
             lamportsToSol(reserveSol),
-            tokenAmountToDecimal(soldTokens, decimals),
+            tokenSoldHuman,
+            isBuy,
+            tokenDeltaHuman,
             markPrice,
             mcap,
           ]
         );
+
+        const progressBps = Math.min(
+          10000,
+          tokenSoldNum >= 793_100_000
+            ? 10000
+            : Math.floor((tokenSoldNum / 793_100_000) * 10000)
+        );
+        const isGraduated = progressBps >= 10000;
+
+        if (isGraduated) {
+          await client.query(
+            `
+              UPDATE tokens
+              SET status = 'GRADUATED', updated_at = now()
+              WHERE address = $1 AND status = 'BONDING'
+            `,
+            [mint]
+          );
+        }
 
         await this.updatePosition(
           client,
@@ -381,6 +418,8 @@ export class SolanaEventHandlers {
           trade_count: number;
           holder_count: number;
           progress_bps: number;
+          curve_complete: boolean;
+          vault_token_reserve: string | null;
         }>(
           `
             SELECT
@@ -388,7 +427,9 @@ export class SolanaEventHandlers {
               COALESCE(token_sold, 0)::text AS token_sold,
               COALESCE(trade_count, 0) AS trade_count,
               COALESCE(holder_count, 0) AS holder_count,
-              COALESCE(progress_bps, 0) AS progress_bps
+              COALESCE(progress_bps, 0) AS progress_bps,
+              COALESCE(curve_complete, false) AS curve_complete,
+              vault_token_reserve::text AS vault_token_reserve
             FROM bonding_states
             WHERE token_address = $1
           `,
@@ -396,10 +437,12 @@ export class SolanaEventHandlers {
         );
         const b = bonding.rows[0] ?? {
           reserve_zug: lamportsToSol(reserveSol),
-          token_sold: tokenAmountToDecimal(soldTokens, decimals),
+          token_sold: tokenSoldHuman,
           trade_count: 1,
           holder_count: 0,
-          progress_bps: 0,
+          progress_bps: isGraduated ? 10000 : progressBps,
+          curve_complete: isGraduated,
+          vault_token_reserve: null,
         };
 
         const grossSol = Number(lamportsToSol(solAmount));
@@ -477,6 +520,9 @@ export class SolanaEventHandlers {
           spotPriceZug: markPrice,
           lastPriceZug: markPrice,
           progressBps: inserted.bonding.progress_bps,
+          graduated: inserted.bonding.curve_complete,
+          curveComplete: inserted.bonding.curve_complete,
+          vaultTokenReserve: inserted.bonding.vault_token_reserve ?? undefined,
           tradeCount: inserted.bonding.trade_count,
           holderCount: inserted.bonding.holder_count,
           volume24hZug: boardExtra?.volume24hZug,

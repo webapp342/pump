@@ -15,6 +15,9 @@ export type ArenaTradeWsPayload = {
     lastPriceZug?: string;
     spotPriceZug?: string;
     progressBps?: number;
+    graduated?: boolean;
+    curveComplete?: boolean;
+    vaultTokenReserve?: string;
     tradeCount?: number;
     holderCount?: number;
     volume24hZug?: string;
@@ -98,6 +101,10 @@ export function patchTokenFromArenaTrade(
 
   return {
     ...token,
+    status:
+      bonding.graduated || bonding.curveComplete || (bonding.progressBps ?? 0) >= 10000
+        ? "GRADUATED"
+        : token.status,
     progressBps: bonding.progressBps ?? token.progressBps,
     reserveBnb: bonding.reserveZug ?? token.reserveBnb,
     marketCapBnb: nextMcap,

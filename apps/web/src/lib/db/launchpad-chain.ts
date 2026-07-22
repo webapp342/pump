@@ -1,4 +1,5 @@
 import { isSolanaChainFamily } from "@/config/chain-family";
+import { PUMP_FEEL_DEFAULTS } from "@/config/solana";
 import { SOLANA_DB_CHAIN_ID, resolveSolanaCluster } from "@pump/solana-sdk";
 
 /** Active launchpad chain_id for DB filters (Solana production). */
@@ -16,4 +17,5 @@ export function sqlChainFilter(tableAlias = "t"): string {
 }
 
 /** Solana virtual SOL reserve (human) for board-stats SQL fallbacks. */
-export const SOLANA_VIRTUAL_SOL_HUMAN = 30;
+export const SOLANA_VIRTUAL_SOL_HUMAN =
+  Number(PUMP_FEEL_DEFAULTS.virtualSolLamports) / 1e9;

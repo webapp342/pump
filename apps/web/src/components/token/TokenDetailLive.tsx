@@ -58,6 +58,7 @@ import { isSolanaChainFamily } from "@/config/chain-family";
 import { PUMP_FEEL_DEFAULTS } from "@/config/solana";
 import { usePumpWallet } from "@/components/wallet/PumpWalletProvider";
 import { useSolanaTradeMarket } from "@/hooks/useSolanaTradeMarket";
+import { solanaBondingStateFromLive } from "@/lib/solana/bonding-live";
 import { copyToClipboard } from "@/lib/copy-to-clipboard";
 import { TradePanel, type TradeConfirmedPayload, type TradeOptimisticPayload, type TradeSubmittedPayload } from "@/components/token/TradePanel";
 import { QuickTradeConfirmModal } from "@/components/token/QuickTradeConfirmModal";
@@ -312,7 +313,8 @@ export function TokenDetailLive({
   const solanaMarket = useSolanaTradeMarket(
     isSolanaLive ? streamAddress : undefined,
     isSolanaLive ? solanaAddress : undefined,
-    isSolanaLive
+    isSolanaLive,
+    { fetchCurve: false }
   );
   const { openConnectModal } = useOpenConnectModal();
   const queryClient = useQueryClient();
@@ -375,9 +377,26 @@ export function TokenDetailLive({
     },
   });
 
+  const solanaLiveBonding = useMemo(() => {
+    if (!isSolanaLive) return null;
+    const graduated =
+      token.status === "GRADUATED" ||
+      token.progressBps >= 10000 ||
+      latestWsBonding?.graduated === true ||
+      latestWsBonding?.curveComplete === true;
+    return solanaBondingStateFromLive({
+      reserveBnb: token.reserveBnb,
+      tokenSold: token.tokenSold ?? "0",
+      progressBps: latestWsBonding?.progressBps ?? token.progressBps,
+      status: graduated ? "GRADUATED" : token.status,
+      vaultTokenReserve: latestWsBonding?.vaultTokenReserve ?? null,
+      curveComplete: graduated,
+    });
+  }, [isSolanaLive, token, latestWsBonding]);
+
   const chainCurve = useMemo((): CurveTuple | undefined => {
     if (isSolanaLive) {
-      const curve = solanaMarket.bondingCurve;
+      const curve = solanaLiveBonding;
       if (!curve) return undefined;
       return [
         streamAddress as Address,
@@ -393,7 +412,7 @@ export function TokenDetailLive({
     return evmChainCurve as CurveTuple | undefined;
   }, [
     isSolanaLive,
-    solanaMarket.bondingCurve,
+    solanaLiveBonding,
     solanaMarket.paused,
     evmChainCurve,
     streamAddress,
@@ -431,11 +450,11 @@ export function TokenDetailLive({
 
   const tradeCurveSnapshot = liveCurveSnapshot ?? chainCurveSnapshot;
 
-  /** Sell-all quote for holder P/L — Solana needs on-chain real_sol_reserves. */
+  /** Sell-all quote for holder P/L — Solana uses WS/DB bonding snapshot (no curve RPC). */
   const holderCurveSnapshot = useMemo(() => {
     if (!tradeCurveSnapshot) return null;
     if (!isSolanaLive) return tradeCurveSnapshot;
-    const curve = solanaMarket.bondingCurve;
+    const curve = solanaLiveBonding;
     if (!curve) return tradeCurveSnapshot;
     return {
       ...tradeCurveSnapshot,
@@ -446,7 +465,7 @@ export function TokenDetailLive({
       complete: curve.complete,
       vaultTokenReserves: curve.vaultTokenReserves?.toString(),
     };
-  }, [tradeCurveSnapshot, isSolanaLive, solanaMarket.bondingCurve]);
+  }, [tradeCurveSnapshot, isSolanaLive, solanaLiveBonding]);
 
   const holderProtocolFeeBps = isSolanaLive
     ? (solanaMarket.protocolFeeBps ?? BigInt(PUMP_FEEL_DEFAULTS.protocolFeeBps))
@@ -548,6 +567,22 @@ export function TokenDetailLive({
       queueWsMessage(message);
     },
   });
+
+  const liveVaultTokenReserve = latestWsBonding?.vaultTokenReserve ?? null;
+  const liveGraduated =
+    liveToken.status === "GRADUATED" ||
+    liveToken.progressBps >= 10000 ||
+    latestWsBonding?.graduated === true ||
+    latestWsBonding?.curveComplete === true;
+
+  const solanaTradeLiveProps = isSolanaLive
+    ? {
+        progressBps: liveToken.progressBps,
+        graduated: liveGraduated,
+        vaultTokenReserve: liveVaultTokenReserve,
+        wsConnected,
+      }
+    : {};
 
   const schedulePoll = useCallback(() => {
     if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
@@ -1174,6 +1209,7 @@ export function TokenDetailLive({
               onTradeSubmitted={handleTradeSubmitted}
               onTradeConfirmed={handleTradeConfirmed}
               chainCurveSnapshot={tradeCurveSnapshot}
+              {...solanaTradeLiveProps}
             />
           </div>
           <CreatorRewardsCard
@@ -1193,6 +1229,7 @@ export function TokenDetailLive({
           ) : null}
           <TokenAnnouncementsPanel
             tokenAddress={streamAddress}
+            creatorAddress={liveToken.creatorAddress}
             refreshKey={announcementsRefreshKey}
             onOpenProfile={setProfileAddress}
             currentMarketCapBnb={liveMarketCapNative}
@@ -1213,6 +1250,7 @@ export function TokenDetailLive({
           reserveBnb={liveToken.reserveBnb}
           tokenSold={liveToken.tokenSold ?? "0"}
           chainCurveSnapshot={tradeCurveSnapshot}
+          {...solanaTradeLiveProps}
           onClose={clearQuickTradeRun}
           onFundingBlocked={handleQuickSubmitBlocked}
           onTradeOptimistic={handleTradeOptimistic}
@@ -1269,6 +1307,7 @@ export function TokenDetailLive({
         priceUsd={priceUsd}
         logoUrl={liveToken.logoUrl}
         persistTokenMobileTradePrefs
+        {...solanaTradeLiveProps}
       />
 
     </div>

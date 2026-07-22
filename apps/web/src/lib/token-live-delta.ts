@@ -95,6 +95,12 @@ export function patchTokenDetailFromWsTrade(
 
   return {
     ...token,
+    status:
+      bonding?.graduated ||
+      bonding?.curveComplete ||
+      (bonding?.progressBps ?? 0) >= 10000
+        ? "GRADUATED"
+        : token.status,
     reserveBnb: bonding?.reserveZug ?? token.reserveBnb,
     tokenSold: bonding?.tokenSold ?? token.tokenSold,
     progressBps: bonding?.progressBps ?? token.progressBps,

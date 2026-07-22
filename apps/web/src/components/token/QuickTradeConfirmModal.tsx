@@ -25,6 +25,10 @@ type QuickTradeConfirmModalProps = {
   reserveBnb?: string;
   tokenSold?: string;
   chainCurveSnapshot?: BondingCurveSnapshot;
+  progressBps?: number;
+  graduated?: boolean;
+  vaultTokenReserve?: string | null;
+  wsConnected?: boolean;
   onTradeOptimistic?: (payload: TradeOptimisticPayload) => void;
   onTradeOptimisticRollback?: (payload: { pendingId: string }) => void;
   onTradeSubmitted?: (payload: TradeSubmittedPayload) => void;
@@ -41,6 +45,10 @@ export function QuickTradeConfirmModal({
   reserveBnb,
   tokenSold,
   chainCurveSnapshot,
+  progressBps,
+  graduated,
+  vaultTokenReserve,
+  wsConnected,
   onTradeOptimistic,
   onTradeOptimisticRollback,
   onTradeSubmitted,
@@ -55,6 +63,10 @@ export function QuickTradeConfirmModal({
       reserveBnb={reserveBnb}
       tokenSold={tokenSold}
       chainCurveSnapshot={chainCurveSnapshot}
+      progressBps={progressBps}
+      graduated={graduated}
+      vaultTokenReserve={vaultTokenReserve}
+      wsConnected={wsConnected}
       prefill={target.prefill}
       overrideTokenBalanceWei={
         target.prefill.side === "sell" ? target.tokenBalanceWei : undefined

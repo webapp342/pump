@@ -95,6 +95,10 @@ import { useSolanaTradeMarket } from "@/hooks/useSolanaTradeMarket";
 import { useSolanaNativeBalance } from "@/hooks/useSolanaNativeBalance";
 import { silentBuy, silentSell } from "@/lib/solana/silent-trade";
 import {
+  isTokenGraduatedLive,
+  solanaBondingStateFromLive,
+} from "@/lib/solana/bonding-live";
+import {
   lamportsToWei,
   solanaBuyPrefundWei,
   solanaSellPrefundWei,
@@ -182,7 +186,14 @@ type TradePanelProps = {
   onTradeOptimisticRollback?: (payload: { pendingId: string }) => void;
   onTradeSubmitted?: (payload: TradeSubmittedPayload) => void;
   onTradeConfirmed?: (payload: TradeConfirmedPayload) => void;
-  /** Live curve snapshot from token page — keeps quotes in sync with chart polling. */
+  /** Live bonding progress 0–10000 (WS/DB — no curve RPC). */
+  progressBps?: number;
+  /** Graduated / AMM phase from WS or DB status. */
+  graduated?: boolean;
+  /** Vault token balance human units (indexer WS). */
+  vaultTokenReserve?: string | null;
+  /** When true, TradePanel skips 4s curve RPC poll. */
+  wsConnected?: boolean;
   chainCurveSnapshot?: BondingCurveSnapshot;
   /** Mobile trade sheet — 24h price change for Quick Order header. */
   changePct?: number | null;
@@ -389,6 +400,10 @@ export function TradePanel({
   onTradeOptimisticRollback,
   onTradeSubmitted,
   onTradeConfirmed,
+  progressBps: progressBpsProp,
+  graduated: graduatedProp,
+  vaultTokenReserve = null,
+  wsConnected = false,
   chainCurveSnapshot,
   changePct = null,
   priceUsd = null,
@@ -550,7 +565,8 @@ export function TradePanel({
   const solanaMarket = useSolanaTradeMarket(
     isSolanaTrade ? (tokenAddress as string) : undefined,
     isSolanaTrade ? solanaAddress : undefined,
-    isSolanaTrade
+    isSolanaTrade,
+    { fetchCurve: !wsConnected }
   );
   const { data: solLamports, refetch: refetchSolBalance } = useSolanaNativeBalance(
     isSolanaTrade ? solanaAddress : undefined
@@ -574,7 +590,45 @@ export function TradePanel({
     ? solanaMarket.paused || status === "PAUSED"
     : (chainCurveSnapshot?.paused ?? localCurveState?.[7] ?? status === "PAUSED");
 
-  const solanaGraduated = isSolanaTrade && solanaMarket.graduated;
+  const solanaGraduated = isSolanaTrade
+    ? (graduatedProp ??
+      (isTokenGraduatedLive(status, progressBpsProp ?? 0) || solanaMarket.graduated))
+    : false;
+
+  const liveSolanaBondingCurve = useMemo(() => {
+    if (!isSolanaTrade) return null;
+    return solanaBondingStateFromLive({
+      reserveBnb: reserveBnb ?? "0",
+      tokenSold: tokenSold ?? "0",
+      progressBps: progressBpsProp ?? 0,
+      status,
+      vaultTokenReserve,
+      curveComplete: graduatedProp,
+    });
+  }, [
+    isSolanaTrade,
+    progressBpsProp,
+    reserveBnb,
+    tokenSold,
+    status,
+    vaultTokenReserve,
+    graduatedProp,
+  ]);
+
+  const solanaBondingProgress = useMemo(() => {
+    if (!isSolanaTrade || solanaGraduated) return null;
+    const bps = progressBpsProp ?? 0;
+    const pct = bps / 100;
+    const soldHuman = Number(tokenSold ?? 0);
+    return {
+      pct,
+      soldLabel: formatTokenAmountCompact(
+        Number.isFinite(soldHuman) ? parseUnits(String(soldHuman), 18) : 0n,
+        18
+      ),
+      solInCurve: parseUnits(reserveBnb ?? "0", 18),
+    };
+  }, [isSolanaTrade, solanaGraduated, progressBpsProp, tokenSold, reserveBnb]);
 
   const dbCurveSnapshot = useMemo(() => {
     if (!reserveBnb && !tokenSold) return null;
@@ -583,6 +637,7 @@ export function TradePanel({
 
   const bondingCurve = useMemo(() => {
     if (isSolanaTrade) {
+      if (liveSolanaBondingCurve) return liveSolanaBondingCurve;
       if (solanaMarket.bondingCurve) return solanaMarket.bondingCurve;
       if (chainCurveSnapshot && !isEmptyCurveSnapshot(chainCurveSnapshot)) {
         return bondingCurveFromSnapshot(chainCurveSnapshot);
@@ -604,25 +659,12 @@ export function TradePanel({
     return null;
   }, [
     isSolanaTrade,
+    liveSolanaBondingCurve,
     solanaMarket.bondingCurve,
     chainCurveSnapshot,
     localCurveState,
     dbCurveSnapshot,
   ]);
-
-  const solanaBondingProgress = useMemo(() => {
-    if (!isSolanaTrade || solanaGraduated || !bondingCurve) return null;
-    const initialReal = tokenRawToWei(PUMP_FEEL_DEFAULTS.realTokenReserves);
-    const remaining = bondingCurve.realTokenReserves ?? initialReal;
-    const sold = initialReal > remaining ? initialReal - remaining : 0n;
-    const pct =
-      initialReal > 0n ? Number((sold * 10000n) / initialReal) / 100 : 0;
-    return {
-      pct,
-      soldLabel: formatTokenAmountCompact(sold, 18),
-      solInCurve: bondingCurve.realSolReserves ?? 0n,
-    };
-  }, [isSolanaTrade, solanaGraduated, bondingCurve]);
 
   const { data: evmProtocolFeeBps } = useReadContract({
     address: contracts.bondingCurveManager,

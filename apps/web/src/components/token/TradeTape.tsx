@@ -572,6 +572,7 @@ export function TradeTape({
         {tab === "social" ? (
           <TokenAnnouncementsPanel
             tokenAddress={tokenAddress}
+            creatorAddress={creatorAddress}
             refreshKey={announcementsRefreshKey}
             onOpenProfile={onAddressClick}
             variant="tape"

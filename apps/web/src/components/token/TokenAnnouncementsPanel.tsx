@@ -6,7 +6,8 @@ import { useActiveWalletAddress } from "@/hooks/useActiveWalletAddress";
 import { UserAvatarForAddress } from "@/components/user/UserAvatarForAddress";
 import { UserDisplayName } from "@/components/user/UserDisplayName";
 import { useCreatorFollows } from "@/components/creators/CreatorFollowsProvider";
-import { PumpIcon, faFollowAdd, faUnfollowPeople } from "@/lib/icons";
+import { PumpIcon, faFollowAdd, faUnfollowPeople, faWellness } from "@/lib/icons";
+import { routeAddressKeysEqual } from "@/lib/address";
 import {
   liveCalloutMultiplierX,
   type TokenAnnouncementRow,
@@ -22,8 +23,22 @@ function formatMultiplierX(value: number | null | undefined): string {
   return `${value.toFixed(2)}x`;
 }
 
+function CreatorBadge() {
+  return (
+    <span
+      className="token-tape-creator-icon inline-flex shrink-0 items-center justify-center text-pump-accent"
+      title="Creator"
+      aria-label="Creator"
+    >
+      <PumpIcon icon={faWellness} className="token-tape-creator-icon__glyph" aria-hidden />
+    </span>
+  );
+}
+
 type TokenAnnouncementsPanelProps = {
   tokenAddress: string;
+  /** Token creator — show wellness icon when announcer matches. */
+  creatorAddress?: string | null;
   refreshKey?: number;
   onOpenProfile?: (address: string) => void;
   /** aside = desktop callout card; tape = Social / About feed (no nested panel). */
@@ -35,6 +50,7 @@ type TokenAnnouncementsPanelProps = {
 
 export function TokenAnnouncementsPanel({
   tokenAddress,
+  creatorAddress = null,
   refreshKey = 0,
   onOpenProfile,
   variant = "aside",
@@ -107,6 +123,9 @@ export function TokenAnnouncementsPanel({
             const isSelf = Boolean(self) && self === announcer;
             const following = isFollowing(item.announcerAddress);
             const xLabel = liveX != null ? formatMultiplierX(liveX) : null;
+            const isCreator = Boolean(
+              creatorAddress && routeAddressKeysEqual(item.announcerAddress, creatorAddress)
+            );
 
             const identity = (
               <>
@@ -124,6 +143,7 @@ export function TokenAnnouncementsPanel({
                         compact
                       />
                     </span>
+                    {isCreator ? <CreatorBadge /> : null}
                     <span className="token-announcements-panel__chips">
                       <span
                         className={`token-announcements-panel__badge${

@@ -38,6 +38,10 @@ type TradeSheetProps = {
   presentation?: "sheet" | "modal";
   /** Save token-page dock buy/sell prefs when the mobile sheet closes. */
   persistTokenMobileTradePrefs?: boolean;
+  progressBps?: number;
+  graduated?: boolean;
+  vaultTokenReserve?: string | null;
+  wsConnected?: boolean;
 };
 
 export function TradeSheet({
@@ -60,6 +64,10 @@ export function TradeSheet({
   onOpenMarket,
   presentation = "sheet",
   persistTokenMobileTradePrefs = false,
+  progressBps,
+  graduated,
+  vaultTokenReserve,
+  wsConnected,
 }: TradeSheetProps) {
   const [mounted, setMounted] = useState(false);
   const isModal = presentation === "modal";
@@ -162,6 +170,10 @@ export function TradeSheet({
               onOpenMarket={onOpenMarket}
               sheetOnClose={isModal ? undefined : handleClose}
               persistTokenMobileTradePrefs={persistTokenMobileTradePrefs}
+              progressBps={progressBps}
+              graduated={graduated}
+              vaultTokenReserve={vaultTokenReserve}
+              wsConnected={wsConnected}
             />
           </div>
         </div>

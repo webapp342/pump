@@ -14,10 +14,13 @@ import {
 } from "@/lib/token-announcements-shared";
 import { attachAddressDisplayNames } from "@/lib/user-display";
 import { resolveDisplayUsername } from "@/lib/username";
+import {
+  SOLANA_VIRTUAL_SOL_HUMAN,
+} from "@/lib/db/launchpad-chain";
+import { PUMP_FEEL_DEFAULTS } from "@/config/solana";
 
-/** Solana pump.fun-feel virtuals (human): 30 SOL / 1.073B tokens. */
-const SOLANA_VIRTUAL_SOL_HUMAN = 30;
-const SOLANA_VIRTUAL_TOKEN_HUMAN = 1_073_000_000;
+/** Solana pump.fun-feel virtual token reserve (human whole tokens). */
+const SOLANA_VIRTUAL_TOKEN_HUMAN = Number(PUMP_FEEL_DEFAULTS.virtualTokenReserves);
 
 export {
   ANNOUNCE_COOLDOWN_MS,
