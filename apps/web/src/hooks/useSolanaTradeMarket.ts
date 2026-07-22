@@ -41,6 +41,8 @@ export type SolanaTradeMarket = {
   bondingCurve: BondingCurveState | undefined;
   protocolFeeBps: bigint | undefined;
   paused: boolean;
+  /** complete=1 — AMM phase; trading stays open. */
+  graduated: boolean;
   solBalanceWei: bigint | undefined;
   tokenBalanceWei: bigint | undefined;
   /** False when first buy must create the trader ATA (~0.002 SOL rent). */
@@ -106,6 +108,14 @@ async function fetchMarket(mintAddress: string, ownerAddress?: string) {
     curve = null;
   }
 
+  let vaultTokenRaw = 0n;
+  if (curve) {
+    const vaultBal = await conn
+      .getTokenAccountBalance(curve.tokenVault, "confirmed")
+      .catch(() => null);
+    vaultTokenRaw = vaultBal?.value?.amount ? BigInt(vaultBal.value.amount) : 0n;
+  }
+
   let creatorFeesPdaExists: boolean | undefined;
   if (curve) {
     const [feesPda] = pdaCreatorFees(curve.creator);
@@ -134,21 +144,20 @@ async function fetchMarket(mintAddress: string, ownerAddress?: string) {
 
   const bondingCurve: BondingCurveState | undefined = curve
     ? {
-        // pump.fun: quotes use virtual reserves only (real is folded into virtual on each trade).
-        // Keep reserveZug/soldTokens at 0 so EVM-style quoteBuy (x0=v+r, y0=v-s) == pump.fun.
         reserveZug: 0n,
         soldTokens: 0n,
         virtualZugReserve: lamportsToWei(curve.virtualSolReserves),
         virtualTokenReserve: tokenRawToWei(curve.virtualTokenReserves),
         realTokenReserves: tokenRawToWei(curve.realTokenReserves),
         realSolReserves: lamportsToWei(curve.realSolReserves),
+        complete: curve.complete !== 0,
+        vaultTokenReserves: tokenRawToWei(vaultTokenRaw),
       }
     : undefined;
 
+  const graduated = (curve?.complete ?? 0) !== 0;
   const paused = Boolean(
-    (curve?.paused ?? 0) !== 0 ||
-      (curve?.complete ?? 0) !== 0 ||
-      (global?.emergencyHalt ?? 0) !== 0
+    (curve?.paused ?? 0) !== 0 || (global?.emergencyHalt ?? 0) !== 0
   );
 
   let buyTxFeeLamports: bigint | undefined;
@@ -189,6 +198,7 @@ async function fetchMarket(mintAddress: string, ownerAddress?: string) {
     protocolFeeBps:
       global?.protocolFeeBps ?? BigInt(PUMP_FEEL_DEFAULTS.protocolFeeBps),
     paused,
+    graduated,
     solBalanceWei:
       solLamports != null ? lamportsToWei(BigInt(solLamports)) : undefined,
     tokenBalanceWei:
@@ -227,6 +237,7 @@ export function useSolanaTradeMarket(
     bondingCurve: query.data?.bondingCurve,
     protocolFeeBps: query.data?.protocolFeeBps,
     paused: query.data?.paused ?? false,
+    graduated: query.data?.graduated ?? false,
     solBalanceWei: query.data?.solBalanceWei,
     tokenBalanceWei: query.data?.tokenBalanceWei,
     traderAtaExists: query.data?.traderAtaExists,

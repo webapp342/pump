@@ -88,7 +88,7 @@ export function programId(key: ProgramIdKey, override?: string | null): string {
 }
 
 /**
- * Pump.fun bonding-curve parity (no graduation).
+ * Pump.fun bonding-curve parity + **AMM mode** when `complete=1` (real reserves).
  * Official Global reserves: https://github.com/pump-fun/pump-public-docs
  * Fees: our protocol/creator/referral split (not pump.fun fee recipients).
  */
@@ -96,8 +96,8 @@ export const PUMP_FEEL_DEFAULTS = {
   tokenDecimals: 6,
   /** 1B tokens @ 6 decimals — minted into vault. */
   totalSupply: 1_000_000_000_000_000n,
-  /** pump.fun initial_virtual_sol_reserves */
-  virtualSolLamports: 30_000_000_000n,
+  /** Test: ~14 SOL net to complete (prod: use 30_000_000_000n). */
+  virtualSolLamports: 5_000_000_000n,
   /** pump.fun initial_virtual_token_reserves (1.073B raw) */
   virtualTokenReserves: 1_073_000_000_000_000n,
   /** pump.fun initial_real_token_reserves (793.1M raw) — sellable on curve */

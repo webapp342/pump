@@ -116,6 +116,7 @@ import {
   resolveBnbInForTokenOut,
   resolveTokenInForBnbOut,
   SLIPPAGE_BPS,
+  formatTokenAmountCompact,
   type BondingCurveSnapshot,
 } from "@/lib/bonding-curve";
 import { formatTradeError } from "@/lib/trade-errors";
@@ -572,6 +573,8 @@ export function TradePanel({
     ? solanaMarket.paused || status === "PAUSED"
     : (chainCurveSnapshot?.paused ?? localCurveState?.[7] ?? status === "PAUSED");
 
+  const solanaGraduated = isSolanaTrade && solanaMarket.graduated;
+
   const dbCurveSnapshot = useMemo(() => {
     if (!reserveBnb && !tokenSold) return null;
     return machineFromTokenReserves(reserveBnb ?? "0", tokenSold, paused).snapshot;
@@ -605,6 +608,20 @@ export function TradePanel({
     localCurveState,
     dbCurveSnapshot,
   ]);
+
+  const solanaBondingProgress = useMemo(() => {
+    if (!isSolanaTrade || solanaGraduated || !bondingCurve) return null;
+    const initialReal = tokenRawToWei(PUMP_FEEL_DEFAULTS.realTokenReserves);
+    const remaining = bondingCurve.realTokenReserves ?? initialReal;
+    const sold = initialReal > remaining ? initialReal - remaining : 0n;
+    const pct =
+      initialReal > 0n ? Number((sold * 10000n) / initialReal) / 100 : 0;
+    return {
+      pct,
+      soldLabel: formatTokenAmountCompact(sold, 18),
+      solInCurve: bondingCurve.realSolReserves ?? 0n,
+    };
+  }, [isSolanaTrade, solanaGraduated, bondingCurve]);
 
   const { data: evmProtocolFeeBps } = useReadContract({
     address: contracts.bondingCurveManager,
@@ -2997,6 +3014,40 @@ export function TradePanel({
 
         {paused ? (
           <p className="notice-warning mx-4 mt-2 text-caption">Trading is paused on this curve.</p>
+        ) : null}
+
+        {solanaGraduated ? (
+          <div className="mx-4 mt-2 flex flex-wrap items-center gap-2">
+            <span className="chip-button chip-button-active px-2.5 py-1 text-caption text-pump-accent">
+              Graduated
+            </span>
+            <span className="text-caption text-pump-muted">AMM · buy and sell open</span>
+          </div>
+        ) : null}
+
+        {solanaBondingProgress ? (
+          <div className="mx-4 mt-2">
+            <div className="mb-1 flex items-center justify-between gap-2 text-caption text-pump-muted">
+              <span>Bonding · {solanaBondingProgress.soldLabel} sold</span>
+              <span className="financial-value shrink-0">
+                {solanaBondingProgress.pct.toFixed(1)}%
+              </span>
+            </div>
+            <div className="progress-track" role="progressbar" aria-valuenow={solanaBondingProgress.pct} aria-valuemin={0} aria-valuemax={100}>
+              <div
+                className="progress-fill"
+                style={{ width: `${Math.min(100, solanaBondingProgress.pct)}%` }}
+              />
+            </div>
+            {solanaBondingProgress.solInCurve > 0n ? (
+              <p className="mt-1 text-caption text-pump-muted">
+                <span className="financial-value">
+                  {formatEther(solanaBondingProgress.solInCurve)}
+                </span>{" "}
+                {NATIVE_SYMBOL} in curve
+              </p>
+            ) : null}
+          </div>
         ) : null}
 
         <div className={useCustomAmountNumpad ? "trade-panel-mobile-numpad-scroll" : undefined}>

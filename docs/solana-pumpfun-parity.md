@@ -2,7 +2,7 @@
 
 Target: **pump.fun bonding-curve math** (create + buy/sell), with intentional differences:
 
-- **No graduation** (`complete` never set; no `migrate`)
+- **Mode-switch graduation** (`complete=1` → in-program AMM on real reserves; **no** PumpSwap `migrate`)
 - **Fee / treasury model = Base Sepolia `BondingCurveManager`** (not pump.fun fee program)
 
 Sources:
@@ -14,7 +14,7 @@ Sources:
 
 | Concern | pump.fun | Pump TMA (Solana) |
 |---|---|---|
-| Graduation / migrate to AMM | Yes (PumpAMM) | **No** — permanent curve until real tokens depleted |
+| Graduation / migrate to AMM | Yes (PumpAMM + `migrate`) | **Mode-switch** — same `buy`/`sell`; `complete=1` = CPMM on `real_sol × vault` |
 | SOL custody | Per-curve | **One shared `vault` PDA** (Base manager balance) |
 | Protocol fee | Dynamic / fee program | Immediate → `protocol-treasury` PDA |
 | Creator / referrer fee | Their fee program | **Pending PDAs + claim** (Base `pendingCreatorFees` / `claim*`) |
@@ -41,7 +41,7 @@ Sources:
 **Bonding curve** (PDA `["curve", mint]`):
 
 - Virtual/real reserves accounting only (SOL does **not** live on curve)  
-- `complete` = always 0  
+- `complete=0` bonding → `complete=1` AMM (one-way flip when `real_token_reserves == 0`)  
 
 **Pending fees** (PDA `["creator-fees", owner]` / `["referrer-fees", owner]`):
 
@@ -69,6 +69,17 @@ On each trade, **both** virtual and real reserves move by the same amounts (pump
 - Buy: `(sol_in, min_token_out)` — fee from SOL, net into **liquidity**, tokens from vault  
 - Sell: `(token_in, min_sol_out)` — tokens to vault, SOL out from **liquidity** after fee  
 - Fee split: creator/referrer **accrue pending**; protocol → treasury immediately  
+
+### AMM phase (`complete=1`)
+
+Same IX tags; math switches to Uniswap V2 CPMM on **`real_sol_reserves × vault ATA balance`**:
+
+```
+buy:  tokens = netSol * vaultTokens / (realSol + netSol)
+sell: grossSol = tokens * realSol / (vaultTokens + tokens)
+```
+
+Virtual reserves are frozen after flip; spot = `realSol / vaultTokens`.
 
 ## Deploy after this upgrade
 

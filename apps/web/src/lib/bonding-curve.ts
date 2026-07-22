@@ -505,10 +505,14 @@ export type BondingCurveState = {
   soldTokens: bigint;
   virtualZugReserve: bigint;
   virtualTokenReserve: bigint;
-  /** pump.fun real_token_reserves — caps buy output (Solana). */
+  /** pump.fun real_token_reserves — caps buy output (Solana bonding). */
   realTokenReserves?: bigint;
-  /** pump.fun real_sol_reserves — caps sell output (Solana). */
+  /** pump.fun real_sol_reserves — AMM quote side + bonding sell cap (Solana). */
   realSolReserves?: bigint;
+  /** Solana: complete=1 → AMM on real_sol × vault. */
+  complete?: boolean;
+  /** Solana AMM: vault ATA balance (18-dec wei scale). */
+  vaultTokenReserves?: bigint;
 };
 
 /** JSON-safe curve fields for passing between client components. */
@@ -520,6 +524,8 @@ export type BondingCurveSnapshot = {
   paused: boolean;
   realTokenReserves?: string;
   realSolReserves?: string;
+  complete?: boolean;
+  vaultTokenReserves?: string;
 };
 
 export function bondingCurveFromSnapshot(snapshot: BondingCurveSnapshot): BondingCurveState {
@@ -532,7 +538,80 @@ export function bondingCurveFromSnapshot(snapshot: BondingCurveSnapshot): Bondin
       snapshot.realTokenReserves != null ? BigInt(snapshot.realTokenReserves) : undefined,
     realSolReserves:
       snapshot.realSolReserves != null ? BigInt(snapshot.realSolReserves) : undefined,
+    complete: snapshot.complete,
+    vaultTokenReserves:
+      snapshot.vaultTokenReserves != null ? BigInt(snapshot.vaultTokenReserves) : undefined,
   };
+}
+
+export function isAmmPhase(curve: BondingCurveState): boolean {
+  return curve.complete === true;
+}
+
+function feeFromGross(gross: bigint, protocolFeeBps: bigint): bigint {
+  return (gross * protocolFeeBps) / BPS;
+}
+
+function grossFromNet(net: bigint, protocolFeeBps: bigint): bigint | null {
+  if (net <= 0n) return null;
+  const num = BPS - protocolFeeBps;
+  if (num <= 0n) return null;
+  return (net * BPS + num - 1n) / num;
+}
+
+function netFromTokenOutBonding(
+  tokenOut: bigint,
+  virtualZugReserve: bigint,
+  virtualTokenReserve: bigint
+): bigint | null {
+  if (tokenOut <= 0n || virtualTokenReserve <= tokenOut) return null;
+  return (tokenOut * virtualZugReserve) / (virtualTokenReserve - tokenOut);
+}
+
+/** AMM buy: real SOL × vault tokens (matches programs/pump-launchpad math.rs). */
+export function quoteAmmBuyFromCurveState(
+  curve: BondingCurveState,
+  protocolFeeBps: bigint,
+  zugIn: bigint
+): { tokenOut: bigint; feeZug: bigint } {
+  if (zugIn <= 0n) return { tokenOut: 0n, feeZug: 0n };
+  const quote = curve.realSolReserves ?? 0n;
+  const base = curve.vaultTokenReserves ?? 0n;
+  if (quote === 0n || base === 0n) return { tokenOut: 0n, feeZug: 0n };
+
+  const feeZug = feeFromGross(zugIn, protocolFeeBps);
+  const netZug = zugIn - feeZug;
+  if (netZug <= 0n) return { tokenOut: 0n, feeZug: 0n };
+
+  const tokenOut = (netZug * base) / (quote + netZug);
+  if (tokenOut <= 0n || tokenOut > base) return { tokenOut: 0n, feeZug: 0n };
+  return { tokenOut, feeZug };
+}
+
+/** AMM sell: real SOL × vault tokens. */
+export function quoteAmmSellFromCurveState(
+  curve: BondingCurveState,
+  protocolFeeBps: bigint,
+  tokenIn: bigint
+): { ethOut: bigint; feeZug: bigint } {
+  if (tokenIn <= 0n) return { ethOut: 0n, feeZug: 0n };
+  const quote = curve.realSolReserves ?? 0n;
+  const base = curve.vaultTokenReserves ?? 0n;
+  if (quote === 0n || base === 0n) return { ethOut: 0n, feeZug: 0n };
+
+  let grossZugOut = (tokenIn * quote) / (base + tokenIn);
+  if (grossZugOut > quote) grossZugOut = quote;
+  if (grossZugOut <= 0n) return { ethOut: 0n, feeZug: 0n };
+
+  const feeZug = feeFromGross(grossZugOut, protocolFeeBps);
+  return { ethOut: grossZugOut - feeZug, feeZug };
+}
+
+export function spotPriceAmmFromCurveState(curve: BondingCurveState): number {
+  const quote = curve.realSolReserves ?? 0n;
+  const base = curve.vaultTokenReserves ?? 0n;
+  if (quote === 0n || base === 0n) return 0;
+  return Number(quote) / Number(base);
 }
 
 export function bondingCurveSnapshotFromTuple(
@@ -566,19 +645,39 @@ export function quoteBuyFromCurveState(
   zugIn: bigint
 ): { tokenOut: bigint; feeZug: bigint } {
   if (zugIn <= 0n) return { tokenOut: 0n, feeZug: 0n };
+  if (isAmmPhase(curve)) {
+    return quoteAmmBuyFromCurveState(curve, protocolFeeBps, zugIn);
+  }
 
-  const feeZug = (zugIn * protocolFeeBps) / BPS;
-  const netZug = zugIn - feeZug;
+  let feeZug = feeFromGross(zugIn, protocolFeeBps);
+  let netZug = zugIn - feeZug;
   const x0 = curve.virtualZugReserve + curve.reserveZug;
   const y0 = curve.virtualTokenReserve - curve.soldTokens;
-  if (y0 === 0n) return { tokenOut: 0n, feeZug };
-
-  const k = x0 * y0;
-  const y1 = k / (x0 + netZug);
-  let tokenOut = y0 - y1;
-  if (curve.realTokenReserves != null && tokenOut > curve.realTokenReserves) {
-    tokenOut = curve.realTokenReserves;
+  if (y0 === 0n) return { tokenOut: 0n, feeZug: 0n };
+  if (curve.realTokenReserves != null && curve.realTokenReserves <= 0n) {
+    return { tokenOut: 0n, feeZug: 0n };
   }
+
+  const uncapped = (netZug * y0) / (x0 + netZug);
+  if (uncapped <= 0n) return { tokenOut: 0n, feeZug: 0n };
+
+  let tokenOut =
+    curve.realTokenReserves != null
+      ? uncapped > curve.realTokenReserves
+        ? curve.realTokenReserves
+        : uncapped
+      : uncapped;
+
+  if (tokenOut < uncapped && curve.realTokenReserves != null) {
+    const net = netFromTokenOutBonding(tokenOut, x0, y0);
+    if (net == null) return { tokenOut: 0n, feeZug: 0n };
+    const gross = grossFromNet(net, protocolFeeBps);
+    if (gross == null) return { tokenOut: 0n, feeZug: 0n };
+    feeZug = gross - net;
+    netZug = net;
+    if (gross > zugIn) return { tokenOut: 0n, feeZug: 0n };
+  }
+
   return { tokenOut, feeZug };
 }
 
@@ -589,6 +688,9 @@ export function quoteSellFromCurveState(
   tokenIn: bigint
 ): { ethOut: bigint; feeZug: bigint } {
   if (tokenIn <= 0n) return { ethOut: 0n, feeZug: 0n };
+  if (isAmmPhase(curve)) {
+    return quoteAmmSellFromCurveState(curve, protocolFeeBps, tokenIn);
+  }
 
   const pumpFeel = curve.realSolReserves != null;
   const x0 = pumpFeel
@@ -619,6 +721,14 @@ export function resolveBnbInForTokenOut(
   targetTokenOut: bigint
 ): bigint | null {
   if (targetTokenOut <= 0n) return null;
+  if (isAmmPhase(curve)) {
+    const quote = curve.realSolReserves ?? 0n;
+    const base = curve.vaultTokenReserves ?? 0n;
+    if (quote === 0n || base === 0n || targetTokenOut >= base) return null;
+    const net = (targetTokenOut * quote) / (base - targetTokenOut);
+    if (net <= 0n) return null;
+    return grossFromNet(net, protocolFeeBps);
+  }
 
   const x0 = curve.virtualZugReserve + curve.reserveZug;
   const y0 = curve.virtualTokenReserve - curve.soldTokens;
@@ -652,6 +762,27 @@ export function resolveTokenInForBnbOut(
   targetZugOut: bigint
 ): bigint | null {
   if (targetZugOut <= 0n) return null;
+  if (isAmmPhase(curve)) {
+    const quote = curve.realSolReserves ?? 0n;
+    const base = curve.vaultTokenReserves ?? 0n;
+    if (quote === 0n || base === 0n) return null;
+
+    const feeMultiplier = BPS - protocolFeeBps;
+    if (feeMultiplier <= 0n) return null;
+    let grossNeeded = (targetZugOut * BPS + feeMultiplier - 1n) / feeMultiplier;
+    if (grossNeeded > quote) grossNeeded = quote;
+    if (grossNeeded <= 0n) return null;
+
+    let tokenIn = (grossNeeded * base) / (quote - grossNeeded);
+    if (tokenIn <= 0n) return null;
+
+    for (let i = 0; i < 8; i++) {
+      const { ethOut } = quoteAmmSellFromCurveState(curve, protocolFeeBps, tokenIn);
+      if (ethOut >= targetZugOut) return tokenIn;
+      tokenIn += 1n;
+    }
+    return null;
+  }
 
   const pumpFeel = curve.realSolReserves != null;
   const x0 = pumpFeel

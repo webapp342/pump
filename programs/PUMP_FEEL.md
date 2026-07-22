@@ -10,12 +10,12 @@ Official pump.fun reference:
 
 | Param | Value | Notes |
 |-------|-------|--------|
-| Virtual SOL | 30 SOL | `initial_virtual_sol_reserves` |
+| Virtual SOL | 5 SOL (test) | `initial_virtual_sol_reserves` — prod: 30 SOL |
 | Virtual tokens | 1.073B raw @ 6dp | `initial_virtual_token_reserves` |
 | Real tokens (sellable) | 793.1M raw | `initial_real_token_reserves` |
 | Total supply (minted to vault) | 1B raw | `token_total_supply` |
 | Math | Uniswap V2 on **virtual** reserves | Buy capped by **real** token reserves |
-| Graduation | **None** | `complete` never set; no `migrate` |
+| Graduation | **Mode-switch** | `complete=1` → AMM on `real_sol × vault`; same `buy`/`sell` IX |
 
 ## Liquidity + fees (Base Sepolia BondingCurveManager parity)
 

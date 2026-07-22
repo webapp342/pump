@@ -443,6 +443,8 @@ export function TokenDetailLive({
       soldTokens: "0",
       realTokenReserves: curve.realTokenReserves?.toString(),
       realSolReserves: curve.realSolReserves?.toString(),
+      complete: curve.complete,
+      vaultTokenReserves: curve.vaultTokenReserves?.toString(),
     };
   }, [tradeCurveSnapshot, isSolanaLive, solanaMarket.bondingCurve]);
 

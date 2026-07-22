@@ -3,7 +3,7 @@
 //! Pump launchpad — Pinocchio (low rent + low CU).
 //! Program ID: `Hwv85kSodkR34rBTE1J67aSzixnAkXdAX6HzZnKDCvus`
 //!
-//! Bonding-curve math: pump.fun virtual+real reserves (**no graduation**).
+//! Bonding-curve math: pump.fun virtual+real reserves; **complete=1 → AMM** on real reserves.
 //! Fee / treasury / claim / emergency: **Base BondingCurveManager parity**
 //!   — all SOL liquidity in one `liquidity` PDA (`address(this)` analogue)
 //!   — creator/referrer fees accrue in pending PDAs (claim required)
@@ -552,6 +552,33 @@ fn process_create_meme(
     Ok(())
 }
 
+fn read_spl_token_amount(account: &AccountInfo) -> Result<u64, ProgramError> {
+    let data = account.try_borrow_data()?;
+    if data.len() < 72 {
+        return Err(ProgramError::InvalidAccountData);
+    }
+    let mut buf = [0u8; 8];
+    buf.copy_from_slice(&data[64..72]);
+    Ok(u64::from_le_bytes(buf))
+}
+
+fn curve_spot_price(c: &Curve, vault_base: u64) -> u64 {
+    if c.complete != 0 {
+        math::spot_price_amm_lamports_per_token(c.real_sol_reserves, vault_base, TOKEN_UNIT_9)
+    } else {
+        math::spot_price_lamports_per_token(
+            c.virtual_sol_reserves,
+            c.virtual_token_reserves,
+            TOKEN_UNIT_9,
+        )
+    }
+}
+
+fn curve_sold_tokens(c: &Curve) -> u64 {
+    c.initial_real_token_reserves
+        .saturating_sub(c.real_token_reserves)
+}
+
 fn process_buy(program_id: &Pubkey, accounts: &[AccountInfo], data: &[u8]) -> ProgramResult {
     let [trader, global, curve, liquidity, protocol_treasury, creator_fees, referrer_fees, mint, vault, trader_ata, _token, _system, referrer_binding, referrer_wallet] =
         accounts
@@ -578,34 +605,50 @@ fn process_buy(program_id: &Pubkey, accounts: &[AccountInfo], data: &[u8]) -> Pr
     }
 
     let mut c = load_pod::<Curve>(curve)?;
-    if c.paused != 0
-        || c.complete != 0
-        || !keys_eq(&c.mint, mint.key())
-        || !keys_eq(&c.token_vault, vault.key())
-    {
+    if c.paused != 0 || !keys_eq(&c.mint, mint.key()) || !keys_eq(&c.token_vault, vault.key()) {
         return Err(ProgramError::InvalidAccountData);
     }
-    if c.real_token_reserves == 0 {
-        return Err(ProgramError::InvalidArgument);
-    }
 
-    let quote = math::quote_buy(
-        sol_in,
-        g.protocol_fee_bps,
-        c.virtual_sol_reserves,
-        c.virtual_token_reserves,
-        c.real_token_reserves,
-    )
-    .ok_or(ProgramError::InvalidArgument)?;
+    let vault_base = read_spl_token_amount(vault)?;
+
+    let quote = if c.complete != 0 {
+        if vault_base == 0 || c.real_sol_reserves == 0 {
+            return Err(ProgramError::InvalidArgument);
+        }
+        math::quote_amm_buy(
+            sol_in,
+            g.protocol_fee_bps,
+            c.real_sol_reserves,
+            vault_base,
+        )
+        .ok_or(ProgramError::InvalidArgument)?
+    } else {
+        if c.real_token_reserves == 0 {
+            return Err(ProgramError::InvalidArgument);
+        }
+        math::quote_buy(
+            sol_in,
+            g.protocol_fee_bps,
+            c.virtual_sol_reserves,
+            c.virtual_token_reserves,
+            c.real_token_reserves,
+        )
+        .ok_or(ProgramError::InvalidArgument)?
+    };
+
     if quote.token_out < min_out || quote.token_out == 0 {
         return Err(ProgramError::InvalidArgument);
     }
 
-    // All SOL into shared liquidity vault (Base manager).
+    let gross = quote.gross_lamports;
+    if gross > sol_in {
+        return Err(ProgramError::InvalidArgument);
+    }
+
     SolTransfer {
         from: trader,
         to: liquidity,
-        lamports: sol_in,
+        lamports: gross,
     }
     .invoke()?;
 
@@ -621,22 +664,32 @@ fn process_buy(program_id: &Pubkey, accounts: &[AccountInfo], data: &[u8]) -> Pr
     }
     .invoke_signed(&signers)?;
 
-    c.virtual_sol_reserves = c
-        .virtual_sol_reserves
-        .checked_add(quote.net_lamports)
-        .ok_or(ProgramError::InvalidAccountData)?;
-    c.real_sol_reserves = c
-        .real_sol_reserves
-        .checked_add(quote.net_lamports)
-        .ok_or(ProgramError::InvalidAccountData)?;
-    c.virtual_token_reserves = c
-        .virtual_token_reserves
-        .checked_sub(quote.token_out)
-        .ok_or(ProgramError::InvalidAccountData)?;
-    c.real_token_reserves = c
-        .real_token_reserves
-        .checked_sub(quote.token_out)
-        .ok_or(ProgramError::InvalidAccountData)?;
+    if c.complete != 0 {
+        c.real_sol_reserves = c
+            .real_sol_reserves
+            .checked_add(quote.net_lamports)
+            .ok_or(ProgramError::InvalidAccountData)?;
+    } else {
+        c.virtual_sol_reserves = c
+            .virtual_sol_reserves
+            .checked_add(quote.net_lamports)
+            .ok_or(ProgramError::InvalidAccountData)?;
+        c.real_sol_reserves = c
+            .real_sol_reserves
+            .checked_add(quote.net_lamports)
+            .ok_or(ProgramError::InvalidAccountData)?;
+        c.virtual_token_reserves = c
+            .virtual_token_reserves
+            .checked_sub(quote.token_out)
+            .ok_or(ProgramError::InvalidAccountData)?;
+        c.real_token_reserves = c
+            .real_token_reserves
+            .checked_sub(quote.token_out)
+            .ok_or(ProgramError::InvalidAccountData)?;
+        if c.real_token_reserves == 0 {
+            c.complete = 1;
+        }
+    }
 
     write_pod(curve, &c)?;
 
@@ -654,23 +707,17 @@ fn process_buy(program_id: &Pubkey, accounts: &[AccountInfo], data: &[u8]) -> Pr
         quote.fee_lamports,
     )?;
     events::emit_fee_split(&c.mint, &c.creator, fees.0, fees.1, fees.2);
-    let sold = c
-        .initial_real_token_reserves
-        .saturating_sub(c.real_token_reserves);
+    let vault_base_after = vault_base.saturating_sub(quote.token_out);
     events::emit_trade_event(
         &c.mint,
         &pubkey_bytes(trader),
         true,
-        sol_in,
+        gross,
         quote.token_out,
         quote.fee_lamports,
         c.real_sol_reserves,
-        sold,
-        math::spot_price_lamports_per_token(
-            c.virtual_sol_reserves,
-            c.virtual_token_reserves,
-            TOKEN_UNIT_9,
-        ),
+        curve_sold_tokens(&c),
+        curve_spot_price(&c, vault_base_after),
     );
     log!("pump:buy");
     Ok(())
@@ -706,14 +753,30 @@ fn process_sell(program_id: &Pubkey, accounts: &[AccountInfo], data: &[u8]) -> P
         return Err(ProgramError::InvalidAccountData);
     }
 
-    let quote = math::quote_sell(
-        token_in,
-        g.protocol_fee_bps,
-        c.virtual_sol_reserves,
-        c.virtual_token_reserves,
-        c.real_sol_reserves,
-    )
-    .ok_or(ProgramError::InvalidArgument)?;
+    let vault_base = read_spl_token_amount(vault)?;
+
+    let quote = if c.complete != 0 {
+        if vault_base == 0 || c.real_sol_reserves == 0 {
+            return Err(ProgramError::InvalidArgument);
+        }
+        math::quote_amm_sell(
+            token_in,
+            g.protocol_fee_bps,
+            c.real_sol_reserves,
+            vault_base,
+        )
+        .ok_or(ProgramError::InvalidArgument)?
+    } else {
+        math::quote_sell(
+            token_in,
+            g.protocol_fee_bps,
+            c.virtual_sol_reserves,
+            c.virtual_token_reserves,
+            c.real_sol_reserves,
+        )
+        .ok_or(ProgramError::InvalidArgument)?
+    };
+
     if quote.lamports_out < min_sol || quote.lamports_out == 0 {
         return Err(ProgramError::InvalidArgument);
     }
@@ -726,33 +789,38 @@ fn process_sell(program_id: &Pubkey, accounts: &[AccountInfo], data: &[u8]) -> P
     }
     .invoke()?;
 
-    c.virtual_sol_reserves = c
-        .virtual_sol_reserves
-        .checked_sub(quote.gross_lamports)
-        .ok_or(ProgramError::InvalidAccountData)?;
-    c.real_sol_reserves = c
-        .real_sol_reserves
-        .checked_sub(quote.gross_lamports)
-        .ok_or(ProgramError::InvalidAccountData)?;
-    c.virtual_token_reserves = c
-        .virtual_token_reserves
-        .checked_add(token_in)
-        .ok_or(ProgramError::InvalidAccountData)?;
-    c.real_token_reserves = c
-        .real_token_reserves
-        .checked_add(token_in)
-        .ok_or(ProgramError::InvalidAccountData)?;
-    if c.real_token_reserves > c.initial_real_token_reserves {
-        c.real_token_reserves = c.initial_real_token_reserves;
+    if c.complete != 0 {
+        c.real_sol_reserves = c
+            .real_sol_reserves
+            .checked_sub(quote.gross_lamports)
+            .ok_or(ProgramError::InvalidAccountData)?;
+    } else {
+        c.virtual_sol_reserves = c
+            .virtual_sol_reserves
+            .checked_sub(quote.gross_lamports)
+            .ok_or(ProgramError::InvalidAccountData)?;
+        c.real_sol_reserves = c
+            .real_sol_reserves
+            .checked_sub(quote.gross_lamports)
+            .ok_or(ProgramError::InvalidAccountData)?;
+        c.virtual_token_reserves = c
+            .virtual_token_reserves
+            .checked_add(token_in)
+            .ok_or(ProgramError::InvalidAccountData)?;
+        c.real_token_reserves = c
+            .real_token_reserves
+            .checked_add(token_in)
+            .ok_or(ProgramError::InvalidAccountData)?;
+        if c.real_token_reserves > c.initial_real_token_reserves {
+            c.real_token_reserves = c.initial_real_token_reserves;
+        }
     }
 
     write_pod(curve, &c)?;
 
-    // Pay trader from shared liquidity; fee share stays / routes via accrue_fees.
     let bump_seed = [g.liquidity_bump];
     let seeds = [Seed::from(VAULT_SEED), Seed::from(bump_seed.as_ref())];
     let signers = [Signer::from(&seeds)];
-    // Manual lamport move signed by vault ownership (system transfer from PDA).
     *liquidity.try_borrow_mut_lamports()? -= quote.lamports_out;
     *trader.try_borrow_mut_lamports()? += quote.lamports_out;
     let _ = signers;
@@ -771,9 +839,7 @@ fn process_sell(program_id: &Pubkey, accounts: &[AccountInfo], data: &[u8]) -> P
         quote.fee_lamports,
     )?;
     events::emit_fee_split(&c.mint, &c.creator, fees.0, fees.1, fees.2);
-    let sold = c
-        .initial_real_token_reserves
-        .saturating_sub(c.real_token_reserves);
+    let vault_base_after = vault_base.saturating_add(token_in);
     events::emit_trade_event(
         &c.mint,
         &pubkey_bytes(trader),
@@ -782,12 +848,8 @@ fn process_sell(program_id: &Pubkey, accounts: &[AccountInfo], data: &[u8]) -> P
         token_in,
         quote.fee_lamports,
         c.real_sol_reserves,
-        sold,
-        math::spot_price_lamports_per_token(
-            c.virtual_sol_reserves,
-            c.virtual_token_reserves,
-            TOKEN_UNIT_9,
-        ),
+        curve_sold_tokens(&c),
+        curve_spot_price(&c, vault_base_after),
     );
     log!("pump:sell");
     Ok(())

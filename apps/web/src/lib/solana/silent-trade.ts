@@ -203,17 +203,21 @@ export async function silentBuy(input: {
   const { curvePda, curve } = await loadCurve(mint);
 
   if (curve.paused) throw new Error("Trading paused");
-  if (curve.complete) throw new Error("Curve complete — trading closed");
   if (!curve.mint.equals(mint)) throw new Error("Mint mismatch");
-  if (curve.realTokenReserves <= 0n) {
-    throw new Error("No tokens left on the bonding curve for this coin.");
-  }
 
   const conn = getSolanaConnection();
   const vaultBal = await conn.getTokenAccountBalance(curve.tokenVault, "confirmed").catch(() => null);
   const vaultRaw = vaultBal?.value?.amount ? BigInt(vaultBal.value.amount) : 0n;
   if (vaultRaw <= 0n) {
     throw new Error("Token vault is empty — this coin was not minted correctly. Create again.");
+  }
+
+  if (!curve.complete) {
+    if (curve.realTokenReserves <= 0n) {
+      throw new Error("No tokens left on the bonding curve for this coin.");
+    }
+  } else if (curve.realSolReserves <= 0n) {
+    throw new Error("No SOL liquidity in the AMM pool for this coin.");
   }
 
   const referrerWallet = await resolveReferrerWallet(trader, input.referrerAddress);

@@ -7,7 +7,7 @@ Parallel Solana launchpad path beside the existing Base/EVM stack. Production st
 | Decision | Choice |
 |----------|--------|
 | Strategy | Scaffold Solana **alongside** EVM; do not delete Base |
-| Curve | Permanent bonding curve (**no** graduation / PumpSwap migrate) |
+| Curve | Bonding → **mode-switch AMM** (`complete=1`; no PumpSwap migrate) |
 | Wallet (Phase 2) | **Self-hosted (EVM parity)** — same Telegram/Google/Apple OIDC; server-held encrypted Ed25519 keypair; **no Privy / Turnkey / paid wallet SaaS** |
 | Tx fees | **User pays** SOL network fees (`feePayer` = user). No Pump-sponsored gas. Curve protocol/creator/referrer **trading** fees unchanged. |
 | Indexer (Phase 3) | Helius LaserStream *or* self-hosted Yellowstone when ready; Redis → `apps/realtime` |

@@ -339,6 +339,13 @@ export class SolanaEventHandlers {
             UPDATE bonding_states
             SET reserve_zug = $2,
                 token_sold = $3,
+                progress_bps = LEAST(
+                  10000,
+                  CASE
+                    WHEN $3::numeric >= 793100000 THEN 10000
+                    ELSE floor(($3::numeric / 793100000) * 10000)::integer
+                  END
+                ),
                 last_price_zug = $4,
                 market_cap_zug = $5,
                 trade_count = trade_count + 1,
