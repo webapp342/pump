@@ -34,6 +34,11 @@ if [[ -f "$REPO_ROOT/deploy/vm/ensure-solana-env.sh" ]]; then
   source "$REPO_ROOT/deploy/vm/ensure-solana-env.sh" "$ENV_FILE"
 fi
 
+# ensure-solana-env.sh defines log() — restore tma-deploy prefix
+log() {
+  echo "[tma-deploy] $*"
+}
+
 log "Installing workspace dependencies"
 npm ci
 
@@ -146,6 +151,7 @@ if [ ! -f "$REPO_ROOT/apps/ch-flusher/dist/flusher.js" ]; then
 fi
 
 log "Reloading PM2 from ecosystem.config.cjs (applies cwd/script paths)"
+chmod +x "$REPO_ROOT/deploy/vm/start-ch-flusher.sh" "$REPO_ROOT/deploy/vm/start-price-worker.sh" 2>/dev/null || true
 pm2 startOrRestart "$REPO_ROOT/ecosystem.config.cjs" --update-env
 
 log "Health check: $HEALTH_URL"

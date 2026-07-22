@@ -81,7 +81,8 @@ module.exports = {
     {
       name: "pump-ch-flusher",
       cwd: REPO_ROOT,
-      script: path.join(REPO_ROOT, "apps/ch-flusher/dist/flusher.js"),
+      script: path.join(REPO_ROOT, "deploy/vm/start-ch-flusher.sh"),
+      interpreter: "bash",
       instances: 1,
       env: {
         NODE_ENV: "production",
@@ -97,9 +98,8 @@ module.exports = {
     {
       name: "pump-price-worker",
       cwd: REPO_ROOT,
-      script: path.join(REPO_ROOT, "node_modules/.bin/tsx"),
-      args: "scripts/price-worker.ts",
-      interpreter: "none",
+      script: path.join(REPO_ROOT, "deploy/vm/start-price-worker.sh"),
+      interpreter: "bash",
       instances: 1,
       env: {
         NODE_ENV: "production",
