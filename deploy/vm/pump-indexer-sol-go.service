@@ -5,10 +5,10 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User=www-data
-Group=www-data
+User=root
+Group=root
 WorkingDirectory=/var/www/pump/tma/apps/indexer-sol-go
-EnvironmentFile=/var/www/pump/tma/apps/indexer-sol-go/.env
+EnvironmentFile=-/var/www/pump/tma/apps/indexer-sol-go/.env
 ExecStart=/var/www/pump/tma/apps/indexer-sol-go/bin/indexer-sol-go
 Restart=on-failure
 RestartSec=5

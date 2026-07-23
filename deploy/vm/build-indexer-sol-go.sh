@@ -13,6 +13,7 @@ go mod tidy
 go test ./...
 mkdir -p bin
 go build -o bin/indexer-sol-go ./cmd/indexer
+chmod +x bin/indexer-sol-go
 
 if [[ ! -f .env ]]; then
   cp .env.example .env
@@ -20,4 +21,6 @@ if [[ ! -f .env ]]; then
 fi
 
 echo "OK bin/indexer-sol-go"
+echo "Note: tma-deploy runs git clean — re-run this script after each CI/CD deploy."
+echo "Install/restart: sudo cp deploy/vm/pump-indexer-sol-go.service /etc/systemd/system/ && sudo systemctl daemon-reload && sudo systemctl restart pump-indexer-sol-go"
 echo "Run: GO_SHADOW_MODE=read_only ./bin/indexer-sol-go"
