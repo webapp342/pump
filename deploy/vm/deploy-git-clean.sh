@@ -9,4 +9,8 @@ git clean -fd \
   -e apps/web/.next \
   -e apps/indexer-sol-go/bin \
   -e apps/admin/dist \
+  -e apps/realtime/dist \
+  -e apps/ch-flusher/dist \
+  -e packages/solana-sdk/dist \
+  -e packages/pump-xp/dist \
   -e .deploy
