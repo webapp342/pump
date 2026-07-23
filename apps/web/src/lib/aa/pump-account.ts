@@ -1,20 +1,27 @@
 "use client";
 
-import type { Hex } from "viem";
+import type { Address, EIP1193Provider, Hex } from "viem";
+import type { KernelAccountClient } from "@zerodev/sdk";
 import {
   buildKernelWalletSession,
   type KernelWalletSession,
 } from "@/lib/aa/kernel-session";
 import { TELEGRAM_SESSION_HINT_KEY } from "@/lib/aa/telegram-account";
+import { isSolanaChainFamily } from "@/config/chain-family";
 
-export type PumpAccountSession = KernelWalletSession & {
+export type PumpAccountSession = Omit<KernelWalletSession, "kernelClient" | "provider"> & {
   authProvider: "telegram" | "google" | "apple";
   accountId: string;
   displayName: string | null;
   email: string | null;
+  /** EVM only — null on Solana (silent-session uses Ed25519 wallet). */
+  kernelClient: KernelAccountClient | null;
+  provider: EIP1193Provider | null;
 };
 
 export const PUMP_SESSION_HINT_KEY = "pump_session_hint";
+
+const SOLANA_EVM_PLACEHOLDER = "0x0000000000000000000000000000000000000000" as Address;
 
 type WalletApiPayload = {
   authProvider: "telegram" | "google" | "apple";
@@ -24,6 +31,7 @@ type WalletApiPayload = {
   telegramId: string;
   telegramUsername: string | null;
   firstName: string | null;
+  eoaAddress: string;
   scwAddress: string;
   privateKey: Hex;
 };
@@ -57,7 +65,7 @@ function hasPumpSessionHint(): boolean {
   }
 }
 
-async function fetchWalletSessionFromMe(timeoutMs?: number): Promise<PumpAccountSession> {
+async function fetchAuthMePayload(timeoutMs?: number): Promise<WalletApiPayload> {
   const controller = new AbortController();
   const timer =
     timeoutMs != null
@@ -77,27 +85,14 @@ async function fetchWalletSessionFromMe(timeoutMs?: number): Promise<PumpAccount
       error?: string;
     };
 
-    if (!response.ok || !body.data?.privateKey) {
+    if (!response.ok || !body.data) {
       if (response.status === 401) {
         throw new Error("Not authenticated");
       }
       throw new Error(body.error ?? "Could not load wallet session.");
     }
 
-    const kernel = await buildKernelWalletSession({
-      telegramId: body.data.telegramId || body.data.accountId,
-      telegramUsername: body.data.telegramUsername,
-      firstName: body.data.firstName ?? body.data.displayName,
-      privateKey: body.data.privateKey,
-    });
-
-    return {
-      ...kernel,
-      authProvider: body.data.authProvider,
-      accountId: body.data.accountId,
-      displayName: body.data.displayName,
-      email: body.data.email,
-    };
+    return body.data;
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") {
       throw new Error("Sign-in timed out. Check your connection and try again.");
@@ -105,6 +100,59 @@ async function fetchWalletSessionFromMe(timeoutMs?: number): Promise<PumpAccount
     throw error;
   } finally {
     if (timer) clearTimeout(timer);
+  }
+}
+
+function buildSolanaPumpSession(data: WalletApiPayload): PumpAccountSession {
+  return {
+    telegramId: data.telegramId || data.accountId,
+    telegramUsername: data.telegramUsername,
+    firstName: data.firstName ?? data.displayName,
+    eoaAddress: (data.eoaAddress as Address) || SOLANA_EVM_PLACEHOLDER,
+    scwAddress: (data.scwAddress as Address) || SOLANA_EVM_PLACEHOLDER,
+    kernelClient: null,
+    provider: null,
+    authProvider: data.authProvider,
+    accountId: data.accountId,
+    displayName: data.displayName,
+    email: data.email,
+  };
+}
+
+async function fetchWalletSessionFromMe(timeoutMs?: number): Promise<PumpAccountSession> {
+  const data = await fetchAuthMePayload(timeoutMs);
+
+  if (isSolanaChainFamily) {
+    return buildSolanaPumpSession(data);
+  }
+
+  if (!data.privateKey) {
+    throw new Error("Could not load wallet session.");
+  }
+
+  try {
+    const kernel = await buildKernelWalletSession({
+      telegramId: data.telegramId || data.accountId,
+      telegramUsername: data.telegramUsername,
+      firstName: data.firstName ?? data.displayName,
+      privateKey: data.privateKey,
+    });
+
+    return {
+      ...kernel,
+      authProvider: data.authProvider,
+      accountId: data.accountId,
+      displayName: data.displayName,
+      email: data.email,
+    };
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    if (/match|fetch failed|JSON-RPC/i.test(msg)) {
+      throw new Error(
+        "Could not connect to the chain RPC. Check NEXT_PUBLIC_RPC_URL and bundler settings."
+      );
+    }
+    throw error;
   }
 }
 

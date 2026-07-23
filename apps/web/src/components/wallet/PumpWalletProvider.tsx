@@ -117,7 +117,9 @@ export function PumpWalletProvider({ children }: { children: ReactNode }) {
   const [loginModalOpen, setLoginModalOpen] = useState(false);
 
   const applySession = useCallback((session: PumpAccountSession) => {
-    setPumpConnectorSession(session.provider, session.scwAddress);
+    if (session.provider && session.scwAddress) {
+      setPumpConnectorSession(session.provider, session.scwAddress);
+    }
     setAuthProvider(session.authProvider);
     setAccountId(session.accountId);
     setDisplayName(session.displayName);
