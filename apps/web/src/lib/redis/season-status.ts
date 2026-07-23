@@ -35,26 +35,29 @@ export async function getSeasonStatus(): Promise<SeasonStatus> {
   };
   if (!client) return fallback;
 
-  if (client.status !== "ready") {
-    await client.connect().catch(() => fallback);
-    if (client.status !== "ready") return fallback;
+  try {
+    if (client.status !== "ready") {
+      await client.connect();
+    }
+
+    const metaRaw = await client.hgetall(REDIS_KEYS.seasonCurrent).catch(() => ({}));
+    const current = parseSeasonMeta(metaRaw);
+    const settledSeasonId = current.id > 1 ? current.id - 1 : null;
+
+    let claimsOpen = false;
+    if (settledSeasonId != null) {
+      const flag = await client
+        .get(REDIS_KEYS.seasonClaimsOpen(settledSeasonId))
+        .catch(() => null);
+      claimsOpen = flag === "true";
+    }
+
+    return {
+      currentSeason: current,
+      settledSeasonId,
+      claimsOpen,
+    };
+  } catch {
+    return fallback;
   }
-
-  const metaRaw = await client.hgetall(REDIS_KEYS.seasonCurrent).catch(() => ({}));
-  const current = parseSeasonMeta(metaRaw);
-  const settledSeasonId = current.id > 1 ? current.id - 1 : null;
-
-  let claimsOpen = false;
-  if (settledSeasonId != null) {
-    const flag = await client
-      .get(REDIS_KEYS.seasonClaimsOpen(settledSeasonId))
-      .catch(() => null);
-    claimsOpen = flag === "true";
-  }
-
-  return {
-    currentSeason: current,
-    settledSeasonId,
-    claimsOpen,
-  };
 }
