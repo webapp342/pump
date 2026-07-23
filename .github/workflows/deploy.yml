@@ -59,6 +59,7 @@ jobs:
         with:
           filters: |
             full_stack:
+              - 'apps/indexer-sol-go/**'
               - 'apps/indexer/**'
               - 'apps/indexer-sol/**'
               - 'apps/realtime/**'

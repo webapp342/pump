@@ -14,17 +14,18 @@ go version | grep -qE 'go1\.(2[5-9]|[3-9][0-9])' || {
 }
 
 go mod tidy
-go test ./...
+if [[ "${SKIP_TESTS:-}" != "1" ]]; then
+  go test ./...
+fi
 mkdir -p bin
 go build -o bin/indexer-sol-go ./cmd/indexer
 chmod +x bin/indexer-sol-go
 
 if [[ ! -f .env ]]; then
   cp .env.example .env
-  echo "[indexer-sol-go] created .env from .env.example — set GO_SHADOW_MODE=read_only"
+  echo "[indexer-sol-go] created .env from .env.example — set GO_SHADOW_MODE=primary"
 fi
 
 echo "OK bin/indexer-sol-go"
-echo "Note: tma-deploy runs git clean — re-run this script after each CI/CD deploy."
+echo "CI/CD: deploy/vm/indexer-sol-go-deploy.sh runs on tma-deploy (no manual rebuild needed)."
 echo "Install/restart: sudo cp deploy/vm/pump-indexer-sol-go.service /etc/systemd/system/ && sudo systemctl daemon-reload && sudo systemctl restart pump-indexer-sol-go"
-echo "Run: GO_SHADOW_MODE=read_only ./bin/indexer-sol-go"

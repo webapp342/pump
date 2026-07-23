@@ -18,7 +18,8 @@ cd "$REPO_ROOT"
 log "Syncing repo to origin/${GIT_REF}"
 git fetch origin "$GIT_REF"
 git reset --hard "origin/${GIT_REF}"
-git clean -fd
+chmod +x deploy/vm/deploy-git-clean.sh deploy/vm/ensure-node-deps.sh 2>/dev/null || true
+bash deploy/vm/deploy-git-clean.sh
 
 ENV_FILE="$REPO_ROOT/.env"
 if [[ -f "$REPO_ROOT/deploy/vm/ensure-solana-env.sh" ]]; then
@@ -27,8 +28,8 @@ if [[ -f "$REPO_ROOT/deploy/vm/ensure-solana-env.sh" ]]; then
   source "$REPO_ROOT/deploy/vm/ensure-solana-env.sh" "$ENV_FILE"
 fi
 
-log "Installing workspace dependencies"
-npm ci
+log "Checking node dependencies (install only if missing)"
+bash deploy/vm/ensure-node-deps.sh "$REPO_ROOT"
 
 if [[ -f "$ENV_FILE" ]]; then
   log "Linking root .env for Next.js build (NEXT_PUBLIC_* inlined at build time)"

@@ -1,12 +1,14 @@
 # Dependencies
 node_modules/
 apps/*/node_modules/
+.deploy/
 
 # Build outputs
 apps/web/.next/
 apps/admin/dist/
 apps/indexer/dist/
 apps/indexer-sol/dist/
+apps/indexer-sol-go/bin/
 packages/solana-sdk/dist/
 apps/realtime/dist/
 out/

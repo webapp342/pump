@@ -15,6 +15,7 @@
     "build:indexer": "npm run build -w @pump/indexer",
     "build:solana-sdk": "npm run build -w @pump/solana-sdk",
     "build:indexer-sol": "npm run build -w @pump/solana-sdk && npm run build -w @pump/xp && npm run build -w @pump/indexer-sol",
+    "build:indexer-sol-go": "cd apps/indexer-sol-go && go build -o bin/indexer-sol-go ./cmd/indexer",
     "build:ch-flusher": "npm run build -w @pump/ch-flusher",
     "season:rename": "tsx scripts/season-rename-cron.ts",
     "price:worker": "tsx scripts/price-worker.ts",

@@ -23,7 +23,8 @@ chmod +x deploy/vm/system-health.sh 2>/dev/null || true
 log "Syncing repo to origin/${GIT_REF}"
 git fetch origin "$GIT_REF"
 git reset --hard "origin/${GIT_REF}"
-git clean -fd
+chmod +x deploy/vm/deploy-git-clean.sh deploy/vm/ensure-node-deps.sh 2>/dev/null || true
+bash deploy/vm/deploy-git-clean.sh
 
 ENV_FILE="$REPO_ROOT/.env"
 
@@ -39,8 +40,8 @@ log() {
   echo "[tma-deploy] $*"
 }
 
-log "Installing workspace dependencies"
-npm ci
+log "Checking node dependencies (install only if missing)"
+bash deploy/vm/ensure-node-deps.sh "$REPO_ROOT"
 
 if [[ -f "$ENV_FILE" ]]; then
   log "Linking root .env for Next.js build (NEXT_PUBLIC_* inlined at build time)"
@@ -188,14 +189,18 @@ if [ "$realtime_ok" -ne 1 ]; then
   exit 1
 fi
 
-if [[ "${SKIP_INDEXER_DEPLOY:-}" != "1" ]] && [[ -f "$REPO_ROOT/deploy/vm/indexer-sol-deploy.sh" ]]; then
-  log "Deploying Solana indexer (sync + rebuild + restart)"
+if [[ "${SKIP_INDEXER_DEPLOY:-}" != "1" ]] && [[ -f "$REPO_ROOT/deploy/vm/indexer-sol-go-deploy.sh" ]]; then
+  log "Deploying Solana Go indexer (F5 — replaces TS indexer-sol build)"
+  chmod +x "$REPO_ROOT/deploy/vm/indexer-sol-go-deploy.sh"
+  bash "$REPO_ROOT/deploy/vm/indexer-sol-go-deploy.sh" || {
+    log "ERROR: indexer-sol-go deploy failed — check Go 1.25+ and apps/indexer-sol-go/.env"
+    exit 1
+  }
+elif [[ "${USE_TS_INDEXER:-}" == "1" ]] && [[ "${SKIP_INDEXER_DEPLOY:-}" != "1" ]] && [[ -f "$REPO_ROOT/deploy/vm/indexer-sol-deploy.sh" ]]; then
+  log "Deploying legacy TS indexer-sol (USE_TS_INDEXER=1 rollback)"
   chmod +x "$REPO_ROOT/deploy/vm/indexer-sol-deploy.sh"
   bash "$REPO_ROOT/deploy/vm/indexer-sol-deploy.sh" || {
-    log "WARN: indexer-sol deploy failed — one-time on VM:"
-    log "  cp deploy/pump-indexer-sol.service /etc/systemd/system/"
-    log "  systemctl daemon-reload && systemctl enable --now pump-indexer-sol"
-    log "  Ensure apps/indexer-sol/.env exists (see apps/indexer-sol/.env.example)"
+    log "WARN: indexer-sol deploy failed"
   }
 elif [[ "${SKIP_EVM_INDEXER:-}" != "1" ]] && [[ "${SKIP_INDEXER_DEPLOY:-}" != "1" ]] && [[ -f "$REPO_ROOT/deploy/vm/indexer-deploy.sh" ]]; then
   log "Deploying EVM indexer"
