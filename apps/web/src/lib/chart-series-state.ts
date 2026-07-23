@@ -1,10 +1,10 @@
 import {
   applyActorOptimisticCandleBucket,
   fillGapsForStoredCandles,
-  mergeWsCandleUpdate,
   sanitizeTailCandleSeries,
   scaleCandleBars,
   seriesHasTemporalGaps,
+  upsertHotCandleTail,
   type ActorOptimisticChartSpot,
   type CandleBar,
   type CandleInterval,
@@ -52,32 +52,20 @@ export function preserveLiveTailOverFetch(
 
   const liveTail = liveCandles[liveCandles.length - 1]!;
   const liveVol = liveVolumes[liveVolumes.length - 1];
+  const fetchTail = fetchedCandles[fetchedCandles.length - 1]!;
+
+  // Durable fetch (PG + Redis hot) is SSOT on poll reconcile.
+  if (liveTail.time <= fetchTail.time) {
+    return { candles: fetchedCandles, volumes: fetchedVolumes };
+  }
+
+  // In-memory WS bucket ahead of durable store — append live tip only.
   const candles = fetchedCandles.slice();
   const volumes = fetchedVolumes.slice();
-  const idx = candles.findIndex((c) => c.time === liveTail.time);
+  candles.push(liveTail);
+  if (liveVol) volumes.push(liveVol);
 
-  if (idx >= 0) {
-    // Live open-bucket SSOT: replace fetched tip entirely (open included).
-    candles[idx] = { ...liveTail };
-    if (liveVol && idx < volumes.length) {
-      volumes[idx] = { ...liveVol };
-    }
-    return {
-      candles,
-      volumes,
-    };
-  }
-
-  const fetchTail = candles[candles.length - 1]!;
-  if (liveTail.time > fetchTail.time) {
-    candles.push(liveTail);
-    if (liveVol) volumes.push(liveVol);
-  }
-
-  return {
-    candles,
-    volumes,
-  };
+  return { candles, volumes };
 }
 
 function applyActorBucketExtremes(
@@ -142,8 +130,7 @@ export function chartSeriesReducer(
       };
     }
     case "merge_ws": {
-      if (state.candles.length === 0) return state;
-      const merged = mergeWsCandleUpdate(
+      const merged = upsertHotCandleTail(
         state.candles,
         state.volumes,
         action.update,
@@ -155,7 +142,6 @@ export function chartSeriesReducer(
         volumes: merged.volumes,
         /** Live WS OHLC is authoritative for the open bucket. */
         source: "db",
-        /** WS may insert buckets — re-gap on next derive. */
         gapFilledByApi: false,
       };
     }

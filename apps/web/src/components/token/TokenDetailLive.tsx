@@ -518,10 +518,9 @@ export function TokenDetailLive({
           }
           setDbTrades((prev) => prependTradeIfNew(prev, tradeItem));
           let updates = (payload.candleUpdates ?? []) as CandleWsUpdate[];
-          // Dual-path: if indexer omitted candleUpdates, synthesize tip from bonding spot
-          // so chart never waits on HTTP poll while tape already moved.
+          // Indexer normally sends candleUpdates (Redis hot SSOT). Fallback only when omitted.
           if (updates.length === 0) {
-            const spot = payload.bonding
+            const spotAfter = payload.bonding
               ? Number(
                   payload.bonding.spotPriceZug ?? payload.bonding.lastPriceZug ?? 0
                 )
@@ -530,7 +529,7 @@ export function TokenDetailLive({
             const fee = Number(tradeItem.feeBnb ?? 0);
             const volumeNative = Math.max(0, gross - fee);
             updates = synthesizeCandleUpdatesFromSpot({
-              spotAfter: spot,
+              spotAfter,
               volumeNative,
               isBuy: tradeItem.side === "BUY",
               blockTimeMs: new Date(tradeItem.blockTime).getTime(),

@@ -67,12 +67,10 @@ export function synthesizeCandleUpdatesFromSpot(input: {
 }): CandleWsUpdate[] {
   const after = input.spotAfter;
   if (!(after > 0) || !Number.isFinite(after)) return [];
-  const rawBefore =
+  const before =
     input.spotBefore != null && input.spotBefore > 0 && Number.isFinite(input.spotBefore)
       ? input.spotBefore
       : after;
-  // Reject garbage before prints (same 4× rule as indexer) — avoids phantom lower wicks.
-  const before = isSpotMoveSane(rawBefore, after) ? rawBefore : after;
   const volume = Math.max(0, input.volumeNative);
   const buyVolume = input.isBuy ? volume : 0;
   const out: CandleWsUpdate[] = [];
@@ -94,7 +92,7 @@ export function synthesizeCandleUpdatesFromSpot(input: {
       volume: String(volume),
       buyVolume: String(buyVolume),
       tradeCount: 1,
-      isNewBucket: true,
+      isNewBucket: false,
     });
   }
   return out;
@@ -741,9 +739,6 @@ export function mergeWsCandleUpdate(
 
   const last = candles[candles.length - 1]!;
   if (update.isNewBucket && candle.time > last.time) {
-    if (!isSpotMoveSane(last.close, candle.close)) {
-      return { candles, volumes };
-    }
     const priorClose = last.close;
     let nextCandles = candles.slice();
     let nextVolumes = volumes.slice();
@@ -767,10 +762,6 @@ export function mergeWsCandleUpdate(
 
   const idx = candles.findIndex((c) => c.time === candle.time);
   if (idx >= 0) {
-    const existing = candles[idx]!;
-    if (!isSpotMoveSane(existing.close, candle.close)) {
-      return { candles, volumes };
-    }
     const nextCandles = candles.slice();
     const nextVolumes = volumes.slice();
     // ONE SOURCE: WS tip replaces the open bucket entirely (including open).
@@ -781,9 +772,6 @@ export function mergeWsCandleUpdate(
   }
 
   if (candle.time === last.time) {
-    if (!isSpotMoveSane(last.close, candle.close)) {
-      return { candles, volumes };
-    }
     const nextCandles = candles.slice();
     const nextVolumes = volumes.slice();
     nextCandles[nextCandles.length - 1] = candle;
@@ -1214,10 +1202,8 @@ export function reconcileCandleSeriesToLiveMark(
 }
 
 /**
- * Pin live bucket close to mark price only.
- * Rejects transient garbage marks (false needles). High/low expand only when the
- * pinned close is a sane move from the existing body — never invent wicks from
- * a bad mark (price-accuracy contract).
+ * Pin live bucket close to bonding spot (same source as header MCAP/price).
+ * High/low expand to include the pinned close; open stays from trade history.
  */
 export function pinTailCandleToLiveMark(
   candles: CandleBar[],
@@ -1244,17 +1230,6 @@ export function pinTailCandleToLiveMark(
   }
 
   const priorClose = targetIdx > 0 ? candles[targetIdx - 1]!.close : undefined;
-  const ref =
-    existing.close > 0
-      ? existing.close
-      : priorClose != null && priorClose > 0
-        ? priorClose
-        : existing.open;
-  if (ref > 0 && !isSpotMoveSane(ref, liveMarkBnb)) {
-    // Transient wrong mark (e.g. Solana virtuals glitch) — do not paint close/wick.
-    return { candles, volumes };
-  }
-
   const close = liveMarkBnb;
   // Live mark only moves close/high/low — never rewrite a traded bucket's open.
   const open =
@@ -1264,7 +1239,7 @@ export function pinTailCandleToLiveMark(
         : close
       : coherentOpenForBar(existing.open, close, priorClose);
 
-  // Mark already passed isSpotMoveSane vs body — safe to expand trade extremes to close.
+  // Live mark moves close/high/low — never rewrite a traded bucket's open.
   const high = Math.max(existing.high, open, close);
   const low = Math.min(existing.low, open, close);
 
