@@ -25,21 +25,59 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 2
+
+      - uses: dorny/paths-filter@v4
+        id: changes
+        with:
+          filters: |
+            npm:
+              - 'package.json'
+              - 'package-lock.json'
+              - 'apps/**'
+              - 'packages/**'
+            go:
+              - 'apps/indexer-sol-go/**'
+            db:
+              - 'db/**'
 
       - uses: actions/setup-node@v6
+        if: steps.changes.outputs.npm == 'true' || github.event_name == 'pull_request'
         with:
           node-version: "24"
-          cache: npm
 
       - uses: actions/setup-go@v6
+        if: steps.changes.outputs.go == 'true' || github.event_name == 'pull_request'
         with:
           go-version: "1.25.1"
           cache-dependency-path: apps/indexer-sol-go/go.sum
 
+      # Full node_modules restore — skip npm ci when lock unchanged (~33s → ~5s)
+      - name: Cache node_modules
+        if: steps.changes.outputs.npm == 'true' || github.event_name == 'pull_request'
+        id: nm-cache
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            node-modules-${{ runner.os }}-
+
       - name: Install dependencies
+        if: (steps.changes.outputs.npm == 'true' || github.event_name == 'pull_request') && steps.nm-cache.outputs.cache-hit != 'true'
         run: npm ci --prefer-offline --no-audit --no-fund
 
+      - name: Dependencies OK (cache hit)
+        if: (steps.changes.outputs.npm == 'true' || github.event_name == 'pull_request') && steps.nm-cache.outputs.cache-hit == 'true'
+        run: echo "[ci] node_modules cache hit — skipped npm ci"
+
+      - name: Verify node_modules
+        if: steps.changes.outputs.npm == 'true' || github.event_name == 'pull_request'
+        run: test -d node_modules/next
+
       - name: Build workspace packages (web prebuild deps)
+        if: steps.changes.outputs.npm == 'true' || github.event_name == 'pull_request'
         run: |
           npm run build -w @pump/solana-sdk
           npm run build -w @pump/xp
@@ -47,14 +85,21 @@ jobs:
           npm run build -w @pump/ch-flusher
 
       - name: Go indexer decode tests
+        if: steps.changes.outputs.go == 'true' || github.event_name == 'pull_request'
         working-directory: apps/indexer-sol-go
         run: |
           go mod download
           go test ./internal/decode/...
 
       - name: Go indexer compile
+        if: steps.changes.outputs.go == 'true' || github.event_name == 'pull_request'
         working-directory: apps/indexer-sol-go
         run: go build -o /dev/null ./cmd/indexer
 
       - name: Migration ledger bootstrap file
+        if: steps.changes.outputs.db == 'true' || steps.changes.outputs.npm == 'true' || github.event_name == 'pull_request'
         run: test -f db/migrations/000_schema_migrations.sql
+
+      - name: Skip heavy validate (deploy/db only change)
+        if: steps.changes.outputs.npm != 'true' && steps.changes.outputs.go != 'true' && github.event_name != 'pull_request'
+        run: echo "[ci] lightweight validate — npm/go unchanged in this push"

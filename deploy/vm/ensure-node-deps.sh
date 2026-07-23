@@ -95,7 +95,7 @@ if [[ -f "$STAMP_FILE" ]]; then
   read -r saved_hash saved_status _ < "$STAMP_FILE" || true
   if [[ "$saved_hash" == "$LOCK_HASH" && "$saved_status" == "ok" && -d "$REPO_ROOT/node_modules" ]]; then
     build_workspace_packages
-    log "cache hit (lock + prior probe OK) — skip install"
+    log "cache hit (lock unchanged, deps verified) — skipped npm ci/install"
     exit 0
   fi
 fi
@@ -106,7 +106,7 @@ probe_tree
 
 if [[ ${#missing[@]} -eq 0 ]]; then
   build_workspace_packages
-  log "all required packages present — skip install"
+  log "all required packages present — skipped npm ci/install"
   printf '%s ok %s\n' "$LOCK_HASH" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$STAMP_FILE"
   exit 0
 fi

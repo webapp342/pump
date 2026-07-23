@@ -338,7 +338,8 @@ Sonuç: CH container ayakta ama veri yok + okunamıyor → F0 bloker
 | 2026-07-24 | F5b: `helius-laserstream-sdk/go` — tek tx filter; RPC poll/WS kaldırıldı |
 | 2026-07-24 | **VM F5b smoke:** TradeEvent + FeeSplitV2 decode slot=478411886; TS indexer disabled |
 | 2026-07-24 | **F5c coded:** `handlers` trade PG TX + `publishTrade` PUBSUB/XADD + CH stream + weekly XP + live candles L1/Redis |
-| 2026-07-24 | **CI/CD kurumsal:** `schema_migrations` ledger, `run-pending-migrations.sh`, preflight, CI validate job, indexer fail=warn |
+| 2026-07-24 | **Targeted CI/CD:** `deploy-targeted.sh` + `gh-classify-targets.sh` — indexer/ui/db/realtime/ch ayrı slice |
+| 2026-07-24 | **CI/CD fix v2:** `full` fallback kaldırıldı; admin web'den ayrı (nginx static, pm2 yok); pm2 çoklu `--only`; Go PATH `/usr/local/go/bin`; deploy/** → `sync_only` (~10s) |
 
 ### F5c — Write path (100k kullanıcı / VM hedefi)
 

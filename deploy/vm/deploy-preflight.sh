@@ -62,19 +62,24 @@ if command -v df >/dev/null 2>&1; then
   fi
 fi
 
-# --- node ---
-if ! command -v node >/dev/null 2>&1; then
-  fail "node not installed"
+# --- node (skip for migrate-only / indexer-only) ---
+if [[ "$MODE" != "migrate" && "$MODE" != "indexer" ]]; then
+  if ! command -v node >/dev/null 2>&1; then
+    fail "node not installed"
+  fi
+  log "node $(node -v)"
 fi
-log "node $(node -v)"
 
-# --- full deploy extras ---
-if [[ "$MODE" == "full" ]]; then
+# --- indexer / full: Go indexer ---
+if [[ "$MODE" == "full" || "$MODE" == "indexer" ]]; then
   if [[ -f "$REPO_ROOT/deploy/vm/indexer-sol-go-deploy.sh" ]]; then
+    # shellcheck source=deploy/vm/ensure-go-path.sh
+    source "$REPO_ROOT/deploy/vm/ensure-go-path.sh"
+    ensure_go_path || true
     if command -v go >/dev/null 2>&1; then
       go version | grep -qE 'go1\.(2[5-9]|[3-9][0-9])' && log "go OK" || warn "Go 1.25.1+ recommended for indexer-sol-go (LaserStream SDK)"
     else
-      warn "Go not installed — web deploy continues; run indexer-sol-go-deploy.sh after installing Go"
+      warn "Go not installed — indexer slice will skip; install Go 1.25.1+ on VM"
     fi
     if [[ ! -f "$REPO_ROOT/apps/indexer-sol-go/.env" ]]; then
       warn "apps/indexer-sol-go/.env missing — indexer deploy will merge from indexer-sol/.env or .env.example"

@@ -11,6 +11,10 @@ TS_SERVICE="${INDEXER_SOL_SERVICE:-pump-indexer-sol}"
 
 log() { echo "[indexer-sol-go-deploy] $*"; }
 
+# shellcheck source=deploy/vm/ensure-go-path.sh
+source "$(dirname "$0")/ensure-go-path.sh"
+ensure_go_path || true
+
 if [[ ! -d "$GO_APP/cmd/indexer" ]]; then
   log "Missing $GO_APP — skip Go indexer"
   exit 0
@@ -21,7 +25,7 @@ if ! command -v go >/dev/null 2>&1; then
     log "ERROR: Go not installed — install Go 1.25.1+ (https://go.dev/dl/)"
     exit 1
   fi
-  log "WARN: Go not installed — skip indexer build (web deploy unaffected)"
+  log "WARN: Go not on PATH — skip indexer build (try: export PATH=/usr/local/go/bin:\$PATH)"
   exit 0
 fi
 
