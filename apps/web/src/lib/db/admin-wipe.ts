@@ -2,6 +2,7 @@ import { Pool } from "pg";
 import { getLaunchpadPool } from "@/lib/db/launchpad";
 import { getIncentivePool } from "@/lib/db/incentive";
 import { readIndexerCursorForEnv } from "@/lib/db/indexer-env-seed";
+import { purgeRuntimeStores, type WipeRuntimePurgeResult } from "@/lib/db/admin-wipe-runtime";
 
 export {
   WIPE_DATA_CONFIRMATION_PHRASE,
@@ -15,6 +16,7 @@ export type WipeAppDataResult = {
   truncated?: string[];
   xpPurged?: boolean;
   incentiveDbSeparate?: boolean;
+  runtime?: WipeRuntimePurgeResult;
 };
 
 export async function readIndexerCursor(): Promise<{
@@ -104,9 +106,12 @@ export async function wipeLaunchpadAppData(): Promise<WipeAppDataResult> {
     }
   }
 
+  const runtime = await purgeRuntimeStores();
+
   return {
     ...payload,
     xpPurged: true,
     incentiveDbSeparate: separate,
+    runtime,
   };
 }

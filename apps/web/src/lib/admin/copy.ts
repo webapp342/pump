@@ -435,20 +435,20 @@ export const ADMIN_COPY = {
   wipe: {
     title: "Reset data",
     description:
-      "Destructive clean-start for this environment. Wipes users, XP, perks, challenge progress, airdrop/rewards leaderboards, and indexed trading data. Keeps promoted campaigns and mission definitions (launchpad_tasks). On-chain contracts and balances are not modified.",
+      "Clean-start test environment: wipes all user/wallet/trading/XP/leaderboard data from PostgreSQL, Redis, and ClickHouse. Mission definitions, platform settings, contract registry, and admin todos stay intact. On-chain contracts and balances are not modified.",
     warning:
-      "Deletes app users, XP, claimed perks, completed challenges, airdrop/rewards leaderboard rows, and indexed market data. Task definitions and promo campaigns stay. Rewards Season rankings are cleared from the same DB the leaderboard reads.",
-    preservedTitle: "Kept",
-    wipedTitle: "Deleted",
+      "Deletes every user account, wallet link, token, trade, XP, weekly leaderboard, clan, airdrop progress, Redis hot cache, and ClickHouse history. You can log in again as the first user, create tokens, trade, earn XP, and complete missions from scratch.",
+    preservedTitle: "Kept (app keeps working)",
+    wipedTitle: "Deleted (runtime / user data)",
     confirmLabel: "Type WIPE PUMP DATA to enable",
     button: "Wipe application data",
-    running: "Wiping…",
+    running: "Wiping PostgreSQL, Redis, ClickHouse…",
     success:
-      "Application data wiped. Contract registry refreshed from .env; indexer restart scheduled to resync from chain.",
+      "Clean start complete. Registry synced from .env; indexer + realtime restarted to resync from chain.",
     successWithWarning:
-      "Data wiped, but indexer restart could not be confirmed — run systemctl restart manually if needed.",
+      "Data wiped with warnings — check indexer/realtime services if live board lags.",
     finalConfirm:
-      "Last chance: wipe all application data (users/XP/perks/airdrop leaderboards)? Promoted campaigns and mission definitions are kept. Contract registry re-syncs from .env.",
+      "Last chance: wipe ALL user/trading/XP/leaderboard data (PG + Redis + ClickHouse)? Mission definitions and platform settings are kept. You will be the first user again after login.",
     indexerNote: "",
   },
 } as const;

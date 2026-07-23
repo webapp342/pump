@@ -1,7 +1,10 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { requireAdminWallet } from "@/lib/auth/admin-access";
-import { restartIndexerServices } from "@/lib/admin/env-reload";
+import {
+  restartIndexerServices,
+  restartPostWipeRealtimeStack,
+} from "@/lib/admin/env-reload";
 import {
   WIPE_DATA_CONFIRMATION_PHRASE,
   WIPE_PRESERVED_TABLES,
@@ -10,10 +13,19 @@ import {
 import { syncContractRegistryFromEnv } from "@/lib/db/contract-registry-seed";
 import { seedIndexerStateFromEnv } from "@/lib/db/indexer-env-seed";
 
-function scheduleIndexerRestart(): void {
-  void restartIndexerServices().catch((error) => {
-    console.error("[wipe-data] background indexer restart failed:", error);
-  });
+function schedulePostWipeRestarts(): void {
+  void (async () => {
+    try {
+      await restartIndexerServices();
+    } catch (error) {
+      console.error("[wipe-data] indexer restart failed:", error);
+    }
+    try {
+      await restartPostWipeRealtimeStack();
+    } catch (error) {
+      console.error("[wipe-data] realtime/ch-flusher restart failed:", error);
+    }
+  })();
 }
 
 export async function POST(request: NextRequest) {
@@ -43,8 +55,14 @@ export async function POST(request: NextRequest) {
     if (!indexerSeed.ok) {
       warnings.push(indexerSeed.reason);
     }
+    if (wipeResult.runtime?.redis && !wipeResult.runtime.redis.ok) {
+      warnings.push(`Redis purge: ${wipeResult.runtime.redis.error ?? "failed"}`);
+    }
+    if (wipeResult.runtime?.clickhouse && !wipeResult.runtime.clickhouse.ok) {
+      warnings.push(`ClickHouse purge: ${wipeResult.runtime.clickhouse.error ?? "failed"}`);
+    }
 
-    scheduleIndexerRestart();
+    schedulePostWipeRestarts();
 
     return NextResponse.json({
       data: {
@@ -55,6 +73,7 @@ export async function POST(request: NextRequest) {
         contractRegistrySeed,
         indexerSeed,
         indexerRestart: { scheduled: true },
+        realtimeRestart: { scheduled: true },
         warnings,
       },
     });
@@ -66,7 +85,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           error:
-            "Wipe function not installed. Run db/migrations/052_wipe_launchpad_app_data_comprehensive.sql as postgres.",
+            "Wipe function not installed. Run pending DB migrations (055_wipe_clans_and_runtime.sql).",
         },
         { status: 503 }
       );
