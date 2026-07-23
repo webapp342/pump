@@ -7,8 +7,14 @@ TMA_DIR="${TMA_DIR:-/var/www/pump/tma}"
 WEB_ENV="${TMA_DIR}/.env"
 REDIS_URL="${REDIS_URL:-}"
 
+env_val() {
+  local file="$1" key="$2"
+  [[ -f "$file" ]] || return 0
+  grep -E "^[[:space:]]*${key}=" "$file" 2>/dev/null | tail -1 | cut -d= -f2- | tr -d '"' | tr -d "'" | sed 's/[[:space:]]*$//'
+}
+
 if [[ -z "$REDIS_URL" && -f "$WEB_ENV" ]]; then
-  REDIS_URL="$(grep -E '^REDIS_URL=' "$WEB_ENV" | tail -1 | cut -d= -f2- | tr -d '"'"'"' | tr -d ' ')"
+  REDIS_URL="$(env_val "$WEB_ENV" REDIS_URL)"
 fi
 REDIS_URL="${REDIS_URL:-redis://127.0.0.1:6379}"
 
