@@ -108,6 +108,7 @@ import {
 import {
   patchTokenDetailFromWsTrade,
   prependTradeIfNew,
+  resolveLiveSpotFromTradeWs,
   wsPayloadToTradeItem,
   type TokenTradeWsPayload,
 } from "@/lib/token-live-delta";
@@ -206,7 +207,8 @@ function computeVolumeWindowBnb(trades: TradeItem[], windowMs: number): number {
 function mergeLiveStats(
   base: TokenDetail,
   chainCurve: CurveTuple | undefined,
-  liveTrades: TradeItem[]
+  liveTrades: TradeItem[],
+  liveSpotBnb?: number | null
 ): TokenDetail {
   // Solana pump-feel tuples keep reserveZug/soldTokens at 0 (virtuals fold real).
   // tokenFromCurve would zero reserveBnb and poison the local curve machine.
@@ -219,7 +221,13 @@ function mergeLiveStats(
   let merged =
     chainCurve && !pumpFeelCurve ? tokenFromCurve(base, chainCurve) : base;
 
-  if (liveTrades.length > 0) {
+  if (liveSpotBnb != null && liveSpotBnb > 0) {
+    merged = {
+      ...merged,
+      lastPriceBnb: String(liveSpotBnb),
+      marketCapBnb: String(liveSpotBnb * BONDING_TOKEN_SUPPLY_HUMAN),
+    };
+  } else if (liveTrades.length > 0) {
     const chronological = sortTradesChronologically(liveTrades);
     const last = chronological[chronological.length - 1]!;
     // Only trust indexed/WS/optimistic bonding mark — never EVM virtual-reserve replay
@@ -273,6 +281,8 @@ export function TokenDetailLive({
   const [latestWsBonding, setLatestWsBonding] = useState<
     TokenTradeWsPayload["bonding"] | null
   >(null);
+  /** WS candle tip — header/sidebar/chart pin share this mark (same tick as chart paint). */
+  const [liveTipSpotBnb, setLiveTipSpotBnb] = useState<number | null>(null);
   const [chartCurrency, setChartCurrency] = useState<"usd" | "mcap">("mcap");
   const chartTapeSplit = useTokenChartTapeSplit();
 
@@ -292,6 +302,7 @@ export function TokenDetailLive({
     setDbTrades(initialTrades);
     setIndexerSyncing(false);
     setLatestWsBonding(null);
+    setLiveTipSpotBnb(null);
     hydratedRef.current = false;
   }, [contentSynced, tokenAddress, initialToken, initialTrades]);
 
@@ -431,8 +442,14 @@ export function TokenDetailLive({
   }, [isSolanaLive, solanaMarket, refetchEvmCurve]);
 
   const liveToken = useMemo(
-    () => mergeLiveStats(token, chainCurve as CurveTuple | undefined, trades),
-    [token, chainCurve, trades]
+    () =>
+      mergeLiveStats(
+        token,
+        chainCurve as CurveTuple | undefined,
+        trades,
+        liveTipSpotBnb
+      ),
+    [token, chainCurve, trades, liveTipSpotBnb]
   );
 
   const chainCurveSnapshot = useMemo(() => {
@@ -478,13 +495,15 @@ export function TokenDetailLive({
     [latestWsBonding]
   );
 
-  const marketSnapshotBase = useMemo(
-    () =>
-      buildTokenMarketSnapshot(liveToken, {
-        pendingSpotAfterBnb: wsSpotBnb > 0 ? wsSpotBnb : null,
-      }),
-    [liveToken, wsSpotBnb]
-  );
+  const marketSnapshotBase = useMemo(() => {
+    const pending =
+      liveTipSpotBnb != null && liveTipSpotBnb > 0
+        ? liveTipSpotBnb
+        : wsSpotBnb > 0
+          ? wsSpotBnb
+          : null;
+    return buildTokenMarketSnapshot(liveToken, { pendingSpotAfterBnb: pending });
+  }, [liveToken, liveTipSpotBnb, wsSpotBnb]);
 
   const displayPrice = marketSnapshotBase.spotPriceBnb;
   const liveMarketCapNative = marketSnapshotBase.marketCapBnb;
@@ -544,6 +563,10 @@ export function TokenDetailLive({
               blockTimeMs: new Date(tradeItem.blockTime).getTime(),
             });
           }
+          const liveSpot = resolveLiveSpotFromTradeWs(payload, updates);
+          if (liveSpot > 0) {
+            setLiveTipSpotBnb(liveSpot);
+          }
           if (updates.length > 0) {
             setLiveCandleUpdates((prev) => mergeWsCandleUpdates(prev, updates));
             for (const update of updates) {
@@ -568,11 +591,20 @@ export function TokenDetailLive({
     }
   }, [streamAddress]);
 
+  const applyWsMessagesRef = useRef(applyWsMessages);
+  applyWsMessagesRef.current = applyWsMessages;
+
   const queueWsMessage = useRafMessageQueue(applyWsMessages);
 
   const { connected: wsConnected } = useLiveChannel({
     room: `token:${normalizeRouteAddressKey(streamAddress)}`,
     onMessage: (message) => {
+      const payload = message as TokenTradeWsPayload;
+      // Trade tips: sync flush — header/sidebar must move on the same tick as chart paint.
+      if (payload?.type === "trade") {
+        applyWsMessagesRef.current([message]);
+        return;
+      }
       queueWsMessage(message);
     },
   });
@@ -1188,7 +1220,11 @@ export function TokenDetailLive({
                 fallbackTrades={chartFallbackTrades}
                 wsConnected={wsConnected}
                 bnbUsd={effectiveBnbUsd}
-  liveOnChainSpotBnb={displayPrice > 0 ? displayPrice : null}
+  liveOnChainSpotBnb={
+                  (liveTipSpotBnb ?? displayPrice) > 0
+                    ? (liveTipSpotBnb ?? displayPrice)
+                    : null
+                }
                 currency={chartCurrency}
                 onCurrencyChange={setChartCurrency}
               />
