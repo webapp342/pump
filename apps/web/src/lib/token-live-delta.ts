@@ -3,8 +3,7 @@ import {
 } from "@/lib/bonding-curve";
 import { addressCacheKey, routeAddressKeysEqual, txHashKey } from "@/lib/address";
 import type { TokenDetail, TradeItem } from "@/lib/db/launchpad";
-import type { CandleWsUpdate, CandleInterval } from "@/lib/candles";
-import { DEFAULT_CHART_INTERVAL } from "@/lib/candles";
+import type { CandleWsUpdate } from "@/lib/candles";
 import { arenaWsSpotPriceBnb, type ArenaTradeWsPayload } from "@/lib/arena-live-delta";
 
 export type TokenTradeWsPayload = {
@@ -111,34 +110,6 @@ export function patchTokenDetailFromWsTrade(
     marketCapBnb: mcapBnb,
     volume24hBnb: bonding?.volume24hZug ?? token.volume24hBnb,
   };
-}
-
-/**
- * Single live mark for header + sidebar + chart pin — prefer WS candle tip (same as chart paint).
- */
-export function resolveLiveSpotFromTradeWs(
-  payload: TokenTradeWsPayload,
-  updates: CandleWsUpdate[] = [],
-  chartInterval: CandleInterval = DEFAULT_CHART_INTERVAL
-): number {
-  const preferred =
-    updates.find((u) => u.interval === chartInterval) ??
-    updates.find((u) => u.interval === DEFAULT_CHART_INTERVAL) ??
-    updates[0];
-  if (preferred) {
-    const close = Number(preferred.close);
-    if (Number.isFinite(close) && close > 0) return close;
-  }
-  if (payload.bonding) {
-    const spot = arenaWsSpotPriceBnb(payload.bonding);
-    if (spot > 0) return spot;
-  }
-  const trade = payload.trade;
-  if (trade) {
-    const mark = Number(trade.priceZug);
-    if (Number.isFinite(mark) && mark > 0) return mark;
-  }
-  return 0;
 }
 
 /** Spot from bonding for portfolio mark (same as arena). */
