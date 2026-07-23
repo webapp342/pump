@@ -10,10 +10,15 @@ deploy_sync_repo() {
   git reset --hard "origin/${git_ref}"
   export DEPLOY_SHA="$(git rev-parse --short HEAD)"
   export DEPLOY_REF="$git_ref"
-  chmod +x deploy/vm/deploy-git-clean.sh deploy/vm/ensure-node-deps.sh \
-    deploy/vm/deploy-preflight.sh deploy/vm/run-pending-migrations.sh \
-    deploy/vm/deploy-post-smoke.sh 2>/dev/null || true
-  bash deploy/vm/deploy-git-clean.sh
+  # Skip git clean when SSH bootstrap already synced (sync-only / first targeted deploy).
+  if [[ "${DEPLOY_SKIP_GIT_CLEAN:-}" == "1" ]]; then
+    log "git clean skipped (DEPLOY_SKIP_GIT_CLEAN=1)"
+  else
+    chmod +x deploy/vm/deploy-git-clean.sh deploy/vm/ensure-node-deps.sh \
+      deploy/vm/deploy-preflight.sh deploy/vm/run-pending-migrations.sh \
+      deploy/vm/deploy-post-smoke.sh 2>/dev/null || true
+    bash deploy/vm/deploy-git-clean.sh
+  fi
 }
 
 deploy_ensure_env() {

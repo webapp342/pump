@@ -158,5 +158,14 @@ jobs:
             export DEPLOY_MODE="${{ github.event.inputs.mode || 'auto' }}"
             echo "[deploy] profile=$DEPLOY_PROFILE targets=$DEPLOY_TARGETS sha=$DEPLOY_SHA"
             cd /var/www/pump/tma
-            chmod +x deploy/vm/*.sh deploy/tma-deploy.sh
+            # Bootstrap sync — VM may lack deploy-targeted.sh until this fetch (sync_only chicken-egg).
+            git fetch origin "$GIT_REF"
+            git reset --hard "origin/$GIT_REF"
+            export DEPLOY_SHA="$(git rev-parse --short HEAD)"
+            chmod +x deploy/vm/*.sh deploy/tma-deploy.sh 2>/dev/null || true
+            if [[ ! -f deploy/vm/deploy-targeted.sh ]]; then
+              echo "[deploy] ERROR: deploy/vm/deploy-targeted.sh missing after sync at $DEPLOY_SHA"
+              exit 1
+            fi
+            export DEPLOY_SKIP_GIT_CLEAN=1
             bash deploy/vm/deploy-targeted.sh
