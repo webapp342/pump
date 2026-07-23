@@ -1,13 +1,14 @@
 import type { TradeItem } from "@/lib/db/launchpad";
 import { listTradesForToken } from "@/lib/db/launchpad";
 import { listTradesFromClickHouse } from "@/lib/clickhouse/trades";
+import { txHashKey } from "@/lib/address";
 import {
   readHotTapeEntries,
   type HotTapeEntry,
 } from "@/lib/redis/hot-cache";
 import { redisUrl } from "@/lib/db/perf-flags";
 
-export type TapeTradesSource = "redis_hot" | "clickhouse" | "postgres";
+export type TapeTradesSource = "redis_hot" | "clickhouse" | "postgres" | "merged";
 
 export type TapeTradesResult = {
   trades: TradeItem[];
@@ -32,9 +33,30 @@ function hotTapeToTradeItem(entry: HotTapeEntry): TradeItem {
   };
 }
 
+/** Redis hot ring supplements PG — never replace full history with hot-only slice. */
+export function mergeTapeTrades(
+  hot: TradeItem[],
+  stored: TradeItem[],
+  limit: number
+): TradeItem[] {
+  const byHash = new Map<string, TradeItem>();
+  for (const trade of stored) {
+    byHash.set(txHashKey(trade.txHash), trade);
+  }
+  for (const trade of hot) {
+    byHash.set(txHashKey(trade.txHash), trade);
+  }
+  return [...byHash.values()]
+    .sort(
+      (a, b) =>
+        new Date(b.blockTime).getTime() - new Date(a.blockTime).getTime()
+    )
+    .slice(0, limit);
+}
+
 /**
  * Tape read path (phase 4):
- * - page 1 (offset=0): Redis hot ring when available
+ * - page 1: PostgreSQL (authoritative) merged with Redis hot tail (indexer lag)
  * - deeper pages: ClickHouse trades_raw, PG fallback
  */
 export async function listTapeTradesForToken(
@@ -42,20 +64,31 @@ export async function listTapeTradesForToken(
   limit: number,
   offset: number
 ): Promise<TapeTradesResult> {
-  if (offset === 0 && redisUrl()) {
-    const hot = await readHotTapeEntries(address, limit);
-    if (hot.length > 0) {
-      return { trades: hot.map(hotTapeToTradeItem), source: "redis_hot" };
-    }
-  }
-
   if (offset > 0) {
     const fromCh = await listTradesFromClickHouse(address, limit, offset);
     if (fromCh && fromCh.length > 0) {
       return { trades: fromCh, source: "clickhouse" };
     }
+    const trades = await listTradesForToken(address, limit, offset);
+    return { trades, source: "postgres" };
   }
 
-  const trades = await listTradesForToken(address, limit, offset);
-  return { trades, source: "postgres" };
+  const stored = await listTradesForToken(address, limit, offset);
+  if (redisUrl()) {
+    const hot = await readHotTapeEntries(address, limit).then((entries) =>
+      entries.map(hotTapeToTradeItem)
+    );
+    if (hot.length > 0) {
+      const merged = mergeTapeTrades(hot, stored, limit);
+      const source: TapeTradesSource =
+        hot.length > 0 && stored.length > 0
+          ? "merged"
+          : hot.length > 0
+            ? "redis_hot"
+            : "postgres";
+      return { trades: merged, source };
+    }
+  }
+
+  return { trades: stored, source: "postgres" };
 }

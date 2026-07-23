@@ -472,13 +472,13 @@ export function TokenDetailLive({
     ? (solanaMarket.protocolFeeBps ?? BigInt(PUMP_FEEL_DEFAULTS.protocolFeeBps))
     : 100n;
 
-  const marketSnapshot = useMemo(
+  const marketSnapshotBase = useMemo(
     () => buildTokenMarketSnapshot(liveToken),
     [liveToken]
   );
 
-  const displayPrice = marketSnapshot.spotPriceBnb;
-  const liveMarketCapNative = marketSnapshot.marketCapBnb;
+  const displayPrice = marketSnapshotBase.spotPriceBnb;
+  const liveMarketCapNative = marketSnapshotBase.marketCapBnb;
 
   const fetchLive = useCallback(async () => {
     try {
@@ -723,6 +723,16 @@ export function TokenDetailLive({
   }, [trades, displayPrice, effectiveBnbUsd, liveToken.change24hPct]);
 
   const volume24hUsd = bnbToUsd(volume24hBnb, effectiveBnbUsd);
+
+  const marketSnapshot = useMemo(
+    () => ({
+      ...marketSnapshotBase,
+      volume24hBnb,
+      tradeCount: liveToken.tradeCount,
+    }),
+    [marketSnapshotBase, volume24hBnb, liveToken.tradeCount]
+  );
+
   const changeTone = change24h?.changePct ?? null;
   const showSocialLinks = hasSocialLinks(liveToken.socialLinks);
 

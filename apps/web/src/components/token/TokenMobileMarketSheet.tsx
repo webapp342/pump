@@ -17,7 +17,12 @@ type TokenMobileMarketSheetProps = {
   open: boolean;
   onClose: () => void;
   activeTokenAddress: string;
-  activeMarketSnapshot?: { spotPriceBnb: number; marketCapBnb: number };
+  activeMarketSnapshot?: {
+    spotPriceBnb: number;
+    marketCapBnb: number;
+    volume24hBnb?: number;
+    tradeCount?: number;
+  };
 };
 
 /** Overlay market picker — chart stays full height (no inline accordion). */

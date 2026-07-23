@@ -33,7 +33,12 @@ type TokenMarketSidebarProps = {
   id?: string;
   activeTokenAddress: string;
   /** Live mark from token page — keeps sidebar row in sync with header/chart. */
-  activeMarketSnapshot?: { spotPriceBnb: number; marketCapBnb: number };
+  activeMarketSnapshot?: {
+    spotPriceBnb: number;
+    marketCapBnb: number;
+    volume24hBnb?: number;
+    tradeCount?: number;
+  };
   density?: TokenSidebarDensity;
   headWrapRef?: Ref<HTMLDivElement>;
   className?: string;
@@ -285,15 +290,19 @@ export function TokenMarketSidebar({
             const rowToken = isActive
               ? applyActiveMarketToListItem(token, activeMarketSnapshot)
               : token;
-            const mcapUsd =
-              animatedCaps[`${addressKey}:cap:mcap`] ??
-              bnbToUsd(Number(rowToken.marketCapBnb), effectiveBnbUsd);
-            const priceUsd =
-              animatedCaps[`${addressKey}:cap:price`] ??
-              listTokenPriceUsd(rowToken.marketCapBnb, effectiveBnbUsd);
-            const vol24hUsd =
-              animatedCaps[`${addressKey}:cap:vol24h`] ??
-              bnbToUsd(Number(rowToken.volume24hBnb ?? 0), effectiveBnbUsd);
+            /** Active token row: header snapshot wins — skip arena animatedCaps (4× jump filter + 1s tween lag). */
+            const mcapUsd = isActive
+              ? bnbToUsd(Number(rowToken.marketCapBnb), effectiveBnbUsd)
+              : (animatedCaps[`${addressKey}:cap:mcap`] ??
+                bnbToUsd(Number(rowToken.marketCapBnb), effectiveBnbUsd));
+            const priceUsd = isActive
+              ? listTokenPriceUsd(rowToken.marketCapBnb, effectiveBnbUsd)
+              : (animatedCaps[`${addressKey}:cap:price`] ??
+                listTokenPriceUsd(rowToken.marketCapBnb, effectiveBnbUsd));
+            const vol24hUsd = isActive
+              ? bnbToUsd(Number(rowToken.volume24hBnb ?? 0), effectiveBnbUsd)
+              : (animatedCaps[`${addressKey}:cap:vol24h`] ??
+                bnbToUsd(Number(rowToken.volume24hBnb ?? 0), effectiveBnbUsd));
 
             if (useArenaRows) {
               return (

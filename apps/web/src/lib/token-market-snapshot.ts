@@ -9,6 +9,9 @@ import type { TokenDetail, TokenListItem } from "@/lib/db/launchpad";
 export type TokenMarketSnapshot = {
   spotPriceBnb: number;
   marketCapBnb: number;
+  /** Optional — keeps token-page sidebar row in sync with header tape stats. */
+  volume24hBnb?: number;
+  tradeCount?: number;
 };
 
 export function buildTokenMarketSnapshot(
@@ -48,5 +51,11 @@ export function applyActiveMarketToListItem(
   return {
     ...token,
     marketCapBnb: String(snapshot.marketCapBnb),
+    ...(snapshot.volume24hBnb != null && Number.isFinite(snapshot.volume24hBnb)
+      ? { volume24hBnb: String(snapshot.volume24hBnb) }
+      : {}),
+    ...(snapshot.tradeCount != null && snapshot.tradeCount > 0
+      ? { tradeCount: snapshot.tradeCount }
+      : {}),
   };
 }

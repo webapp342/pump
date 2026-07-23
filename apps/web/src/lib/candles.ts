@@ -1122,28 +1122,25 @@ export function sanitizeTailCandleOhlc(
 ): CandleBar {
   if (!Number.isFinite(anchor) || anchor <= 0) return bar;
 
-  const pickMag = (p: number, fallback: number): number => {
+  /** Decade snap only — never collapse OHLC legs onto close (kills real bonding wicks). */
+  const pickLeg = (p: number, fallback: number, preserveRaw = false): number => {
     if (!Number.isFinite(p) || p <= 0) return fallback;
     if (pricesSameMagnitude(p, anchor)) return p;
     const rescaled = rescalePriceToAnchor(p, anchor);
-    return pricesSameMagnitude(rescaled, anchor) ? rescaled : fallback;
+    if (pricesSameMagnitude(rescaled, anchor)) return rescaled;
+    return preserveRaw ? p : fallback;
   };
 
-  const close = pickMag(bar.close, anchor);
+  const close = pickLeg(bar.close, anchor);
   let open: number;
   if (opts?.preserveOpen && Number.isFinite(bar.open) && bar.open > 0) {
     // Decade-rescale only — never invent open from close.
-    open = pricesSameMagnitude(bar.open, anchor)
-      ? bar.open
-      : (() => {
-          const rescaled = rescalePriceToAnchor(bar.open, anchor);
-          return pricesSameMagnitude(rescaled, anchor) ? rescaled : bar.open;
-        })();
+    open = pickLeg(bar.open, close, true);
   } else {
-    open = pickMag(bar.open, close);
+    open = pickLeg(bar.open, close);
   }
-  const high = Math.max(pickMag(bar.high, close), open, close);
-  const low = Math.min(pickMag(bar.low, close), open, close);
+  const high = Math.max(pickLeg(bar.high, close, true), open, close);
+  const low = Math.min(pickLeg(bar.low, close, true), open, close);
   return { time: bar.time, open, high, low, close };
 }
 

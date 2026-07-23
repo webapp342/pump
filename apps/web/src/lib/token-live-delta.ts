@@ -108,6 +108,7 @@ export function patchTokenDetailFromWsTrade(
     holderCount: bonding?.holderCount ?? token.holderCount,
     lastPriceBnb: spotStr,
     marketCapBnb: mcapBnb,
+    volume24hBnb: bonding?.volume24hZug ?? token.volume24hBnb,
   };
 }
 
