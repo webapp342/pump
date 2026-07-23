@@ -1083,6 +1083,10 @@ export function rescalePriceToAnchor(price: number, anchor: number): number {
   if (Math.abs(decade) < 1 || Math.abs(logRatio - decade) > DECADE_RESCALE_LOG_EPS) {
     return price;
   }
+  // Buy-only buckets often have open ~4–6× below close (same decade). Do not 10×-rescale that.
+  if (Math.abs(logRatio) < 0.85) {
+    return price;
+  }
 
   const scaled = price / Math.pow(10, decade);
   return Number.isFinite(scaled) && scaled > 0 ? scaled : price;

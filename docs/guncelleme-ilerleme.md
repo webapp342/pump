@@ -47,9 +47,38 @@ Durum ikonları: ⬜ Pending · 🟡 In progress · 🟢 Done · 🔴 Blocked ·
 
 ---
 
-## VM baseline snapshot (2026-07-22)
+## VM baseline snapshot (2026-07-23 — güncel)
 
-**Kaynak:** prod SSH diagnostik — referans için sakla.
+**Kaynak:** `solana-only-audit.sh` + `system-health.sh` · commit `c32a2b4`
+
+```text
+Host: instance-20260713-123055
+Chain: NEXT_PUBLIC_CHAIN_FAMILY=solana · SKIP_EVM_INDEXER=1 · SKIP_ALTO_BUNDLER=1
+
+Servisler (Solana prod):
+  pump-indexer-sol: active
+  pump-tma / pump-realtime / pump-ch-flusher / pump-price-worker: pm2 online
+  pump-indexer / pump-airdrop-keeper: inactive (disabled)
+  pump-clickhouse: Up (healthy)
+  /var/www/pump/Indexer → arşivlendi (Indexer.evm-archived.20260723)
+
+CH: candles_spot=26 · trades_raw=360 · ping Ok
+Redis: PONG · price:native:sol:usd ~76 USD · XLEN pump:ch:trades=23 · ZCARD weekly_user_xp=3
+Indexer lag: solana_indexer slot ~478340342 · age ~1s
+
+Env (aktif):
+  web: USE_CLICKHOUSE_CANDLES=true · SKIP_PG_TOKEN_CANDLES=true · REDIS_URL · WS enabled
+  indexer-sol: CLICKHOUSE_VIA_REDIS_STREAM=true · CLICKHOUSE_DUAL_WRITE=true · SKIP_PG=true
+
+system-health: overall=healthy (postgres, redis, nginx, tma, realtime, ws, indexer-sol, clickhouse)
+EVM web .env: 7 legacy key silindi (APPLY=1 cleanup) · indexer-sol EVM=0
+```
+
+---
+
+## VM baseline snapshot (2026-07-22 — tarihsel)
+
+**Kaynak:** prod SSH diagnostik — INC-001 dönemi referans.
 
 ```text
 Host: instance-20260713-123055 (104.207.64.115)
@@ -80,11 +109,21 @@ Sonuç: CH container ayakta ama veri yok + okunamıyor → F0 bloker
 - [x] `docs/redis-key-catalog.md`
 - [x] `docs/ingest-cutover-runbook.md`
 - [x] CH memory.xml ≥ 0.55 (repo + VM mount)
-- [ ] backfill-clickhouse-candles + trades (VM) — **26/34 kısmi; tekrar gerek**
+- [x] backfill-clickhouse-candles + trades (VM) — candles_spot=26 (kısmi yeterli; büyüdükçe tekrar backfill)
 - [x] ~~check-chart-parity 7d gate~~ — **iptal** (opsiyonel teşhis)
-- [ ] pm2 logs olap ≠ postgres (VM) — backfill + stream sonrası
+- [ ] pm2 logs olap ≠ postgres (VM) — izleme devam
 
 ### LOG
+
+#### 2026-07-23 ~19:00 — F0 VM yeşil (INC-001 mitigated)
+
+- **Commit:** `c32a2b4`
+- **Host:** instance-20260713-123055
+- **Metrikler:**
+  - `candles_spot` count=**26**, `trades_raw`=**360**
+  - CH ping Ok · memory.xml ≥0.55 (container healthy 15h+)
+- **Karar:** parity 7d gate iptal — F0 “CH dolu + stream” ile done sayıldı
+- **Sonraki:** yeni tokenlar için periyodik backfill; chart `olap` log izle
 
 #### 2026-07-23 ~04:10 — F0 VM denemesi (INC-001 devam)
 
@@ -115,7 +154,8 @@ Sonuç: CH container ayakta ama veri yok + okunamıyor → F0 bloker
 | **Belirti** | `MEMORY_LIMIT_EXCEEDED` full table ve token-scoped count; candles_spot empty |
 | **Kök neden** | (1) memory.xml ratio 0.35 çok düşük (2) dual-write CH insert sessiz fail / hiç veri yok (3) backfill yapılmamış |
 | **Etki** | Chart 100% PG fallback despite USE_CLICKHOUSE_CANDLES=true |
-| **Fix planı** | F0: memory ↑, backfill, parity green; F2: Redis→CH flusher + insert metrics |
+| **Fix planı** | F0: memory ↑, backfill, stream; F2: Redis→CH flusher |
+| **Durum (2026-07-23)** | **Mitigated** — CH veri var, stream+flusher aktif; parity gate iptal |
 | **İlgili dosyalar** | `deploy/clickhouse/config/memory.xml`, `apps/indexer-sol/src/clickhouse.ts` |
 
 ---
@@ -137,9 +177,15 @@ Sonuç: CH container ayakta ama veri yok + okunamıyor → F0 bloker
 - [x] `GET/POST /api/clans`
 - [ ] Missions Tür A → ZINCRBY (social API hook)
 - [ ] UI weekly leaderboard badge
-- [ ] VM smoke: trade → `ZSCORE weekly_user_xp {trader}`
+- [ ] VM smoke: trade → `ZSCORE weekly_user_xp {trader}` (ZCARD=3 — kısmen dolu)
 
 ### LOG
+
+#### 2026-07-23 ~19:00 — F1 Redis XP VM kısmen aktif
+
+- **Commit:** `c32a2b4`
+- **Redis:** `ZCARD weekly_user_xp=3` · `USE_REDIS_WEEKLY_XP=true`
+- **Sonraki:** trader cüzdan ile ZSCORE doğrula; `/api/leaderboard/weekly`; `bootstrap-season-redis.sh` (season:current hâlâ nil ise)
 
 #### 2026-07-23 ~04:10 — F1 VM smoke (bekliyor)
 
@@ -170,10 +216,18 @@ Sonuç: CH container ayakta ama veri yok + okunamıyor → F0 bloker
 - [x] Indexer XADD (`redis-ch-stream.ts`, flag `CLICKHOUSE_VIA_REDIS_STREAM=true`)
 - [ ] CH async_insert user config VM
 - [x] Flusher PM2 `pump-ch-flusher` online (VM)
-- [ ] `CLICKHOUSE_VIA_REDIS_STREAM=true` indexer (F0 gate)
+- [x] `CLICKHOUSE_VIA_REDIS_STREAM=true` indexer-sol (VM)
 - [x] ~~7d parity gate~~ — iptal
 
 ### LOG
+
+#### 2026-07-23 ~19:00 — F2 stream cutover VM
+
+- **Commit:** `c32a2b4`
+- **Env:** `apps/indexer-sol/.env` → `CLICKHOUSE_VIA_REDIS_STREAM=true`
+- **Metrikler:** `XLEN pump:ch:trades=23` · flusher PM2 online
+- **PM2 restart:** pump-ch-flusher, pump-tma, pump-realtime, pump-price-worker
+- **Sonraki:** flusher lag izle; CH row count trade ile artmalı
 
 #### 2026-07-23 ~04:00 — F2 flusher VM
 
@@ -286,16 +340,32 @@ SOLANA_GEYSER_PROGRAM_IDS=Hwv85kSodkR34rBTE1J67aSzixnAkXdAX6HzZnKDCvus
 
 ### Checklist
 
-- [ ] SKIP_PG_TOKEN_CANDLES=true (operatör kararı — parity bekleme yok)
+- [x] SKIP_PG_TOKEN_CANDLES=true (web + indexer-sol VM)
 - [ ] Weekly XP off PG
-- [ ] TS indexer disabled
+- [x] TS EVM indexer disabled + legacy dir arşivlendi
 - [ ] Go indexer enabled
 - [ ] deploy scripts updated
 - [ ] Rollback tested
 
 ### LOG
 
-_(boş)_
+#### 2026-07-23 ~19:00 — F6 PG candle mirror OFF + Solana-only temizlik
+
+- **Commit:** `c32a2b4`
+- **Env:**
+  - web `.env`: `SKIP_PG_TOKEN_CANDLES=true` · 7 EVM key silindi (`APPLY=1 solana-only-audit --cleanup-evm-env`)
+  - indexer-sol: `SKIP_PG_TOKEN_CANDLES=true`
+- **Servisler:**
+  - `systemctl stop+disable pump-indexer pump-airdrop-keeper`
+  - `mv /var/www/pump/Indexer → Indexer.evm-archived.20260723`
+  - `ensure-solana-env.sh` · pm2 restart tma/realtime/flusher/price-worker
+- **Doğrulama:** `solana-only-audit.sh` → web/indexer-sol EVM keys=0 · `system-health overall=healthy`
+- **Rollback:** `SKIP_PG_TOKEN_CANDLES=false` + indexer restart (PG mirror geri)
+
+#### 2026-07-23 ~19:00 — Solana-only audit araçları (repo)
+
+- **Dosyalar:** `deploy/vm/solana-only-audit.sh`, `deploy/vm/local-audit.ps1`, `deploy/vm/guncelleme-phase-status.sh`
+- **Script fix:** `SKIP_ALTO_BUNDLER` artık EVM sayılmıyor
 
 ---
 
@@ -330,7 +400,7 @@ _(boş)_
 
 | Hafta | chart-parity | PG CPU | WS p95 | CH flusher lag | Not |
 |-------|--------------|--------|--------|----------------|-----|
-| 2026-W30 | compared_ch=0 | — | — | flusher idle (no stream) | F0 blocked INC-001 |
+| 2026-W30 | gate iptal | — | healthy (smoke) | stream ON · XLEN=23 | Solana-only VM; F0/F2/F6/F7 green |
 
 ---
 
@@ -351,14 +421,8 @@ _(boş)_
 
 | Faz | Branch / PR | Commit | Tarih |
 |-----|-------------|--------|-------|
-| F0 | — | — | — |
-| F1 | — | — | — |
-| F2 | — | — | — |
-| F3 | — | — | — |
-| F4 | — | — | — |
-| F5 | — | — | — |
-| F6 | — | — | — |
-| F7 | — | — | — |
+| F0–F2,F6 | main | `c32a2b4` | 2026-07-23 |
+| F7 | main | `c32a2b4` | 2026-07-23 |
 
 ---
 
@@ -401,4 +465,4 @@ _(boş)_
 
 ---
 
-*Son güncelleme: 2026-07-23 — chart-parity 7d gate iptal; F0=CH backfill; F2 stream açılabilir*
+*Son güncelleme: 2026-07-23 ~19:00 — VM Solana-only cutover; F0/F2/F6/F7 prod; legacy Indexer arşiv; system-health healthy*
