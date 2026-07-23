@@ -5,6 +5,7 @@ import { parseUnits } from "viem";
 import { PUMP_FEEL_DEFAULTS } from "@/config/solana";
 import type { BondingCurveState } from "@/lib/bonding-curve";
 import { lamportsToWei, tokenRawToWei } from "@/lib/solana/amount-scale";
+import { parseUnitsDecimal } from "@/lib/viem-decimal";
 
 const REAL_TOKEN_CAP_HUMAN = 793_100_000;
 const TOTAL_SUPPLY_HUMAN = 1_000_000_000;
@@ -54,16 +55,16 @@ export function solanaBondingStateFromLive(params: {
     soldTokens: 0n,
     virtualZugReserve: lamportsToWei(PUMP_FEEL_DEFAULTS.virtualSolLamports),
     virtualTokenReserve: tokenRawToWei(PUMP_FEEL_DEFAULTS.virtualTokenReserves),
-    realTokenReserves: parseUnits(String(remainingHuman), 18),
-    realSolReserves: parseUnits(
-      Number.isFinite(reserveHuman) && reserveHuman >= 0 ? String(reserveHuman) : "0",
+    realTokenReserves: parseUnitsDecimal(remainingHuman, 18),
+    realSolReserves: parseUnitsDecimal(
+      Number.isFinite(reserveHuman) && reserveHuman >= 0 ? reserveHuman : 0,
       18
     ),
     complete: graduated,
-    vaultTokenReserves: parseUnits(
+    vaultTokenReserves: parseUnitsDecimal(
       Number.isFinite(vaultHumanRaw) && vaultHumanRaw >= 0
-        ? String(vaultHumanRaw)
-        : String(TOTAL_SUPPLY_HUMAN),
+        ? vaultHumanRaw
+        : TOTAL_SUPPLY_HUMAN,
       18
     ),
   };

@@ -1,4 +1,5 @@
 import { formatEther, parseUnits } from "viem";
+import { parseUnitsDecimal } from "@/lib/viem-decimal";
 import {
   bondingCurveFromSnapshot,
   quoteSellFromCurveState,
@@ -27,11 +28,11 @@ export function bondingSnapshotFromDbBondingState(
 ): BondingCurveSnapshot {
   const virtualZugWei =
     virtualZugReserveHuman != null && String(virtualZugReserveHuman).trim() !== ""
-      ? parseUnits(String(virtualZugReserveHuman), 18).toString()
+      ? parseUnitsDecimal(virtualZugReserveHuman, 18).toString()
       : undefined;
   const virtualTokenWei =
     virtualTokenReserveHuman != null && String(virtualTokenReserveHuman).trim() !== ""
-      ? parseUnits(String(virtualTokenReserveHuman), 18).toString()
+      ? parseUnitsDecimal(virtualTokenReserveHuman, 18).toString()
       : undefined;
 
   return machineFromTokenReserves(

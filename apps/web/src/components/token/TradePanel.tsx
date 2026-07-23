@@ -4,6 +4,7 @@ import { PumpIcon, faCheck, faChevronDown } from "@/lib/icons";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { encodeFunctionData, formatEther, formatUnits, parseEther, parseSignature, parseUnits } from "viem";
+import { parseUnitsDecimal } from "@/lib/viem-decimal";
 import type { Address, TransactionReceipt } from "viem";
 import { useOpenConnectModal } from "@/hooks/useOpenConnectModal";
 import type { SessionBuyParams, SessionSellParams } from "@/hooks/useSessionTrade";
@@ -623,10 +624,10 @@ export function TradePanel({
     return {
       pct,
       soldLabel: formatTokenAmountCompact(
-        Number.isFinite(soldHuman) ? parseUnits(String(soldHuman), 18) : 0n,
+        Number.isFinite(soldHuman) ? parseUnitsDecimal(soldHuman, 18) : 0n,
         18
       ),
-      solInCurve: parseUnits(reserveBnb ?? "0", 18),
+      solInCurve: parseUnitsDecimal(reserveBnb ?? "0", 18),
     };
   }, [isSolanaTrade, solanaGraduated, progressBpsProp, tokenSold, reserveBnb]);
 

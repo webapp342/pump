@@ -4,6 +4,7 @@
  */
 
 import { formatEther, parseEther, parseUnits } from "viem";
+import { toViemDecimalString } from "@/lib/viem-decimal";
 import {
   bondingCurveFromSnapshot,
   bondingCurveSnapshotFromTuple,
@@ -35,7 +36,7 @@ function buildMachine(snapshot: BondingCurveSnapshot, version: number): BondingC
 /** DB / WS bonding fields are human decimals; on-chain snapshots are wei strings. */
 function normalizeReserveWei(value: string | undefined, fallback: string): string {
   if (!value?.trim()) return fallback;
-  const trimmed = value.trim();
+  const trimmed = toViemDecimalString(value.trim());
   if (trimmed.includes(".")) {
     try {
       return parseEther(trimmed).toString();
@@ -54,7 +55,7 @@ function normalizeReserveWei(value: string | undefined, fallback: string): strin
 
 function normalizeSoldWei(value: string | undefined, fallback: string): string {
   if (!value?.trim()) return fallback;
-  const trimmed = value.trim();
+  const trimmed = toViemDecimalString(value.trim());
   if (trimmed.includes(".")) {
     try {
       return parseUnits(trimmed, 18).toString();

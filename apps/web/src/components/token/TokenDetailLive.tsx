@@ -13,6 +13,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouter, useSearchParams } from "next/navigation";
 import { parseUnits, type Address } from "viem";
+import { parseUnitsDecimal } from "@/lib/viem-decimal";
 import { useReadContract } from "wagmi";
 import { useActiveWalletAddress } from "@/hooks/useActiveWalletAddress";
 import type { TokenHolderSnapshot, TokenDetail, TradeItem } from "@/lib/db/launchpad";
@@ -403,7 +404,7 @@ export function TokenDetailLive({
         (token.creatorAddress ?? streamAddress) as Address,
         curve.reserveZug,
         curve.soldTokens,
-        parseUnits(token.targetBnb ?? "0", 18),
+        parseUnitsDecimal(token.targetBnb ?? "0", 18),
         curve.virtualZugReserve,
         curve.virtualTokenReserve,
         solanaMarket.paused,
