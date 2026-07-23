@@ -6,11 +6,10 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	"github.com/joho/godotenv"
 	"github.com/pump-tma/indexer-sol-go/internal/config"
-	"github.com/pump-tma/indexer-sol-go/internal/geyser"
+	"github.com/pump-tma/indexer-sol-go/internal/runner"
 )
 
 func main() {
@@ -20,19 +19,14 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
 
-	log.Printf("[indexer-sol-go] start cluster=%s source=%s shadow=%s",
-		cfg.Cluster, cfg.Source, cfg.ShadowMode)
+	log.Printf("[indexer-sol-go] start cluster=%s source=%s shadow=%s rpc=%s",
+		cfg.Cluster, cfg.Source, cfg.ShadowMode, cfg.RpcURL)
 
-	client, err := geyser.NewClient(cfg)
-	if err != nil {
-		log.Fatalf("geyser client: %v", err)
-	}
-
-	if err := client.Run(ctx); err != nil && ctx.Err() == nil {
-		log.Fatalf("geyser run: %v", err)
+	// F5a: RPC WS ingest + decode (read-only). LaserStream wiring lands in F5b.
+	if err := runner.Run(ctx, cfg); err != nil && ctx.Err() == nil {
+		log.Fatalf("runner: %v", err)
 	}
 
 	log.Println("[indexer-sol-go] stopped")
-	time.Sleep(100 * time.Millisecond)
 	os.Exit(0)
 }

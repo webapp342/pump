@@ -1,0 +1,20 @@
+[Unit]
+Description=Pump Solana Go indexer (F5 shadow / primary)
+After=network-online.target redis-server.service postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/pump/tma/apps/indexer-sol-go
+EnvironmentFile=/var/www/pump/tma/apps/indexer-sol-go/.env
+ExecStart=/var/www/pump/tma/apps/indexer-sol-go/bin/indexer-sol-go
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=pump-indexer-sol-go
+
+[Install]
+WantedBy=multi-user.target

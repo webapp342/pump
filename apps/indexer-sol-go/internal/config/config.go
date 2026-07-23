@@ -6,6 +6,7 @@ import (
 )
 
 type Config struct {
+	RpcURL             string
 	Cluster            string
 	Source             string
 	ShadowMode         string
@@ -20,6 +21,7 @@ type Config struct {
 func Load() Config {
 	return Config{
 		Cluster:        env("SOLANA_CLUSTER", "devnet"),
+		RpcURL:         env("SOLANA_RPC_URL", "https://api.devnet.solana.com"),
 		Source:         env("SOLANA_INDEXER_SOURCE", "geyser"),
 		ShadowMode:     env("GO_SHADOW_MODE", ""),
 		LaserStreamURL: env("SOLANA_GEYSER_ENDPOINT", "https://laserstream-devnet-ewr.helius-rpc.com"),
