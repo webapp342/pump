@@ -1,21 +1,17 @@
 #!/usr/bin/env bash
-# Pull latest + build web/indexer packages after F3/F4 program + UI changes.
+# F3/F4 hotfix helper — delegates to the real production deploy.
+#
+# CI/CD (push → main) already runs deploy/tma-deploy.sh via .github/workflows/deploy.yml.
+# Use this ONLY when you need a manual VM deploy without waiting for Actions:
+#   bash deploy/vm/guncelleme-web-deploy.sh
+#
+# Do NOT use for day-to-day deploys — prefer: git push origin main
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-cd "$ROOT"
 
-echo "[guncelleme-deploy] git pull"
-git pull --ff-only
+echo "[guncelleme-deploy] Bu script deploy/tma-deploy.sh çağırır (npm ci + full build + pm2)."
+echo "[guncelleme-deploy] Normal akış: main'e push → GitHub Actions otomatik deploy."
+echo ""
 
-echo "[guncelleme-deploy] build workspaces"
-npm run build -w @pump/solana-sdk
-npm run build -w @pump/xp
-npm run build -w @pump/web
-
-echo "[guncelleme-deploy] pm2 restart"
-pm2 restart pump-tma pump-indexer-sol --update-env
-
-echo "[guncelleme-deploy] OK — verify:"
-echo "  curl -s localhost:3012/api/season/status | jq"
-echo "  curl -s 'localhost:3012/api/xp/weekly?address=<wallet>' | jq"
+exec bash "$ROOT/deploy/tma-deploy.sh"

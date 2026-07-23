@@ -290,7 +290,7 @@ Sonuç: CH container ayakta ama veri yok + okunamıyor → F0 bloker
 |-------|-----|
 | 2026-07-24 | F3 kod: program 6-way `accrue_fees`, 17-account buy/sell, `FeeSplitV2Event`, SDK/web/indexer wiring |
 | 2026-07-24 | **Devnet deploy** sig `3U54buGN…` · ProgramData 74160 bytes · authority `7yqf5m5P…` |
-| 2026-07-24 | **Sonraki:** VM `git pull && npm run build -w @pump/web && pm2 restart` — trade 17-account + user_xp |
+| 2026-07-24 | **Sonraki:** `main` push → CI/CD (`deploy/tma-deploy.sh`) veya VM `./deploy/tma-deploy.sh` |
 
 ---
 
@@ -313,7 +313,7 @@ Sonuç: CH container ayakta ama veri yok + okunamıyor → F0 bloker
 |-------|-----|
 | 2026-07-24 | F4a: `allocatePoolByXp` / `allocateClanSeasonPool`, worker reads season/clan PDA balances, claims banner on leaderboard |
 | 2026-07-24 | F4b: IX 12/13 credit+claim season, settlement `--credit-on-chain`, `/api/season/rewards`, leaderboard claim |
-| 2026-07-24 | **Deploy:** program redeploy (F4b) + VM `bash deploy/vm/guncelleme-web-deploy.sh` |
+| 2026-07-24 | **Deploy:** program redeploy (F4b) + `main` push veya VM `./deploy/tma-deploy.sh` |
 
 ---
 
