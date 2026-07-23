@@ -31,6 +31,8 @@ env_val() {
 is_evm_env_key() {
   local key="$1"
   case "$key" in
+    SKIP_ALTO_BUNDLER|SKIP_EVM_INDEXER)
+      return 1 ;;
     BUNDLER_*|ALTO_*|SKANDHA_*|PIMLICO_*|ZERO_DEV_*|KERNEL_*|PAYMASTER_*)
       return 0 ;;
     NEXT_PUBLIC_CHAIN_ID|CHAIN_ID|NEXT_PUBLIC_RPC_URL|RPC_URL)
@@ -44,8 +46,10 @@ is_evm_env_key() {
     BUNDLER_EXECUTOR_*|BUNDLER_UTILITY_*|BUNDLER_RELAYER_*)
       return 0 ;;
     *)
+      [[ "$key" == SKIP_ALTO_* ]] && return 1
       [[ "$key" == *BUNDLER* ]] && return 0
-      [[ "$key" == *ALTO* ]] && return 0
+      [[ "$key" == ALTO_* ]] && return 0
+      [[ "$key" == *ALTO* ]] && [[ "$key" != SKIP_ALTO_* ]] && return 0
       [[ "$key" == *MEME_FACTORY* ]] && return 0
       [[ "$key" == *AIRDROP* ]] && [[ "$key" != *SOLANA* ]] && return 0
       return 1 ;;

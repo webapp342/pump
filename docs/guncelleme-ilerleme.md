@@ -12,14 +12,14 @@
 
 | Faz | Ad | Durum | Başlangıç | Bitiş | Not |
 |-----|-----|--------|-----------|-------|-----|
-| F0 | Spec + CH ops | 🟡 **In progress** | 2026-07-23 | — | backfill + CH OOM fix; parity gate **iptal** |
-| F1 | Redis XP + clans | 🟡 **In progress** | 2026-07-23 | — | kod+054 VM OK; XP smoke = yeni trade + trader cüzdan |
-| F2 | Redis→CH flusher | 🟡 **Ready** | 2026-07-23 | — | flusher online; stream flag **açılabilir** (parity bekleme yok) |
+| F0 | Spec + CH ops | 🟢 **Done** | 2026-07-23 | 2026-07-23 | CH candles_spot=26, trades_raw=360 |
+| F1 | Redis XP + clans | 🟡 **In progress** | 2026-07-23 | — | ZCARD weekly_user_xp=3; UI smoke eksik |
+| F2 | Redis→CH flusher | 🟢 **Stream ON** | 2026-07-23 | — | XLEN pump:ch:trades=23, flusher online |
 | F3 | Program fee v2 | 🟡 **In progress** | 2026-07-23 | — | kod local; on-chain deploy yok |
 | F4 | Sezon settlement | 🟡 **In progress** | 2026-07-23 | — | settlement-worker scaffold |
 | F5 | Go indexer + LaserStream | 🟡 **In progress** | 2026-07-23 | — | apps/indexer-sol-go scaffold |
-| F6 | PG offload + TS cutover | ⬜ Pending | — | — | F0+F5 sonrası |
-| F7 | Jupiter + portfolio CH | 🟢 **Price worker done** | 2026-07-23 | — | Redis SOL ~78; portfolio CH tab bekliyor |
+| F6 | PG offload + TS cutover | 🟢 **SKIP_PG ON** | 2026-07-23 | — | web+indexer SKIP_PG_TOKEN_CANDLES=true |
+| F7 | Jupiter + portfolio CH | 🟢 **Price worker done** | 2026-07-23 | — | Redis SOL ~76 USD |
 | F8 | Hardening | ⬜ Ongoing | — | — | |
 
 **Kritik yol:** CH backfill + stream → F2 cutover → F1 XP smoke → F3 deploy → F5/F6.  
