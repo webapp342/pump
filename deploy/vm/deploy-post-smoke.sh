@@ -6,6 +6,7 @@ REPO_ROOT="${1:-/var/www/pump/tma}"
 HEALTH_URL="${HEALTH_URL:-http://127.0.0.1:3012/api/health}"
 REALTIME_URL="${REALTIME_HEALTH_URL:-http://127.0.0.1:3013}"
 TARGETS="${DEPLOY_TARGETS:-}"
+RECONCILE_RAN="${DEPLOY_RECONCILE_RAN:-}"
 
 log() { echo "[post-deploy] $*"; }
 warn() { echo "[post-deploy] WARN: $*" >&2; }
@@ -15,9 +16,14 @@ has_target() {
   [[ -z "$TARGETS" || ",${TARGETS}," == *",${t},"* ]]
 }
 
+should_check() {
+  local t="$1"
+  has_target "$t" || [[ "$RECONCILE_RAN" == "1" ]] || [[ "$TARGETS" == "sync" ]]
+}
+
 cd "$REPO_ROOT"
 
-if has_target web; then
+if should_check web; then
   if curl -sf "$HEALTH_URL" >/dev/null 2>&1; then
     log "web health OK"
   else
@@ -25,7 +31,7 @@ if has_target web; then
   fi
 fi
 
-if has_target realtime; then
+if should_check realtime; then
   if curl -sf "$REALTIME_URL" >/dev/null 2>&1; then
     log "realtime OK"
   else
@@ -33,7 +39,7 @@ if has_target realtime; then
   fi
 fi
 
-if has_target indexer_go; then
+if should_check indexer_go || [[ -d "$REPO_ROOT/apps/indexer-sol-go/cmd/indexer" ]]; then
   if systemctl is-active pump-indexer-sol-go >/dev/null 2>&1; then
     log "pump-indexer-sol-go active"
   elif systemctl is-active pump-indexer-sol >/dev/null 2>&1; then
@@ -43,7 +49,7 @@ if has_target indexer_go; then
   fi
 fi
 
-if has_target web || has_target realtime || has_target indexer_go; then
+if should_check web || should_check realtime || should_check indexer_go; then
   if command -v redis-cli >/dev/null 2>&1; then
     if redis-cli ping 2>/dev/null | grep -qi PONG; then
       log "redis OK"

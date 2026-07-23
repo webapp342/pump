@@ -167,6 +167,15 @@ fi
 
 export DEPLOY_SHA="${DEPLOY_SHA:-$(git rev-parse --short HEAD)}"
 export DEPLOY_TARGETS="$TARGETS_RAW"
+
+# Heal down/unhealthy production services (indexer, pm2, health) — always, especially sync_only.
+log "slice: reconcile (heal inactive or unhealthy services)"
+export DEPLOY_RECONCILE_RAN=1
+bash deploy/vm/deploy-reconcile-services.sh "$REPO_ROOT" || warn_reconcile=$?
+if [[ "${warn_reconcile:-0}" -ne 0 ]]; then
+  log "WARN: reconcile had errors — check [reconcile] logs above"
+fi
+
 bash deploy/vm/deploy-post-smoke.sh "$REPO_ROOT" || true
 
 log "DONE profile=$PROFILE targets=$TARGETS_RAW sha=$DEPLOY_SHA"

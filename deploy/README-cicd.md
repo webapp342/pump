@@ -74,3 +74,15 @@ VM'de Go 1.25.1+ yoksa indexer slice **warn + skip** (web deploy devam). Zorunlu
 
 - GitHub: `node_modules` cache (lock aynı → npm ci skip)
 - VM: `.deploy/` stamp + `node_modules` + `.next` korunur
+
+## Reconcile (her deploy sonu)
+
+`deploy-reconcile-services.sh` — rebuild yok; sadece heal:
+
+| Servis | Ne zaman müdahale |
+|--------|-------------------|
+| pm2 pump-tma / realtime / ch-flusher / price-worker | status ≠ online |
+| web / realtime HTTP | health fail → pm2 restart |
+| pump-indexer-sol-go | inactive / failed / binary yok → `indexer-sol-go-deploy.sh` |
+
+`sync_only` deploy bile indexer'ı ayağa kaldırır (önceki full deploy'da Go skip edilmişse).
