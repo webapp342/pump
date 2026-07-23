@@ -12,6 +12,7 @@ export const PDA_SEEDS = {
   cashbackFees: "cashback-fees",
   seasonAccrual: "season-accrual",
   clanPoolAccrual: "clan-pool-accrual",
+  seasonRewards: "season-rewards",
 } as const;
 
 /** Max user_xp passed in buy/sell IX (anti-spoof cap). */
@@ -46,6 +47,14 @@ export const IX = {
   emergencyClaimPendingFees: 9,
   setEmergencyHalt: 10,
   claimCashbackFees: 11,
+  creditSeasonReward: 12,
+  claimSeasonRewards: 13,
+} as const;
+
+/** Accrual vault source for creditSeasonReward IX. */
+export const SEASON_POOL_KIND = {
+  season: 0,
+  clan: 1,
 } as const;
 
 export type SolanaCluster = "localnet" | "devnet" | "mainnet-beta";
@@ -223,6 +232,26 @@ export function encodeSellIx(
 export function encodeClaimCashbackFeesIx(): Buffer {
   const out = new Uint8Array(1);
   writeU8(out, 0, IX.claimCashbackFees);
+  return instructionData(out);
+}
+
+export function encodeCreditSeasonRewardIx(input: {
+  seasonId: number;
+  amountLamports: bigint;
+  poolKind: typeof SEASON_POOL_KIND[keyof typeof SEASON_POOL_KIND];
+}): Buffer {
+  const out = new Uint8Array(1 + 4 + 8 + 1);
+  let o = writeU8(out, 0, IX.creditSeasonReward);
+  o = writeU32Le(out, o, input.seasonId);
+  o = writeU64Le(out, o, input.amountLamports);
+  writeU8(out, o, input.poolKind);
+  return instructionData(out);
+}
+
+export function encodeClaimSeasonRewardsIx(seasonId: number): Buffer {
+  const out = new Uint8Array(1 + 4);
+  let o = writeU8(out, 0, IX.claimSeasonRewards);
+  writeU32Le(out, o, seasonId);
   return instructionData(out);
 }
 

@@ -10,7 +10,9 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@pump/solana-sdk": "*",
     "@pump/xp": "*",
+    "@solana/web3.js": "^1.98.4",
     "dotenv": "^17.2.3",
     "ioredis": "^5.8.1",
     "pg": "^8.16.3"

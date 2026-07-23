@@ -59,6 +59,15 @@ export const REWARDS_WEEKLY_XP = {
   you: "You",
   clansHeading: "Top clans",
   clanFallback: "Clan",
+  claimsPending: (seasonId: number) =>
+    `Season ${seasonId} rewards are being settled on-chain. Claim opens soon.`,
+  claimsOpen: (seasonId: number) =>
+    `Season ${seasonId} pool rewards are ready to claim.`,
+  claimsClosed: "Season rewards claim is not open yet.",
+  claimSeasonCta: "Claim season rewards",
+  claimSeasonLoading: "Claiming…",
+  claimSeasonSuccess: "Season rewards claimed.",
+  claimSeasonNone: "No season rewards for this wallet.",
 } as const;
 
 export const REWARDS_MARKET = {

@@ -16,6 +16,9 @@
 //!   6 claim_creator_fees | 7 claim_referrer_fees | 8 emergency_sweep
 //!   9 emergency_claim_pending_fees (authority sweeps creator/referrer pending)
 //!  10 set_emergency_halt (authority clear/set Global.emergency_halt)
+//!  11 claim_cashback_fees
+//!  12 credit_season_reward (authority — settlement)
+//!  13 claim_season_rewards
 
 pub mod events;
 pub mod math;
@@ -27,6 +30,7 @@ const REFERRER_FEES_SEED: &[u8] = b"referrer-fees";
 const CASHBACK_FEES_SEED: &[u8] = b"cashback-fees";
 const SEASON_ACCRUAL_SEED: &[u8] = b"season-accrual";
 const CLAN_POOL_ACCRUAL_SEED: &[u8] = b"clan-pool-accrual";
+const SEASON_REWARDS_SEED: &[u8] = b"season-rewards";
 const PROTOCOL_TREASURY_SEED: &[u8] = b"protocol-treasury";
 const CASHBACK_XP_THRESHOLD: u32 = 1000;
 const USER_XP_MAX: u32 = 10_000_000;
@@ -79,6 +83,11 @@ const IX_EMERGENCY_SWEEP: u8 = 8;
 const IX_EMERGENCY_CLAIM_PENDING: u8 = 9;
 const IX_SET_EMERGENCY_HALT: u8 = 10;
 const IX_CLAIM_CASHBACK: u8 = 11;
+const IX_CREDIT_SEASON_REWARD: u8 = 12;
+const IX_CLAIM_SEASON_REWARDS: u8 = 13;
+
+const POOL_KIND_SEASON: u8 = 0;
+const POOL_KIND_CLAN: u8 = 1;
 
 const LIQUIDITY_RENT_LAMPORTS: u64 = 890_880;
 const PROTOCOL_TREASURY_RENT_LAMPORTS: u64 = 890_880;
@@ -169,6 +178,21 @@ impl PendingFees {
     pub const LEN: usize = core::mem::size_of::<Self>();
 }
 
+/// Season leaderboard / clan pool claim ledger (F4).
+#[repr(C)]
+#[derive(Clone, Copy, Pod, Zeroable)]
+pub struct SeasonReward {
+    pub owner: [u8; 32],
+    pub pending_lamports: u64,
+    pub season_id: u32,
+    pub bump: u8,
+    pub _pad: [u8; 3],
+}
+
+impl SeasonReward {
+    pub const LEN: usize = core::mem::size_of::<Self>();
+}
+
 fn process_instruction(
     program_id: &Pubkey,
     accounts: &[AccountInfo],
@@ -190,6 +214,8 @@ fn process_instruction(
         IX_EMERGENCY_CLAIM_PENDING => process_emergency_claim_pending(program_id, accounts),
         IX_SET_EMERGENCY_HALT => process_set_emergency_halt(program_id, accounts, rest),
         IX_CLAIM_CASHBACK => process_claim_cashback_fees(program_id, accounts),
+        IX_CREDIT_SEASON_REWARD => process_credit_season_reward(program_id, accounts, rest),
+        IX_CLAIM_SEASON_REWARDS => process_claim_season_rewards(program_id, accounts, rest),
         _ => Err(ProgramError::InvalidInstructionData),
     }
 }
@@ -1222,6 +1248,203 @@ fn claim_pending_fees(
 fn process_claim_cashback_fees(program_id: &Pubkey, accounts: &[AccountInfo]) -> ProgramResult {
     claim_pending_fees(program_id, accounts, CASHBACK_FEES_SEED)?;
     log!("pump:claim_cashback");
+    Ok(())
+}
+
+fn ensure_season_reward(
+    payer: &AccountInfo,
+    account: &AccountInfo,
+    program_id: &Pubkey,
+    season_id: u32,
+    owner: &[u8; 32],
+) -> Result<u8, ProgramError> {
+    let season_bytes = season_id.to_le_bytes();
+    let (pda, bump) = find_program_address(
+        &[
+            SEASON_REWARDS_SEED,
+            season_bytes.as_ref(),
+            owner.as_ref(),
+        ],
+        program_id,
+    );
+    if account.key() != &pda {
+        return Err(ProgramError::InvalidSeeds);
+    }
+    if account.lamports() == 0 {
+        let bump_seed = [bump];
+        let seeds = [
+            Seed::from(SEASON_REWARDS_SEED),
+            Seed::from(season_bytes.as_ref()),
+            Seed::from(owner.as_ref()),
+            Seed::from(bump_seed.as_ref()),
+        ];
+        let signers = [Signer::from(&seeds)];
+        CreateAccount {
+            from: payer,
+            to: account,
+            lamports: PENDING_FEES_RENT_LAMPORTS,
+            space: SeasonReward::LEN as u64,
+            owner: program_id,
+        }
+        .invoke_signed(&signers)?;
+        let init = SeasonReward {
+            owner: *owner,
+            season_id,
+            pending_lamports: 0,
+            bump,
+            _pad: [0; 3],
+        };
+        write_pod(account, &init)?;
+    } else if !owner_eq(account, program_id) {
+        return Err(ProgramError::IncorrectProgramId);
+    }
+    Ok(bump)
+}
+
+fn validate_accrual_pool(
+    pool: &AccountInfo,
+    program_id: &Pubkey,
+    pool_kind: u8,
+) -> Result<(), ProgramError> {
+    let seed = if pool_kind == POOL_KIND_CLAN {
+        CLAN_POOL_ACCRUAL_SEED
+    } else if pool_kind == POOL_KIND_SEASON {
+        SEASON_ACCRUAL_SEED
+    } else {
+        return Err(ProgramError::InvalidInstructionData);
+    };
+    let (pda, _) = find_program_address(&[seed], program_id);
+    if pool.key() != &pda || !owner_eq(pool, program_id) {
+        return Err(ProgramError::InvalidSeeds);
+    }
+    Ok(())
+}
+
+/// Authority credits one wallet's season reward from accrual vault → liquidity + PDA ledger.
+fn process_credit_season_reward(
+    program_id: &Pubkey,
+    accounts: &[AccountInfo],
+    data: &[u8],
+) -> ProgramResult {
+    let [authority, global, source_pool, liquidity, season_reward, beneficiary, _system] = accounts
+    else {
+        return Err(ProgramError::NotEnoughAccountKeys);
+    };
+    if !authority.is_signer() {
+        return Err(ProgramError::MissingRequiredSignature);
+    }
+    if !owner_eq(global, program_id) {
+        return Err(ProgramError::IncorrectProgramId);
+    }
+
+    let season_id = read_u32(data, 0)?;
+    let amount = read_u64(data, 4)?;
+    let pool_kind = read_u8(data, 12)?;
+    if amount == 0 || season_id == 0 {
+        return Err(ProgramError::InvalidArgument);
+    }
+
+    let g = load_pod::<GlobalConfig>(global)?;
+    if !keys_eq(&g.authority, authority.key()) || !keys_eq(&g.liquidity, liquidity.key()) {
+        return Err(ProgramError::InvalidAccountData);
+    }
+
+    validate_accrual_pool(source_pool, program_id, pool_kind)?;
+
+    let beneficiary_key = pubkey_bytes(beneficiary);
+    if beneficiary_key == [0u8; 32] {
+        return Err(ProgramError::InvalidAccountData);
+    }
+
+    ensure_season_reward(
+        authority,
+        season_reward,
+        program_id,
+        season_id,
+        &beneficiary_key,
+    )?;
+
+    let mut reward = load_pod::<SeasonReward>(season_reward)?;
+    if reward.owner != beneficiary_key || reward.season_id != season_id {
+        return Err(ProgramError::InvalidAccountData);
+    }
+
+    if source_pool.lamports() < amount.saturating_add(PROTOCOL_TREASURY_RENT_LAMPORTS) {
+        return Err(ProgramError::InsufficientFunds);
+    }
+    if liquidity.lamports().saturating_add(amount) < LIQUIDITY_RENT_LAMPORTS {
+        return Err(ProgramError::InsufficientFunds);
+    }
+
+    transfer_from_liquidity(source_pool, liquidity, amount)?;
+
+    reward.pending_lamports = reward
+        .pending_lamports
+        .checked_add(amount)
+        .ok_or(ProgramError::InvalidAccountData)?;
+    write_pod(season_reward, &reward)?;
+    events::emit_season_reward_credited(&beneficiary_key, season_id, amount, pool_kind);
+    log!("pump:credit_season");
+    Ok(())
+}
+
+fn process_claim_season_rewards(
+    program_id: &Pubkey,
+    accounts: &[AccountInfo],
+    data: &[u8],
+) -> ProgramResult {
+    let season_id = read_u32(data, 0)?;
+    if season_id == 0 {
+        return Err(ProgramError::InvalidArgument);
+    }
+    let [claimer, global, liquidity, season_reward] = accounts else {
+        return Err(ProgramError::NotEnoughAccountKeys);
+    };
+    if !claimer.is_signer() {
+        return Err(ProgramError::MissingRequiredSignature);
+    }
+    if !owner_eq(global, program_id) || !owner_eq(season_reward, program_id) {
+        return Err(ProgramError::IncorrectProgramId);
+    }
+    let g = load_pod::<GlobalConfig>(global)?;
+    if !keys_eq(&g.liquidity, liquidity.key()) {
+        return Err(ProgramError::InvalidAccountData);
+    }
+
+    let claimer_key = pubkey_bytes(claimer);
+    let season_bytes = season_id.to_le_bytes();
+    let (pda, _bump) = find_program_address(
+        &[
+            SEASON_REWARDS_SEED,
+            season_bytes.as_ref(),
+            claimer_key.as_ref(),
+        ],
+        program_id,
+    );
+    if season_reward.key() != &pda {
+        return Err(ProgramError::InvalidSeeds);
+    }
+
+    let mut reward = load_pod::<SeasonReward>(season_reward)?;
+    if reward.owner != claimer_key || reward.season_id != season_id {
+        return Err(ProgramError::InvalidAccountData);
+    }
+    let amount = reward.pending_lamports;
+    if amount == 0 {
+        return Err(ProgramError::Custom(1));
+    }
+    if liquidity.lamports() < amount.saturating_add(LIQUIDITY_RENT_LAMPORTS) {
+        return Err(ProgramError::InsufficientFunds);
+    }
+
+    reward.pending_lamports = 0;
+    write_pod(season_reward, &reward)?;
+
+    *liquidity.try_borrow_mut_lamports()? -= amount;
+    *claimer.try_borrow_mut_lamports()? += amount;
+
+    events::emit_season_reward_claimed(&claimer_key, season_id, amount);
+    log!("pump:claim_season");
     Ok(())
 }
 

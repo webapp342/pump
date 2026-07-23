@@ -38,3 +38,12 @@ export function parseSeasonMeta(raw: Record<string, string> | null): SeasonMeta 
     startedAt: raw?.started_at ?? new Date().toISOString(),
   };
 }
+
+export {
+  allocateClanSeasonPool,
+  allocatePoolByXp,
+  type ClanMemberXp,
+  type ClanWalletAllocation,
+  type LamportAllocation,
+  type RankedEntry,
+} from "./settlement.js";

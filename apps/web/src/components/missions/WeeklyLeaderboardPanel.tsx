@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { UserAvatarForAddress } from "@/components/user/UserAvatarForAddress";
 import { UserDisplayName } from "@/components/user/UserDisplayName";
 import { REWARDS_WEEKLY_XP } from "@/lib/rewards-copy";
+import { silentClaimSeasonRewards } from "@/lib/solana/silent-claim-season";
+import { isSolanaChainFamily } from "@/config/chain-family";
 
 type WeeklyUserRow = {
   rank: number;
@@ -24,6 +26,11 @@ type WeeklyLeaderboardData = {
   clans: WeeklyClanRow[];
 };
 
+type SeasonClaimsState = {
+  settledSeasonId: number | null;
+  claimsOpen: boolean;
+};
+
 type WeeklyLeaderboardPanelProps = {
   address?: string;
   refreshKey?: number;
@@ -34,6 +41,10 @@ export function WeeklyLeaderboardPanel({
   refreshKey = 0,
 }: WeeklyLeaderboardPanelProps) {
   const [data, setData] = useState<WeeklyLeaderboardData | null>(null);
+  const [seasonClaims, setSeasonClaims] = useState<SeasonClaimsState | null>(null);
+  const [seasonRewardLamports, setSeasonRewardLamports] = useState<bigint>(0n);
+  const [claimLoading, setClaimLoading] = useState(false);
+  const [claimMessage, setClaimMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -42,21 +53,48 @@ export function WeeklyLeaderboardPanel({
     setLoading(true);
     void (async () => {
       try {
-        const response = await fetch("/api/leaderboard/weekly?limit=100&clans=1", {
-          cache: "no-store",
-        });
-        const body = (await response.json()) as {
+        const [leaderboardRes, seasonRes] = await Promise.all([
+          fetch("/api/leaderboard/weekly?limit=100&clans=1", { cache: "no-store" }),
+          fetch("/api/season/status", { cache: "no-store" }),
+        ]);
+        const body = (await leaderboardRes.json()) as {
           data?: WeeklyLeaderboardData;
           error?: string;
         };
-        if (!response.ok) throw new Error(body.error ?? REWARDS_WEEKLY_XP.loadError);
+        if (!leaderboardRes.ok) {
+          throw new Error(body.error ?? REWARDS_WEEKLY_XP.loadError);
+        }
+        const seasonBody = (await seasonRes.json()) as {
+          data?: SeasonClaimsState;
+        };
+        let pendingLamports = 0n;
+        if (
+          address.trim() &&
+          seasonBody.data?.claimsOpen &&
+          seasonBody.data.settledSeasonId != null
+        ) {
+          const rewardsRes = await fetch(
+            `/api/season/rewards?address=${encodeURIComponent(address.trim())}`,
+            { cache: "no-store" }
+          );
+          const rewardsBody = (await rewardsRes.json()) as {
+            data?: { pendingLamports?: string };
+          };
+          if (rewardsRes.ok && rewardsBody.data?.pendingLamports) {
+            pendingLamports = BigInt(rewardsBody.data.pendingLamports);
+          }
+        }
         if (cancelled) return;
         setData(body.data ?? null);
+        setSeasonClaims(seasonBody.data ?? null);
+        setSeasonRewardLamports(pendingLamports);
+        setClaimMessage(null);
         setError(null);
       } catch (err) {
         if (!cancelled) {
           setError(err instanceof Error ? err.message : REWARDS_WEEKLY_XP.loadError);
           setData(null);
+          setSeasonClaims(null);
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -65,7 +103,37 @@ export function WeeklyLeaderboardPanel({
     return () => {
       cancelled = true;
     };
-  }, [refreshKey]);
+  }, [refreshKey, address]);
+
+  const canClaimSeason =
+    isSolanaChainFamily &&
+    Boolean(address.trim()) &&
+    seasonClaims?.claimsOpen &&
+    seasonClaims.settledSeasonId != null &&
+    seasonRewardLamports > 0n;
+
+  async function handleClaimSeason() {
+    if (!canClaimSeason || seasonClaims?.settledSeasonId == null) return;
+    setClaimLoading(true);
+    setClaimMessage(null);
+    try {
+      await silentClaimSeasonRewards(seasonClaims.settledSeasonId);
+      setSeasonRewardLamports(0n);
+      setClaimMessage(REWARDS_WEEKLY_XP.claimSeasonSuccess);
+    } catch (err) {
+      setClaimMessage(err instanceof Error ? err.message : REWARDS_WEEKLY_XP.loadError);
+    } finally {
+      setClaimLoading(false);
+    }
+  }
+
+  const claimsBanner = useMemo(() => {
+    if (!seasonClaims?.settledSeasonId) return null;
+    if (seasonClaims.claimsOpen) {
+      return REWARDS_WEEKLY_XP.claimsOpen(seasonClaims.settledSeasonId);
+    }
+    return REWARDS_WEEKLY_XP.claimsPending(seasonClaims.settledSeasonId);
+  }, [seasonClaims]);
 
   const selfRank = useMemo(() => {
     if (!address.trim() || !data?.users.length) return null;
@@ -104,6 +172,27 @@ export function WeeklyLeaderboardPanel({
           {REWARDS_WEEKLY_XP.seasonLabel(seasonId)}
         </span>
       </header>
+
+      {claimsBanner ? (
+        <p className="weekly-leaderboard-panel__claims text-pump-muted text-sm">{claimsBanner}</p>
+      ) : null}
+
+      {canClaimSeason ? (
+        <div className="weekly-leaderboard-panel__claim-row">
+          <button
+            type="button"
+            className="btn-primary btn-sm"
+            disabled={claimLoading}
+            onClick={() => void handleClaimSeason()}
+          >
+            {claimLoading ? REWARDS_WEEKLY_XP.claimSeasonLoading : REWARDS_WEEKLY_XP.claimSeasonCta}
+          </button>
+        </div>
+      ) : null}
+
+      {claimMessage ? (
+        <p className="weekly-leaderboard-panel__claim-msg text-sm text-pump-muted">{claimMessage}</p>
+      ) : null}
 
       {selfRank ? (
         <p className="weekly-leaderboard-panel__self text-pump-muted text-sm">

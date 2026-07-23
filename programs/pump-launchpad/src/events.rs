@@ -8,6 +8,10 @@ const DISC_TRADE_EVENT: [u8; 8] = [0xbd, 0xdb, 0x7f, 0xd3, 0x4e, 0xe6, 0x61, 0xe
 const DISC_FEE_SPLIT: [u8; 8] = [0x54, 0xe9, 0x74, 0xac, 0xb3, 0xb9, 0x4f, 0xce];
 /// sha256("event:FeeSplitV2Event")[0..8]
 const DISC_FEE_SPLIT_V2: [u8; 8] = [0x70, 0x24, 0x22, 0x68, 0x00, 0x79, 0x8c, 0xda];
+/// sha256("event:SeasonRewardCredited")[0..8]
+const DISC_SEASON_REWARD_CREDITED: [u8; 8] = [0x4e, 0x2d, 0xb7, 0xcd, 0xf0, 0xd0, 0x2c, 0x7f];
+/// sha256("event:SeasonRewardClaimed")[0..8]
+const DISC_SEASON_REWARD_CLAIMED: [u8; 8] = [0x4d, 0x23, 0x08, 0xe4, 0x22, 0x85, 0xe6, 0xea];
 const DISC_REFERRER_SET: [u8; 8] = [0xd7, 0x63, 0xd4, 0x8c, 0x3b, 0xef, 0x5f, 0x23];
 const DISC_CREATOR_FEE_CLAIMED: [u8; 8] = [0x36, 0x78, 0xc1, 0x1a, 0xa1, 0x2f, 0xbb, 0xcf];
 const DISC_REFERRER_FEE_CLAIMED: [u8; 8] = [0x60, 0x57, 0xa3, 0x26, 0xfd, 0x3b, 0x0a, 0x88];
@@ -195,5 +199,31 @@ pub fn emit_emergency_pending_claimed(
     write_pubkey(&mut buf, &mut off, to);
     write_u64(&mut buf, &mut off, amount);
     write_u8(&mut buf, &mut off, if is_creator { 1 } else { 0 });
+    emit(&buf[..off]);
+}
+
+pub fn emit_season_reward_credited(
+    beneficiary: &[u8; 32],
+    season_id: u32,
+    amount: u64,
+    pool_kind: u8,
+) {
+    let mut buf = [0u8; 8 + 32 + 4 + 8 + 1];
+    buf[..8].copy_from_slice(&DISC_SEASON_REWARD_CREDITED);
+    let mut off = 8;
+    write_pubkey(&mut buf, &mut off, beneficiary);
+    write_u32(&mut buf, &mut off, season_id);
+    write_u64(&mut buf, &mut off, amount);
+    write_u8(&mut buf, &mut off, pool_kind);
+    emit(&buf[..off]);
+}
+
+pub fn emit_season_reward_claimed(beneficiary: &[u8; 32], season_id: u32, amount: u64) {
+    let mut buf = [0u8; 8 + 32 + 4 + 8];
+    buf[..8].copy_from_slice(&DISC_SEASON_REWARD_CLAIMED);
+    let mut off = 8;
+    write_pubkey(&mut buf, &mut off, beneficiary);
+    write_u32(&mut buf, &mut off, season_id);
+    write_u64(&mut buf, &mut off, amount);
     emit(&buf[..off]);
 }

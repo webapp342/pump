@@ -109,6 +109,19 @@ export function pdaClanPoolAccrual(programId = launchpadProgramId()): [PublicKey
   );
 }
 
+export function pdaSeasonRewards(
+  owner: PublicKey,
+  seasonId: number,
+  programId = launchpadProgramId()
+): [PublicKey, number] {
+  const season = Buffer.alloc(4);
+  season.writeUInt32LE(seasonId, 0);
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from(PDA_SEEDS.seasonRewards), season, owner.toBuffer()],
+    programId
+  );
+}
+
 function readBigUInt64LE(data: Uint8Array, offset: number): bigint {
   const view = new DataView(data.buffer, data.byteOffset + offset, 8);
   return view.getBigUint64(0, true);
@@ -272,5 +285,24 @@ export function decodeReferrerBinding(data: Uint8Array): OnchainReferrerBinding 
     trader: new PublicKey(data.subarray(0, 32)),
     referrer: new PublicKey(data.subarray(32, 64)),
     bump: readUInt8(data, 64),
+  };
+}
+
+export type OnchainSeasonReward = {
+  owner: PublicKey;
+  pendingLamports: bigint;
+  seasonId: number;
+  bump: number;
+};
+
+export function decodeSeasonReward(data: Uint8Array): OnchainSeasonReward {
+  if (data.length < 48) {
+    throw new Error("SeasonReward account too small");
+  }
+  return {
+    owner: new PublicKey(data.subarray(0, 32)),
+    pendingLamports: readBigUInt64LE(data, 32),
+    seasonId: new DataView(data.buffer, data.byteOffset + 40, 4).getUint32(0, true),
+    bump: readUInt8(data, 44),
   };
 }

@@ -15,8 +15,8 @@
 | F0 | Spec + CH ops | 🟢 **Done** | 2026-07-23 | 2026-07-23 | CH candles_spot=26, trades_raw=360 |
 | F1 | Redis XP + clans | 🟢 **Done (VM smoke)** | 2026-07-23 | 2026-07-24 | ZSCORE/ZREVRANGE + weekly API OK |
 | F2 | Redis→CH flusher | 🟢 **Stream ON** | 2026-07-23 | — | XLEN pump:ch:trades=23, flusher online |
-| F3 | Program fee v2 | 🟡 **In progress** | 2026-07-23 | — | 6-way split kod local; devnet deploy bekliyor |
-| F4 | Sezon settlement | 🟡 **In progress** | 2026-07-23 | — | settlement-worker scaffold |
+| F3 | Program fee v2 | 🟢 **Done (devnet)** | 2026-07-23 | 2026-07-24 | F4b redeploy pending (IX 12/13) |
+| F4 | Sezon settlement | 🟡 **F4b coded** | 2026-07-23 | — | worker + claim UI; VM deploy bekliyor |
 | F5 | Go indexer + LaserStream | 🟡 **In progress** | 2026-07-23 | — | apps/indexer-sol-go scaffold |
 | F6 | PG offload + TS cutover | 🟢 **SKIP_PG ON** | 2026-07-23 | — | web+indexer SKIP_PG_TOKEN_CANDLES=true |
 | F7 | Jupiter + portfolio CH | 🟢 **Price worker done** | 2026-07-23 | — | Redis SOL ~76 USD |
@@ -282,13 +282,15 @@ Sonuç: CH container ayakta ama veri yok + okunamıyor → F0 bloker
 - [x] SDK rebuild (`encodeBuyIx`/`encodeSellIx` 21-byte + PDA seeds)
 - [x] TradePanel pre-trade XP (`silent-trade` → `/api/xp/weekly`)
 - [x] Indexer: `FeeSplitV2Event` decode + audit log
-- [ ] Devnet deploy + tests
+- [x] Devnet deploy + tests (program upgrade slot 478398440)
 
 ### LOG
 
 | Tarih | Not |
 |-------|-----|
 | 2026-07-24 | F3 kod: program 6-way `accrue_fees`, 17-account buy/sell, `FeeSplitV2Event`, SDK/web/indexer wiring |
+| 2026-07-24 | **Devnet deploy** sig `3U54buGN…` · ProgramData 74160 bytes · authority `7yqf5m5P…` |
+| 2026-07-24 | **Sonraki:** VM `git pull && npm run build -w @pump/web && pm2 restart` — trade 17-account + user_xp |
 
 ---
 
@@ -299,15 +301,19 @@ Sonuç: CH container ayakta ama veri yok + okunamıyor → F0 bloker
 
 ### Checklist
 
-- [ ] `apps/settlement-worker/`
-- [ ] Top100 + top3 clan math
-- [ ] Chunked on-chain writes
-- [ ] claims_open flag + UI
-- [ ] `season_settlement_runs` audit table
+- [x] `apps/settlement-worker/` — allocation math + PG audit
+- [x] Top100 + top3 clan math (`@pump/xp/settlement`)
+- [x] Chunked on-chain writes (`credit_season_reward` IX 12 + worker `--credit-on-chain`)
+- [x] claims_open flag + UI claim CTA
+- [x] `season_settlement_runs` audit table (used by worker)
 
 ### LOG
 
-_(boş)_
+| Tarih | Not |
+|-------|-----|
+| 2026-07-24 | F4a: `allocatePoolByXp` / `allocateClanSeasonPool`, worker reads season/clan PDA balances, claims banner on leaderboard |
+| 2026-07-24 | F4b: IX 12/13 credit+claim season, settlement `--credit-on-chain`, `/api/season/rewards`, leaderboard claim |
+| 2026-07-24 | **Deploy:** program redeploy (F4b) + VM `bash deploy/vm/guncelleme-web-deploy.sh` |
 
 ---
 
