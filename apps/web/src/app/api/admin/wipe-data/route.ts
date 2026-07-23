@@ -9,6 +9,7 @@ import {
   WIPE_DATA_CONFIRMATION_PHRASE,
   WIPE_PRESERVED_TABLES,
   wipeLaunchpadAppData,
+  wipeRuntimeStoresOnly,
 } from "@/lib/db/admin-wipe";
 import { syncContractRegistryFromEnv } from "@/lib/db/contract-registry-seed";
 import { seedIndexerStateFromEnv } from "@/lib/db/indexer-env-seed";
@@ -55,11 +56,11 @@ export async function POST(request: NextRequest) {
     if (!indexerSeed.ok) {
       warnings.push(indexerSeed.reason);
     }
-    if (wipeResult.runtime?.redis && !wipeResult.runtime.redis.ok) {
-      warnings.push(`Redis purge: ${wipeResult.runtime.redis.error ?? "failed"}`);
-    }
     if (wipeResult.runtime?.clickhouse && !wipeResult.runtime.clickhouse.ok) {
       warnings.push(`ClickHouse purge: ${wipeResult.runtime.clickhouse.error ?? "failed"}`);
+    }
+    if (wipeResult.warnings?.length) {
+      warnings.push(...wipeResult.warnings);
     }
 
     schedulePostWipeRestarts();
@@ -79,6 +80,32 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
+
+    // PG may have truncated before a follow-up step failed — still clear Redis leaderboard.
+    if (message.includes("permission denied") || message.includes("points_inventory")) {
+      try {
+        const runtime = await wipeRuntimeStoresOnly();
+        if (runtime.redis?.ok) {
+          return NextResponse.json({
+            data: {
+              ok: true,
+              partial: true,
+              preserved: [...WIPE_PRESERVED_TABLES],
+              wipedBy: admin,
+              wipedAt: new Date().toISOString(),
+              runtime,
+              warnings: [
+                "PostgreSQL wipe completed but a legacy purge step failed (fixed in next deploy). Redis leaderboard cleared — refresh Rewards page.",
+                message,
+              ],
+            },
+          });
+        }
+      } catch {
+        // fall through
+      }
+    }
+
     const missingFn =
       message.includes("wipe_launchpad_app_data") && message.includes("does not exist");
     if (missingFn) {

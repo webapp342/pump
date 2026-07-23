@@ -1,6 +1,5 @@
 import { Pool } from "pg";
 import { getLaunchpadPool } from "@/lib/db/launchpad";
-import { getIncentivePool } from "@/lib/db/incentive";
 import { readIndexerCursorForEnv } from "@/lib/db/indexer-env-seed";
 import { purgeRuntimeStores, type WipeRuntimePurgeResult } from "@/lib/db/admin-wipe-runtime";
 
@@ -14,9 +13,8 @@ export type WipeAppDataResult = {
   ok: true;
   preserved: string[];
   truncated?: string[];
-  xpPurged?: boolean;
-  incentiveDbSeparate?: boolean;
   runtime?: WipeRuntimePurgeResult;
+  warnings?: string[];
 };
 
 export async function readIndexerCursor(): Promise<{
@@ -36,43 +34,28 @@ function dbFingerprint(url: string): string {
   }
 }
 
-/**
- * Rewards Leaderboard = `users.points_lifetime` (via incentive pool).
- * Purge XP tables so Season rankings cannot survive a clean-start wipe.
- */
-async function purgeRewardsXpLeaderboardSource(pool: Pool): Promise<void> {
-  await pool.query(`
-    DO $wipe$
-    DECLARE
-      t text;
-      tables text[] := ARRAY[
-        'points_inventory',
-        'points_redemptions',
-        'points_audit_log',
-        'launchpad_user_daily_completions',
-        'launchpad_user_task_completions',
-        'launchpad_points_sync_log',
-        'referral_invite_xp_claims',
-        'users'
-      ];
-      existing text[] := ARRAY[]::text[];
-    BEGIN
-      FOREACH t IN ARRAY tables LOOP
-        IF to_regclass(format('public.%I', t)) IS NOT NULL THEN
-          existing := array_append(existing, format('public.%I', t));
-        END IF;
-      END LOOP;
-      IF cardinality(existing) > 0 THEN
-        EXECUTE 'TRUNCATE TABLE ' || array_to_string(existing, ', ') ||
-          ' RESTART IDENTITY CASCADE';
-      END IF;
-    END
-    $wipe$;
-  `);
+/** Legacy second DB — call same SECURITY DEFINER wipe fn if present. */
+async function wipeLegacyIncentiveDb(connectionString: string): Promise<string | null> {
+  const legacy = new Pool({
+    connectionString,
+    max: 1,
+    idleTimeoutMillis: 5_000,
+  });
+  try {
+    await legacy.query(`SELECT wipe_launchpad_app_data() AS wipe_launchpad_app_data`);
+    return null;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "legacy DB wipe failed";
+    return message;
+  } finally {
+    await legacy.end();
+  }
 }
 
 export async function wipeLaunchpadAppData(): Promise<WipeAppDataResult> {
+  const warnings: string[] = [];
   const pool = getLaunchpadPool();
+
   const result = await pool.query<{ wipe_launchpad_app_data: WipeAppDataResult }>(
     `SELECT wipe_launchpad_app_data() AS wipe_launchpad_app_data`
   );
@@ -89,29 +72,30 @@ export async function wipeLaunchpadAppData(): Promise<WipeAppDataResult> {
     Boolean(launchpadUrl) &&
     dbFingerprint(incentiveUrl) !== dbFingerprint(launchpadUrl);
 
-  // Rewards UI reads this pool — must be empty after wipe.
-  await purgeRewardsXpLeaderboardSource(getIncentivePool());
-
-  // Legacy: if VM1_MAIN_DB_URL still points at another DB, purge leftover EVM XP there too.
   if (separate && incentiveUrl) {
-    const legacy = new Pool({
-      connectionString: incentiveUrl,
-      max: 1,
-      idleTimeoutMillis: 5_000,
-    });
-    try {
-      await purgeRewardsXpLeaderboardSource(legacy);
-    } finally {
-      await legacy.end();
+    const legacyWarning = await wipeLegacyIncentiveDb(incentiveUrl);
+    if (legacyWarning) {
+      warnings.push(`Legacy incentive DB: ${legacyWarning}`);
     }
   }
 
+  // Weekly leaderboard reads Redis ZSET — always purge after PG wipe.
   const runtime = await purgeRuntimeStores();
+  if (runtime.redis && !runtime.redis.ok) {
+    warnings.push(`Redis purge: ${runtime.redis.error ?? "failed"}`);
+  }
+  if (runtime.clickhouse && !runtime.clickhouse.ok) {
+    warnings.push(`ClickHouse purge: ${runtime.clickhouse.error ?? "failed"}`);
+  }
 
   return {
     ...payload,
-    xpPurged: true,
-    incentiveDbSeparate: separate,
     runtime,
+    warnings,
   };
+}
+
+/** Best-effort Redis/CH cleanup when PG wipe already ran but a later step failed. */
+export async function wipeRuntimeStoresOnly(): Promise<WipeRuntimePurgeResult> {
+  return purgeRuntimeStores();
 }
