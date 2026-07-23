@@ -90,7 +90,9 @@ if has_target web; then
   if [[ -f "$REPO_ROOT/.env" ]]; then
     ln -sfn "$REPO_ROOT/.env" "$WEB_DIR/.env"
   fi
-  export NEXT_PRIVATE_BUILD_WORKERS="${NEXT_PRIVATE_BUILD_WORKERS:-2}"
+  export NEXT_PRIVATE_BUILD_WORKERS="${NEXT_PRIVATE_BUILD_WORKERS:-$(nproc 2>/dev/null || echo 2)}"
+  export NEXT_BUILD_CPUS="${NEXT_BUILD_CPUS:-$NEXT_PRIVATE_BUILD_WORKERS}"
+  log "slice: web build workers=$NEXT_PRIVATE_BUILD_WORKERS"
   npm run build -w @pump/web
 
   STANDALONE_APP_DIR="$WEB_DIR/.next/standalone/apps/web"

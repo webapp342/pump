@@ -1,10 +1,18 @@
 import type { NextConfig } from "next";
+import os from "node:os";
 import path from "node:path";
 import { withSerwist } from "@serwist/turbopack";
 import { loadMonorepoRootEnv } from "./src/lib/load-monorepo-env";
 
 /** Monorepo root — standalone tracing + turbopack resolve shared deps. */
 const monorepoRoot = path.join(__dirname, "../..");
+
+/** VM/prod build parallelism (2–4 cores typical). Leave 1 core for OS. */
+const buildCpus = Math.max(
+  1,
+  Number(process.env.NEXT_BUILD_CPUS ?? "") ||
+    Math.min(4, Math.max(1, (os.cpus()?.length ?? 2) - 1))
+);
 
 /** VM + local: single `.env` at repo root (PM2), not apps/web/.env */
 loadMonorepoRootEnv(monorepoRoot);
@@ -42,6 +50,21 @@ const nextConfig: NextConfig = {
   outputFileTracingRoot: monorepoRoot,
   turbopack: {
     root: monorepoRoot,
+  },
+  experimental: {
+    cpus: buildCpus,
+    staticGenerationRetryCount: 1,
+    staticGenerationMaxConcurrency: buildCpus * 2,
+    staticGenerationMinPagesPerWorker: 8,
+    optimizePackageImports: [
+      "@fortawesome/free-solid-svg-icons",
+      "@fortawesome/free-regular-svg-icons",
+      "@fortawesome/free-brands-svg-icons",
+      "@coinbase/cds-icons",
+      "@aws-sdk/client-s3",
+      "viem",
+      "wagmi",
+    ],
   },
   async headers() {
     return [

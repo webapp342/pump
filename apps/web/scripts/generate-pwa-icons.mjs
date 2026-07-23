@@ -1,4 +1,4 @@
-import { mkdir, readFile } from "node:fs/promises";
+import { mkdir, readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import sharp from "sharp";
@@ -13,6 +13,29 @@ const sizes = [
   { name: "icon-512.png", size: 512, padding: 72 },
   { name: "apple-touch-icon.png", size: 180, padding: 26 },
 ];
+
+async function iconsUpToDate() {
+  let logoMtime;
+  try {
+    logoMtime = (await stat(logoMarkPath)).mtimeMs;
+  } catch {
+    return false;
+  }
+  for (const { name } of sizes) {
+    try {
+      const iconStat = await stat(path.join(publicPwaDir, name));
+      if (iconStat.mtimeMs < logoMtime) return false;
+    } catch {
+      return false;
+    }
+  }
+  return true;
+}
+
+if (await iconsUpToDate()) {
+  console.log("[pwa:icons] skip (logo-mark.svg unchanged)");
+  process.exit(0);
+}
 
 const svg = await readFile(logoMarkPath, "utf8");
 const brandSvg = svg.replace(/class="cyclops-mark"/g, 'fill="#0052FF"').replace(/<style[\s\S]*?<\/style>/, "");

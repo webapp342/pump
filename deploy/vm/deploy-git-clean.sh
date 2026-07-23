@@ -7,6 +7,7 @@ git clean -fd \
   -e 'apps/*/node_modules' \
   -e 'packages/*/node_modules' \
   -e apps/web/.next \
+  -e apps/web/tsconfig.tsbuildinfo \
   -e apps/indexer-sol-go/bin \
   -e apps/admin/dist \
   -e apps/realtime/dist \

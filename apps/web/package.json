@@ -5,9 +5,9 @@
   "scripts": {
     "dev": "next dev -H 0.0.0.0 -p 3012",
     "dev:local": "next dev -H 0.0.0.0 -p 80",
-    "predev": "npm run build -w @pump/solana-sdk && npm run build -w @pump/xp",
-    "prebuild": "npm run build -w @pump/solana-sdk && npm run build -w @pump/xp",
-    "build": "npm run pwa:icons && next build",
+    "predev": "node scripts/ensure-workspace-packages.mjs",
+    "prebuild": "node scripts/ensure-workspace-packages.mjs",
+    "build": "node scripts/generate-pwa-icons.mjs && next build",
     "pwa:icons": "node scripts/generate-pwa-icons.mjs",
     "push:vapid": "node scripts/generate-vapid-keys.mjs",
     "start": "next start -H 0.0.0.0 -p 3012",
