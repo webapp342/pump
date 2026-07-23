@@ -6,10 +6,12 @@ ALTER TABLE launchpad_tasks
 
 UPDATE launchpad_tasks SET task_source = 'system' WHERE task_source IS NULL;
 
+ALTER TABLE launchpad_tasks DROP CONSTRAINT IF EXISTS launchpad_tasks_task_source_check;
 ALTER TABLE launchpad_tasks
   ADD CONSTRAINT launchpad_tasks_task_source_check
   CHECK (task_source IN ('system', 'admin_link'));
 
+ALTER TABLE launchpad_tasks DROP CONSTRAINT IF EXISTS launchpad_tasks_admin_link_url_check;
 ALTER TABLE launchpad_tasks
   ADD CONSTRAINT launchpad_tasks_admin_link_url_check
   CHECK (

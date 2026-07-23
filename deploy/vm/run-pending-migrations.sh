@@ -1,10 +1,6 @@
 #!/usr/bin/env bash
 # Apply pending SQL migrations once (schema_migrations ledger). Safe for CI/CD every deploy.
 # Usage: bash deploy/vm/run-pending-migrations.sh [/var/www/pump/tma]
-#
-# Existing production DB (tokens table present, empty ledger): one-time bootstrap marks
-# all current migration files as applied without re-running (avoids destructive re-apply).
-# New migrations (055+) apply automatically on next deploy.
 set -euo pipefail
 
 REPO_ROOT="${1:-/var/www/pump/tma}"
@@ -33,43 +29,62 @@ if ! sudo -u postgres psql -d "$PG_DB" -c "SELECT 1" >/dev/null 2>&1; then
   exit 1
 fi
 
-# Ledger table (000 runs first on fresh DB; CREATE IF NOT EXISTS on existing)
-if [[ -f "$MIG_DIR/000_schema_migrations.sql" ]]; then
-  psql_q -f "$MIG_DIR/000_schema_migrations.sql" || true
-fi
 psql_q <<'SQL'
 CREATE TABLE IF NOT EXISTS schema_migrations (
   version    TEXT PRIMARY KEY,
   applied_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   checksum   TEXT
 );
+CREATE INDEX IF NOT EXISTS schema_migrations_applied_at_idx ON schema_migrations (applied_at DESC);
 SQL
 
 ledger_count="$(psql_t "SELECT COUNT(*)::text FROM schema_migrations")"
+ledger_count="${ledger_count:-0}"
+
 has_tokens="$(psql_t "SELECT EXISTS (
   SELECT 1 FROM information_schema.tables
   WHERE table_schema = 'public' AND table_name = 'tokens'
 )::text")"
+has_launchpad="$(psql_t "SELECT EXISTS (
+  SELECT 1 FROM information_schema.tables
+  WHERE table_schema = 'public' AND table_name = 'launchpad_tasks'
+)::text")"
+
+shopt -s nullglob
+migration_files=("$MIG_DIR"/*.sql)
+total_migrations="${#migration_files[@]}"
 
 mkdir -p "$STAMP_DIR"
 
-# One-time bootstrap for existing pump_db (already migrated outside ledger)
-if [[ "${ledger_count:-0}" == "0" && "$has_tokens" == "t" && ! -f "$BOOTSTRAP_MARKER" ]]; then
-  log "bootstrapping ledger for existing production DB (mark current files applied)"
-  shopt -s nullglob
-  for f in "$MIG_DIR"/*.sql; do
+is_existing_prod=false
+if [[ "$has_tokens" == "t" || "$has_launchpad" == "t" ]]; then
+  is_existing_prod=true
+fi
+
+needs_bootstrap=false
+if [[ "$is_existing_prod" == true ]]; then
+  if [[ "$ledger_count" == "0" && ! -f "$BOOTSTRAP_MARKER" ]]; then
+    needs_bootstrap=true
+    log "existing DB + empty ledger → bootstrap"
+  elif [[ "$ledger_count" -gt 0 && "$ledger_count" -lt "$total_migrations" ]]; then
+    needs_bootstrap=true
+    log "repair: partial ledger ($ledger_count/$total_migrations) on existing DB — mark rest applied"
+  fi
+fi
+
+if [[ "$needs_bootstrap" == true ]]; then
+  for f in "${migration_files[@]}"; do
     base="$(basename "$f")"
     psql_q -c "INSERT INTO schema_migrations (version) VALUES ('${base}') ON CONFLICT (version) DO NOTHING"
   done
   date -u +%Y-%m-%dT%H:%M:%SZ > "$BOOTSTRAP_MARKER"
-  log "bootstrap complete — only new migration files will run from now on"
+  log "bootstrap/repair complete ($total_migrations versions in ledger) — no historical SQL re-run"
 fi
 
 applied_new=0
 skipped=0
 
-shopt -s nullglob
-for f in "$MIG_DIR"/*.sql; do
+for f in "${migration_files[@]}"; do
   base="$(basename "$f")"
   already="$(psql_t "SELECT 1 FROM schema_migrations WHERE version = '${base}' LIMIT 1")"
   if [[ "$already" == "1" ]]; then
