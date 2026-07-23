@@ -3,7 +3,7 @@
 import type { ReactNode } from "react";
 import { MissionsFilterNav } from "@/components/missions/MissionsFilterNav";
 import { MissionsList } from "@/components/missions/MissionList";
-import { PointsLeaderboardPanel } from "@/components/missions/PointsLeaderboardPanel";
+import { WeeklyLeaderboardPanel } from "@/components/missions/WeeklyLeaderboardPanel";
 import { PointsMarketPanel } from "@/components/missions/PointsMarketPanel";
 import type { MissionListItem } from "@/lib/missions-guest-data";
 import type { MissionFilter } from "@/lib/missions-types";
@@ -129,7 +129,7 @@ export function PointsHubBody({
   footerSlot,
 }: PointsHubBodyProps) {
   if (tab === "leaderboard") {
-    return <PointsLeaderboardPanel address={address} refreshKey={leaderboardRefreshKey} />;
+    return <WeeklyLeaderboardPanel address={address} refreshKey={leaderboardRefreshKey} />;
   }
 
   if (tab === "market") {

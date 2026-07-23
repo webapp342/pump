@@ -40,6 +40,27 @@ export const REWARDS_LEADERBOARD = {
   you: "You",
 } as const;
 
+/** F1 — Redis weekly XP (not PG lifetime). */
+export const REWARDS_WEEKLY_XP = {
+  heading: "Weekly leaderboard",
+  seasonLabel: (id: number) => `Season ${id}`,
+  hint: "Rankings reset each season. Weekly XP comes from trades and completed challenges.",
+  badgeLabel: "Weekly XP",
+  badgeTitle: "View weekly XP leaderboard",
+  cashbackOn: "Cashback",
+  yourRank: (rank: number) => `Your rank #${rank}`,
+  unranked: "Unranked — trade or complete challenges to earn weekly XP.",
+  empty: "No weekly XP yet. Trade or complete challenges to appear here.",
+  loading: "Loading…",
+  loadError: "Couldn't load weekly leaderboard",
+  colRank: "#",
+  colTrader: "Trader",
+  colXp: "Weekly XP",
+  you: "You",
+  clansHeading: "Top clans",
+  clanFallback: "Clan",
+} as const;
+
 export const REWARDS_MARKET = {
   shop: "Catalog",
   inventory: "Owned",

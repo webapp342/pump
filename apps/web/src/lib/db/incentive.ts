@@ -9,6 +9,7 @@ import {
 } from "@/lib/points-perk-effects";
 import type { ActivatePerkResult, PointsInventoryItem } from "@/lib/points-inventory-types";
 import { dbStorageAddress, normalizeUserStorageAddress } from "@/lib/address";
+import { syncWeeklyXpAfterMissionAward } from "@/lib/redis/weekly-xp";
 
 let pool: Pool | null = null;
 
@@ -241,7 +242,11 @@ export async function ensureFirstSmartBuyAward(
     ]
   );
 
-  return (awardResult.rows[0]?.points_awarded ?? 0) > 0;
+  const awarded = (awardResult.rows[0]?.points_awarded ?? 0) > 0;
+  if (awarded) {
+    syncWeeklyXpAfterMissionAward(normalized, awardResult.rows[0]!.points_awarded);
+  }
+  return awarded;
 }
 
 /**
@@ -290,7 +295,11 @@ export async function ensureDailySwapAward(
     ]
   );
 
-  return (awardResult.rows[0]?.points_awarded ?? 0) > 0;
+  const awarded = (awardResult.rows[0]?.points_awarded ?? 0) > 0;
+  if (awarded) {
+    syncWeeklyXpAfterMissionAward(normalized, awardResult.rows[0]!.points_awarded);
+  }
+  return awarded;
 }
 
 /**
@@ -337,7 +346,11 @@ export async function ensureDeployMemeAward(
     ]
   );
 
-  return (awardResult.rows[0]?.points_awarded ?? 0) > 0;
+  const awarded = (awardResult.rows[0]?.points_awarded ?? 0) > 0;
+  if (awarded) {
+    syncWeeklyXpAfterMissionAward(normalized, awardResult.rows[0]!.points_awarded);
+  }
+  return awarded;
 }
 
 export async function getReferralInviteXpStatus(
@@ -468,6 +481,9 @@ export async function claimReferralInviteXp(
     }
 
     await client.query("COMMIT");
+    if (pointsAwarded > 0) {
+      syncWeeklyXpAfterMissionAward(normalized, pointsAwarded);
+    }
     return { claimedInvites, pointsAwarded };
   } catch (error) {
     try {
@@ -561,6 +577,9 @@ export async function ensureVolumeMonsterAward(address: string): Promise<boolean
       );
       await client.query("COMMIT");
       const awarded = awardResult.rows[0]?.points_awarded ?? 0;
+      if (awarded > 0) {
+        syncWeeklyXpAfterMissionAward(normalized, awarded);
+      }
       return awarded > 0;
     }
 
@@ -628,6 +647,9 @@ export async function ensureVolumeMonsterAward(address: string): Promise<boolean
     }
 
     await client.query("COMMIT");
+    if ((repaired.rowCount ?? 0) > 0) {
+      syncWeeklyXpAfterMissionAward(normalized, points);
+    }
     return (repaired.rowCount ?? 0) > 0;
   } catch (error) {
     await client.query("ROLLBACK");
@@ -860,6 +882,10 @@ export async function completeAdminLinkTask(
   const row = awardResult.rows[0];
   const pointsAwarded = row?.points_awarded ?? 0;
   const status = row?.status === "SYNCED" ? "SYNCED" : "SKIPPED";
+
+  if (pointsAwarded > 0) {
+    syncWeeklyXpAfterMissionAward(normalized, pointsAwarded);
+  }
 
   return { status, pointsAwarded };
 }

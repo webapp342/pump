@@ -12,6 +12,7 @@ import { useWalletFunding } from "@/components/wallet/WalletFundingProvider";
 import { PumpAmountNumpad } from "@/components/token/PumpAmountNumpad";
 import { PumpAmountPresets } from "@/components/token/PumpAmountPresets";
 import { TradeQuickOrderHeader } from "@/components/token/TradeQuickOrderHeader";
+import { WeeklyXpBadge } from "@/components/token/WeeklyXpBadge";
 import { TradeConfirmModal, type TradeConfirmAssetLine } from "@/components/token/TradeConfirmModal";
 import { assertScwReadyForUserOp } from "@/lib/aa/scw-preflight";
 import { estimateKernelUserOpPrefundWei } from "@/lib/aa/estimate-kernel-user-op-prefund";
@@ -447,6 +448,7 @@ export function TradePanel({
   };
   const { openDeposit } = useWalletFunding();
   const [tradeConfirmOpen, setTradeConfirmOpen] = useState(false);
+  const [weeklyXpRefreshKey, setWeeklyXpRefreshKey] = useState(0);
   const [tradeConfirmError, setTradeConfirmError] = useState<string | null>(null);
   const [tradeConfirmLoading, setTradeConfirmLoading] = useState(false);
   const confirmOnlyOpenedRef = useRef(false);
@@ -1903,6 +1905,8 @@ export function TradePanel({
       receipt: activeReceipt,
     });
 
+    setWeeklyXpRefreshKey((k) => k + 1);
+
     awaitingConfirmSideRef.current = null;
     awaitingConfirmPendingIdRef.current = null;
     void (async () => {
@@ -3022,6 +3026,7 @@ export function TradePanel({
                 Sell
               </button>
             </div>
+            <WeeklyXpBadge walletAddress={address ?? null} refreshKey={weeklyXpRefreshKey} />
           </div>
         ) : null}
 

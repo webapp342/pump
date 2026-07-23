@@ -2,6 +2,7 @@ import "server-only";
 
 import { Redis } from "ioredis";
 import { CASHBACK_XP_THRESHOLD, REDIS_KEYS, parseSeasonMeta } from "@pump/xp";
+import { getLaunchpadPool } from "@/lib/db/launchpad";
 import { redisUrl, useRedisWeeklyXp } from "@/lib/db/perf-flags";
 
 let redis: Redis | null = null;
@@ -100,6 +101,52 @@ export async function getSeasonMeta() {
   } catch {
     return parseSeasonMeta(null);
   }
+}
+
+export async function lookupClanIdForWallet(walletAddress: string): Promise<string | null> {
+  try {
+    const pool = getLaunchpadPool();
+    const res = await pool.query<{ clan_id: string }>(
+      `SELECT clan_id::text FROM clan_members WHERE wallet_address = $1 LIMIT 1`,
+      [walletAddress]
+    );
+    return res.rows[0]?.clan_id ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** Missions Tür A — mirror indexer awardWeeklyXpMission (F1). */
+export async function awardWeeklyXpMission(
+  walletAddress: string,
+  xp: number,
+  clanId?: string | null
+): Promise<void> {
+  if (xp <= 0) return;
+  const client = getClient();
+  if (!client) return;
+
+  try {
+    if (client.status !== "ready") await client.connect();
+    await client.zincrby(REDIS_KEYS.weeklyUserXp, xp, walletAddress);
+    if (clanId) {
+      await client.zincrby(REDIS_KEYS.weeklyClanXp, xp, clanId);
+    }
+  } catch {
+    // Fire-and-forget — PG mission award already succeeded.
+  }
+}
+
+/** After launchpad_award_points — sync weekly ZSET (non-blocking). */
+export function syncWeeklyXpAfterMissionAward(
+  walletAddress: string,
+  pointsAwarded: number
+): void {
+  if (pointsAwarded <= 0 || !useRedisWeeklyXp()) return;
+  void (async () => {
+    const clanId = await lookupClanIdForWallet(walletAddress);
+    await awardWeeklyXpMission(walletAddress, pointsAwarded, clanId);
+  })();
 }
 
 export { CASHBACK_XP_THRESHOLD };

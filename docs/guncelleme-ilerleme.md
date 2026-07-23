@@ -13,7 +13,7 @@
 | Faz | Ad | Durum | Başlangıç | Bitiş | Not |
 |-----|-----|--------|-----------|-------|-----|
 | F0 | Spec + CH ops | 🟢 **Done** | 2026-07-23 | 2026-07-23 | CH candles_spot=26, trades_raw=360 |
-| F1 | Redis XP + clans | 🟡 **In progress** | 2026-07-23 | — | ZCARD weekly_user_xp=3; UI smoke eksik |
+| F1 | Redis XP + clans | 🟡 **In progress** | 2026-07-23 | — | missions ZINCRBY + weekly UI done; VM smoke bekliyor |
 | F2 | Redis→CH flusher | 🟢 **Stream ON** | 2026-07-23 | — | XLEN pump:ch:trades=23, flusher online |
 | F3 | Program fee v2 | 🟡 **In progress** | 2026-07-23 | — | kod local; on-chain deploy yok |
 | F4 | Sezon settlement | 🟡 **In progress** | 2026-07-23 | — | settlement-worker scaffold |
@@ -175,11 +175,21 @@ Sonuç: CH container ayakta ama veri yok + okunamıyor → F0 bloker
 - [x] `packages/pump-xp` shared keys
 - [x] Indexer trade → ZINCRBY (handlers.ts)
 - [x] `GET/POST /api/clans`
-- [ ] Missions Tür A → ZINCRBY (social API hook)
-- [ ] UI weekly leaderboard badge
+- [x] Missions Tür A → ZINCRBY (social API hook via `syncWeeklyXpAfterMissionAward`)
+- [x] UI weekly leaderboard badge (`WeeklyXpBadge` on TradePanel)
+- [x] UI weekly leaderboard tab (`WeeklyLeaderboardPanel` — Redis ZREVRANGE)
 - [ ] VM smoke: trade → `ZSCORE weekly_user_xp {trader}` (ZCARD=3 — kısmen dolu)
 
 ### LOG
+
+#### 2026-07-24 ~00:10 — F1 missions hook + weekly UI (local)
+
+- **Dosyalar:**
+  - `apps/web/src/lib/redis/weekly-xp.ts` — `awardWeeklyXpMission`, `syncWeeklyXpAfterMissionAward`
+  - `apps/web/src/lib/db/incentive.ts` — mission/referral award → Redis ZINCRBY
+  - `WeeklyXpBadge`, `WeeklyLeaderboardPanel`, `useWeeklyXp`
+  - `TradePanel` toolbar badge; missions leaderboard tab → Redis weekly
+- **Sonraki:** VM smoke (trade + admin-link mission + ZSCORE trader wallet)
 
 #### 2026-07-23 ~19:00 — F1 Redis XP VM kısmen aktif
 
