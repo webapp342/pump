@@ -1,40 +1,23 @@
 #!/bin/bash
 # Fast deploy: Next.js UI + admin static only (monorepo apps/web + apps/admin).
-# Skips realtime rebuild and indexer deploy. Full stack: deploy/tma-deploy.sh
+# Skips realtime rebuild, migrations, and indexer. Full stack: deploy/tma-deploy.sh
 set -euo pipefail
 
 REPO_ROOT="${REPO_ROOT:-/var/www/pump/tma}"
 WEB_DIR="$REPO_ROOT/apps/web"
 PM2_APP="${PM2_APP:-pump-tma}"
 HEALTH_URL="${HEALTH_URL:-http://127.0.0.1:3012/api/health}"
-GIT_REF="${GIT_REF:-main}"
 
 log() {
   echo "[ui-deploy] $*"
 }
 
 cd "$REPO_ROOT"
-
-log "Syncing repo to origin/${GIT_REF}"
-git fetch origin "$GIT_REF"
-git reset --hard "origin/${GIT_REF}"
-chmod +x deploy/vm/deploy-git-clean.sh deploy/vm/ensure-node-deps.sh 2>/dev/null || true
-bash deploy/vm/deploy-git-clean.sh
-
-ENV_FILE="$REPO_ROOT/.env"
-if [[ -f "$REPO_ROOT/deploy/vm/ensure-solana-env.sh" ]]; then
-  chmod +x "$REPO_ROOT/deploy/vm/ensure-solana-env.sh"
-  # shellcheck source=/dev/null
-  source "$REPO_ROOT/deploy/vm/ensure-solana-env.sh" "$ENV_FILE"
-fi
-
-log "Checking node dependencies (install only if missing)"
-bash deploy/vm/ensure-node-deps.sh "$REPO_ROOT"
-
-if [[ -f "$ENV_FILE" ]]; then
-  log "Linking root .env for Next.js build (NEXT_PUBLIC_* inlined at build time)"
-  ln -sfn "$ENV_FILE" "$WEB_DIR/.env"
-fi
+chmod +x deploy/vm/deploy-common.sh 2>/dev/null || true
+# shellcheck source=deploy/vm/deploy-common.sh
+source deploy/vm/deploy-common.sh
+deploy_prepare ui
+log() { echo "[ui-deploy] $*"; }
 
 log "Building Next.js (@pump/web)"
 npm run build -w @pump/web
@@ -83,5 +66,5 @@ if [ "$health_ok" -ne 1 ]; then
   exit 1
 fi
 
-log "UI deploy finished successfully"
+log "UI deploy finished successfully (sha=${DEPLOY_SHA:-unknown})"
 log "App: http://<host>/  · Admin: http://<host>/admin/"

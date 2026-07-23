@@ -3,112 +3,23 @@ set -euo pipefail
 
 REPO_ROOT="${REPO_ROOT:-/var/www/pump/tma}"
 WEB_DIR="$REPO_ROOT/apps/web"
-ADMIN_DIR="$REPO_ROOT/apps/admin"
 REALTIME_DIR="$REPO_ROOT/apps/realtime"
 PM2_APP="${PM2_APP:-pump-tma}"
 REALTIME_PM2_APP="${REALTIME_PM2_APP:-pump-realtime}"
 HEALTH_URL="${HEALTH_URL:-http://127.0.0.1:3012/api/health}"
 REALTIME_HEALTH_URL="${REALTIME_HEALTH_URL:-http://127.0.0.1:3013}"
+GIT_REF="${GIT_REF:-main}"
 
 log() {
   echo "[tma-deploy] $*"
 }
 
 cd "$REPO_ROOT"
-
-GIT_REF="${GIT_REF:-main}"
-
-chmod +x deploy/vm/system-health.sh 2>/dev/null || true
-
-log "Syncing repo to origin/${GIT_REF}"
-git fetch origin "$GIT_REF"
-git reset --hard "origin/${GIT_REF}"
-chmod +x deploy/vm/deploy-git-clean.sh deploy/vm/ensure-node-deps.sh 2>/dev/null || true
-bash deploy/vm/deploy-git-clean.sh
-
-ENV_FILE="$REPO_ROOT/.env"
-
-# Production = Solana (push → CI/CD sets env before build)
-if [[ -f "$REPO_ROOT/deploy/vm/ensure-solana-env.sh" ]]; then
-  chmod +x "$REPO_ROOT/deploy/vm/ensure-solana-env.sh"
-  # shellcheck source=/dev/null
-  source "$REPO_ROOT/deploy/vm/ensure-solana-env.sh" "$ENV_FILE"
-fi
-
-# ensure-solana-env.sh defines log() — restore tma-deploy prefix
-log() {
-  echo "[tma-deploy] $*"
-}
-
-log "Checking node dependencies (install only if missing)"
-bash deploy/vm/ensure-node-deps.sh "$REPO_ROOT"
-
-if [[ -f "$ENV_FILE" ]]; then
-  log "Linking root .env for Next.js build (NEXT_PUBLIC_* inlined at build time)"
-  ln -sfn "$ENV_FILE" "$WEB_DIR/.env"
-fi
-
-# solana_wallets table (custodial Ed25519 keys)
-MIG_044="$REPO_ROOT/db/migrations/044_solana_wallets.sql"
-if [[ -f "$MIG_044" ]]; then
-  log "Applying migration 044_solana_wallets.sql (idempotent)"
-  if sudo -u postgres psql -d pump_db -v ON_ERROR_STOP=1 -f "$MIG_044"; then
-    log "Migration 044 OK"
-  else
-    log "WARN: migration 044 failed — check postgres permissions"
-  fi
-fi
-
-MIG_045="$REPO_ROOT/db/migrations/045_solana_address_checks.sql"
-if [[ -f "$MIG_045" ]]; then
-  log "Applying migration 045_solana_address_checks.sql (idempotent)"
-  if sudo -u postgres psql -d pump_db -v ON_ERROR_STOP=1 -f "$MIG_045"; then
-    log "Migration 045 OK"
-  else
-    log "WARN: migration 045 failed — check postgres permissions"
-  fi
-fi
-
-MIG_046="$REPO_ROOT/db/migrations/046_solana_user_address_checks.sql"
-if [[ -f "$MIG_046" ]]; then
-  log "Applying migration 046_solana_user_address_checks.sql (idempotent)"
-  if sudo -u postgres psql -d pump_db -v ON_ERROR_STOP=1 -f "$MIG_046"; then
-    log "Migration 046 OK"
-  else
-    log "WARN: migration 046 failed — check postgres permissions"
-  fi
-fi
-
-MIG_047="$REPO_ROOT/db/migrations/047_solana_remaining_address_checks.sql"
-if [[ -f "$MIG_047" ]]; then
-  log "Applying migration 047_solana_remaining_address_checks.sql (idempotent)"
-  if sudo -u postgres psql -d pump_db -v ON_ERROR_STOP=1 -f "$MIG_047"; then
-    log "Migration 047 OK"
-  else
-    log "WARN: migration 047 failed — check postgres permissions"
-  fi
-fi
-
-# Solana points / referral claim (base58 case) — required for Referral Invites XP claim
-# + comprehensive admin wipe (XP / perks / airdrop leaderboards; keeps launchpad_tasks)
-for mig in \
-  049_launchpad_wallet_address_normalize.sql \
-  050_repair_solana_points_inventory_address.sql \
-  051_claim_referral_invite_xp_solana.sql \
-  052_wipe_launchpad_app_data_comprehensive.sql \
-  053_tokens_graduated_bonding_complete.sql \
-  054_clans.sql
-do
-  MIG_PATH="$REPO_ROOT/db/migrations/$mig"
-  if [[ -f "$MIG_PATH" ]]; then
-    log "Applying migration $mig (idempotent)"
-    if sudo -u postgres psql -d pump_db -v ON_ERROR_STOP=1 -f "$MIG_PATH"; then
-      log "Migration $mig OK"
-    else
-      log "WARN: migration $mig failed — check postgres permissions"
-    fi
-  fi
-done
+chmod +x deploy/vm/system-health.sh deploy/vm/deploy-common.sh 2>/dev/null || true
+# shellcheck source=deploy/vm/deploy-common.sh
+source deploy/vm/deploy-common.sh
+deploy_prepare full
+log() { echo "[tma-deploy] $*"; }
 
 log "Building Next.js (@pump/web)"
 npm run build -w @pump/web
@@ -190,12 +101,16 @@ if [ "$realtime_ok" -ne 1 ]; then
 fi
 
 if [[ "${SKIP_INDEXER_DEPLOY:-}" != "1" ]] && [[ -f "$REPO_ROOT/deploy/vm/indexer-sol-go-deploy.sh" ]]; then
-  log "Deploying Solana Go indexer (F5 — replaces TS indexer-sol build)"
+  log "Deploying Solana Go indexer (F5)"
   chmod +x "$REPO_ROOT/deploy/vm/indexer-sol-go-deploy.sh"
-  bash "$REPO_ROOT/deploy/vm/indexer-sol-go-deploy.sh" || {
-    log "ERROR: indexer-sol-go deploy failed — check Go 1.25+ and apps/indexer-sol-go/.env"
+  if bash "$REPO_ROOT/deploy/vm/indexer-sol-go-deploy.sh"; then
+    log "Go indexer deploy OK"
+  elif [[ "${INDEXER_DEPLOY_REQUIRED:-}" == "1" ]]; then
+    log "ERROR: indexer-sol-go required but failed"
     exit 1
-  }
+  else
+    log "WARN: indexer-sol-go failed — web/realtime deployed; fix Go/.env and re-run deploy/vm/indexer-sol-go-deploy.sh"
+  fi
 elif [[ "${USE_TS_INDEXER:-}" == "1" ]] && [[ "${SKIP_INDEXER_DEPLOY:-}" != "1" ]] && [[ -f "$REPO_ROOT/deploy/vm/indexer-sol-deploy.sh" ]]; then
   log "Deploying legacy TS indexer-sol (USE_TS_INDEXER=1 rollback)"
   chmod +x "$REPO_ROOT/deploy/vm/indexer-sol-deploy.sh"
@@ -212,5 +127,6 @@ else
   log "Skipping indexer deploy"
 fi
 
-log "Deploy finished successfully"
-log "Admin UI: http://<host>/admin/  (nginx location /admin/ — run nginx -t && reload if config changed)"
+log "Deploy finished successfully (sha=${DEPLOY_SHA:-unknown})"
+bash deploy/vm/deploy-post-smoke.sh "$REPO_ROOT" || true
+log "Admin UI: http://<host>/admin/"

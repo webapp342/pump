@@ -17,8 +17,12 @@ if [[ ! -d "$GO_APP/cmd/indexer" ]]; then
 fi
 
 if ! command -v go >/dev/null 2>&1; then
-  log "ERROR: Go not installed — install Go 1.25.1+ (https://go.dev/dl/) then re-run deploy"
-  exit 1
+  if [[ "${INDEXER_DEPLOY_REQUIRED:-}" == "1" ]]; then
+    log "ERROR: Go not installed — install Go 1.25.1+ (https://go.dev/dl/)"
+    exit 1
+  fi
+  log "WARN: Go not installed — skip indexer build (web deploy unaffected)"
+  exit 0
 fi
 
 # Bootstrap .env

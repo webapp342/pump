@@ -1,13 +1,10 @@
-# Pump monorepo deploy — full stack vs UI-only (single workflow)
+# Pump monorepo deploy — validate → classify → full | UI-only SSH deploy
 #
-# Auto on push to main:
-#   - Non-UI paths changed  → full deploy (tma-deploy.sh)
-#   - UI-only paths changed → fast deploy (ui-deploy.sh)
+# Push main:
+#   1. CI validate (build packages + go compile)
+#   2. Path filter → tma-deploy.sh | ui-deploy.sh on VM
 #
-# Manual UI deploy:
-#   gh workflow run deploy.yml -f mode=ui
-# Manual full deploy:
-#   gh workflow run deploy.yml -f mode=full
+# Manual: gh workflow run deploy.yml -f mode=full|ui
 name: Deploy
 
 on:
@@ -40,19 +37,23 @@ on:
       - "package-lock.json"
       - "ecosystem.config.cjs"
       - ".github/workflows/deploy.yml"
+      - ".github/workflows/ci.yml"
 
 concurrency:
   group: deploy-tma-production
   cancel-in-progress: true
 
 jobs:
+  validate:
+    uses: ./.github/workflows/ci.yml
+
   changes:
+    needs: validate
     runs-on: ubuntu-latest
     outputs:
       full_stack: ${{ steps.classify.outputs.full_stack }}
       ui_only: ${{ steps.classify.outputs.ui_only }}
     steps:
-      # Node 24-native majors (GitHub deprecates Node 20 action runtimes Jun 2026)
       - uses: actions/checkout@v6
       - uses: dorny/paths-filter@v4
         id: filter
@@ -63,6 +64,7 @@ jobs:
               - 'apps/indexer/**'
               - 'apps/indexer-sol/**'
               - 'apps/realtime/**'
+              - 'apps/ch-flusher/**'
               - 'packages/**'
               - 'apps/web/src/app/api/**'
               - 'apps/web/src/lib/**'
@@ -132,11 +134,13 @@ jobs:
           key: ${{ secrets.VM_SSH_KEY }}
           port: ${{ secrets.VM_SSH_PORT }}
           script_stop: true
-          command_timeout: 20m
+          command_timeout: 25m
           script: |
+            set -euo pipefail
             export GIT_REF="${{ github.event.inputs.ref || 'main' }}"
+            export DEPLOY_SHA="${{ github.sha }}"
             cd /var/www/pump/tma
-            chmod +x deploy/tma-deploy.sh
+            chmod +x deploy/tma-deploy.sh deploy/vm/*.sh
             ./deploy/tma-deploy.sh
 
   deploy-ui:
@@ -152,9 +156,11 @@ jobs:
           key: ${{ secrets.VM_SSH_KEY }}
           port: ${{ secrets.VM_SSH_PORT }}
           script_stop: true
-          command_timeout: 15m
+          command_timeout: 20m
           script: |
+            set -euo pipefail
             export GIT_REF="${{ github.event.inputs.ref || 'main' }}"
+            export DEPLOY_SHA="${{ github.sha }}"
             cd /var/www/pump/tma
-            chmod +x deploy/ui-deploy.sh
+            chmod +x deploy/ui-deploy.sh deploy/vm/*.sh
             ./deploy/ui-deploy.sh
