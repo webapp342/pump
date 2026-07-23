@@ -11,6 +11,7 @@ export const CURVE_EVENTS = {
   TokenRegistered: "TokenRegistered",
   TradeEvent: "TradeEvent",
   FeeSplitEvent: "FeeSplitEvent",
+  FeeSplitV2Event: "FeeSplitV2Event",
   ReferrerSetEvent: "ReferrerSetEvent",
   /** Base CreatorFeeClaimed parity — pending fees require claim. */
   CreatorFeeClaimed: "CreatorFeeClaimed",
@@ -34,6 +35,7 @@ export const EVENT_TO_HANDLER = {
   TokenRegistered: "onTokenRegistered",
   TradeEvent: "onTrade",
   FeeSplitEvent: "onFeeSplit",
+  FeeSplitV2Event: "onFeeSplitV2",
   ReferrerSetEvent: "onReferrerSet",
   CreatorFeeClaimed: "onCreatorFeeClaimed",
   ReferrerFeeClaimed: "onReferrerFeeClaimed",

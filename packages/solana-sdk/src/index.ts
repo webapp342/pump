@@ -10,7 +10,12 @@ export const PDA_SEEDS = {
   creatorFees: "creator-fees",
   referrerFees: "referrer-fees",
   cashbackFees: "cashback-fees",
+  seasonAccrual: "season-accrual",
+  clanPoolAccrual: "clan-pool-accrual",
 } as const;
+
+/** Max user_xp passed in buy/sell IX (anti-spoof cap). */
+export const USER_XP_IX_MAX = 10_000_000;
 
 /**
  * Pinocchio launchpad (single program). Deployed keypair under
@@ -108,10 +113,10 @@ export const PUMP_FEEL_DEFAULTS = {
   createFeeLamports: 0n,
   /** Total trade fee on bonding curve (125 bps = 1.25%). */
   protocolFeeBps: 125,
-  /** Share of trade fee to creator: 30 bps / 125 bps = 2400 (0.30% of trade volume). */
-  creatorFeeShareBps: 2_400,
-  /** Share of trade fee to bound referrer (from fee pool, not extra on trader). */
-  referrerShareBps: 1_000,
+  /** Fee v2 — 25% of fee pool to creator (0.3125% volume). */
+  creatorFeeShareBps: 2_500,
+  /** Fee v2 — 15% of fee pool to bound referrer (0.1875% volume). */
+  referrerShareBps: 1_500,
   verifiedReferrerShareBps: 2_000,
 } as const;
 
@@ -192,13 +197,12 @@ export function encodeBuyIx(
   minTokenOut: bigint,
   userXp = 0
 ): Buffer {
-  const out = new Uint8Array(userXp > 0 ? 21 : 17);
+  const capped = Math.min(Math.max(0, Math.floor(userXp)), USER_XP_IX_MAX);
+  const out = new Uint8Array(21);
   let o = writeU8(out, 0, IX.buy);
   o = writeU64Le(out, o, solInLamports);
   o = writeU64Le(out, o, minTokenOut);
-  if (userXp > 0) {
-    writeU32Le(out, o, userXp);
-  }
+  writeU32Le(out, o, capped);
   return instructionData(out);
 }
 
@@ -207,13 +211,12 @@ export function encodeSellIx(
   minSolOut: bigint,
   userXp = 0
 ): Buffer {
-  const out = new Uint8Array(userXp > 0 ? 21 : 17);
+  const capped = Math.min(Math.max(0, Math.floor(userXp)), USER_XP_IX_MAX);
+  const out = new Uint8Array(21);
   let o = writeU8(out, 0, IX.sell);
   o = writeU64Le(out, o, tokenIn);
   o = writeU64Le(out, o, minSolOut);
-  if (userXp > 0) {
-    writeU32Le(out, o, userXp);
-  }
+  writeU32Le(out, o, capped);
   return instructionData(out);
 }
 

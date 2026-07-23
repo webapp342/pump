@@ -7,12 +7,15 @@ import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import {
   type OnchainCurve,
   launchpadProgramId,
+  pdaCashbackFees,
+  pdaClanPoolAccrual,
   pdaCreatorFees,
   pdaGlobal,
   pdaLiquidityVault,
   pdaProtocolTreasury,
   pdaReferrerBinding,
   pdaReferrerFees,
+  pdaSeasonAccrual,
 } from "@/lib/solana/launchpad-pdas";
 
 export function solanaTradeAccountMetas(input: {
@@ -31,6 +34,9 @@ export function solanaTradeAccountMetas(input: {
   const referrerWallet = input.referrerWallet ?? input.trader;
   const [referrerFees] = pdaReferrerFees(referrerWallet, programId);
   const [referrerBinding] = pdaReferrerBinding(input.trader, programId);
+  const [cashbackFees] = pdaCashbackFees(input.trader, programId);
+  const [seasonAccrual] = pdaSeasonAccrual(programId);
+  const [clanPoolAccrual] = pdaClanPoolAccrual(programId);
 
   return [
     { pubkey: input.trader, isSigner: true, isWritable: true },
@@ -47,5 +53,8 @@ export function solanaTradeAccountMetas(input: {
     { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
     { pubkey: referrerBinding, isSigner: false, isWritable: false },
     { pubkey: referrerWallet, isSigner: false, isWritable: true },
+    { pubkey: cashbackFees, isSigner: false, isWritable: true },
+    { pubkey: seasonAccrual, isSigner: false, isWritable: true },
+    { pubkey: clanPoolAccrual, isSigner: false, isWritable: true },
   ];
 }

@@ -6,12 +6,19 @@ use pinocchio::log::sol_log_data;
 const DISC_TOKEN_CREATED: [u8; 8] = [0xec, 0x13, 0x29, 0xff, 0x82, 0x4e, 0x93, 0xac];
 const DISC_TRADE_EVENT: [u8; 8] = [0xbd, 0xdb, 0x7f, 0xd3, 0x4e, 0xe6, 0x61, 0xee];
 const DISC_FEE_SPLIT: [u8; 8] = [0x54, 0xe9, 0x74, 0xac, 0xb3, 0xb9, 0x4f, 0xce];
+/// sha256("event:FeeSplitV2Event")[0..8]
+const DISC_FEE_SPLIT_V2: [u8; 8] = [0x70, 0x24, 0x22, 0x68, 0x00, 0x79, 0x8c, 0xda];
 const DISC_REFERRER_SET: [u8; 8] = [0xd7, 0x63, 0xd4, 0x8c, 0x3b, 0xef, 0x5f, 0x23];
 const DISC_CREATOR_FEE_CLAIMED: [u8; 8] = [0x36, 0x78, 0xc1, 0x1a, 0xa1, 0x2f, 0xbb, 0xcf];
 const DISC_REFERRER_FEE_CLAIMED: [u8; 8] = [0x60, 0x57, 0xa3, 0x26, 0xfd, 0x3b, 0x0a, 0x88];
 const DISC_EMERGENCY_SWEPT: [u8; 8] = [0x80, 0xce, 0xe1, 0xbd, 0x40, 0x19, 0xd0, 0xa9];
 /// sha256("event:EmergencyPendingClaimed")[0..8] — placeholder fixed bytes for indexer.
 const DISC_EMERGENCY_PENDING_CLAIMED: [u8; 8] = [0xa1, 0x4f, 0x2c, 0x91, 0x7b, 0xe0, 0x33, 0x5d];
+
+fn write_u32(buf: &mut [u8], off: &mut usize, v: u32) {
+    buf[*off..*off + 4].copy_from_slice(&v.to_le_bytes());
+    *off += 4;
+}
 
 fn write_u64(buf: &mut [u8], off: &mut usize, v: u64) {
     buf[*off..*off + 8].copy_from_slice(&v.to_le_bytes());
@@ -93,6 +100,33 @@ pub fn emit_trade_event(
     emit(&buf[..off]);
 }
 
+pub fn emit_fee_split_v2(
+    mint: &[u8; 32],
+    creator: &[u8; 32],
+    creator_fee: u64,
+    referrer_fee: u64,
+    cashback_fee: u64,
+    clan_pool_fee: u64,
+    season_pool_fee: u64,
+    platform_fee: u64,
+    user_xp: u32,
+) {
+    let mut buf = [0u8; 8 + 32 + 32 + 8 * 6 + 4];
+    buf[..8].copy_from_slice(&DISC_FEE_SPLIT_V2);
+    let mut off = 8;
+    write_pubkey(&mut buf, &mut off, mint);
+    write_pubkey(&mut buf, &mut off, creator);
+    write_u64(&mut buf, &mut off, creator_fee);
+    write_u64(&mut buf, &mut off, referrer_fee);
+    write_u64(&mut buf, &mut off, cashback_fee);
+    write_u64(&mut buf, &mut off, clan_pool_fee);
+    write_u64(&mut buf, &mut off, season_pool_fee);
+    write_u64(&mut buf, &mut off, platform_fee);
+    write_u32(&mut buf, &mut off, user_xp);
+    emit(&buf[..off]);
+}
+
+#[allow(dead_code)]
 pub fn emit_fee_split(
     mint: &[u8; 32],
     creator: &[u8; 32],

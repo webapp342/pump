@@ -25,10 +25,18 @@ const REFERRER_SEED: &[u8] = b"referrer";
 const CREATOR_FEES_SEED: &[u8] = b"creator-fees";
 const REFERRER_FEES_SEED: &[u8] = b"referrer-fees";
 const CASHBACK_FEES_SEED: &[u8] = b"cashback-fees";
+const SEASON_ACCRUAL_SEED: &[u8] = b"season-accrual";
+const CLAN_POOL_ACCRUAL_SEED: &[u8] = b"clan-pool-accrual";
 const PROTOCOL_TREASURY_SEED: &[u8] = b"protocol-treasury";
 const CASHBACK_XP_THRESHOLD: u32 = 1000;
-/** 10% of protocol fee → trader cashback PDA when XP threshold met. */
-const CASHBACK_FEE_BPS: u64 = 1000;
+const USER_XP_MAX: u32 = 10_000_000;
+/** Fee v2 — shares of total trade fee pool (sum = 10_000 bps). */
+const FEE_BPS_CREATOR: u64 = 2500;
+const FEE_BPS_REFERRER: u64 = 1500;
+const FEE_BPS_CASHBACK: u64 = 1000;
+const FEE_BPS_CLAN_POOL: u64 = 2500;
+const FEE_BPS_SEASON_POOL: u64 = 1700;
+const FEE_BPS_PLATFORM: u64 = 800;
 
 use bytemuck::{Pod, Zeroable};
 use pinocchio::{
@@ -220,10 +228,18 @@ fn read_u32(data: &[u8], off: usize) -> Result<u32, ProgramError> {
 
 fn read_user_xp(data: &[u8]) -> u32 {
     if data.len() >= 20 {
-        read_u32(data, 16).unwrap_or(0)
+        read_u32(data, 16).unwrap_or(0).min(USER_XP_MAX)
     } else {
         0
     }
+}
+
+fn fee_pool_share(fee: u64, bps: u64) -> Result<u64, ProgramError> {
+    Ok((fee as u128)
+        .checked_mul(bps as u128)
+        .ok_or(ProgramError::InvalidAccountData)?
+        .checked_div(BPS as u128)
+        .ok_or(ProgramError::InvalidAccountData)? as u64)
 }
 
 fn read_u8(data: &[u8], off: usize) -> Result<u8, ProgramError> {
@@ -603,7 +619,7 @@ fn curve_sold_tokens(c: &Curve) -> u64 {
 }
 
 fn process_buy(program_id: &Pubkey, accounts: &[AccountInfo], data: &[u8]) -> ProgramResult {
-    let [trader, global, curve, liquidity, protocol_treasury, creator_fees, referrer_fees, mint, vault, trader_ata, _token, _system, referrer_binding, referrer_wallet] =
+    let [trader, global, curve, liquidity, protocol_treasury, creator_fees, referrer_fees, mint, vault, trader_ata, _token, _system, referrer_binding, referrer_wallet, cashback_fees, season_accrual, clan_pool_accrual] =
         accounts
     else {
         return Err(ProgramError::NotEnoughAccountKeys);
@@ -716,6 +732,7 @@ fn process_buy(program_id: &Pubkey, accounts: &[AccountInfo], data: &[u8]) -> Pr
 
     write_pod(curve, &c)?;
 
+    let user_xp = read_user_xp(data);
     let fees = accrue_fees(
         trader,
         liquidity,
@@ -724,14 +741,26 @@ fn process_buy(program_id: &Pubkey, accounts: &[AccountInfo], data: &[u8]) -> Pr
         referrer_fees,
         referrer_binding,
         referrer_wallet,
-        accounts.get(14),
+        cashback_fees,
+        season_accrual,
+        clan_pool_accrual,
         program_id,
         &g,
         &c,
         quote.fee_lamports,
-        read_user_xp(data),
+        user_xp,
     )?;
-    events::emit_fee_split(&c.mint, &c.creator, fees.0, fees.1, fees.2);
+    events::emit_fee_split_v2(
+        &c.mint,
+        &c.creator,
+        fees.0,
+        fees.1,
+        fees.2,
+        fees.3,
+        fees.4,
+        fees.5,
+        user_xp,
+    );
     let vault_base_after = vault_base.saturating_sub(quote.token_out);
     events::emit_trade_event(
         &c.mint,
@@ -749,7 +778,7 @@ fn process_buy(program_id: &Pubkey, accounts: &[AccountInfo], data: &[u8]) -> Pr
 }
 
 fn process_sell(program_id: &Pubkey, accounts: &[AccountInfo], data: &[u8]) -> ProgramResult {
-    let [trader, global, curve, liquidity, protocol_treasury, creator_fees, referrer_fees, mint, vault, trader_ata, _token, _system, referrer_binding, referrer_wallet] =
+    let [trader, global, curve, liquidity, protocol_treasury, creator_fees, referrer_fees, mint, vault, trader_ata, _token, _system, referrer_binding, referrer_wallet, cashback_fees, season_accrual, clan_pool_accrual] =
         accounts
     else {
         return Err(ProgramError::NotEnoughAccountKeys);
@@ -850,6 +879,7 @@ fn process_sell(program_id: &Pubkey, accounts: &[AccountInfo], data: &[u8]) -> P
     *trader.try_borrow_mut_lamports()? += quote.lamports_out;
     let _ = signers;
 
+    let user_xp = read_user_xp(data);
     let fees = accrue_fees(
         trader,
         liquidity,
@@ -858,14 +888,26 @@ fn process_sell(program_id: &Pubkey, accounts: &[AccountInfo], data: &[u8]) -> P
         referrer_fees,
         referrer_binding,
         referrer_wallet,
-        accounts.get(14),
+        cashback_fees,
+        season_accrual,
+        clan_pool_accrual,
         program_id,
         &g,
         &c,
         quote.fee_lamports,
-        read_user_xp(data),
+        user_xp,
     )?;
-    events::emit_fee_split(&c.mint, &c.creator, fees.0, fees.1, fees.2);
+    events::emit_fee_split_v2(
+        &c.mint,
+        &c.creator,
+        fees.0,
+        fees.1,
+        fees.2,
+        fees.3,
+        fees.4,
+        fees.5,
+        user_xp,
+    );
     let vault_base_after = vault_base.saturating_add(token_in);
     events::emit_trade_event(
         &c.mint,
@@ -938,7 +980,48 @@ fn ensure_pending_fees(
     Ok(bump)
 }
 
-/// Base `_distributeFee`: pending creator/referrer + immediate protocol treasury.
+fn ensure_global_vault(
+    payer: &AccountInfo,
+    account: &AccountInfo,
+    program_id: &Pubkey,
+    seed: &[u8],
+) -> Result<(), ProgramError> {
+    let (pda, bump) = find_program_address(&[seed], program_id);
+    if account.key() != &pda {
+        return Err(ProgramError::InvalidSeeds);
+    }
+    if account.lamports() == 0 {
+        let bump_seed = [bump];
+        let seeds = [Seed::from(seed), Seed::from(bump_seed.as_ref())];
+        let signers = [Signer::from(&seeds)];
+        CreateAccount {
+            from: payer,
+            to: account,
+            lamports: PROTOCOL_TREASURY_RENT_LAMPORTS,
+            space: 0,
+            owner: program_id,
+        }
+        .invoke_signed(&signers)?;
+    } else if !owner_eq(account, program_id) {
+        return Err(ProgramError::IncorrectProgramId);
+    }
+    Ok(())
+}
+
+fn transfer_from_liquidity(
+    liquidity: &AccountInfo,
+    to: &AccountInfo,
+    amount: u64,
+) -> Result<(), ProgramError> {
+    if amount == 0 {
+        return Ok(());
+    }
+    *liquidity.try_borrow_mut_lamports()? -= amount;
+    *to.try_borrow_mut_lamports()? += amount;
+    Ok(())
+}
+
+/// Fee v2: 6-way split — creator / referrer / cashback / clan pool / season pool / platform.
 fn accrue_fees(
     payer: &AccountInfo,
     liquidity: &AccountInfo,
@@ -947,73 +1030,63 @@ fn accrue_fees(
     referrer_fees: &AccountInfo,
     referrer_binding: &AccountInfo,
     referrer_wallet: &AccountInfo,
-    cashback_fees: Option<&AccountInfo>,
+    cashback_fees: &AccountInfo,
+    season_accrual: &AccountInfo,
+    clan_pool_accrual: &AccountInfo,
     program_id: &Pubkey,
-    g: &GlobalConfig,
+    _g: &GlobalConfig,
     c: &Curve,
     fee: u64,
     user_xp: u32,
-) -> Result<(u64, u64, u64), ProgramError> {
+) -> Result<(u64, u64, u64, u64, u64, u64), ProgramError> {
     if fee == 0 {
-        return Ok((0, 0, 0));
+        return Ok((0, 0, 0, 0, 0, 0));
     }
 
-    let creator_fee = (fee as u128)
-        .checked_mul(g.creator_fee_share_bps as u128)
-        .ok_or(ProgramError::InvalidAccountData)?
-        .checked_div(BPS as u128)
-        .ok_or(ProgramError::InvalidAccountData)? as u64;
+    let creator_fee = fee_pool_share(fee, FEE_BPS_CREATOR)?;
+    let referrer_share = fee_pool_share(fee, FEE_BPS_REFERRER)?;
+    let cashback_share = fee_pool_share(fee, FEE_BPS_CASHBACK)?;
+    let clan_fee = fee_pool_share(fee, FEE_BPS_CLAN_POOL)?;
+    let season_fee = fee_pool_share(fee, FEE_BPS_SEASON_POOL)?;
+    let mut platform_fee = fee_pool_share(fee, FEE_BPS_PLATFORM)?;
 
     let mut referrer_fee = 0u64;
     let mut referrer_key = [0u8; 32];
     if let Some(binding) = load_referrer_binding(referrer_binding, program_id, payer) {
         let zero = [0u8; 32];
         if binding.referrer != zero && keys_eq(&binding.referrer, referrer_wallet.key()) {
-            referrer_fee = (fee as u128)
-                .checked_mul(g.referrer_share_bps as u128)
-                .ok_or(ProgramError::InvalidAccountData)?
-                .checked_div(BPS as u128)
-                .ok_or(ProgramError::InvalidAccountData)? as u64;
+            referrer_fee = referrer_share;
             referrer_key = binding.referrer;
         }
     }
-
-    let mut treasury_fee = fee
-        .checked_sub(creator_fee)
-        .ok_or(ProgramError::InvalidAccountData)?
-        .checked_sub(referrer_fee)
+    platform_fee = platform_fee
+        .checked_add(referrer_share.saturating_sub(referrer_fee))
         .ok_or(ProgramError::InvalidAccountData)?;
 
+    let mut cashback_fee = 0u64;
     let trader_key = pubkey_bytes(payer);
     if user_xp >= CASHBACK_XP_THRESHOLD {
-        if let Some(cashback) = cashback_fees {
-            let cashback_fee = (fee as u128)
-                .checked_mul(CASHBACK_FEE_BPS as u128)
-                .ok_or(ProgramError::InvalidAccountData)?
-                .checked_div(BPS as u128)
-                .ok_or(ProgramError::InvalidAccountData)? as u64;
-            if cashback_fee > 0 && cashback_fee <= treasury_fee {
-                ensure_pending_fees(
-                    payer,
-                    cashback,
-                    program_id,
-                    CASHBACK_FEES_SEED,
-                    &trader_key,
-                )?;
-                let mut pending = load_pod::<PendingFees>(cashback)?;
-                if pending.owner != trader_key {
-                    return Err(ProgramError::InvalidAccountData);
-                }
-                pending.pending_lamports = pending
-                    .pending_lamports
-                    .checked_add(cashback_fee)
-                    .ok_or(ProgramError::InvalidAccountData)?;
-                write_pod(cashback, &pending)?;
-                treasury_fee = treasury_fee
-                    .checked_sub(cashback_fee)
-                    .ok_or(ProgramError::InvalidAccountData)?;
-            }
+        cashback_fee = cashback_share;
+        ensure_pending_fees(
+            payer,
+            cashback_fees,
+            program_id,
+            CASHBACK_FEES_SEED,
+            &trader_key,
+        )?;
+        let mut pending = load_pod::<PendingFees>(cashback_fees)?;
+        if pending.owner != trader_key {
+            return Err(ProgramError::InvalidAccountData);
         }
+        pending.pending_lamports = pending
+            .pending_lamports
+            .checked_add(cashback_fee)
+            .ok_or(ProgramError::InvalidAccountData)?;
+        write_pod(cashback_fees, &pending)?;
+    } else {
+        platform_fee = platform_fee
+            .checked_add(cashback_share)
+            .ok_or(ProgramError::InvalidAccountData)?;
     }
 
     if creator_fee > 0 {
@@ -1042,12 +1115,40 @@ fn accrue_fees(
         write_pod(referrer_fees, &pending)?;
     }
 
-    if treasury_fee > 0 {
-        *liquidity.try_borrow_mut_lamports()? -= treasury_fee;
-        *protocol_treasury.try_borrow_mut_lamports()? += treasury_fee;
+    if clan_fee > 0 {
+        ensure_global_vault(payer, clan_pool_accrual, program_id, CLAN_POOL_ACCRUAL_SEED)?;
+        transfer_from_liquidity(liquidity, clan_pool_accrual, clan_fee)?;
     }
 
-    Ok((creator_fee, referrer_fee, treasury_fee))
+    if season_fee > 0 {
+        ensure_global_vault(payer, season_accrual, program_id, SEASON_ACCRUAL_SEED)?;
+        transfer_from_liquidity(liquidity, season_accrual, season_fee)?;
+    }
+
+    if platform_fee > 0 {
+        transfer_from_liquidity(liquidity, protocol_treasury, platform_fee)?;
+    }
+
+    let allocated = creator_fee
+        .saturating_add(referrer_fee)
+        .saturating_add(cashback_fee)
+        .saturating_add(clan_fee)
+        .saturating_add(season_fee)
+        .saturating_add(platform_fee);
+    if allocated < fee {
+        let dust = fee - allocated;
+        transfer_from_liquidity(liquidity, protocol_treasury, dust)?;
+        platform_fee = platform_fee.saturating_add(dust);
+    }
+
+    Ok((
+        creator_fee,
+        referrer_fee,
+        cashback_fee,
+        clan_fee,
+        season_fee,
+        platform_fee,
+    ))
 }
 
 fn process_claim_fees(

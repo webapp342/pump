@@ -12,6 +12,9 @@ export const REDIS_KEYS = {
   nativePriceSolUsd: "price:native:sol:usd",
 } as const;
 
+/** Max user_xp passed in buy/sell IX (anti-spoof cap). */
+export const USER_XP_IX_MAX = 10_000_000;
+
 /** Minimum weekly XP for on-chain cashback (program v2). */
 export const CASHBACK_XP_THRESHOLD = 1000;
 

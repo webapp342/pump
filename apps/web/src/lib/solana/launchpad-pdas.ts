@@ -85,6 +85,30 @@ export function pdaReferrerFees(
   );
 }
 
+export function pdaCashbackFees(
+  trader: PublicKey,
+  programId = launchpadProgramId()
+): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from(PDA_SEEDS.cashbackFees), trader.toBuffer()],
+    programId
+  );
+}
+
+export function pdaSeasonAccrual(programId = launchpadProgramId()): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from(PDA_SEEDS.seasonAccrual)],
+    programId
+  );
+}
+
+export function pdaClanPoolAccrual(programId = launchpadProgramId()): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from(PDA_SEEDS.clanPoolAccrual)],
+    programId
+  );
+}
+
 function readBigUInt64LE(data: Uint8Array, offset: number): bigint {
   const view = new DataView(data.buffer, data.byteOffset + offset, 8);
   return view.getBigUint64(0, true);

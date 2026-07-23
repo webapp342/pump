@@ -46,7 +46,10 @@ import {
   pdaProtocolTreasury,
   pdaReferrerBinding,
   pdaReferrerFees,
+  pdaCashbackFees,
 } from "@/lib/solana/launchpad-pdas";
+import { fetchWeeklyXpForTrade } from "@/lib/xp/fetch-weekly-xp-for-trade";
+import { CASHBACK_XP_THRESHOLD } from "@pump/xp";
 import { solanaTradeAccountMetas } from "@/lib/solana/trade-accounts";
 
 export type SolanaSilentTradeResult = {
@@ -158,6 +161,7 @@ async function assertBuyAffordable(input: {
   needsReferrerBinding: boolean;
   needsCreatorFeesPda: boolean;
   needsReferrerFeesPda: boolean;
+  needsCashbackFeesPda: boolean;
 }): Promise<void> {
   const conn = getSolanaConnection();
   const [balance, ataRent, txFee] = await Promise.all([
@@ -171,6 +175,7 @@ async function assertBuyAffordable(input: {
   const bindingRent = input.needsReferrerBinding ? SOLANA_REFERRER_BINDING_RENT_LAMPORTS : 0n;
   const creatorFeesRent = input.needsCreatorFeesPda ? SOLANA_PENDING_FEES_RENT_LAMPORTS : 0n;
   const referrerFeesRent = input.needsReferrerFeesPda ? SOLANA_PENDING_FEES_RENT_LAMPORTS : 0n;
+  const cashbackFeesRent = input.needsCashbackFeesPda ? SOLANA_PENDING_FEES_RENT_LAMPORTS : 0n;
   // No wallet rent-exempt floor — only fee + accounts this buy creates.
   const required =
     input.solInLamports +
@@ -178,6 +183,7 @@ async function assertBuyAffordable(input: {
     bindingRent +
     creatorFeesRent +
     referrerFeesRent +
+    cashbackFeesRent +
     txFee +
     SOLANA_BUY_FEE_SLACK_LAMPORTS;
 
@@ -190,6 +196,7 @@ async function assertBuyAffordable(input: {
       `${bindingRent > 0n ? ` + referrer account ${formatSol(bindingRent)}` : ""}` +
       `${creatorFeesRent > 0n ? ` + creator fees account ${formatSol(creatorFeesRent)}` : ""}` +
       `${referrerFeesRent > 0n ? ` + referrer fees account ${formatSol(referrerFeesRent)}` : ""}` +
+      `${cashbackFeesRent > 0n ? ` + cashback account ${formatSol(cashbackFeesRent)}` : ""}` +
       ` + fee ${formatSol(txFee)}).`
   );
 }
@@ -262,23 +269,31 @@ export async function silentBuy(input: {
   }
 
   const referrerWallet = await resolveReferrerWallet(trader, input.referrerAddress);
+  const userXp = await fetchWeeklyXpForTrade(trader.toBase58());
 
   const traderAta = getAssociatedTokenAddressSync(mint, trader, false, TOKEN_PROGRAM_ID);
   const [creatorFeesPda] = pdaCreatorFees(curve.creator, programId);
   const [referrerFeesPda] = pdaReferrerFees(referrerWallet, programId);
+  const [cashbackFeesPda] = pdaCashbackFees(trader, programId);
 
-  const [ataInfo, setRefIx, creatorFeesInfo, referrerFeesInfo] = await Promise.all([
+  const [ataInfo, setRefIx, creatorFeesInfo, referrerFeesInfo, cashbackFeesInfo] =
+    await Promise.all([
     conn.getAccountInfo(traderAta, "confirmed"),
     maybeSetReferrer(trader, input.referrerAddress),
     conn.getAccountInfo(creatorFeesPda, "confirmed"),
     referrerWallet.equals(trader)
       ? Promise.resolve(null)
       : conn.getAccountInfo(referrerFeesPda, "confirmed"),
+    userXp >= CASHBACK_XP_THRESHOLD
+      ? conn.getAccountInfo(cashbackFeesPda, "confirmed")
+      : Promise.resolve(null),
   ]);
   const needsAta = ataInfo === null;
   const needsCreatorFeesPda = accountNeedsInit(creatorFeesInfo);
   const needsReferrerFeesPda =
     !referrerWallet.equals(trader) && accountNeedsInit(referrerFeesInfo);
+  const needsCashbackFeesPda =
+    userXp >= CASHBACK_XP_THRESHOLD && accountNeedsInit(cashbackFeesInfo);
 
   const minTokenOut = await resolveBuyMinTokenOut(
     curve,
@@ -312,7 +327,7 @@ export async function silentBuy(input: {
         traderAta,
         referrerWallet,
       }),
-      data: encodeBuyIx(input.solInLamports, minTokenOut),
+      data: encodeBuyIx(input.solInLamports, minTokenOut, userXp),
     })
   );
 
@@ -324,6 +339,7 @@ export async function silentBuy(input: {
     needsReferrerBinding: setRefIx !== null,
     needsCreatorFeesPda,
     needsReferrerFeesPda,
+    needsCashbackFeesPda,
   });
 
   const { signature } = await sendSolanaSilentTransaction(ixs);
@@ -348,6 +364,7 @@ export async function silentSell(input: {
   if (curve.paused) throw new Error("Trading paused");
 
   const referrerWallet = await resolveReferrerWallet(trader, input.referrerAddress);
+  const userXp = await fetchWeeklyXpForTrade(trader.toBase58());
 
   const traderAta = getAssociatedTokenAddressSync(mint, trader, false, TOKEN_PROGRAM_ID);
   const conn = getSolanaConnection();
@@ -368,7 +385,7 @@ export async function silentSell(input: {
         traderAta,
         referrerWallet,
       }),
-      data: encodeSellIx(input.tokenIn, input.minSolOut),
+      data: encodeSellIx(input.tokenIn, input.minSolOut, userXp),
     }),
   ];
 

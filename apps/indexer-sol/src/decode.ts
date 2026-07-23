@@ -33,6 +33,7 @@ const DISC_TO_NAME: Map<string, string> = (() => {
     CURVE_EVENTS.TokenRegistered,
     CURVE_EVENTS.TradeEvent,
     CURVE_EVENTS.FeeSplitEvent,
+    CURVE_EVENTS.FeeSplitV2Event,
     CURVE_EVENTS.ReferrerSetEvent,
     CURVE_EVENTS.CreatorFeeClaimed,
     CURVE_EVENTS.ReferrerFeeClaimed,
@@ -117,6 +118,18 @@ function decodeFields(name: string, body: Buffer): Record<string, unknown> {
         creatorFee: readU64(r),
         referrerFee: readU64(r),
         treasuryFee: readU64(r),
+      };
+    case CURVE_EVENTS.FeeSplitV2Event:
+      return {
+        mint: readPubkey(r),
+        creator: readPubkey(r),
+        creatorFee: readU64(r),
+        referrerFee: readU64(r),
+        cashbackFee: readU64(r),
+        clanPoolFee: readU64(r),
+        seasonPoolFee: readU64(r),
+        platformFee: readU64(r),
+        userXp: r.buf.readUInt32LE(r.offset),
       };
     case CURVE_EVENTS.ReferrerSetEvent:
       return {

@@ -13,9 +13,9 @@
 | Faz | Ad | Durum | Başlangıç | Bitiş | Not |
 |-----|-----|--------|-----------|-------|-----|
 | F0 | Spec + CH ops | 🟢 **Done** | 2026-07-23 | 2026-07-23 | CH candles_spot=26, trades_raw=360 |
-| F1 | Redis XP + clans | 🟡 **In progress** | 2026-07-23 | — | missions ZINCRBY + weekly UI done; VM smoke bekliyor |
+| F1 | Redis XP + clans | 🟢 **Done (VM smoke)** | 2026-07-23 | 2026-07-24 | ZSCORE/ZREVRANGE + weekly API OK |
 | F2 | Redis→CH flusher | 🟢 **Stream ON** | 2026-07-23 | — | XLEN pump:ch:trades=23, flusher online |
-| F3 | Program fee v2 | 🟡 **In progress** | 2026-07-23 | — | kod local; on-chain deploy yok |
+| F3 | Program fee v2 | 🟡 **In progress** | 2026-07-23 | — | 6-way split kod local; devnet deploy bekliyor |
 | F4 | Sezon settlement | 🟡 **In progress** | 2026-07-23 | — | settlement-worker scaffold |
 | F5 | Go indexer + LaserStream | 🟡 **In progress** | 2026-07-23 | — | apps/indexer-sol-go scaffold |
 | F6 | PG offload + TS cutover | 🟢 **SKIP_PG ON** | 2026-07-23 | — | web+indexer SKIP_PG_TOKEN_CANDLES=true |
@@ -178,9 +178,21 @@ Sonuç: CH container ayakta ama veri yok + okunamıyor → F0 bloker
 - [x] Missions Tür A → ZINCRBY (social API hook via `syncWeeklyXpAfterMissionAward`)
 - [x] UI weekly leaderboard badge (`WeeklyXpBadge` on TradePanel)
 - [x] UI weekly leaderboard tab (`WeeklyLeaderboardPanel` — Redis ZREVRANGE)
-- [ ] VM smoke: trade → `ZSCORE weekly_user_xp {trader}` (ZCARD=3 — kısmen dolu)
+- [x] VM smoke: trade → `ZSCORE weekly_user_xp {trader}` — 4784 @ FSsut6… (2026-07-24)
+- [x] VM smoke: `ZREVRANGE weekly_user_xp 0 9` = `/api/leaderboard/weekly?limit=10` (8 rows)
+- [x] `bootstrap-season-redis.sh` — season:current id=1 (2026-07-23T19:58:50Z)
 
 ### LOG
+
+#### 2026-07-24 ~00:30 — F1 VM smoke yeşil
+
+- **Host:** instance-20260713-123055
+- **Redis:** `ZREVRANGE weekly_user_xp 0 9` → 8 trader (top 9910 XP)
+- **API:** `/api/xp/weekly?address=FSsut6…` → 4784, cashbackEligible
+- **API:** `/api/leaderboard/weekly?limit=10` → 8 users, season id=1
+- **Ops:** `bootstrap-season-redis.sh` OK (season:current created)
+- **Fix deployed:** weekly-xp Redis connect mutex (leaderboard empty bug)
+- **Sonraki:** F3 program fee v2 devnet
 
 #### 2026-07-24 ~00:10 — F1 missions hook + weekly UI (local)
 
@@ -265,15 +277,18 @@ Sonuç: CH container ayakta ama veri yok + okunamıyor → F0 bloker
 
 ### Checklist
 
-- [ ] `docs/fee-split-v2-spec.md` finalized
-- [ ] Program: user_xp arg, 6-way split, cashback PDA
-- [ ] SDK rebuild
-- [ ] TradePanel pre-trade XP
+- [x] `docs/fee-split-v2-spec.md` finalized
+- [x] Program: user_xp arg, 6-way split, cashback PDA, season/clan accrual PDAs
+- [x] SDK rebuild (`encodeBuyIx`/`encodeSellIx` 21-byte + PDA seeds)
+- [x] TradePanel pre-trade XP (`silent-trade` → `/api/xp/weekly`)
+- [x] Indexer: `FeeSplitV2Event` decode + audit log
 - [ ] Devnet deploy + tests
 
 ### LOG
 
-_(boş)_
+| Tarih | Not |
+|-------|-----|
+| 2026-07-24 | F3 kod: program 6-way `accrue_fees`, 17-account buy/sell, `FeeSplitV2Event`, SDK/web/indexer wiring |
 
 ---
 

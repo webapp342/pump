@@ -42,6 +42,7 @@ import {
   pdaReferrerBinding,
 } from "@/lib/solana/launchpad-pdas";
 import { solanaTradeAccountMetas } from "@/lib/solana/trade-accounts";
+import { fetchWeeklyXpForTrade } from "@/lib/xp/fetch-weekly-xp-for-trade";
 
 export type SolanaSilentCreateResult = {
   signature: string;
@@ -151,6 +152,7 @@ async function buildCreateMemeInstructions(input: {
       TOKEN_PROGRAM_ID
     );
     const minOut = input.minTokenOut ?? 1n;
+    const userXp = await fetchWeeklyXpForTrade(input.creator.toBase58());
     const { referrerWallet } = referrerAccounts(
       input.creator,
       input.referrerAddress
@@ -188,7 +190,7 @@ async function buildCreateMemeInstructions(input: {
           traderAta,
           referrerWallet,
         }),
-        data: encodeBuyIx(initialBuy, minOut),
+        data: encodeBuyIx(initialBuy, minOut, userXp),
       })
     );
   }

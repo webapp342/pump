@@ -44,6 +44,8 @@ type FeeSplit = {
   creatorFee: bigint;
   referrerFee: bigint;
   treasuryFee: bigint;
+  cashbackFee?: bigint;
+  userXp?: number;
 };
 
 export type HandlerContext = {
@@ -85,6 +87,9 @@ export class SolanaEventHandlers {
       case "onFeeSplit":
         this.onFeeSplit(event);
         break;
+      case "onFeeSplitV2":
+        this.onFeeSplitV2(event);
+        break;
       case "onReferrerSet":
         await this.onReferrerSet(event);
         break;
@@ -113,6 +118,27 @@ export class SolanaEventHandlers {
       referrerFee: asBigInt(f.referrerFee),
       treasuryFee: asBigInt(f.treasuryFee),
     });
+  }
+
+  private onFeeSplitV2(event: DecodedSolanaEvent): void {
+    const f = event.fields!;
+    const mint = asString(f.mint);
+    const platformFee = asBigInt(f.platformFee);
+    const seasonPoolFee = asBigInt(f.seasonPoolFee);
+    const clanPoolFee = asBigInt(f.clanPoolFee);
+    const userXp = typeof f.userXp === "number" ? f.userXp : 0;
+    this.pendingFeeSplits.set(feeSplitKey(event.signature, mint), {
+      creatorFee: asBigInt(f.creatorFee),
+      referrerFee: asBigInt(f.referrerFee),
+      treasuryFee: platformFee + seasonPoolFee + clanPoolFee,
+      cashbackFee: asBigInt(f.cashbackFee),
+      userXp,
+    });
+    if (userXp > 0) {
+      console.log(
+        `[indexer-sol] fee_v2 user_xp=${userXp} cashback=${String(f.cashbackFee)} sig=${event.signature}`
+      );
+    }
   }
 
   async onTokenCreated(event: DecodedSolanaEvent): Promise<void> {
