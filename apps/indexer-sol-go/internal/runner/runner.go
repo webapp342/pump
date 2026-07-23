@@ -5,20 +5,48 @@ import (
 	"log"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/pump-tma/indexer-sol-go/internal/config"
+	"github.com/pump-tma/indexer-sol-go/internal/db"
 	"github.com/pump-tma/indexer-sol-go/internal/decode"
 	"github.com/pump-tma/indexer-sol-go/internal/geyser"
+	"github.com/pump-tma/indexer-sol-go/internal/handlers"
 	"github.com/pump-tma/indexer-sol-go/internal/ingest"
 	"github.com/pump-tma/indexer-sol-go/internal/metrics"
+	"github.com/pump-tma/indexer-sol-go/internal/redisx"
 )
 
 const recentCap = 5000
 
-// Run starts LaserStream gRPC ingest → decode → metrics (no RPC poll/WS).
+// Run starts LaserStream gRPC ingest → decode → handlers (F5c writes when primary).
 func Run(ctx context.Context, cfg config.Config) error {
 	stats := &metrics.Stats{}
 	seen := make(map[string]struct{}, recentCap)
 	order := make([]string, 0, recentCap)
+
+	var h *handlers.Handlers
+	if cfg.WritesEnabled() {
+		var pool *pgxpool.Pool
+		if cfg.PgWritesEnabled() {
+			p, err := db.NewPool(ctx, cfg.LaunchpadDBURL)
+			if err != nil {
+				return err
+			}
+			pool = p
+			defer pool.Close()
+			log.Printf("[runner] PG pool ready")
+		}
+		rdb := redisx.Client(cfg.RedisURL)
+		if rdb != nil {
+			if err := redisx.Ping(ctx, cfg.RedisURL); err != nil {
+				log.Printf("[runner] redis ping: %v", err)
+			} else {
+				log.Printf("[runner] redis ready publish=%v ch_stream=%v", cfg.RedisPublish, cfg.ChViaRedisStream)
+			}
+		}
+		h = handlers.New(cfg, pool, rdb)
+		log.Printf("[runner] write path shadow=%s pg=%v redis=%v", cfg.ShadowMode, cfg.PgWritesEnabled(), cfg.RedisPublish)
+	}
 
 	remember := func(id string) bool {
 		if _, ok := seen[id]; ok {
@@ -50,7 +78,10 @@ func Run(ctx context.Context, cfg config.Config) error {
 			case decode.EventFeeSplitV2Event:
 				stats.FeeSplitV2.Add(1)
 			}
-			if cfg.ShadowMode == "read_only" || cfg.ShadowMode == "" {
+
+			if h != nil {
+				h.Dispatch(ctx, ev)
+			} else if cfg.ShadowMode == "read_only" || cfg.ShadowMode == "" {
 				log.Printf("[decode] %s sig=%s slot=%d", ev.Name, ev.Signature, ev.Slot)
 			}
 		}

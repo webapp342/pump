@@ -22,7 +22,13 @@ Copy `.env.example` → `.env`:
 SOLANA_GEYSER_ENDPOINT=https://laserstream-devnet-ewr.helius-rpc.com
 HELIUS_API_KEY=<dashboard key>
 SOLANA_GEYSER_PROGRAM_IDS=Hwv85kSodkR34rBTE1J67aSzixnAkXdAX6HzZnKDCvus
-GO_SHADOW_MODE=read_only   # decode + metrics until F5c PG/Redis writes
+GO_SHADOW_MODE=read_only   # read_only | primary | redis_only
+
+# F5c primary — mirror apps/indexer-sol/.env:
+# LAUNCHPAD_DATABASE_URL=...
+# REDIS_URL=redis://127.0.0.1:6379
+# REDIS_PUBLISH_ENABLED=true
+# CLICKHOUSE_VIA_REDIS_STREAM=true
 ```
 
 Also accepts `SOLANA_GEYSER_API_KEY` / `SOLANA_GEYSER_TOKEN`.

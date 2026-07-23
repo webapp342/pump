@@ -17,7 +17,7 @@
 | F2 | Redis→CH flusher | 🟢 **Stream ON** | 2026-07-23 | — | XLEN pump:ch:trades=23, flusher online |
 | F3 | Program fee v2 | 🟢 **Done (devnet)** | 2026-07-23 | 2026-07-24 | F4b redeploy pending (IX 12/13) |
 | F4 | Sezon settlement | 🟡 **F4b coded** | 2026-07-23 | — | worker + claim UI; VM deploy bekliyor |
-| F5 | Go indexer + LaserStream | 🟡 **F5b ingest** | 2026-07-24 | — | LaserStream gRPC only; PG writes F5c |
+| F5 | Go indexer + LaserStream | 🟡 **F5c coded** | 2026-07-24 | — | VM: GO_SHADOW_MODE=primary + smoke |
 | F6 | PG offload + TS cutover | 🟢 **SKIP_PG ON** | 2026-07-23 | — | web+indexer SKIP_PG_TOKEN_CANDLES=true |
 | F7 | Jupiter + portfolio CH | 🟢 **Price worker done** | 2026-07-23 | — | Redis SOL ~76 USD |
 | F8 | Hardening | ⬜ Ongoing | — | — | |
@@ -326,17 +326,33 @@ Sonuç: CH container ayakta ama veri yok + okunamıyor → F0 bloker
 
 - [x] `apps/indexer-sol-go/` scaffold + decode port
 - [x] Devnet RPC poll ingest (F5a — superseded)
-- [x] **Helius LaserStream gRPC only** (F5b — no RPC poll/WS shadow)
-- [ ] Shadow Redis writes (F5c)
-- [ ] Primary cutover prep (F5c)
+- [x] **Helius LaserStream gRPC only** (F5b — VM decode smoke ✅)
+- [x] **F5c primary writes** (PG SSOT + Redis PUBSUB/XADD + CH stream) — kod hazır; VM smoke bekliyor
+- [ ] F5d TS indexer retire (F6)
 - [x] systemd `pump-indexer-sol-go.service` + `build-indexer-sol-go.sh`
 
 ### LOG
 
 | Tarih | Not |
 |-------|-----|
-| 2026-07-24 | F5b: `helius-laserstream-sdk/go` — tek tx filter (program ID, vote=false, failed=false, CONFIRMED); RPC poll/WS kaldırıldı |
-| 2026-07-24 | **Sonraki:** VM Go 1.25 + `.env` HELIUS_API_KEY + rebuild; TS indexer durdur (tek ingest) |
+| 2026-07-24 | F5b: `helius-laserstream-sdk/go` — tek tx filter; RPC poll/WS kaldırıldı |
+| 2026-07-24 | **VM F5b smoke:** TradeEvent + FeeSplitV2 decode slot=478411886; TS indexer disabled |
+| 2026-07-24 | **F5c coded:** `handlers` trade PG TX + `publishTrade` PUBSUB/XADD + CH stream + weekly XP + live candles L1/Redis |
+| 2026-07-24 | **Sonraki:** VM `.env` mirror + `GO_SHADOW_MODE=primary` → rebuild → trade → board/WS smoke |
+
+### F5c — Write path (100k kullanıcı / VM hedefi)
+
+**Prensip:** Hot path = Redis (PUBSUB + hot cache + seq); durable = CH via `pump:ch:*` stream + flusher; PG = positions/trades/bonding SSOT only. WS fan-out `apps/realtime` — indexer Redis’e yazar, kullanıcı başına RPC yok.
+
+| Alt | Deliverable | Durum |
+|-----|-------------|--------|
+| F5c.1 | Config + PG pool + trade TX (trades, bonding, positions, volumes) | 🟢 |
+| F5c.2 | Live candles L1+Redis → `publishTrade` PUBSUB + replay streams | 🟢 |
+| F5c.3 | CH stream XADD (`pump:ch:trades`, `pump:ch:candles`) + weekly XP ZINCRBY | 🟢 |
+| F5c.4 | TokenCreated + board stats + missions + wallet PUBLISH | ⬜ |
+| F5c.5 | Slot cursor + load smoke + rollback runbook | ⬜ |
+
+**VM SLO (devnet → mainnet):** indexer CPU < TS baseline · WS p95 ≤ baseline · `XLEN pump:ch:*` lag < 5s · PG insert rate = trade rate
 
 ### Araştırma notları
 
@@ -360,10 +376,9 @@ SOLANA_GEYSER_PROGRAM_IDS=Hwv85kSodkR34rBTE1J67aSzixnAkXdAX6HzZnKDCvus
 
 | Alt | Durum | Not |
 |-----|--------|-----|
-| 5a read-only | ✅ | decode parity (RPC — retired) |
-| 5b LaserStream gRPC | 🟢 | tek ingest; quota filter |
-| 5c primary writes | ⬜ | PG+Redis+CH stream |
-| 5d TS stop | ⬜ | F6 |
+| 5b LaserStream gRPC | 🟢 | VM: Trade+FeeSplitV2 decode |
+| 5c primary writes | 🟢 coded | VM smoke: GO_SHADOW_MODE=primary |
+| 5d TS stop | 🟢 | VM: pump-indexer-sol disabled |
 
 ---
 

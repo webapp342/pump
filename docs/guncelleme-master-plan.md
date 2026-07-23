@@ -386,14 +386,30 @@ Subscription filter: `pump-launchpad` program ID transactions + logs.
 | FeeClaim | ✅ claims | — | — |
 | Points/missions | audit row only | ZINCRBY (weekly) | XADD lifetime |
 
-### 7.4 Paralel çalışma (cutover öncesi)
+### 7.4 Cutover fazları (2026-07-24 güncelleme)
 
 ```text
-Phase 5a: Go read-only — decode + metrics, no writes (1 hf)
-Phase 5b: Go shadow writes — Redis only, compare TS (3 gün)
-Phase 5c: Go primary PG+Redis, TS standby (1 hf)
-Phase 5d: TS indexer stop (F6)
+Phase 5a: Go read-only decode — ✅ (retired; RPC poll removed)
+Phase 5b: LaserStream gRPC tek ingest — ✅ VM smoke
+Phase 5c: Go primary writes — 🟢 coded (VM smoke pending)
+Phase 5d: TS indexer stop — ✅ VM (pump-indexer-sol disabled)
+Phase 6:  PG offload (SKIP_PG candles, weekly XP Redis-only)
 ```
+
+**100k kullanıcı / tek VM prensibi (F5–F6):**
+
+| Katman | Rol | Yük |
+|--------|-----|-----|
+| LaserStream gRPC | Tek ingest, program-filtered | Sabit quota (Helius plan) |
+| Go indexer | Decode + PG TX + Redis fire-and-forget | O(trade rate), not O(users) |
+| Redis PUBSUB | `pump:trade:*`, `pump:wallet:*` | Fan-out → realtime WS |
+| Redis STREAM | `pump:stream:*` MAXLEN ~200 replay | O(1) join, bounded memory |
+| Redis hot | `pump:hot:candle:*`, `pump:hot:tape:*` | SSR/chart tip, TTL |
+| Redis ZSET | `weekly_user_xp`, `weekly_clan_xp` | O(log N) leaderboard |
+| CH stream | `pump:ch:trades`, `pump:ch:candles` | Async batch via ch-flusher |
+| PG | trades, positions, bonding only | SSOT; no candle mirror (SKIP_PG) |
+
+Kullanıcı sayısı WS’i scale eder (`apps/realtime`); indexer trade başına sabit iş yapar.
 
 ### 7.5 Kabul kriterleri
 
