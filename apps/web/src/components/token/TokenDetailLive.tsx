@@ -33,6 +33,7 @@ import { mergeWsCandleUpdates } from "@/lib/chart-series-state";
 import { logChartWsMerge } from "@/lib/chart-observability";
 import type { InitialChartCandles } from "@/lib/token-server";
 import { buildTokenMarketSnapshot } from "@/lib/token-market-snapshot";
+import { arenaWsSpotPriceBnb } from "@/lib/arena-live-delta";
 import {
   bnbToUsd,
   tokenPriceUsd,
@@ -472,9 +473,17 @@ export function TokenDetailLive({
     ? (solanaMarket.protocolFeeBps ?? BigInt(PUMP_FEEL_DEFAULTS.protocolFeeBps))
     : 100n;
 
+  const wsSpotBnb = useMemo(
+    () => (latestWsBonding ? arenaWsSpotPriceBnb(latestWsBonding) : 0),
+    [latestWsBonding]
+  );
+
   const marketSnapshotBase = useMemo(
-    () => buildTokenMarketSnapshot(liveToken),
-    [liveToken]
+    () =>
+      buildTokenMarketSnapshot(liveToken, {
+        pendingSpotAfterBnb: wsSpotBnb > 0 ? wsSpotBnb : null,
+      }),
+    [liveToken, wsSpotBnb]
   );
 
   const displayPrice = marketSnapshotBase.spotPriceBnb;
