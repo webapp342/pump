@@ -1,8 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSeasonStatus } from "@/lib/redis/season-status";
 
-export const dynamic = "force-dynamic";
-
 export async function GET() {
   try {
     const status = await getSeasonStatus();

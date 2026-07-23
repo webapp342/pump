@@ -2,8 +2,6 @@ import { NextResponse } from "next/server";
 import { getSeasonStatus } from "@/lib/redis/season-status";
 import { fetchPendingSeasonRewardsLamports } from "@/lib/solana/silent-claim-season";
 
-export const dynamic = "force-dynamic";
-
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const address = url.searchParams.get("address")?.trim() ?? "";
