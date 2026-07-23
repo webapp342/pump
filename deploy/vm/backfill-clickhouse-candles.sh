@@ -11,6 +11,18 @@ PG_SCRIPT="${TMA_DIR}/deploy/vm/backfill-clickhouse-candles-pg.sh"
 
 log() { echo "[backfill-clickhouse-candles] $*"; }
 
+wait_clickhouse() {
+  local max="${WAIT_SECS:-60}"
+  for i in $(seq 1 "$max"); do
+    if curl -sf "http://127.0.0.1:8123/ping" >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 1
+  done
+  log "ERROR: ClickHouse ping timeout (${max}s) — do not backfill during container restart"
+  return 1
+}
+
 if [[ ! -f "$ENV_FILE" ]]; then
   log "ERROR: missing $ENV_FILE"
   exit 1
@@ -25,6 +37,7 @@ if [[ -f "$BACKFILL_JS" ]]; then
     log "ERROR: CLICKHOUSE_URL not set in $ENV_FILE"
     exit 1
   fi
+  wait_clickhouse
   log "Using pre-built $BACKFILL_JS"
   node "$BACKFILL_JS"
 else

@@ -120,6 +120,8 @@ upsert_env "$WEB_ENV" "CLICKHOUSE_URL" "http://127.0.0.1:8123"
 upsert_env "$WEB_ENV" "CLICKHOUSE_DATABASE" "pump"
 upsert_env "$WEB_ENV" "USE_CLICKHOUSE_CANDLES" "true"
 upsert_env "$WEB_ENV" "NEXT_PUBLIC_WS_ENABLED" "true"
+upsert_env "$WEB_ENV" "USE_REDIS_WEEKLY_XP" "true"
+upsert_env "$INDEXER_ENV" "USE_REDIS_WEEKLY_XP" "true"
 
 if systemctl is-active --quiet pump-indexer-sol 2>/dev/null; then
   log "Restarting pump-indexer-sol…"

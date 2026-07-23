@@ -63,6 +63,7 @@ ensure_env "REDIS_URL" "${REDIS_URL:-redis://127.0.0.1:6379}"
 ensure_env "CLICKHOUSE_URL" "${CLICKHOUSE_URL:-http://127.0.0.1:8123}"
 ensure_env "CLICKHOUSE_DUAL_WRITE" "true"
 ensure_env "CLICKHOUSE_DATABASE" "pump"
+ensure_env "USE_REDIS_WEEKLY_XP" "true"
 
 log "Building indexer-sol from monorepo (requires root npm ci from tma-deploy)"
 cd "$TMA_DIR"

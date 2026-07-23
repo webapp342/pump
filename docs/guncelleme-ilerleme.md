@@ -12,15 +12,17 @@
 
 | Faz | Ad | Durum | Başlangıç | Bitiş | Not |
 |-----|-----|--------|-----------|-------|-----|
-| F0 | Spec + CH ops | 🟡 **In progress** | 2026-07-23 | — | memory.xml 0.55 repo'da; VM backfill bekliyor |
-| F1 | Redis XP + clans | 🟡 **In progress** | 2026-07-23 | — | migration 054, weekly-xp, API, cron |
-| F2 | Redis→CH flusher | 🟡 **In progress** | 2026-07-23 | — | apps/ch-flusher + redis-ch-stream |
-| F3 | Program fee v2 | 🟡 **In progress** | 2026-07-23 | — | cashback PDA + user_xp + SDK; 6-way pool TODO |
+| F0 | Spec + CH ops | 🔴 **Blocked** | 2026-07-23 | — | backfill 26/34; `compared_ch=0` — **sıradaki adım** |
+| F1 | Redis XP + clans | 🟡 **In progress** | 2026-07-23 | — | kod+054 VM OK; XP smoke = yeni trade + trader cüzdan |
+| F2 | Redis→CH flusher | ⏸ **Paused** | 2026-07-23 | — | pump-ch-flusher online; stream flag **F0 sonrası** |
+| F3 | Program fee v2 | 🟡 **In progress** | 2026-07-23 | — | kod local; on-chain deploy yok |
 | F4 | Sezon settlement | 🟡 **In progress** | 2026-07-23 | — | settlement-worker scaffold |
 | F5 | Go indexer + LaserStream | 🟡 **In progress** | 2026-07-23 | — | apps/indexer-sol-go scaffold |
-| F6 | PG offload + TS cutover | ⬜ Pending | — | — | SKIP_PG flag mevcut, cutover bekliyor |
-| F7 | Jupiter + portfolio CH | 🟡 **In progress** | 2026-07-23 | — | price-worker + Redis read |
+| F6 | PG offload + TS cutover | ⬜ Pending | — | — | F0+F5 sonrası |
+| F7 | Jupiter + portfolio CH | 🟢 **Price worker done** | 2026-07-23 | — | Redis SOL ~78; portfolio CH tab bekliyor |
 | F8 | Hardening | ⬜ Ongoing | — | — | |
+
+**Kritik yol:** F0 yeşil → F2 stream cutover → F1 XP smoke → F3 program deploy → F5/F6.
 
 Durum ikonları: ⬜ Pending · 🟡 In progress · 🟢 Done · 🔴 Blocked · ⏸ Paused
 
@@ -58,12 +60,22 @@ Sonuç: CH container ayakta ama veri yok + okunamıyor → F0 bloker
 - [x] `docs/fee-split-v2-spec.md`
 - [x] `docs/redis-key-catalog.md`
 - [x] `docs/ingest-cutover-runbook.md`
-- [x] CH memory.xml ≥ 0.55 (repo — VM deploy bekliyor)
-- [ ] backfill-clickhouse-candles + trades (VM)
-- [ ] check-chart-parity compared_ch > 0 (VM)
+- [x] CH memory.xml ≥ 0.55 (repo + VM mount)
+- [ ] backfill-clickhouse-candles + trades (VM) — **26/34 kısmi; tekrar gerek**
+- [ ] check-chart-parity compared_ch > 0 (VM) — **hâlâ 0**
 - [ ] pm2 logs olap ≠ postgres (VM)
 
 ### LOG
+
+#### 2026-07-23 ~04:10 — F0 VM denemesi (INC-001 devam)
+
+- **Host:** instance-20260713-123055
+- **Komutlar:** `docker restart pump-clickhouse` + backfill aynı blokta (hatalı sıra)
+- **Sonuç:**
+  - backfill: pg rows=34, insert sırasında `other side closed` (CH restart)
+  - verify: `candles_spot` count=26
+  - parity: `compared_ch=0 compared_pg=2 ch_enabled=true` — exit 1
+- **Sonraki:** `bash deploy/vm/f0-ch-recover.sh` (CH stabil → backfill → parity)
 
 #### 2026-07-23 — F0 repo implementasyonu (local)
 
@@ -106,8 +118,17 @@ Sonuç: CH container ayakta ama veri yok + okunamıyor → F0 bloker
 - [x] `GET/POST /api/clans`
 - [ ] Missions Tür A → ZINCRBY (social API hook)
 - [ ] UI weekly leaderboard badge
+- [ ] VM smoke: trade → `ZSCORE weekly_user_xp {trader}`
 
 ### LOG
+
+#### 2026-07-23 ~04:10 — F1 VM smoke (bekliyor)
+
+- **Migration 054:** OK (deploy)
+- **Env:** indexer `REDIS_URL` OK; web `USE_REDIS_WEEKLY_XP` — trailing space düzeltilmeli
+- **Smoke hatası:** `ZSCORE` token mint ile sorgulandı (trader cüzdan değil) → `(nil)` beklenen
+- **season:current:** `(nil)` — opsiyonel: `bash deploy/vm/bootstrap-season-redis.sh`
+- **Sonraki:** küçük trade + trader cüzdan ile ZSCORE; `curl -i /api/leaderboard/weekly`
 
 #### 2026-07-23 — F1 core (local)
 
@@ -129,10 +150,17 @@ Sonuç: CH container ayakta ama veri yok + okunamıyor → F0 bloker
 - [x] Redis streams `pump:ch:trades`, `pump:ch:candles`
 - [x] Indexer XADD (`redis-ch-stream.ts`, flag `CLICKHOUSE_VIA_REDIS_STREAM=true`)
 - [ ] CH async_insert user config VM
-- [ ] Flusher systemd service VM
+- [x] Flusher PM2 `pump-ch-flusher` online (VM)
+- [ ] `CLICKHOUSE_VIA_REDIS_STREAM=true` indexer (F0 gate)
 - [ ] 7d parity gate
 
 ### LOG
+
+#### 2026-07-23 ~04:00 — F2 flusher VM
+
+- **PM2:** `pump-ch-flusher` online (manuel build + startOrRestart)
+- **Stream flag:** kapalı — F0 `compared_ch>0` sonrası açılacak
+- **Sonraki:** F0 green → indexer env `CLICKHOUSE_VIA_REDIS_STREAM=true` → `XLEN pump:ch:trades`
 
 #### 2026-07-23 — F2 worker + indexer stream path
 
@@ -259,14 +287,20 @@ _(boş)_
 
 ### Checklist
 
-- [ ] Price worker → Redis `price:native:sol:usd`
-- [ ] `/api/price/native` Redis read
+- [x] Price worker → Redis `price:native:sol:usd` (VM ~77.99 CoinGecko)
+- [ ] `/api/price/native` Redis read doğrulama
 - [ ] Portfolio trade history from CH
 - [ ] Binance/CG fallback preserved
 
 ### LOG
 
-_(boş)_
+#### 2026-07-23 ~04:05 — F7 price worker VM
+
+- **Redis:** `GET price:native:sol:usd` → SOL ~77.99, source=coingecko
+- **PM2:** `pump-price-worker` online
+- **Sonraki:** `/api/price/native` curl; portfolio CH tab F2/F0 sonrası
+
+#### _(önceki)_
 
 ---
 
@@ -277,7 +311,7 @@ _(boş)_
 
 | Hafta | chart-parity | PG CPU | WS p95 | CH flusher lag | Not |
 |-------|--------------|--------|--------|----------------|-----|
-| 2026-W30 | compared_ch=0 | — | — | N/A | F0 blocked |
+| 2026-W30 | compared_ch=0 | — | — | flusher idle (no stream) | F0 blocked INC-001 |
 
 ---
 
@@ -348,4 +382,4 @@ _(boş)_
 
 ---
 
-*Son güncelleme: 2026-07-23 — F0 blocked (VM CH incident INC-001)*
+*Son güncelleme: 2026-07-23 — F0 VM bloker (compared_ch=0); F7 price worker green; F2 flusher paused*
