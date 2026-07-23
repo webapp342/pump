@@ -6,7 +6,6 @@ import (
 )
 
 type Config struct {
-	RpcURL             string
 	Cluster            string
 	Source             string
 	ShadowMode         string
@@ -15,22 +14,42 @@ type Config struct {
 	ProgramIDs         []string
 	RedisURL           string
 	LaunchpadDBURL     string
-	PollIntervalMs     int
+	MetricsIntervalMs  int
 }
 
 func Load() Config {
 	return Config{
-		Cluster:        env("SOLANA_CLUSTER", "devnet"),
-		RpcURL:         env("SOLANA_RPC_URL", "https://api.devnet.solana.com"),
-		Source:         env("SOLANA_INDEXER_SOURCE", "geyser"),
-		ShadowMode:     env("GO_SHADOW_MODE", ""),
-		LaserStreamURL: env("SOLANA_GEYSER_ENDPOINT", "https://laserstream-devnet-ewr.helius-rpc.com"),
-		HeliusAPIKey:   env("HELIUS_API_KEY", ""),
-		ProgramIDs:     strings.Split(env("SOLANA_GEYSER_PROGRAM_IDS", "Hwv85kSodkR34rBTE1J67aSzixnAkXdAX6HzZnKDCvus"), ","),
-		RedisURL:       env("REDIS_URL", ""),
-		LaunchpadDBURL: env("LAUNCHPAD_DATABASE_URL", ""),
-		PollIntervalMs: envInt("SOLANA_INDEXER_POLL_MS", 2000),
+		Cluster:           env("SOLANA_CLUSTER", "devnet"),
+		Source:            env("SOLANA_INDEXER_SOURCE", "laserstream"),
+		ShadowMode:        env("GO_SHADOW_MODE", "read_only"),
+		LaserStreamURL:    env("SOLANA_GEYSER_ENDPOINT", "https://laserstream-devnet-ewr.helius-rpc.com"),
+		HeliusAPIKey:      firstNonEmpty(env("HELIUS_API_KEY", ""), env("SOLANA_GEYSER_API_KEY", ""), env("SOLANA_GEYSER_TOKEN", "")),
+		ProgramIDs:        splitCSV(env("SOLANA_GEYSER_PROGRAM_IDS", "Hwv85kSodkR34rBTE1J67aSzixnAkXdAX6HzZnKDCvus")),
+		RedisURL:          env("REDIS_URL", ""),
+		LaunchpadDBURL:    env("LAUNCHPAD_DATABASE_URL", ""),
+		MetricsIntervalMs: envInt("SOLANA_INDEXER_POLL_MS", 5000),
 	}
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, v := range values {
+		if strings.TrimSpace(v) != "" {
+			return strings.TrimSpace(v)
+		}
+	}
+	return ""
+}
+
+func splitCSV(raw string) []string {
+	parts := strings.Split(raw, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
 }
 
 func env(key, fallback string) string {

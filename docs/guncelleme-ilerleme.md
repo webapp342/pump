@@ -17,7 +17,7 @@
 | F2 | Redis→CH flusher | 🟢 **Stream ON** | 2026-07-23 | — | XLEN pump:ch:trades=23, flusher online |
 | F3 | Program fee v2 | 🟢 **Done (devnet)** | 2026-07-23 | 2026-07-24 | F4b redeploy pending (IX 12/13) |
 | F4 | Sezon settlement | 🟡 **F4b coded** | 2026-07-23 | — | worker + claim UI; VM deploy bekliyor |
-| F5 | Go indexer + LaserStream | 🟡 **F5a done** | 2026-07-23 | — | RPC poll + decode; LaserStream F5b |
+| F5 | Go indexer + LaserStream | 🟡 **F5b ingest** | 2026-07-24 | — | LaserStream gRPC only; PG writes F5c |
 | F6 | PG offload + TS cutover | 🟢 **SKIP_PG ON** | 2026-07-23 | — | web+indexer SKIP_PG_TOKEN_CANDLES=true |
 | F7 | Jupiter + portfolio CH | 🟢 **Price worker done** | 2026-07-23 | — | Redis SOL ~76 USD |
 | F8 | Hardening | ⬜ Ongoing | — | — | |
@@ -325,10 +325,9 @@ Sonuç: CH container ayakta ama veri yok + okunamıyor → F0 bloker
 ### Checklist
 
 - [x] `apps/indexer-sol-go/` scaffold + decode port
-- [x] Devnet RPC poll ingest (read-only phase — F5a)
-- [x] Decode unit tests (disc parity TS ↔ Go)
-- [ ] Helius LaserStream gRPC connect (F5b)
-- [ ] Shadow Redis writes (F5b)
+- [x] Devnet RPC poll ingest (F5a — superseded)
+- [x] **Helius LaserStream gRPC only** (F5b — no RPC poll/WS shadow)
+- [ ] Shadow Redis writes (F5c)
 - [ ] Primary cutover prep (F5c)
 - [x] systemd `pump-indexer-sol-go.service` + `build-indexer-sol-go.sh`
 
@@ -336,8 +335,8 @@ Sonuç: CH container ayakta ama veri yok + okunamıyor → F0 bloker
 
 | Tarih | Not |
 |-------|-----|
-| 2026-07-24 | F5a: `internal/decode` (FeeSplitV2 dahil), RPC poll ingest, metrics heartbeat, `go test ./...` OK |
-| 2026-07-24 | **Sonraki:** VM `build-indexer-sol-go.sh` shadow sidecar · F5b LaserStream |
+| 2026-07-24 | F5b: `helius-laserstream-sdk/go` — tek tx filter (program ID, vote=false, failed=false, CONFIRMED); RPC poll/WS kaldırıldı |
+| 2026-07-24 | **Sonraki:** VM Go 1.25 + `.env` HELIUS_API_KEY + rebuild; TS indexer durdur (tek ingest) |
 
 ### Araştırma notları
 
@@ -361,8 +360,8 @@ SOLANA_GEYSER_PROGRAM_IDS=Hwv85kSodkR34rBTE1J67aSzixnAkXdAX6HzZnKDCvus
 
 | Alt | Durum | Not |
 |-----|--------|-----|
-| 5a read-only | 🟢 | RPC poll + decode + metrics |
-| 5b shadow Redis | ⬜ | LaserStream + compare TS 3 gün |
+| 5a read-only | ✅ | decode parity (RPC — retired) |
+| 5b LaserStream gRPC | 🟢 | tek ingest; quota filter |
 | 5c primary writes | ⬜ | PG+Redis+CH stream |
 | 5d TS stop | ⬜ | F6 |
 

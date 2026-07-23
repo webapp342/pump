@@ -5,9 +5,13 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT/apps/indexer-sol-go"
 
 if ! command -v go >/dev/null 2>&1; then
-  echo "install Go 1.22+ first"
+  echo "install Go 1.25+ first (LaserStream SDK requires go 1.25.1)"
   exit 1
 fi
+
+go version | grep -qE 'go1\.(2[5-9]|[3-9][0-9])' || {
+  echo "WARN: LaserStream SDK needs Go 1.25.1+ — upgrade: https://go.dev/dl/"
+}
 
 go mod tidy
 go test ./...

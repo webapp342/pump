@@ -19,10 +19,9 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
 
-	log.Printf("[indexer-sol-go] start cluster=%s source=%s shadow=%s rpc=%s",
-		cfg.Cluster, cfg.Source, cfg.ShadowMode, cfg.RpcURL)
+	log.Printf("[indexer-sol-go] start cluster=%s source=%s shadow=%s endpoint=%s",
+		cfg.Cluster, cfg.Source, cfg.ShadowMode, cfg.LaserStreamURL)
 
-	// F5a: RPC WS ingest + decode (read-only). LaserStream wiring lands in F5b.
 	if err := runner.Run(ctx, cfg); err != nil && ctx.Err() == nil {
 		log.Fatalf("runner: %v", err)
 	}

@@ -1,24 +1,33 @@
 # pump-indexer-sol-go (F5)
 
-Go indexer — phased cutover from `apps/indexer-sol` (TS).
+Solana launchpad indexer — **Helius LaserStream gRPC only** (no RPC poll / WS).
 
-## Modes (`GO_SHADOW_MODE`)
+## Ingest (quota-optimized)
 
-| Mode | Behavior |
-|------|----------|
-| `read_only` | RPC poll → decode → log + metrics (no writes) |
-| `redis_only` | F5b — Redis ZINCRBY/PUBLISH/XADD only |
-| _(empty / primary)_ | F5c — full PG + Redis + CH stream |
+Single `transactions` filter:
 
-## F5a — run locally
+- `accountInclude`: launchpad program ID(s) — deduped
+- `vote: false`, `failed: false`
+- `commitment: CONFIRMED`
+- No slots / blocks / accounts subscriptions
+- SDK auto-reconnect + slot replay (default)
+
+Ref: [Helius LaserStream clients](https://www.helius.dev/docs/laserstream/clients)
+
+## Env
+
+Copy `.env.example` → `.env`:
 
 ```bash
-cd apps/indexer-sol-go
-cp .env.example .env
-GO_SHADOW_MODE=read_only go run ./cmd/indexer
+SOLANA_GEYSER_ENDPOINT=https://laserstream-devnet-ewr.helius-rpc.com
+HELIUS_API_KEY=<dashboard key>
+SOLANA_GEYSER_PROGRAM_IDS=Hwv85kSodkR34rBTE1J67aSzixnAkXdAX6HzZnKDCvus
+GO_SHADOW_MODE=read_only   # decode + metrics until F5c PG/Redis writes
 ```
 
-Build:
+Also accepts `SOLANA_GEYSER_API_KEY` / `SOLANA_GEYSER_TOKEN`.
+
+## Build (Go 1.25.1+)
 
 ```bash
 go test ./...
@@ -29,16 +38,14 @@ VM:
 
 ```bash
 bash deploy/vm/build-indexer-sol-go.sh
-sudo cp deploy/vm/pump-indexer-sol-go.service /etc/systemd/system/
-sudo systemctl enable --now pump-indexer-sol-go
+sudo systemctl restart pump-indexer-sol-go
 ```
 
-## Decode parity
-
-Go discriminators match TS `@pump/solana-sdk` event names (`sha256("event:{Name}")[0:8]`).
+**Tek ingest:** disable TS indexer when Go is primary:
 
 ```bash
-go test ./internal/decode/...
+sudo systemctl stop pump-indexer-sol
+sudo systemctl disable pump-indexer-sol
 ```
 
 ## Cutover
