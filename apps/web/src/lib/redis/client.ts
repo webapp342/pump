@@ -1,10 +1,9 @@
 import { Redis } from "ioredis";
-import { redisUrl, useRedisArenaCache } from "@/lib/db/perf-flags";
+import { redisUrl } from "@/lib/db/perf-flags";
 
 let redis: Redis | null = null;
 
 export function getRedisClient(): Redis | null {
-  if (!useRedisArenaCache()) return null;
   const url = redisUrl();
   if (!url) return null;
 

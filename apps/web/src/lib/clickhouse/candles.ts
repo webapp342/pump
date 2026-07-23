@@ -182,16 +182,21 @@ export async function listTokenCandlesFromClickHouseMv(
 }
 
 /**
- * Deep history preference (enterprise chart SSOT):
- * 1) trades_raw dynamic OHLC (argMin/argMax + spot_before)
- * 2) candles_mv (same formula, pre-aggregated)
- * 3) candles_spot (indexer dual-write fallback)
+ * Deep history preference — match indexer incremental OHLC (candles_spot dual-write):
+ * 1) candles_spot (indexer live tip mirror — same as PG token_candles / Redis hot)
+ * 2) trades_raw dynamic OHLC (backfill / analytics)
+ * 3) candles_mv (pre-aggregated rollups)
  */
 export async function listTokenCandlesFromClickHouse(
   tokenAddress: string,
   interval: CandleInterval,
   limit = 1000
 ): Promise<{ rows: StoredTokenCandleRow[]; source: ClickHouseCandleSource } | null> {
+  const spot = await listTokenCandlesFromClickHouseSpot(tokenAddress, interval, limit);
+  if (spot && spot.length > 0) {
+    return { rows: spot, source: "candles_spot" };
+  }
+
   const fromTrades = await listTokenCandlesFromTradesRaw(tokenAddress, interval, limit);
   if (fromTrades && fromTrades.length > 0) {
     return { rows: fromTrades, source: "trades_raw" };
@@ -202,11 +207,9 @@ export async function listTokenCandlesFromClickHouse(
     return { rows: mv, source: "candles_mv" };
   }
 
-  const spot = await listTokenCandlesFromClickHouseSpot(tokenAddress, interval, limit);
-  if (spot && spot.length > 0) {
-    return { rows: spot, source: "candles_spot" };
+  if (spot && spot.length === 0) {
+    return { rows: [], source: "candles_spot" };
   }
-
   if (fromTrades && fromTrades.length === 0) {
     return { rows: [], source: "trades_raw" };
   }

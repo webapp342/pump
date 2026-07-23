@@ -92,7 +92,7 @@ export function synthesizeCandleUpdatesFromSpot(input: {
       volume: String(volume),
       buyVolume: String(buyVolume),
       tradeCount: 1,
-      isNewBucket: false,
+      isNewBucket: true,
     });
   }
   return out;

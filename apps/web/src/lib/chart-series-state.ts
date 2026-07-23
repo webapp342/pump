@@ -52,18 +52,24 @@ export function preserveLiveTailOverFetch(
 
   const liveTail = liveCandles[liveCandles.length - 1]!;
   const liveVol = liveVolumes[liveVolumes.length - 1];
-  const fetchTail = fetchedCandles[fetchedCandles.length - 1]!;
-
-  // Durable fetch (PG + Redis hot) is SSOT on poll reconcile.
-  if (liveTail.time <= fetchTail.time) {
-    return { candles: fetchedCandles, volumes: fetchedVolumes };
-  }
-
-  // In-memory WS bucket ahead of durable store — append live tip only.
   const candles = fetchedCandles.slice();
   const volumes = fetchedVolumes.slice();
-  candles.push(liveTail);
-  if (liveVol) volumes.push(liveVol);
+  const idx = candles.findIndex((c) => c.time === liveTail.time);
+
+  if (idx >= 0) {
+    // Live open-bucket SSOT: replace fetched tip entirely (open included).
+    candles[idx] = { ...liveTail };
+    if (liveVol && idx < volumes.length) {
+      volumes[idx] = { ...liveVol };
+    }
+    return { candles, volumes };
+  }
+
+  const fetchTail = candles[candles.length - 1]!;
+  if (liveTail.time > fetchTail.time) {
+    candles.push(liveTail);
+    if (liveVol) volumes.push(liveVol);
+  }
 
   return { candles, volumes };
 }

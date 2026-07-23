@@ -245,7 +245,6 @@ export function PriceChart({
 
   const liveCandleUpdatesRef = useRef(liveCandleUpdates);
   liveCandleUpdatesRef.current = liveCandleUpdates;
-  const wsReconcileTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const fetchCandles = useCallback(async () => {
     const intervalAtFetch = timeInterval;
@@ -378,20 +377,64 @@ export function PriceChart({
       });
     }
 
-    // Same SSOT as refresh: /candles merges Redis hot tail + durable store.
-    if (wsReconcileTimerRef.current) clearTimeout(wsReconcileTimerRef.current);
-    wsReconcileTimerRef.current = setTimeout(() => {
-      wsReconcileTimerRef.current = null;
-      void fetchCandles();
-    }, 250);
-
-    return () => {
-      if (wsReconcileTimerRef.current) {
-        clearTimeout(wsReconcileTimerRef.current);
-        wsReconcileTimerRef.current = null;
+    // Instant tip paint — reducer + derive reconcile on next frame.
+    const mainSeries = mainSeriesRef.current;
+    const update = tip;
+    if (ready && mainSeries) {
+      const scale = candleUnitScale;
+      const open = Number(update.open) * scale;
+      const high = Number(update.high) * scale;
+      const low = Number(update.low) * scale;
+      const close = Number(update.close) * scale;
+      if (Number.isFinite(close) && close > 0) {
+        const prev = renderedCandlesRef.current;
+        const last = prev.length > 0 ? prev[prev.length - 1] : null;
+        const painted =
+          last && last.time === update.time
+            ? {
+                time: update.time,
+                open: open > 0 ? open : last.open > 0 ? last.open : close,
+                high: Math.max(high, open, close),
+                low: Math.min(
+                  low > 0 ? low : close,
+                  open > 0 ? open : close,
+                  close
+                ),
+                close,
+              }
+            : {
+                time: update.time,
+                open: open > 0 ? open : close,
+                high: Math.max(high, open, close),
+                low: Math.min(low > 0 ? low : close, open, close),
+                close,
+              };
+        try {
+          mainSeries.update(
+            candleToMainChartPoint(chartStyleRef.current, painted) as never
+          );
+          if (last && last.time === painted.time) {
+            const next = prev.slice();
+            next[next.length - 1] = painted;
+            renderedCandlesRef.current = next;
+          } else if (!last || painted.time > last.time) {
+            renderedCandlesRef.current = [...prev, painted];
+          }
+        } catch {
+          // Full setData in the derive effect heals ordering edge cases.
+        }
       }
-    };
-  }, [liveCandleUpdates, timeInterval, tokenAddress, wsConnected, fetchCandles]);
+    }
+
+    renderedFingerprintRef.current = "";
+  }, [
+    liveCandleUpdates,
+    timeInterval,
+    tokenAddress,
+    wsConnected,
+    ready,
+    candleUnitScale,
+  ]);
 
   /** History from API/WS only — never rebuild OHLC from tape (diverges from indexer). */
   const chartSeriesState = seriesState;
