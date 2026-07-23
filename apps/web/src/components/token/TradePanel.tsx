@@ -567,7 +567,7 @@ export function TradePanel({
     isSolanaTrade ? (tokenAddress as string) : undefined,
     isSolanaTrade ? solanaAddress : undefined,
     isSolanaTrade,
-    { fetchCurve: !wsConnected }
+    { fetchCurve: true }
   );
   const { data: solLamports, refetch: refetchSolBalance } = useSolanaNativeBalance(
     isSolanaTrade ? solanaAddress : undefined
@@ -638,8 +638,9 @@ export function TradePanel({
 
   const bondingCurve = useMemo(() => {
     if (isSolanaTrade) {
-      if (liveSolanaBondingCurve) return liveSolanaBondingCurve;
+      // Quotes must match on-chain virtual reserves (updated each trade), not DB static virtuals.
       if (solanaMarket.bondingCurve) return solanaMarket.bondingCurve;
+      if (liveSolanaBondingCurve) return liveSolanaBondingCurve;
       if (chainCurveSnapshot && !isEmptyCurveSnapshot(chainCurveSnapshot)) {
         return bondingCurveFromSnapshot(chainCurveSnapshot);
       }

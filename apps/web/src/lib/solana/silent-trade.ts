@@ -17,29 +17,37 @@ import {
   getAssociatedTokenAddressSync,
 } from "@solana/spl-token";
 import { encodeBuyIx, encodeSellIx, encodeSetReferrerIx } from "@pump/solana-sdk";
+import { PUMP_FEEL_DEFAULTS } from "@/config/solana";
+import { minOutWithSlippage, quoteBuyFromCurveState } from "@/lib/bonding-curve";
 import { getSolanaConnection } from "@/lib/solana/transfer";
 import { sendSolanaSilentTransaction } from "@/lib/solana/send-silent-transaction";
 import { getLiveTransactionFeeLamports } from "@/lib/solana/tx-fee";
+import {
+  lamportsToWei,
+  weiToTokenRaw,
+  SOLANA_BUY_FEE_SLACK_LAMPORTS,
+  SOLANA_PENDING_FEES_RENT_LAMPORTS,
+  SOLANA_REFERRER_BINDING_RENT_LAMPORTS,
+} from "@/lib/solana/amount-scale";
+import { bondingCurveStateFromOnchainCurve } from "@/lib/solana/bonding-curve-onchain";
 import {
   hydrateSolanaSilentSession,
   getSolanaSilentSession,
 } from "@/lib/solana/silent-session";
 import {
   decodeCurveAccount,
+  decodeGlobalConfig,
   decodeReferrerBinding,
+  type OnchainCurve,
   launchpadProgramId,
   pdaCreatorFees,
   pdaCurve,
+  pdaGlobal,
   pdaProtocolTreasury,
   pdaReferrerBinding,
   pdaReferrerFees,
 } from "@/lib/solana/launchpad-pdas";
 import { solanaTradeAccountMetas } from "@/lib/solana/trade-accounts";
-import {
-  SOLANA_BUY_FEE_SLACK_LAMPORTS,
-  SOLANA_PENDING_FEES_RENT_LAMPORTS,
-  SOLANA_REFERRER_BINDING_RENT_LAMPORTS,
-} from "@/lib/solana/amount-scale";
 
 export type SolanaSilentTradeResult = {
   signature: string;
@@ -186,6 +194,39 @@ async function assertBuyAffordable(input: {
   );
 }
 
+/** Chain-accurate min out — prevents InvalidArgument when UI used stale DB virtual reserves. */
+async function resolveBuyMinTokenOut(
+  curve: OnchainCurve,
+  vaultRaw: bigint,
+  solInLamports: bigint,
+  uiMinTokenOut: bigint
+): Promise<bigint> {
+  const conn = getSolanaConnection();
+  const [globalPda] = pdaGlobal();
+  const globalInfo = await conn.getAccountInfo(globalPda, "confirmed");
+  let protocolFeeBps = BigInt(PUMP_FEEL_DEFAULTS.protocolFeeBps);
+  if (globalInfo?.data) {
+    try {
+      protocolFeeBps = decodeGlobalConfig(globalInfo.data).protocolFeeBps;
+    } catch {
+      // keep default
+    }
+  }
+
+  const state = bondingCurveStateFromOnchainCurve(curve, vaultRaw);
+  const { tokenOut } = quoteBuyFromCurveState(
+    state,
+    protocolFeeBps,
+    lamportsToWei(solInLamports)
+  );
+  if (tokenOut <= 0n) {
+    throw new Error("Could not quote this buy on-chain. Try a smaller amount.");
+  }
+
+  const chainMin = weiToTokenRaw(minOutWithSlippage(tokenOut));
+  return chainMin < uiMinTokenOut ? chainMin : uiMinTokenOut;
+}
+
 /**
  * Buy tokens with SOL — popup-free.
  * Creates trader ATA only when missing; preflights live balance on the signer.
@@ -239,6 +280,13 @@ export async function silentBuy(input: {
   const needsReferrerFeesPda =
     !referrerWallet.equals(trader) && accountNeedsInit(referrerFeesInfo);
 
+  const minTokenOut = await resolveBuyMinTokenOut(
+    curve,
+    vaultRaw,
+    input.solInLamports,
+    input.minTokenOut
+  );
+
   const ixs: TransactionInstruction[] = [];
   if (setRefIx) ixs.push(setRefIx);
   if (needsAta) {
@@ -264,7 +312,7 @@ export async function silentBuy(input: {
         traderAta,
         referrerWallet,
       }),
-      data: encodeBuyIx(input.solInLamports, input.minTokenOut),
+      data: encodeBuyIx(input.solInLamports, minTokenOut),
     })
   );
 

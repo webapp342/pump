@@ -34,6 +34,7 @@ import {
   lamportsToWei,
   tokenRawToWei,
 } from "@/lib/solana/amount-scale";
+import { bondingCurveStateFromOnchainCurve } from "@/lib/solana/bonding-curve-onchain";
 
 export type SolanaTradeMarketOptions = {
   /** When false, skip curve/vault RPC (use WS/DB live state). Default true. */
@@ -154,16 +155,7 @@ async function fetchMarket(
 
   const bondingCurve: BondingCurveState | undefined =
     curve && fetchCurve
-      ? {
-          reserveZug: 0n,
-          soldTokens: 0n,
-          virtualZugReserve: lamportsToWei(curve.virtualSolReserves),
-          virtualTokenReserve: tokenRawToWei(curve.virtualTokenReserves),
-          realTokenReserves: tokenRawToWei(curve.realTokenReserves),
-          realSolReserves: lamportsToWei(curve.realSolReserves),
-          complete: curve.complete !== 0,
-          vaultTokenReserves: tokenRawToWei(vaultTokenRaw),
-        }
+      ? bondingCurveStateFromOnchainCurve(curve, vaultTokenRaw)
       : undefined;
 
   const graduated = fetchCurve ? (curve?.complete ?? 0) !== 0 : false;

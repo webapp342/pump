@@ -649,14 +649,20 @@ export function quoteBuyFromCurveState(
     return quoteAmmBuyFromCurveState(curve, protocolFeeBps, zugIn);
   }
 
-  let feeZug = feeFromGross(zugIn, protocolFeeBps);
-  let netZug = zugIn - feeZug;
-  const x0 = curve.virtualZugReserve + curve.reserveZug;
-  const y0 = curve.virtualTokenReserve - curve.soldTokens;
+  const pumpFeel = curve.realSolReserves != null;
+  const x0 = pumpFeel
+    ? curve.virtualZugReserve
+    : curve.virtualZugReserve + curve.reserveZug;
+  const y0 = pumpFeel
+    ? curve.virtualTokenReserve
+    : curve.virtualTokenReserve - curve.soldTokens;
   if (y0 === 0n) return { tokenOut: 0n, feeZug: 0n };
   if (curve.realTokenReserves != null && curve.realTokenReserves <= 0n) {
     return { tokenOut: 0n, feeZug: 0n };
   }
+
+  let feeZug = feeFromGross(zugIn, protocolFeeBps);
+  let netZug = zugIn - feeZug;
 
   const uncapped = (netZug * y0) / (x0 + netZug);
   if (uncapped <= 0n) return { tokenOut: 0n, feeZug: 0n };
@@ -730,8 +736,13 @@ export function resolveBnbInForTokenOut(
     return grossFromNet(net, protocolFeeBps);
   }
 
-  const x0 = curve.virtualZugReserve + curve.reserveZug;
-  const y0 = curve.virtualTokenReserve - curve.soldTokens;
+  const pumpFeel = curve.realSolReserves != null;
+  const x0 = pumpFeel
+    ? curve.virtualZugReserve
+    : curve.virtualZugReserve + curve.reserveZug;
+  const y0 = pumpFeel
+    ? curve.virtualTokenReserve
+    : curve.virtualTokenReserve - curve.soldTokens;
   if (y0 === 0n || targetTokenOut >= y0) return null;
 
   const y1 = y0 - targetTokenOut;
