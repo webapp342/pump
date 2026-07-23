@@ -21,7 +21,7 @@ export function incrementalCandlesEnabled(): boolean {
   return true;
 }
 
-/** When true: OHLC → ClickHouse + Redis only (no PG token_candles). Enable after 7d green parity. */
+/** When true: OHLC → ClickHouse + Redis only (no PG token_candles). Operatör cutover — no 7d parity wait. */
 export function skipPgTokenCandles(): boolean {
   return process.env.SKIP_PG_TOKEN_CANDLES === "true";
 }

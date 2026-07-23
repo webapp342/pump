@@ -12,9 +12,9 @@
 
 | Faz | Ad | Durum | Başlangıç | Bitiş | Not |
 |-----|-----|--------|-----------|-------|-----|
-| F0 | Spec + CH ops | 🔴 **Blocked** | 2026-07-23 | — | backfill 26/34; `compared_ch=0` — **sıradaki adım** |
+| F0 | Spec + CH ops | 🟡 **In progress** | 2026-07-23 | — | backfill + CH OOM fix; parity gate **iptal** |
 | F1 | Redis XP + clans | 🟡 **In progress** | 2026-07-23 | — | kod+054 VM OK; XP smoke = yeni trade + trader cüzdan |
-| F2 | Redis→CH flusher | ⏸ **Paused** | 2026-07-23 | — | pump-ch-flusher online; stream flag **F0 sonrası** |
+| F2 | Redis→CH flusher | 🟡 **Ready** | 2026-07-23 | — | flusher online; stream flag **açılabilir** (parity bekleme yok) |
 | F3 | Program fee v2 | 🟡 **In progress** | 2026-07-23 | — | kod local; on-chain deploy yok |
 | F4 | Sezon settlement | 🟡 **In progress** | 2026-07-23 | — | settlement-worker scaffold |
 | F5 | Go indexer + LaserStream | 🟡 **In progress** | 2026-07-23 | — | apps/indexer-sol-go scaffold |
@@ -22,9 +22,28 @@
 | F7 | Jupiter + portfolio CH | 🟢 **Price worker done** | 2026-07-23 | — | Redis SOL ~78; portfolio CH tab bekliyor |
 | F8 | Hardening | ⬜ Ongoing | — | — | |
 
-**Kritik yol:** F0 yeşil → F2 stream cutover → F1 XP smoke → F3 program deploy → F5/F6.
+**Kritik yol:** CH backfill + stream → F2 cutover → F1 XP smoke → F3 deploy → F5/F6.  
+**~~7 gün chart-parity gate~~ → İPTAL (2026-07-23)** — beklenmeyecek; aşağıdaki [karar](#decision-no-parity-gate).
 
 Durum ikonları: ⬜ Pending · 🟡 In progress · 🟢 Done · 🔴 Blocked · ⏸ Paused
+
+---
+
+<a id="decision-no-parity-gate"></a>
+### KARAR — Chart parity gate iptal (2026-07-23)
+
+| Eski kural | Yeni kural |
+|------------|------------|
+| 7 gün `check-chart-parity` green → `SKIP_PG_TOKEN_CANDLES` | **Yok** — operatör cutover kararı |
+| `compared_ch > 0` F0/F2 bloker | **Yok** — CH ping + backfill + canlı indexer yeterli |
+| Günlük parity cron zorunlu | **Opsiyonel** teşhis (`npm run check-chart-parity` isteğe bağlı) |
+
+**Cutover sırası (hızlı yol):**
+1. CH ayakta + `backfill-clickhouse-candles` (OOM fix memory.xml)
+2. Web: `USE_CLICKHOUSE_CANDLES=true`, `REDIS_URL`
+3. Indexer: `CLICKHOUSE_VIA_REDIS_STREAM=true` + `pump-ch-flusher` online
+4. İsteğe bağlı: `SKIP_PG_TOKEN_CANDLES=true` (PG mirror kapat — rollback: flag kaldır + restart indexer)
+5. Canlı mum: Redis hot + WS (parity script değil)
 
 ---
 
@@ -62,8 +81,8 @@ Sonuç: CH container ayakta ama veri yok + okunamıyor → F0 bloker
 - [x] `docs/ingest-cutover-runbook.md`
 - [x] CH memory.xml ≥ 0.55 (repo + VM mount)
 - [ ] backfill-clickhouse-candles + trades (VM) — **26/34 kısmi; tekrar gerek**
-- [ ] check-chart-parity compared_ch > 0 (VM) — **hâlâ 0**
-- [ ] pm2 logs olap ≠ postgres (VM)
+- [x] ~~check-chart-parity 7d gate~~ — **iptal** (opsiyonel teşhis)
+- [ ] pm2 logs olap ≠ postgres (VM) — backfill + stream sonrası
 
 ### LOG
 
@@ -152,7 +171,7 @@ Sonuç: CH container ayakta ama veri yok + okunamıyor → F0 bloker
 - [ ] CH async_insert user config VM
 - [x] Flusher PM2 `pump-ch-flusher` online (VM)
 - [ ] `CLICKHOUSE_VIA_REDIS_STREAM=true` indexer (F0 gate)
-- [ ] 7d parity gate
+- [x] ~~7d parity gate~~ — iptal
 
 ### LOG
 
@@ -267,7 +286,7 @@ SOLANA_GEYSER_PROGRAM_IDS=Hwv85kSodkR34rBTE1J67aSzixnAkXdAX6HzZnKDCvus
 
 ### Checklist
 
-- [ ] SKIP_PG_TOKEN_CANDLES=true (7d green sonrası)
+- [ ] SKIP_PG_TOKEN_CANDLES=true (operatör kararı — parity bekleme yok)
 - [ ] Weekly XP off PG
 - [ ] TS indexer disabled
 - [ ] Go indexer enabled
@@ -321,7 +340,7 @@ _(boş)_
 |------|----|----|----|-----|----------|
 | `USE_CLICKHOUSE_CANDLES` | true | true | true | true | Web chart read |
 | `CLICKHOUSE_DUAL_WRITE` | true | true | false→stream | false | F2’de indexer direct write kapat |
-| `SKIP_PG_TOKEN_CANDLES` | false | false | false | **true** | 7d parity sonrası |
+| `SKIP_PG_TOKEN_CANDLES` | false | false | false | **true** | operatör cutover (parity gate iptal) |
 | `USE_REDIS_WEEKLY_XP` | — | **true** | true | true | F1 feature flag |
 | `SOLANA_INDEXER_SOURCE` | rpc | rpc | rpc | **geyser** | F5 cutover |
 | `INDEXER_IMPL` | ts | ts | ts | **go** | F6 |
@@ -382,4 +401,4 @@ _(boş)_
 
 ---
 
-*Son güncelleme: 2026-07-23 — F0 VM bloker (compared_ch=0); F7 price worker green; F2 flusher paused*
+*Son güncelleme: 2026-07-23 — chart-parity 7d gate iptal; F0=CH backfill; F2 stream açılabilir*

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Daily chart parity ritual — exit 0 = green day for 7-day SKIP_PG gate.
-# Cron example: 0 6 * * * root bash /var/www/pump/tma/deploy/vm/check-chart-parity.sh >> /var/log/pump-chart-parity.log 2>&1
+# Opsiyonel chart drift teşhisi — 7-day SKIP_PG gate İPTAL (2026-07-23).
+# Cron example (optional): 0 6 * * * root bash .../check-chart-parity.sh >> /var/log/pump-chart-parity.log 2>&1
 set -euo pipefail
 
 TMA_DIR="${TMA_DIR:-/var/www/pump/tma}"

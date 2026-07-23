@@ -345,7 +345,7 @@ flowchart LR
 | **F5** | Go indexer + LaserStream | `apps/indexer-sol-go`, shadow→primary cutover |
 | **F6** | PG offload | SKIP_PG_TOKEN_CANDLES, TS indexer emekli, Go primary |
 | **F7** | Jupiter + portfolio CH | price worker, trade history tab |
-| **F8** | Hardening | 7d parity gate, weekly SLO ritual |
+| **F8** | Hardening | weekly SLO ritual |
 
 ---
 

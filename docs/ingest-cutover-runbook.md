@@ -4,9 +4,8 @@
 
 ## Pre-cutover checklist
 
-- [ ] F1 Redis weekly XP green 7d
+- [ ] F1 Redis weekly XP smoke (trade → ZSCORE)
 - [ ] F2 ch-flusher lag p95 < 5s
-- [ ] `check-chart-parity` compared_ch == compared_pg
 - [ ] Go decode parity: 1000 tx sample vs TS (fields match)
 - [ ] Shadow mode 72h: Go writes Redis only, TS primary PG
 

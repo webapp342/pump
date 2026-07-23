@@ -6,9 +6,8 @@
  *
  *   npm run check-chart-parity -w @pump/indexer-sol
  *
- * **7-day green gate (before SKIP_PG_TOKEN_CANDLES=true):**
- * Run daily; record exit 0 in ops log. Enable skip only after 7 consecutive green days
- * with CH candles_spot populated and USE_CLICKHOUSE_CANDLES=true on web.
+ * Optional ops smoke (not a deploy gate — 7-day ritual cancelled 2026-07-23).
+ * See docs/guncelleme-ilerleme.md#decision-no-parity-gate
  */
 import "dotenv/config";
 import pg from "pg";

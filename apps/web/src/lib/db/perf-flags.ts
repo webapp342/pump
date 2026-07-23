@@ -34,7 +34,7 @@ export function useRedisWeeklyXp(): boolean {
   return Boolean(process.env.REDIS_URL?.trim());
 }
 
-/** F6 — skip PG token_candles mirror when CH parity green 7d. */
+/** F6 — skip PG token_candles mirror (operatör cutover; parity gate cancelled). */
 export function skipPgTokenCandles(): boolean {
   return process.env.SKIP_PG_TOKEN_CANDLES === "true";
 }

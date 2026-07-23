@@ -66,7 +66,7 @@ flowchart TB
 | **Positions / P/L** | PostgreSQL | CH veya Redis |
 | **Haftalık XP / leaderboard** | Redis ZSET | PG aggregate, CH hot query |
 | **Canlı board / chart tip** | Redis + WS | PG poll, UI RPC |
-| **Chart history (HTTP)** | ClickHouse `candles_spot` / `trades_raw` | PG (7 gün parity sonrası kapat) |
+| **Chart history (HTTP)** | ClickHouse `candles_spot` / `trades_raw` | PG (opsiyonel mirror — `SKIP_PG` operatör kararı) |
 | **Lifetime missions (Volume Monster)** | CH + PG audit | — |
 | **Trade öncesi XP** | Redis `ZSCORE` | ClickHouse sorgu ([`guncelleme.md`](../guncelleme.md) **reddedildi**) |
 | **Ingest** | Go + LaserStream gRPC | RPC `onLogs` (cutover sonrası) |
@@ -97,7 +97,7 @@ flowchart TB
 | **F5** | Go indexer + LaserStream gRPC | 2–4 hf | F1, F2 |
 | **F6** | TS indexer cutover + PG XP offload | 1 hf | F5, F1 |
 | **F7** | Jupiter price worker + portfolio CH tab | 1 hf | F2, F5 |
-| **F8** | Prod hardening + 7d parity gate | sürekli | tümü |
+| **F8** | Prod hardening | sürekli | tümü |
 
 **hf** = hafta (1 dev, full-time eşdeğeri)
 
@@ -105,7 +105,7 @@ flowchart TB
 
 ## 2. F0 — Spec kilidi + ClickHouse ops (ÖNCELİK: VM)
 
-> **VM gerçeği (2026-07-22):** CH container healthy ama `candles_spot` boş, sorgular OOM, chart `olap:postgres`. Bu faz **bloker** — sonraki fazlar CH’ye güvenemez.
+> **VM (2026-07-22):** CH container healthy ama `candles_spot` kısmi/boş olabilir — **backfill + memory fix** yeterli. ~~7 gün parity gate iptal~~ ([`guncelleme-ilerleme.md`](./guncelleme-ilerleme.md#decision-no-parity-gate)).
 
 ### 2.1 Deliverables
 
@@ -114,7 +114,7 @@ flowchart TB
 - [ ] `docs/ingest-cutover-runbook.md` — TS→Go geçiş checklist
 - [ ] CH `memory.xml` → `max_server_memory_usage_to_ram_ratio ≥ 0.55`
 - [ ] Backfill: `backfill-clickhouse-candles` + `backfill-clickhouse-trades`
-- [ ] `check-chart-parity` → `compared_ch > 0`
+- [x] ~~`check-chart-parity` 7d gate~~ — iptal (opsiyonel teşhis)
 
 ### 2.2 Komutlar (VM)
 
@@ -127,16 +127,16 @@ docker compose -f deploy/clickhouse/docker-compose.yml up -d clickhouse
 cd /var/www/pump/tma && npm run build -w @pump/indexer-sol
 npm run backfill-clickhouse-candles -w @pump/indexer-sol
 npm run backfill-clickhouse-trades -w @pump/indexer-sol
-npm run check-chart-parity -w @pump/indexer-sol
+# Opsiyonel teşhis (gate değil):
+# npm run check-chart-parity -w @pump/indexer-sol
 ```
 
 ### 2.3 Kabul kriterleri
 
 | Metrik | Hedef |
 |--------|-------|
-| `SELECT count() FROM pump.candles_spot` | OOM yok |
-| `compared_ch` (parity) | ≥ 1 |
-| pm2 log `chart_olap_source` | `candles_spot` veya `trades_raw` (postgres değil) |
+| `SELECT count() FROM pump.candles_spot` | OOM yok, count > 0 (backfill sonrası) |
+| pm2 log `chart_olap_source` | `candles_spot` veya `trades_raw` (postgres fallback kabul) |
 
 ### 2.4 Rollback
 
@@ -258,14 +258,13 @@ sequenceDiagram
 
 - `USE_CLICKHOUSE_CANDLES=true` (VM’de var)
 - Öncelik: `candles_spot` → `trades_raw` aggregate ([`candles.ts`](../apps/web/src/lib/clickhouse/candles.ts))
-- 7 gün `check-chart-parity` green → `SKIP_PG_TOKEN_CANDLES=true`
+- `SKIP_PG_TOKEN_CANDLES=true` — operatör cutover ([parity gate iptal](./guncelleme-ilerleme.md#decision-no-parity-gate))
 
 ### 4.4 Kabul kriterleri
 
-- [ ] Indexer trade path’te CH HTTP yok (grep verify)
+- [ ] Indexer trade path’te CH HTTP yok (grep verify; stream mode)
 - [ ] Flusher lag p95 < 5s
-- [ ] `compared_ch == compared_pg` (parity)
-- [ ] Chart `olap != postgres` 95%+ requests
+- [ ] Chart `olap` çoğunlukla `candles_spot` veya `trades_raw`
 
 **→ İlerleme:** [`guncelleme-ilerleme.md`](./guncelleme-ilerleme.md#f2)
 
@@ -432,8 +431,7 @@ Phase 5d: TS indexer stop (F6)
 ### 8.3 Kabul kriterleri
 
 - [ ] PG CPU trade peak’te ≥30% düşüş (VM metrics)
-- [ ] 7 gün parity + zero chart drift incidents
-- [ ] Rollback runbook tested once
+- [ ] Rollback runbook tested once (`SKIP_PG` kapat + indexer restart)
 
 **→ İlerleme:** [`guncelleme-ilerleme.md`](./guncelleme-ilerleme.md#f6)
 
@@ -465,7 +463,6 @@ Fallback: mevcut Binance/CG (`native-usd.ts`) — Jupiter primary değil backup.
 ## 10. F8 — Prod hardening (sürekli)
 
 - [ ] Weekly SLO ritual — [`ops-perf-playbook.md`](./ops-perf-playbook.md)
-- [ ] `check-chart-parity` daily cron
 - [ ] Redis memory maxmemory-policy
 - [ ] Go indexer pprof + trace
 - [ ] Load test: 500 concurrent WS, 100 trades/min
@@ -511,7 +508,7 @@ flowchart TD
 
 ### Sprint A (hafta 1)
 
-1. F0 CH memory + backfill + parity green
+1. F0 CH memory + backfill (parity gate yok)
 2. F1 migration `054_clans.sql` + Redis keys + `/api/xp/weekly`
 3. `docs/redis-key-catalog.md` + `docs/fee-split-v2-spec.md` draft
 

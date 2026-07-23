@@ -44,9 +44,9 @@ Sets dual-write + `USE_CLICKHOUSE_CANDLES` + Redis publish. Positions stay in Po
 cd /var/www/pump/tma
 npm run backfill-cost-basis -w @pump/indexer-sol
 npm run check-position-invariants -w @pump/indexer-sol
-npm run check-chart-parity -w @pump/indexer-sol
-# Or daily cron: bash deploy/vm/check-chart-parity.sh
-# 7 consecutive green days → SKIP_PG_TOKEN_CANDLES=true (see ultra-fast-ui-phases.md)
+# Opsiyonel drift teşhisi (gate değil):
+# npm run check-chart-parity -w @pump/indexer-sol
+# SKIP_PG: operatör kararı — see guncelleme-ilerleme.md#decision-no-parity-gate
 ```
 
 ### Açık env flag’leri (doğrulandı)

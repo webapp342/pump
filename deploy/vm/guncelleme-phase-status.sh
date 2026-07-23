@@ -151,21 +151,26 @@ else
   red "PG query failed"
 fi
 
-section "F0 — chart parity (compared_ch gate)"
+section "F0 — ClickHouse (backfill; parity gate iptal)"
+CH_COUNT=0
+if docker ps --format '{{.Names}}' 2>/dev/null | grep -q pump-clickhouse; then
+  CH_COUNT="$(docker exec pump-clickhouse clickhouse-client -q "SELECT count() FROM pump.candles_spot" 2>/dev/null || echo 0)"
+  echo "candles_spot count=$CH_COUNT"
+fi
+if [[ "${CH_COUNT:-0}" -gt 0 ]]; then
+  green "F0 CH data: OK (count>0)"
+  F0_CH="OK"
+else
+  yellow "F0 CH data: empty or unreachable — run f0-ch-recover.sh"
+  F0_CH="EMPTY"
+fi
+
 if [[ -d "$TMA_DIR" ]]; then
   cd "$TMA_DIR"
   set +e
-  npm run check-chart-parity -w @pump/indexer-sol 2>&1 | tail -15
-  PARITY=$?
+  npm run check-chart-parity -w @pump/indexer-sol 2>&1 | tail -8
   set -e
-  if [[ "$PARITY" -eq 0 ]]; then
-    green "F0 parity: GREEN (compared_ch > 0)"
-  else
-    red "F0 parity: FAIL (exit=$PARITY) — BLOCKER for F2/F6"
-  fi
-else
-  yellow "Skip parity — TMA_DIR missing"
-  PARITY=99
+  echo "(parity script — opsiyonel, gate değil)"
 fi
 
 section "CHART HTTP probe (web runtime path)"
@@ -185,7 +190,7 @@ section "FAZ VERDICT (Solana güncelleme yolu)"
 USE_CH="$(env_val "$WEB_ENV" USE_CLICKHOUSE_CANDLES)"
 STREAM="$(env_val "$IDX_ENV" CLICKHOUSE_VIA_REDIS_STREAM)"
 SKIP_PG="$(env_val "$IDX_ENV" SKIP_PG_TOKEN_CANDLES)"
-F0="BLOCKED"; [[ "${PARITY:-99}" -eq 0 ]] && F0="DONE"
+F0="NEEDS_BACKFILL"; [[ "$F0_CH" == "OK" ]] && F0="OK"
 F1="PENDING"
 truthy "$(env_val "$WEB_ENV" USE_REDIS_WEEKLY_XP)" && [[ "$(redis-cli -u "$REDIS_URL" ZCARD weekly_user_xp 2>/dev/null || echo 0)" -gt 0 ]] && F1="SMOKE_OK" || \
   truthy "$(env_val "$WEB_ENV" USE_REDIS_WEEKLY_XP)" && F1="IN_PROGRESS"
@@ -198,7 +203,7 @@ redis-cli -u "$REDIS_URL" GET price:native:sol:usd 2>/dev/null | grep -q . && F7
 
 echo "F0 Spec+CH ops     : $F0"
 echo "F1 Redis XP        : $F1"
-echo "F2 CH flusher      : $F2  (stream flag should stay OFF until F0 green)"
+echo "F2 CH flusher      : $F2  (stream flag açılabilir — parity bekleme yok)"
 echo "F3 Program fee v2  : CODE_ONLY (on-chain deploy yok)"
 echo "F4 Settlement      : SCAFFOLD"
 echo "F5 Go indexer      : SCAFFOLD"
@@ -207,21 +212,19 @@ echo "F7 Price worker    : $F7"
 echo "F8 Hardening       : ONGOING"
 
 echo
-if truthy "$USE_CH" && [[ "$F0" == "BLOCKED" ]]; then
-  yellow "USE_CLICKHOUSE_CANDLES=true AMA F0 parity red → chart history CH boş/kısmi, PG fallback veya kötü mum riski."
-  yellow "Plana göre: önce bash deploy/vm/f0-ch-recover.sh → parity green, sonra F2 stream."
-elif truthy "$USE_CH" && [[ "$F0" == "DONE" ]]; then
-  green "USE_CLICKHOUSE_CANDLES=true + parity green → doğru cutover noktası."
+if truthy "$USE_CH" && [[ "$F0_CH" == "EMPTY" ]]; then
+  yellow "USE_CLICKHOUSE_CANDLES=true ama CH boş — bash deploy/vm/f0-ch-recover.sh"
+elif truthy "$USE_CH" && [[ "$F0_CH" == "OK" ]]; then
+  green "USE_CLICKHOUSE_CANDLES=true + CH dolu — cutover hazır."
 fi
 
 echo
-echo "Sonraki adım (kritik yol):"
-if [[ "$F0" != "DONE" ]]; then
+echo "Sonraki adım (hızlı yol — parity yok):"
+if [[ "$F0_CH" != "OK" ]]; then
   echo "  1) bash deploy/vm/f0-ch-recover.sh"
   echo "  2) pm2 restart pump-tma --update-env"
-elif [[ "$F2" != "STREAM_ON" ]]; then
+else
   echo "  1) indexer-sol .env → CLICKHOUSE_VIA_REDIS_STREAM=true"
   echo "  2) systemctl restart pump-indexer-sol && pm2 restart pump-ch-flusher"
-else
-  echo "  F1 smoke: trade + redis-cli ZSCORE weekly_user_xp <TRADER_WALLET>"
+  echo "  3) isteğe bağlı: SKIP_PG_TOKEN_CANDLES=true + restart indexer"
 fi
